@@ -3,8 +3,7 @@
 # vitals - TLS Toolkit
 
 Modern TLS (1.2 and 1.3) for the PS Vita browser, apps and games that use Sony's `sceHttp` APIs.  
-All of the heavylifting has been done by [devnoname120](https://github.com/devnoname120) with `tls_fixer`, I'm only making those weights lighter.  
-This repo isn't just a fork because the code has changed so much in its architecture and approach (for example, around the shared SSL library) that my changes can't be merged into the original project, and vice versa.
+All of the heavylifting has been done by [devnoname120](https://github.com/devnoname120) with `tls_fixer`, I'm only making those weights lighter. ([more info](#why-a-separate-project))
 
 The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals replaces only the TLS layer with [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) and installs an up-to-date certificate store. Sony's HTTP code keeps handling URLs, redirects, cookies and everything else, so apps work unchanged.
 
@@ -99,6 +98,19 @@ Each run saves a report to `ux0:data/vitals/`. The test works on any firmware an
 | `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                     |
 | `licenses/`          | full license texts of the third-party software in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 | `dependencies.cmake` | pinned versions and SHA-256 hashes of `Mbed TLS` and `curl`                                        |
+
+## Why a separate project
+
+`vitals` started as meshup of my url redirector project and devnoname120's `tls_fixer` and owes it the hardest parts: the Mbed TLS port, the providers and the injection. It's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
+
+- **Different memory design.** `tls_fixer` gives every app its own private copy of Sony's HTTP and SSL libraries, which costs a game about 440 KiB on top of the provider. `vitals` keeps the SSL library shared and handles the certificates games load at the HTTP level instead, so games that were running out of memory (like Sound Shapes) now fit. The comments left in the code and in the specs made me feel like it was a deliberate choice from devnoname120 I was going against.
+- **Different scope.** `tls_fixer` supports several firmware versions, and keeps experimental, diagnostic and self-disarming code for testing on hardware. `vitals` targets firmware 3.65 only, with that code removed and a simpler kernel plugin modeled on `iTLS-Enso`.
+- **Features that don't exist upstream:** the configurable host redirects, the built-in PSN sign-in redirect, the redirect list read through the kernel for sandboxed games, and a single app for installing, updating certificates and testing.
+- **They replace each other.** Both take over the same system modules and use different install paths, so only one can be installed at a time. The `vitals` installer removes `tls_fixer` for that reason.
+
+Merging would mean asking `tls_fixer` to give up its multi-firmware and goals, or `vitals` to bring back what it removed. Keeping them apart lets each follow its own direction.
+
+Seriously tho, devnoname120 is a legend and you'll find out that, out of respect and admiration for what was accomplished, I kept my name out of any visible part of the code or UIs.
 
 ## Building
 
