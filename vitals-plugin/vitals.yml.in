@@ -1,0 +1,8 @@
+vitals_kernel:
+  attributes: 0
+  version:
+    major: @VITALS_MODULE_VERSION_MAJOR@
+    minor: @VITALS_MODULE_VERSION_MINOR@
+  main:
+    start: module_start
+    stop: module_stop

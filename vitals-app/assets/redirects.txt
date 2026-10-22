@@ -1,0 +1,5 @@
+# vitals host redirects
+# One "old-host new-host" pair per line
+# Changes apply the next time an app or game starts
+
+native.np.ac.playstation.net native-vita.np.ac.playstation.net

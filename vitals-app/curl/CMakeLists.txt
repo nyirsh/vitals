@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.16)
+project(vitals_curl C)
+
+include("${CMAKE_CURRENT_SOURCE_DIR}/../../dependencies.cmake")
+vitals_download("${VITALS_CURL_URL}" "${VITALS_CURL_SHA256}" VITALS_CURL_ARCHIVE)
+
+set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(BUILD_LIBCURL_DOCS OFF CACHE BOOL "" FORCE)
+set(BUILD_MISC_DOCS OFF CACHE BOOL "" FORCE)
+set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
+set(HTTP_ONLY ON CACHE BOOL "" FORCE)
+set(ENABLE_IPV6 OFF CACHE BOOL "" FORCE)
+set(CURL_DISABLE_SOCKETPAIR ON CACHE BOOL "" FORCE)
+set(HAVE_FCNTL_O_NONBLOCK OFF CACHE BOOL "" FORCE)
+set(ENABLE_THREADED_RESOLVER OFF CACHE BOOL "" FORCE)
+set(HAVE_PIPE2 "" CACHE INTERNAL "Vita has no pipe2 implementation" FORCE)
+set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
+set(CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
+set(CURL_CA_BUNDLE "none" CACHE STRING "No default/system CA file" FORCE)
+set(CURL_CA_PATH "none" CACHE STRING "No default/system CA directory" FORCE)
+set(CURL_CA_FALLBACK OFF CACHE BOOL "" FORCE)
+
+include(FetchContent)
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+FetchContent_Declare(vitals_curl URL "${VITALS_CURL_ARCHIVE}"
+    URL_HASH SHA256=${VITALS_CURL_SHA256})
+FetchContent_MakeAvailable(vitals_curl)
+# VitaSDK's OpenSSL archive has no console UI implementation
+target_compile_definitions(libcurl_static PRIVATE OPENSSL_NO_UI_CONSOLE)

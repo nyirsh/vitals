@@ -1,0 +1,4 @@
+# Preserve bundled certificate bytes without newline conversion
+vitals-app/assets/certs.cer -text
+vitals-app/assets/sony-certs.pem -text
+vitals-app/assets/mozilla-certs.pem -text

@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        // C code navigation
+        "ms-vscode.cpptools",
+        // Tests
+        "ms-vscode.cmake-tools", "ms-python.python"
+    ]
+}
