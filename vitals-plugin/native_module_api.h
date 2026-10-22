@@ -16,7 +16,8 @@ typedef struct VitalsNativeHttpConsumer {
     uint32_t step;
     int32_t native_result;
 } VitalsNativeHttpConsumer;
-/* 0: private exports are compatible; 1: a shared HTTP/SSL consumer; <0: unknown */
+/* 0: private exports are compatible; 1: a shared HTTP/SSL consumer, or Adrenaline's PSP
+ * emulator; <0: unknown */
 int vitals_native_http_shared_consumer(SceUID pid, VitalsNativeHttpConsumer *consumer);
 
 /* Host fixtures retain their native-service mocks

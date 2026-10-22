@@ -68,9 +68,11 @@ int main(void) {
     expected_path = paths[0];
     before_loads = (unsigned int)loads;
     unsigned int before_query_allocations = query_allocations, before_stack_calls = stack_calls;
-    const char *browser_titles[] = {"NPXS10003", "NPXS10083"};
-    for (size_t i = 0; i < sizeof(browser_titles) / sizeof(*browser_titles); ++i) {
-        process_title = browser_titles[i];
+    /* The browser's two processes never get the HTTP provider */
+    const char *excluded_titles[] = {"NPXS10003", "NPXS10083"};
+    const unsigned int excluded = sizeof(excluded_titles) / sizeof(*excluded_titles);
+    for (size_t i = 0; i < excluded; ++i) {
+        process_title = excluded_titles[i];
         assert(vitals_kernel_inject_for_pid(99, 88) == 0);
         assert((unsigned int)loads == before_loads && query_allocations == before_query_allocations);
         assert(process_title_queries == i + 1 && stack_calls == before_stack_calls);
@@ -84,13 +86,13 @@ int main(void) {
     /* The process exclusion applies only to HTTP, even with a failed title lookup */
     expected_path = paths[1];
     assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) == 0);
-    assert((unsigned int)loads == before_loads + 1 && process_title_queries == 3);
+    assert((unsigned int)loads == before_loads + 1 && process_title_queries == excluded + 1);
     clean_context();
     process_title_error = 0;
     process_title = "TLSFIXAPP";
     expected_path = paths[0];
     assert(vitals_kernel_inject_for_pid(99, 88) == 0);
-    assert((unsigned int)loads == before_loads + 2 && process_title_queries == 4);
+    assert((unsigned int)loads == before_loads + 2 && process_title_queries == excluded + 2);
     clean_context();
     reset();
     test_extended_stack_contract();

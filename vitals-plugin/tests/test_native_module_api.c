@@ -106,6 +106,13 @@ static void consumer_checks(void) {
     consumer_sharing = 1;
     consumer_name = "SceLibHttp";
     assert(vitals_native_http_shared_consumer(21, NULL) == 0);
+    /* Adrenaline's PSP emulator keeps Sony's library, found by its module whatever bubble
+     * started it; its imports are not read (the import lookup would reject its name) */
+    consumer_name = "ScePspemu";
+    library = 0x12345678; memcpy(import_header + 12, &library, 4);
+    assert(vitals_native_http_shared_consumer(21, &consumer) == 1);
+    assert(consumer.module == 22 && consumer.step == 6 && strcmp(consumer.name, "ScePspemu") == 0);
+    library = UINT32_C(0xe8f15cde); memcpy(import_header + 12, &library, 4);
     consumer_name = "shared_http_user";
     import_header[0] = 0;
     assert(vitals_native_http_shared_consumer(21, NULL) < 0);

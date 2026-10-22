@@ -87,6 +87,17 @@ static int query_shared_consumers(void *argument) {
         if (query->consumer != NULL) query->consumer->native_result = result;
         if (result != 0 || info.modid <= 0 ||
             info.module_name[sizeof(info.module_name) - 1] != '\0') return 0;
+        /* Adrenaline's PSP emulator crashes calling a null pointer once its libhttp is private and
+         * the provider is loaded; whichever bubble (title ID) starts it, it keeps Sony's library */
+        if (strcmp(info.module_name, "ScePspemu") == 0) {
+            if (query->consumer != NULL) {
+                query->consumer->module = info.modid;
+                memcpy(query->consumer->name, info.module_name, sizeof(info.module_name));
+                query->consumer->step = 6;
+            }
+            query->result = 1;
+            return 0;
+        }
         /* modattr is the SELF's declared attribute, not the loader's internal mode, so every
          * importing module is checked */
         if (strcmp(info.module_name, "SceLibHttp") == 0 ||

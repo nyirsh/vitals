@@ -50,6 +50,8 @@ Before installing, the app removes the plugins known to conflict with vitals. Un
 - **Apps and games:** a second provider takes over TLS inside `SceLibHttp` for each app that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
 - **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. A small module, `vitals-reauth.suprx`, is loaded into the shell once it loads its HTTP library, and into apps once they load the Store library (`SceNpCommerce2`). It sends their connections for the old host to the new one, and also applies the rules in your [host redirects](#host-redirects) list. The PSN redirect stays unless the list has its own rule for that host. This is the redirect [reAuth](https://github.com/psv-plugins-archive/reAuth) does, built into `vitals`
 
+Adrenaline is left alone: its PSP emulator crashes when `vitals` takes over its HTTP library, so the plugin skips it, whichever bubble starts it, and PSP games keep Sony's own TLS.
+
 TLS 1.0 and 1.1 are deliberately disabled.
 
 ## What's new compared to tls_fixer
