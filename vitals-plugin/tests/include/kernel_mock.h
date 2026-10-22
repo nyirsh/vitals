@@ -1,6 +1,7 @@
 #ifndef VITALS_KERNEL_MOCK_H
 #define VITALS_KERNEL_MOCK_H
 #include <vita_mock.h>
+#include <assert.h>
 #include <psp2common/kernel/modulemgr.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -30,12 +31,14 @@ int ksceIoRead(int, void *, unsigned int);
 int ksceIoClose(int);
 int ksceIoGetstat(const char *, SceIoStat *);
 int ksceIoPwrite(SceUID, const void *, SceSize, SceOff);
+int ksceIoPread(SceUID, void *, SceSize, SceOff);
 SceOff ksceIoLseek(SceUID, SceOff, int);
 int ksceIoSync(const char *, unsigned int);
 SceUID ksceKernelAllocMemBlock(const char *, int, SceSize, const void *);
 int ksceKernelGetMemBlockBase(SceUID, void **);
 int ksceKernelFreeMemBlock(SceUID);
 int ksceKernelCopyToUserProc(SceUID, void *, const void *, SceSize);
+int ksceKernelCopyToUser(void *, const void *, SceSize);
 int ksceKernelCopyFromUserProc(SceUID, void *, const void *, SceSize);
 int ksceSha256BlockInit(SceSha256Context *);
 int ksceSha256BlockUpdate(SceSha256Context *, const void *, SceSize);
@@ -66,4 +69,8 @@ int ksceKernelDelayThread(SceUInt);
 SceUID ksceKernelSysrootGetShellPid(void);
 SceUID ksceKernelSearchModuleByName(const char *);
 int ksceDebugPrintf(const char *, ...);
+/* Each test counts the syscall state changes in syscall_depth */
+extern int syscall_depth;
+#define ENTER_SYSCALL(state) ((state) = 0x1234, ++syscall_depth)
+#define EXIT_SYSCALL(state) (assert((state) == 0x1234), --syscall_depth)
 #endif

@@ -6,3 +6,8 @@ vitals_kernel:
   main:
     start: module_start
     stop: module_stop
+  libraries:
+    vitals_redirects:
+      syscall: true
+      functions:
+        - vitals_redirects_read

@@ -2,8 +2,8 @@
 
 #include "diagnostics.h"
 #include "vitals/host_map.h"
+#include "vitals/redirects.h"
 
-#include <psp2/io/fcntl.h>
 #include <psp2/types.h>
 #include <taihen.h>
 
@@ -11,10 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define VITALS_REDIRECTS_PATH "ux0:data/vitals/redirects.txt"
-/* The file is read in pieces and handled one line at a time, so its size does not matter; only
- * the host names of valid lines are kept */
-#define VITALS_REDIRECTS_CHUNK 256u
+/* The list is read in pieces (VITALS_REDIRECTS_CHUNK) through the kernel plugin and handled one
+ * line at a time, so its size does not matter; only the host names of valid lines are kept */
 /* Longer than any valid pair (two 253-character names and a space between them) */
 #define VITALS_REDIRECTS_LINE_LIMIT 512u
 #define VITALS_SCE_HTTP_LIBRARY_NID UINT32_C(0xE8F15CDE)
@@ -155,25 +153,22 @@ static void keep_line(ListReader *reader, const char *line, size_t length, int o
  * unreadable (a read error discards the whole list) */
 static size_t load_list(void) {
     size_t line_length = 0, loaded = 0;
+    unsigned int offset = 0;
     int overflowed = 0, count = 0;
-    SceUID fd = sceIoOpen(VITALS_REDIRECTS_PATH, SCE_O_RDONLY, 0);
 
-    if (fd < 0) {
-        return 0;
-    }
     /* Working memory comes from the provider's heap, not the stack, and is freed after reading */
     ListReader *reader = calloc(1, sizeof(*reader));
     char *chunk = malloc(VITALS_REDIRECTS_CHUNK + VITALS_REDIRECTS_LINE_LIMIT);
     if (reader == NULL || chunk == NULL) {
         free(reader);
         free(chunk);
-        (void)sceIoClose(fd);
         return 0;
     }
     char *line = chunk + VITALS_REDIRECTS_CHUNK;
     /* Reading stops as soon as the list is full */
     while (!reader->failed && reader->count < VITALS_HOST_MAP_MAX_RULES &&
-           (count = sceIoRead(fd, chunk, VITALS_REDIRECTS_CHUNK)) > 0) {
+           (count = vitals_redirects_read(offset, chunk, VITALS_REDIRECTS_CHUNK)) > 0) {
+        offset += (unsigned int)count;
         for (int i = 0; i < count && reader->count < VITALS_HOST_MAP_MAX_RULES && !reader->failed; ++i) {
             if (chunk[i] == '\n') {
                 keep_line(reader, line, line_length, overflowed);
@@ -187,14 +182,15 @@ static size_t load_list(void) {
         }
     }
     if (count < 0) {
-        VITALS_LOG("redirect list ignored: read error rc=%08X", (unsigned int)count);
+        /* At offset 0 this is usually a missing list (0x80010002) */
+        VITALS_LOG("redirect list not read: rc=%08X offset=%u path=" VITALS_REDIRECTS_PATH,
+            (unsigned int)count, offset);
         reader->failed = 1;
     }
     /* The last line need not end with a newline */
     if (!reader->failed && reader->count < VITALS_HOST_MAP_MAX_RULES && (line_length > 0 || overflowed)) {
         keep_line(reader, line, line_length, overflowed);
     }
-    (void)sceIoClose(fd);
     free(chunk);
     if (!reader->failed && reader->count > 0) {
         for (size_t i = 0; i < reader->count; ++i) {

@@ -1,4 +1,5 @@
-/* Host test of the provider's host redirects: reading ux0:data/vitals/redirects.txt, installing
+/* Host test of the provider's host redirects: reading ux0:data/vitals/redirects.txt (through the
+ * kernel plugin's system call, faked here), installing
  * the three sceHttp hooks, and what each hook passes on to Sony's libhttp
  * Portable C only, so it runs on Linux and macOS alike */
 #include <assert.h>
@@ -57,25 +58,21 @@ static void test_free(void *block)
 #undef realloc
 #undef free
 
-#define LIST_PATH "ux0:data/vitals/redirects.txt"
 #define LIBHTTP_NID UINT32_C(0xE8F15CDE)
-#define FD 21
+#define NOT_FOUND ((int)0x80010002)
 
-/* ---- The list file ---- */
+/* ---- The list, as the kernel plugin returns it ---- */
 static const char *file_text;
 static size_t file_length, file_offset, chunk;
-static int read_error, read_error_at, reads, open_calls, close_calls;
+static int read_error, read_error_at, reads;
 
-SceUID sceIoOpen(const char *path, int flags, int mode)
+int vitals_redirects_read(unsigned int offset, void *data, unsigned int size)
 {
-    assert(strcmp(path, LIST_PATH) == 0 && flags == SCE_O_RDONLY && mode == 0);
-    ++open_calls;
-    return file_text == NULL ? -2 : FD;
-}
-
-int sceIoRead(SceUID fd, void *data, SceSize size)
-{
-    assert(fd == FD && data != NULL);
+    assert(data != NULL && size == VITALS_REDIRECTS_CHUNK);
+    /* Each piece is asked for where the previous one ended */
+    assert(offset == file_offset);
+    if (file_text == NULL)
+        return NOT_FOUND;
     /* A read error from the start, or at the given read (counting from 1) */
     if (read_error || ++reads == read_error_at)
         return -5;
@@ -83,17 +80,10 @@ int sceIoRead(SceUID fd, void *data, SceSize size)
     if (count > size)
         count = size;
     if (chunk != 0 && count > chunk)
-        count = chunk; /* short reads, as a real file system may return */
+        count = chunk; /* short reads, which the plugin passes on from the file system */
     memcpy(data, file_text + file_offset, count);
     file_offset += count;
     return (int)count;
-}
-
-int sceIoClose(SceUID fd)
-{
-    assert(fd == FD);
-    ++close_calls;
-    return 0;
 }
 
 /* ---- What Sony's libhttp receives ---- */
@@ -194,7 +184,7 @@ static void reset(const char *text)
     chunk = 0;
     read_error = read_error_at = reads = fail_allocations = 0;
     allocations_left = -1;
-    open_calls = close_calls = hook_calls = 0;
+    hook_calls = 0;
     failing_nid_index = -1;
     for (size_t i = 0; i < HOOK_COUNT; ++i)
         hooked[i].hook = NULL;
@@ -209,8 +199,6 @@ static int install_failing(const char *text, int failing_index)
     failing_nid_index = failing_index;
     int before = outstanding;
     vitals_host_redirect_install();
-    if (text != NULL)
-        assert(open_calls == 1 && close_calls == 1);
     if (hook_calls == 0)
         assert(outstanding == before && g_names == NULL);
     else
@@ -233,7 +221,7 @@ static void test_no_hooks_without_a_usable_list(void)
     reset("old.example new.example\n");
     read_error = 1;
     vitals_host_redirect_install();
-    assert(hook_calls == 0 && close_calls == 1 && g_names == NULL && outstanding == 0);
+    assert(hook_calls == 0 && g_names == NULL && outstanding == 0);
 }
 
 /* The list is read in pieces, one line at a time: its size does not matter, at most 32 pairs are

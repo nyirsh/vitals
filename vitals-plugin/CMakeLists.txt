@@ -29,6 +29,7 @@ add_executable(vitals.elf
 	hook_guard.c
 	post_start.c
 	reauth.c
+	redirects.c
 	tls13_loader.c
 	../tls13-vita/src/path.c
 )
@@ -59,6 +60,13 @@ set_target_properties(vitals.elf
 add_custom_target(vitals.skprx ALL
 	COMMAND vita-elf-create -e ${CMAKE_CURRENT_BINARY_DIR}/vitals.yml vitals.elf vitals.velf
 	COMMAND vita-make-fself -c vitals.velf vitals.skprx
+)
+# The user stub for the plugin's system call, which the HTTP provider links (../tls13-vita)
+add_custom_target(vitals_stubs ALL
+	COMMAND vita-elf-export kernel vitals.elf ${CMAKE_CURRENT_BINARY_DIR}/vitals.yml vitals_exports.yml
+	COMMAND vita-libs-gen vitals_exports.yml stubs
+	COMMAND make -C stubs
+	DEPENDS vitals.elf
 )
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_custom_target(vitals_kernel_register_check

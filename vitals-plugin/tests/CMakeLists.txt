@@ -33,5 +33,7 @@ plugin_test(vitals_hook_guard test_hook_guard.c hook_guard.c)
 plugin_test(vitals_native_module_api test_native_module_api.c native_module_api.c)
 plugin_test(vitals_post_start test_post_start.c post_start.c)
 plugin_test(vitals_reauth test_reauth.c reauth.c)
+# Reading the redirect list for games, which may not open it themselves
+plugin_test(vitals_redirects test_redirects.c redirects.c)
 # The production loader path: name lookups on a dedicated native stack
 plugin_test(vitals_production_context test_production_context.c tls13_loader.c)

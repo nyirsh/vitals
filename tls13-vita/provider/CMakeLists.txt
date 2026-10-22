@@ -64,8 +64,15 @@ foreach(function ${vitals_runtime_wrappers})
 endforeach()
 set_source_files_properties(user_runtime.c PROPERTIES COMPILE_OPTIONS "-fno-builtin")
 
+# The kernel plugin's system call that reads the redirect list (host_redirect.c), from the
+# stub its build generates
+set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-plugin/stubs/libvitals_kernel_stub.a")
+if(NOT EXISTS "${VITALS_KERNEL_STUB}")
+    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-plugin first (make does this)")
+endif()
 target_link_libraries(vitals_http PRIVATE
     vitals_core
+    ${VITALS_KERNEL_STUB}
     mbedtls
     mbedx509
     tfpsacrypto
