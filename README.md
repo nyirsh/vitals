@@ -25,7 +25,7 @@ The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current
 You need a hacked PS Vita on **firmware 3.65** with taiHEN. `vitals` was developed and tested on real hardware with 3.65 only.  
 Keeping compatibility with only one firmware makes things a lot easier, and the version has been chosen by looking at what [Vita Hacks Guide](https://vita.hacks.guide/) recommends, if you're not on that version and you want to use this software, please follow their guides and update. On any other firmware the installation simply won't start.
 
-- Download `vitals-app.vpk` from the [releases page](../../releases)
+- Download `vitals-app.vpk` from the releases page on [GitHub](https://github.com/nyirsh/vitals/releases) or [GitLab](https://gitlab.com/nyirsh/vitals/-/releases)
 - Transfer it to your vita and install it (`VitaShell` can do both)
 - Open `vitals`, select **Install** and press **Cross**  
   _This installs everything: the browser plugin, the system plugin and the certificates. The certificates are also downloaded from the internet, so there's no need to update them -- yet_
