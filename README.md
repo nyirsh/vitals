@@ -48,7 +48,7 @@ Before installing, the app removes the plugins known to conflict with vitals. Un
 
 - **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl)
 - **Apps and games:** a second provider takes over TLS inside `SceLibHttp` for each app that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
-- **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. A small module, `vitals-reauth.suprx`, is loaded into the shell once it loads its HTTP library, and into apps once they load the Store library (`SceNpCommerce2`). It sends their connections for the old host to the new one and changes nothing else. This is the redirect [reAuth](https://github.com/psv-plugins-archive/reAuth) does, built into `vitals`
+- **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. A small module, `vitals-reauth.suprx`, is loaded into the shell once it loads its HTTP library, and into apps once they load the Store library (`SceNpCommerce2`). It sends their connections for the old host to the new one, and also applies the rules in your [host redirects](#host-redirects) list. The PSN redirect stays unless the list has its own rule for that host. This is the redirect [reAuth](https://github.com/psv-plugins-archive/reAuth) does, built into `vitals`
 
 TLS 1.0 and 1.1 are deliberately disabled.
 
@@ -73,7 +73,7 @@ soundshapes.psvita.online.scea.com  sound.ture.fish
 
 Installing `vitals` also creates the file with instructions and examples: it is never overwritten, and uninstalling leaves it in place. Changes apply the next time a game starts.
 
-Every app and game that uses Sony's HTTP library, and that vitals' TLS provider runs in, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
+Every app and game that uses Sony's HTTP library, as well as the system shell, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
 For now, only up to a maximum of 32 hosts can be redirected (trying to be cautious with memory usage and performance), maybe one day after more careful testing the restriction will be lifted. Malformed host names are also ignored.
 
 ## Connection test

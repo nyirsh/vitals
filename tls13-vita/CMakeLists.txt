@@ -40,6 +40,7 @@ add_library(vitals_core STATIC
     src/host_map.c
     src/module_gate.c
     src/path.c
+    src/redirect_list.c
     src/registry.c
     src/x509_names.c
 )

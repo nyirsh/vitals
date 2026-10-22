@@ -12,40 +12,92 @@
 #define REAUTH_LOG(format, ...) ((void)0)
 #endif
 
+#include "vitals/redirect_list.h"
+
 /* PSN sign-in moved to a new host; old firmware still asks for the old one
  * The kernel plugin loads this module into the shell after it loads its HTTP library, and into
  * apps after they load the Store library (SceNpCommerce2)
- * It rewrites that one hostname in that module's sceHttpCreateConnection calls and changes
- * nothing else */
+ * It rewrites hostnames in that module's sceHttpCreateConnection calls, by the rules of the host
+ * redirect list (ux0:data/vitals/redirects.txt, read through the kernel plugin) and changes
+ * nothing else; the PSN rule below always applies, unless the list has its own rule for that host */
 #define OLD_HOST "native.np.ac.playstation.net"
 #define NEW_HOST "native-vita.np.ac.playstation.net"
+/* Space for the host names the list's rules keep; the module has no heap, and typical pairs take
+ * about 50 bytes, so this holds the full 32 rules unless the names are very long */
+#define NAMES_SIZE 2048u
 
 #define SCE_HTTP_LIBRARY_NID 0xE8F15CDE
 #define SCE_HTTP_CREATE_CONNECTION_NID 0xAEB3307E
 
 static SceUID g_hook_id = -1;
 static tai_hook_ref_t g_hook_ref;
+static VitalsHostMap g_map;
+static char g_names[NAMES_SIZE];
+static size_t g_names_used;
+static char g_work[VITALS_REDIRECT_LIST_WORK_SIZE];
 
-static int is_old_host(const char *name)
+static void copy_name(char *destination, const char *source, size_t length)
 {
-    static const char old_host[] = OLD_HOST;
-    if (name == 0)
-        return 0;
-    for (unsigned i = 0; i < sizeof(old_host); ++i)
+    for (size_t i = 0; i < length; ++i)
+        destination[i] = source[i];
+    destination[length] = '\0';
+}
+
+/* Keeps one pair from the list; a pair whose names no longer fit is skipped */
+static int keep_rule(void *context, const VitalsHostRule *rule)
+{
+    (void)context;
+    size_t needed = rule->from_length + rule->to_length + 2u;
+    if (needed > sizeof(g_names) - g_names_used)
     {
-        if (name[i] != old_host[i])
-            return 0;
+        REAUTH_LOG("redirect skipped: the list's host names take more than %u bytes", NAMES_SIZE);
+        return 0;
     }
-    return 1;
+    char *from = g_names + g_names_used, *to = from + rule->from_length + 1u;
+    copy_name(from, rule->from, rule->from_length);
+    copy_name(to, rule->to, rule->to_length);
+    g_names_used += needed;
+    g_map.rules[g_map.count++] = (VitalsHostRule){from, to, rule->from_length, rule->to_length};
+    /* One place stays free for the PSN rule */
+    return g_map.count == VITALS_HOST_MAP_MAX_RULES - 1u;
+}
+
+/* The list's rules, then the PSN rule unless the list redirects that host itself; a list that
+ * cannot be read is left out entirely */
+static void load_rules(void)
+{
+    g_map.count = 0;
+    g_names_used = 0;
+    int result = vitals_redirect_list_read(vitals_redirects_read, g_work, keep_rule, 0);
+    if (result < 0)
+    {
+        REAUTH_LOG("redirect list not read: rc=0x%08X", (unsigned)result);
+        g_map.count = 0;
+    }
+    if (vitals_host_map_find(&g_map, OLD_HOST, sizeof(OLD_HOST) - 1u) == 0)
+        g_map.rules[g_map.count++] = (VitalsHostRule){OLD_HOST, NEW_HOST, sizeof(OLD_HOST) - 1u,
+                                                      sizeof(NEW_HOST) - 1u};
+    REAUTH_LOG("redirects loaded=%u", (unsigned)g_map.count);
+}
+
+/* The length of a host name, counted no further than the longest valid one */
+static size_t host_length(const char *host)
+{
+    size_t length = 0;
+    while (length <= VITALS_HOST_MAP_MAX_HOST && host[length] != '\0')
+        ++length;
+    return length;
 }
 
 static int create_connection_hook(int template_id, const char *server_name, const char *scheme,
                                   unsigned short port, int keep_alive)
 {
-    if (is_old_host(server_name))
+    const VitalsHostRule *rule = server_name == 0 ? 0
+        : vitals_host_map_find(&g_map, server_name, host_length(server_name));
+    if (rule != 0)
     {
-        server_name = NEW_HOST;
-        REAUTH_LOG("redirected " OLD_HOST " to " NEW_HOST);
+        REAUTH_LOG("redirected %s to %s", rule->from, rule->to);
+        server_name = rule->to;
     }
     return TAI_CONTINUE(int, g_hook_ref, template_id, server_name, scheme, port, keep_alive);
 }
@@ -66,6 +118,7 @@ int module_start(SceSize argc, const void *args)
         info.size = sizeof(info);
         if (taiGetModuleInfo(targets[i], &info) < 0)
             continue;
+        load_rules();
         g_hook_id = taiHookFunctionImport(&g_hook_ref, targets[i], SCE_HTTP_LIBRARY_NID,
                                           SCE_HTTP_CREATE_CONNECTION_NID, create_connection_hook);
         REAUTH_LOG("hook %s rc=0x%08X", targets[i], (unsigned)g_hook_id);

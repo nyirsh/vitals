@@ -2,7 +2,7 @@
 
 #include "diagnostics.h"
 #include "vitals/host_map.h"
-#include "vitals/redirects.h"
+#include "vitals/redirect_list.h"
 
 #include <psp2/types.h>
 #include <taihen.h>
@@ -11,10 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The list is read in pieces (VITALS_REDIRECTS_CHUNK) through the kernel plugin and handled one
- * line at a time, so its size does not matter; only the host names of valid lines are kept */
-/* Longer than any valid pair (two 253-character names and a space between them) */
-#define VITALS_REDIRECTS_LINE_LIMIT 512u
 #define VITALS_SCE_HTTP_LIBRARY_NID UINT32_C(0xE8F15CDE)
 
 enum {
@@ -119,79 +115,48 @@ typedef struct ListReader {
     int failed;
 } ListReader;
 
-/* Keeps the pair on one line; overflowed says the line was longer than the line buffer and was
- * cut, which is only safe when the cut fell inside a comment */
-static void keep_line(ListReader *reader, const char *line, size_t length, int overflowed) {
-    VitalsHostRule rule;
-
-    if (overflowed && memchr(line, '#', length) == NULL) {
-        return;
-    }
-    if (!vitals_host_map_parse_line(line, length, &rule)) {
-        return;
-    }
-    char *grown = realloc(reader->names, reader->used + rule.from_length + rule.to_length + 2u);
+/* Keeps one pair from the list; stops the reading once the list is full or memory runs out */
+static int keep_rule(void *context, const VitalsHostRule *rule) {
+    ListReader *reader = context;
+    char *grown = realloc(reader->names, reader->used + rule->from_length + rule->to_length + 2u);
     if (grown == NULL) {
         reader->failed = 1;
-        return;
+        return 1;
     }
     reader->names = grown;
     reader->from[reader->count] = reader->used;
-    reader->from_length[reader->count] = rule.from_length;
-    memcpy(grown + reader->used, rule.from, rule.from_length);
-    reader->used += rule.from_length;
+    reader->from_length[reader->count] = rule->from_length;
+    memcpy(grown + reader->used, rule->from, rule->from_length);
+    reader->used += rule->from_length;
     grown[reader->used++] = '\0';
     reader->to[reader->count] = reader->used;
-    reader->to_length[reader->count] = rule.to_length;
-    memcpy(grown + reader->used, rule.to, rule.to_length);
-    reader->used += rule.to_length;
+    reader->to_length[reader->count] = rule->to_length;
+    memcpy(grown + reader->used, rule->to, rule->to_length);
+    reader->used += rule->to_length;
     grown[reader->used++] = '\0';
-    ++reader->count;
+    return ++reader->count == VITALS_HOST_MAP_MAX_RULES;
 }
 
 /* Reads the list into g_map; returns the number of rules, 0 when the list is missing, empty or
  * unreadable (a read error discards the whole list) */
 static size_t load_list(void) {
-    size_t line_length = 0, loaded = 0;
-    unsigned int offset = 0;
-    int overflowed = 0, count = 0;
+    size_t loaded = 0;
 
     /* Working memory comes from the provider's heap, not the stack, and is freed after reading */
     ListReader *reader = calloc(1, sizeof(*reader));
-    char *chunk = malloc(VITALS_REDIRECTS_CHUNK + VITALS_REDIRECTS_LINE_LIMIT);
-    if (reader == NULL || chunk == NULL) {
+    char *work = malloc(VITALS_REDIRECT_LIST_WORK_SIZE);
+    if (reader == NULL || work == NULL) {
         free(reader);
-        free(chunk);
+        free(work);
         return 0;
     }
-    char *line = chunk + VITALS_REDIRECTS_CHUNK;
-    /* Reading stops as soon as the list is full */
-    while (!reader->failed && reader->count < VITALS_HOST_MAP_MAX_RULES &&
-           (count = vitals_redirects_read(offset, chunk, VITALS_REDIRECTS_CHUNK)) > 0) {
-        offset += (unsigned int)count;
-        for (int i = 0; i < count && reader->count < VITALS_HOST_MAP_MAX_RULES && !reader->failed; ++i) {
-            if (chunk[i] == '\n') {
-                keep_line(reader, line, line_length, overflowed);
-                line_length = 0;
-                overflowed = 0;
-            } else if (line_length < VITALS_REDIRECTS_LINE_LIMIT) {
-                line[line_length++] = chunk[i];
-            } else {
-                overflowed = 1;
-            }
-        }
-    }
-    if (count < 0) {
-        /* At offset 0 this is usually a missing list (0x80010002) */
-        VITALS_LOG("redirect list not read: rc=%08X offset=%u path=" VITALS_REDIRECTS_PATH,
-            (unsigned int)count, offset);
+    int result = vitals_redirect_list_read(vitals_redirects_read, work, keep_rule, reader);
+    free(work);
+    if (result < 0) {
+        /* 0x80010002 is a missing list */
+        VITALS_LOG("redirect list not read: rc=%08X path=" VITALS_REDIRECTS_PATH, (unsigned int)result);
         reader->failed = 1;
     }
-    /* The last line need not end with a newline */
-    if (!reader->failed && reader->count < VITALS_HOST_MAP_MAX_RULES && (line_length > 0 || overflowed)) {
-        keep_line(reader, line, line_length, overflowed);
-    }
-    free(chunk);
     if (!reader->failed && reader->count > 0) {
         for (size_t i = 0; i < reader->count; ++i) {
             g_map.rules[i] = (VitalsHostRule){reader->names + reader->from[i], reader->names + reader->to[i],
