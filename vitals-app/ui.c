@@ -44,9 +44,9 @@ static uint32_t tone(enum CheckState s)
            : s == CHECK_INFO    ? amber
                                 : muted;
 }
-static void mark(uint32_t *p, int x, int y, enum CheckState s)
+/* The icon for state s, drawn in colour c */
+static void mark_colored(uint32_t *p, int x, int y, enum CheckState s, uint32_t c)
 {
-    uint32_t c = tone(s);
     if (s == CHECK_PASS)
     {
         for (int i = 0; i < 6; ++i)
@@ -71,6 +71,10 @@ static void mark(uint32_t *p, int x, int y, enum CheckState s)
         text(p, x, y - 7, s == CHECK_RUNNING ? ">" : s == CHECK_INFO ? "?"
                                                                      : "-",
              c, 24);
+}
+static void mark(uint32_t *p, int x, int y, enum CheckState s)
+{
+    mark_colored(p, x, y, s, tone(s));
 }
 void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, int busy,
                 const char *notice)
@@ -246,7 +250,9 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 }
 
 /* The status card in the top right corner: "<label> <mark> <status>" */
-static void status_card(uint32_t *p, const char *label, const char *status, enum CheckState style)
+/* style picks the icon; color draws it and the status */
+static void status_card(uint32_t *p, const char *label, const char *status, enum CheckState style,
+                        uint32_t color)
 {
     int label_width = check_font_width(label, 20);
     int status_width = check_font_width(status, 20);
@@ -255,8 +261,8 @@ static void status_card(uint32_t *p, const char *label, const char *status, enum
     int icon_left = left + 18 + label_width + 14;
     card(p, left, 27, box_width, 42, panel);
     text(p, left + 18, 34, label, muted, 20);
-    mark(p, icon_left, 39, style);
-    text(p, icon_left + 30, 34, status, tone(style), 20);
+    mark_colored(p, icon_left, 39, style, color);
+    text(p, icon_left + 30, 34, status, color, 20);
 }
 /* outdated: a different version's plugin is installed than the one this app carries;
  * installed_version is its release number, empty when unknown */
@@ -287,10 +293,10 @@ static void header(uint32_t *p, int installed, int outdated, const char *install
         snprintf(status, sizeof(status), "%s", known ? installed_version : "installed");
     else
         snprintf(status, sizeof(status), "not installed");
-    /* A debug build stands out in amber */
-    status_card(p, "vitals:", status,
-                outdated ? CHECK_WARNING : installed ? (debug_output != NULL ? CHECK_INFO : CHECK_PASS)
-                                                     : CHECK_FAIL);
+    enum CheckState style = outdated ? CHECK_WARNING : installed ? CHECK_PASS : CHECK_FAIL;
+    /* A working debug build keeps its checkmark, in amber so it stands out */
+    status_card(p, "vitals:", status, style,
+                style == CHECK_PASS && debug_output != NULL ? amber : tone(style));
 }
 static void footer(uint32_t *p, const char *hints)
 {
