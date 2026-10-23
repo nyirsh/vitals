@@ -318,11 +318,16 @@ static void run_test(void)
             vitals_check_cancel();
         if (page_presses)
         {
-            page = (int)((page + page_presses) % 3);
+            /* Ciphers, request details, handshake details and host redirects */
+            page = (int)((page + page_presses) % 4);
             scroll = 0;
         }
-        scroll = check_scroll_move(scroll, page == 0 ? scroll_steps : 0,
-                                   view.handshake.cipher_count, CHECK_VISIBLE_CIPHERS);
+        /* The cipher list and the redirect list scroll */
+        if (page == 3)
+            scroll = check_scroll_move(scroll, scroll_steps, view.redirect_count, CHECK_VISIBLE_REDIRECTS);
+        else
+            scroll = check_scroll_move(scroll, page == 0 ? scroll_steps : 0,
+                                       view.handshake.cipher_count, CHECK_VISIBLE_CIPHERS);
         if (ready && !busy && !leaving && (pressed & SCE_CTRL_CROSS))
         {
             vitals_check_start();

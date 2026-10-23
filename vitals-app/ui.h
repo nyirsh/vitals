@@ -4,6 +4,7 @@
 #define CHECK_WIDTH 960
 #define CHECK_HEIGHT 544
 #define CHECK_VISIBLE_CIPHERS 4
+#define CHECK_VISIBLE_REDIRECTS 5
 #define APP_TASK_VISIBLE_LINES 12
 typedef struct {
     const char *label;

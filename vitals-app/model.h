@@ -56,9 +56,19 @@ typedef struct
     unsigned cipher_count, group_count, extension_count;
     char ja3[65], ja4[129], alpn[96];
 } CheckHandshake;
+/* Host redirects as ux0:data/vitals/redirects.txt lists them, at most as many as vitals applies */
+#define CHECK_REDIRECT_MAX 32
+#define CHECK_HOST_MAX 254
+typedef struct
+{
+    char from[CHECK_HOST_MAX], to[CHECK_HOST_MAX];
+    CheckResult result;
+} CheckRedirect;
 typedef struct
 {
     CheckResult protocols[4], connection, playstation;
+    CheckRedirect redirects[CHECK_REDIRECT_MAX];
+    unsigned redirect_count;
     CheckHandshake handshake;
     int started, complete;
     int vitals_enabled; /* -1 before runtime detection, then 0 or 1 */

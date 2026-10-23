@@ -219,6 +219,34 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
             text(p, 856, y + 2, line, muted, 16);
         }
     }
+    else if (page == 3)
+    {
+        text(p, 28, 365, "Host redirects", white, 23);
+        if (s->redirect_count == 0)
+            text(p, 28, 410, "No redirects listed in ux0:data/vitals/redirects.txt.", muted, 20);
+        else
+        {
+            snprintf(line, sizeof(line), "%u listed / Hold arrows or stick", s->redirect_count);
+            text(p, 621, 373, line, muted, 16);
+        }
+        /* Old host -> new host, then what requesting the old host through vitals gave */
+        for (unsigned i = 0; i < CHECK_VISIBLE_REDIRECTS && scroll + i < s->redirect_count; ++i)
+        {
+            const CheckRedirect *redirect = &s->redirects[scroll + i];
+            const CheckResult *r = &redirect->result;
+            int y = 400 + (int)i * 21;
+            snprintf(line, sizeof(line), "%s -> %s", redirect->from, redirect->to);
+            check_font_draw(p, 30, y, line, 16, white, 530);
+            snprintf(line, sizeof(line), "%s",
+                     r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..." : "Waiting");
+            check_font_draw(p, 545, y, line, 16, tone(r->state), 840);
+            if (r->elapsed_ms)
+                snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
+            else
+                snprintf(line, sizeof(line), "-");
+            text(p, 856, y, line, muted, 16);
+        }
+    }
     else
     {
         text(p, 28, 365, "Handshake details", white, 23);

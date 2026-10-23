@@ -1,5 +1,6 @@
 #include "check.h"
 #include "probe.h"
+#include "vitals/redirect_list.h"
 #include <psp2/io/stat.h>
 #include <psp2/kernel/modulemgr.h>
 #include <psp2/kernel/processmgr.h>
@@ -11,8 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The connection test from Vital Signs: BrowserLeaks TLS 1.0-1.3, PlayStation servers and the
- * BrowserLeaks TLS report, each over a fresh sceHttp connection on a worker thread */
+/* The connection test from Vital Signs: BrowserLeaks TLS 1.0-1.3, PlayStation servers, the
+ * BrowserLeaks TLS report and each host redirect, each over a fresh sceHttp connection on a
+ * worker thread */
 #define REPORT_DIR "ux0:/data/vitals"
 static CheckService service = {.vitals_enabled = -1};
 static SceUID guard = -1, worker = -1;
@@ -30,6 +32,12 @@ static int stopped(void)
     int c = cancelled;
     unlock();
     return c;
+}
+static void publish_redirect(unsigned index, const CheckResult *r)
+{
+    lock();
+    service.redirects[index].result = *r;
+    unlock();
 }
 static void publish(unsigned row, const CheckResult *r)
 {
@@ -57,20 +65,17 @@ static void abort_current(int user_cancel)
     }
     unlock();
 }
-static int fetch(void *context, unsigned test, int verify, char *body, size_t *length,
-                 CheckResult *r)
+/* One request to url; status_only accepts any final HTTP status without reading the body, and
+ * unverified_allowed permits the protocol checks' retries without certificate checks */
+static int fetch_url(const char *url, int verify, int unverified_allowed, int status_only, char *body,
+                     size_t *length, CheckResult *r)
 {
-    (void)context;
     int tmpl = -1, conn = -1, req = -1, rc = 0;
     uint64_t begin = now_ms();
-    char url[320];
-    const char *endpoint = check_endpoint(test);
     memset(r, 0, sizeof(*r));
     r->state = CHECK_FAIL;
     r->vitals_active = service.vitals_enabled == 1;
     *length = 0;
-    snprintf(url, sizeof(url), "%s%ccheck=%llu", endpoint, strchr(endpoint, '?') ? '&' : '?',
-             (unsigned long long)sceKernelGetSystemTimeWide());
 #define REQUIRE(call)  \
     do                 \
     {                  \
@@ -83,7 +88,7 @@ static int fetch(void *context, unsigned test, int verify, char *body, size_t *l
         rc = (int)0x80431080;
         goto done;
     }
-    if (!verify && test >= 4)
+    if (!verify && !unverified_allowed)
     {
         rc = -1;
         snprintf(r->message, sizeof(r->message), "Unverified request refused for this endpoint");
@@ -124,7 +129,7 @@ static int fetch(void *context, unsigned test, int verify, char *body, size_t *l
     }
     REQUIRE(sceHttpSendRequest(req, NULL, 0));
     REQUIRE(sceHttpGetStatusCode(req, &r->http_code));
-    if (test == CHECK_PLAYSTATION)
+    if (status_only)
     {
         /* This root URL is not a public Store operation
          * Any final HTTP response, including 403/404/503, proves verified HTTPS
@@ -232,6 +237,56 @@ done:
     return rc;
 #undef REQUIRE
 }
+static int fetch(void *context, unsigned test, int verify, char *body, size_t *length,
+                 CheckResult *r)
+{
+    char url[320];
+    const char *endpoint = check_endpoint(test);
+    (void)context;
+    snprintf(url, sizeof(url), "%s%ccheck=%llu", endpoint, strchr(endpoint, '?') ? '&' : '?',
+             (unsigned long long)sceKernelGetSystemTimeWide());
+    return fetch_url(url, verify, test < 4, test == CHECK_PLAYSTATION, body, length, r);
+}
+
+/* The host redirect list, read the way vitals' provider reads it (the app may open ux0:data
+ * itself), so the test sees the same rules */
+static FILE *redirect_file;
+static int read_redirects(unsigned int offset, void *buffer, unsigned int size)
+{
+    if (fseek(redirect_file, (long)offset, SEEK_SET) != 0)
+        return -1;
+    size_t count = fread(buffer, 1, size, redirect_file);
+    return ferror(redirect_file) ? -1 : (int)count;
+}
+typedef struct
+{
+    CheckRedirect *list;
+    unsigned count;
+} RedirectCollection;
+static int keep_redirect(void *context, const VitalsHostRule *rule)
+{
+    RedirectCollection *collection = context;
+    CheckRedirect *redirect = &collection->list[collection->count++];
+    memset(redirect, 0, sizeof(*redirect));
+    memcpy(redirect->from, rule->from, rule->from_length);
+    memcpy(redirect->to, rule->to, rule->to_length);
+    return collection->count == CHECK_REDIRECT_MAX;
+}
+/* The rules in list, as many as vitals applies; none when the file is missing or unreadable */
+static unsigned load_redirects(CheckRedirect *list)
+{
+    RedirectCollection collection = {list, 0};
+    char *work = malloc(VITALS_REDIRECT_LIST_WORK_SIZE);
+    redirect_file = fopen(VITALS_REDIRECTS_PATH, "rb");
+    if (work != NULL && redirect_file != NULL &&
+        vitals_redirect_list_read(read_redirects, work, keep_redirect, &collection) < 0)
+        collection.count = 0;
+    if (redirect_file != NULL)
+        fclose(redirect_file);
+    redirect_file = NULL;
+    free(work);
+    return collection.count;
+}
 static int detect_vitals(void)
 {
     SceUID ids[128];
@@ -307,6 +362,16 @@ static void save_report(const CheckService *s)
                     r->retry.http_code, (unsigned)r->retry.error, (unsigned)r->retry.ssl_error,
                     r->retry.ssl_detail, r->retry.elapsed_ms, (unsigned)r->retry.restore_error);
     }
+    fprintf(f, "\nHost redirects (" VITALS_REDIRECTS_PATH ")=%u\n", s->redirect_count);
+    for (unsigned i = 0; i < s->redirect_count; ++i)
+    {
+        const CheckRedirect *redirect = &s->redirects[i];
+        fprintf(f, "%s -> %s\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\nssl_detail=0x%08X\n"
+                   "elapsed_ms=%u\nresult=%s\n",
+                redirect->from, redirect->to, redirect->result.state, redirect->result.http_code,
+                (unsigned)redirect->result.error, (unsigned)redirect->result.ssl_error,
+                redirect->result.ssl_detail, redirect->result.elapsed_ms, redirect->result.message);
+    }
     const CheckHandshake *h = &s->handshake;
     fprintf(f,
             "\nSelected protocol=%04X %s\nSelected cipher=%04X %s\nKey exchange=%04X "
@@ -349,6 +414,14 @@ static int run_checks(SceSize argc, void *argv)
         free(h);
         return 0;
     }
+    /* The redirect rules are listed first, so their page fills in as they are tested */
+    CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
+    unsigned redirect_count = redirects != NULL ? load_redirects(redirects) : 0;
+    lock();
+    for (unsigned i = 0; i < redirect_count; ++i)
+        service.redirects[i] = redirects[i];
+    service.redirect_count = redirect_count;
+    unlock();
     /* Every check is independent
      * The optional report is last, so its request and parser cannot gate the
      * protocol tiles or PlayStation reachability */
@@ -401,6 +474,39 @@ static int run_checks(SceSize argc, void *argv)
         policy_failed = r.restore_error < 0;
         publish((unsigned)test, &r);
     }
+    /* Each redirect is requested by its old name, as a game would: vitals' provider sends it to
+     * the new host and checks the certificate against the new name, so a pass proves the whole
+     * path; any final HTTP status counts, as only the server's reachability is tested */
+    for (unsigned i = 0; i < redirect_count; ++i)
+    {
+        CheckResult r = {0};
+        if (stopped() || policy_failed)
+        {
+            r.state = CHECK_INFO;
+            snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
+        }
+        else if (service.vitals_enabled != 1)
+        {
+            r.state = CHECK_INFO;
+            snprintf(r.message, sizeof(r.message), "Not tested: vitals isn't active here");
+        }
+        else
+        {
+            char url[CHECK_HOST_MAX + 16];
+            size_t n = 0;
+            r.state = CHECK_RUNNING;
+            publish_redirect(i, &r);
+            snprintf(url, sizeof(url), "https://%s/", redirects[i].from);
+            if (fetch_url(url, 1, 0, 1, body, &n, &r) < 0 && stopped())
+            {
+                r.state = CHECK_INFO;
+                snprintf(r.message, sizeof(r.message), "Cancelled / not tested");
+            }
+            policy_failed = r.restore_error < 0;
+        }
+        publish_redirect(i, &r);
+    }
+    free(redirects);
     free(body);
     free(h);
     /* No UI read of the report path races this snapshot */

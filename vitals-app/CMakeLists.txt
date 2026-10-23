@@ -45,6 +45,9 @@ add_executable(vitals-app
     module_version.c
     release_version.c
     version_check.c
+    # The host redirect list is read as vitals' provider reads it
+    ../tls13-vita/src/host_map.c
+    ../tls13-vita/src/redirect_list.c
     config_edit.c
     check.c
     ui.c
@@ -58,6 +61,7 @@ add_executable(vitals-app
     probe.c
 )
 target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
+target_include_directories(vitals-app PRIVATE ../tls13-vita/include)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 # OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
 foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock
