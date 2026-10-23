@@ -127,14 +127,14 @@ int main(int argc, char **argv) {
     if (strcmp(scenario, "wrong-host") == 0 || strcmp(scenario, "untrusted") == 0 ||
         strcmp(scenario, "wrong-ip") == 0 || strcmp(scenario, "callback-reject") == 0 ||
         strcmp(scenario, "sha1-wrong-host") == 0 || strcmp(scenario, "sha1-untrusted") == 0 ||
-        strcmp(scenario, "sha1-expired") == 0) {
+        strcmp(scenario, "sha1-expired") == 0 || strcmp(scenario, "self-signed-untrusted") == 0) {
         assert(result == VITALS_SCE_HTTP_ERROR_SSL);
         assert(vitals_read_i32(sony, VITALS_CONNECTION_SSL_ERROR_OFFSET) == VITALS_SCE_HTTPS_ERROR_CERT);
         assert(callbacks == 1);
         assert((callback_detail == 0) == (callback_result < 0));
         if (strcmp(scenario, "sha1-wrong-host") == 0)
             assert(callback_detail & VITALS_SCE_HTTPS_DETAIL_CN_CHECK);
-        if (strcmp(scenario, "sha1-untrusted") == 0)
+        if (strcmp(scenario, "sha1-untrusted") == 0 || strcmp(scenario, "self-signed-untrusted") == 0)
             assert(callback_detail & VITALS_SCE_HTTPS_DETAIL_UNKNOWN_CA);
         if (strcmp(scenario, "sha1-expired") == 0)
             assert(callback_detail & VITALS_SCE_HTTPS_DETAIL_NOT_AFTER);

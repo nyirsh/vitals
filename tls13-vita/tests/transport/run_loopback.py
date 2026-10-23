@@ -27,6 +27,13 @@ def certificates(directory):
             "-CAcreateserial", "-days", "2", "-extfile", "server.ext", "-out", "server.pem")
     openssl(directory, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
             "-nodes", "-keyout", "other.key", "-out", "other.pem", "-days", "2", "-subj", "/CN=other root")
+    # A server's own self-signed certificate, not a CA, trusted because it is itself in the store
+    openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-sha256", "-days", "2",
+            "-keyout", "self.key", "-out", "self.pem", "-subj", "/CN=localhost",
+            "-addext", "basicConstraints=critical,CA:FALSE",
+            "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1")
+    (directory / "self-store.pem").write_bytes((directory / "ca.pem").read_bytes() +
+                                               (directory / "self.pem").read_bytes())
     openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
             "-keyout", "sha1-ca.key", "-out", "sha1-ca.pem", "-days", "2",
             "-subj", "/CN=vitals SHA1 test root")
@@ -56,11 +63,13 @@ def run_case(binary, directory, scenario, version):
     negotiated = []
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = context.maximum_version = version
-    certificate = "server.pem"
+    certificate, key = "server.pem", "server.key"
     if scenario.startswith("sha1-"):
         context.set_ciphers("DEFAULT:@SECLEVEL=0")
         certificate = "sha1-expired.pem" if scenario == "sha1-expired" else "sha1-server.pem"
-    context.load_cert_chain(directory / certificate, directory / "server.key")
+    if scenario.startswith("self-signed"):
+        certificate, key = "self.pem", "self.key"
+    context.load_cert_chain(directory / certificate, directory / key)
     context.set_servername_callback(lambda connection, name, unused: negotiated.append(name))
 
     def serve():
@@ -88,7 +97,7 @@ def run_case(binary, directory, scenario, version):
                     connection.unwrap().close()
         except (OSError, ssl.SSLError) as exc:
             if scenario not in {"wrong-host", "wrong-ip", "untrusted", "bad-record", "callback-reject", "changed-write-retry",
-                                "sha1-wrong-host", "sha1-untrusted", "sha1-expired"}:
+                                "sha1-wrong-host", "sha1-untrusted", "sha1-expired", "self-signed-untrusted"}:
                 errors.append(str(exc))
         finally:
             listener.close()
@@ -96,7 +105,8 @@ def run_case(binary, directory, scenario, version):
     worker = threading.Thread(target=serve, daemon=True)
     worker.start()
     trust = directory / ("other.pem" if scenario in {"untrusted", "sha1-untrusted"}
-                         else "sha1-ca.pem" if scenario.startswith("sha1-") else "ca.pem")
+                         else "sha1-ca.pem" if scenario.startswith("sha1-")
+                         else "self-store.pem" if scenario == "self-signed" else "ca.pem")
     expected_version = "TLSv1.3" if version == ssl.TLSVersion.TLSv1_3 else "TLSv1.2"
     try:
         result = subprocess.run([str(binary), str(trust), str(port), scenario, expected_version],
@@ -128,6 +138,9 @@ def main():
         cases = [("valid", ssl.TLSVersion.TLSv1_2), ("valid", ssl.TLSVersion.TLSv1_3)]
         cases.extend(("sha1-cert", version) for version in
                      [ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3])
+        cases.extend(("self-signed", version) for version in
+                     [ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3])
+        cases.append(("self-signed-untrusted", ssl.TLSVersion.TLSv1_3))
         cases.extend((scenario, ssl.TLSVersion.TLSv1_3) for scenario in
                      ["sha1-wrong-host", "sha1-untrusted", "sha1-expired"])
         cases.extend((scenario, ssl.TLSVersion.TLSv1_3) for scenario in

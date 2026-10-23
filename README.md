@@ -87,7 +87,7 @@ To trust your own servers, for example a community server with a self-signed cer
 
 The file is optional. Its certificates are added to Sony's and Mozilla's whenever the app installs, updates, reinstalls or updates certificates, so after editing it run **Update certificates**. Duplicates are added only once, a mistake in the file never stops an update, and uninstalling leaves the file in place.
 
-Each certificate must be marked as a certificate authority (`CA:TRUE`). A self-signed certificate made with `openssl req -x509` is one by default:
+A server's self-signed certificate is trusted as itself, exactly as it appears in the file, whether or not it's marked as a certificate authority. For a server whose certificate was issued by a certificate authority of your own, add that authority's certificate instead. To make a self-signed certificate:
 
 ```
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout server.key -out server.crt \

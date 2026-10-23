@@ -44,6 +44,16 @@ add_test(NAME vitals_game_ca COMMAND vitals_game_ca_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../vitals-app/assets/certs.cer")
 set_tests_properties(vitals_game_ca PROPERTIES TIMEOUT 30)
 
+# A self-signed server certificate trusted by exact match (ca_index.c), with real certificates
+add_executable(vitals_exact_trust_tests test_exact_trust.c ../../provider/ca_index.c ../../provider/platform_shims.c)
+target_include_directories(vitals_exact_trust_tests PRIVATE ../../provider ../../include)
+target_link_libraries(vitals_exact_trust_tests PRIVATE mbedtls vitals_vita_mock)
+target_compile_options(vitals_exact_trust_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME vitals_exact_trust
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_exact_trust.py"
+            $<TARGET_FILE:vitals_exact_trust_tests>)
+set_tests_properties(vitals_exact_trust PROPERTIES TIMEOUT 120)
+
 add_executable(vitals_trust_store_tests
     ../../provider/ca_file.c
     ../../provider/ca_index.c

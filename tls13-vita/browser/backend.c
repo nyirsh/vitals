@@ -182,6 +182,18 @@ size_t vitals_browser_connection_count(void) {
     return browser.initialized ? vitals_registry_count(&browser.registry) : 0;
 }
 
+/* Called by Mbed TLS for each certificate it checked: a self-signed server certificate that is
+ * itself in the store counts as trusted; its other checks (host name, dates, signature strength)
+ * still apply */
+static int trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int depth,
+    uint32_t *flags) {
+    if (depth == 0 && (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) != 0 &&
+        vitals_ca_trusts_exact(vitals_ca_index_find, context, certificate)) {
+        *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
+    }
+    return 0;
+}
+
 static int bio_result(BrowserConnection *connection, int result, int sending) {
     if (result >= 0) return result;
     connection->net_error = result;
@@ -257,10 +269,14 @@ static int initialize_connection(BrowserConnection *connection, uint32_t cipher_
     mbedtls_ssl_conf_max_tls_version(&connection->config, MBEDTLS_SSL_VERSION_TLS1_3);
     mbedtls_ssl_conf_ciphersuites(&connection->config, connection->ciphers);
     mbedtls_ssl_conf_authmode(&connection->config, MBEDTLS_SSL_VERIFY_OPTIONAL);
+    /* A fixed list (a page's own CA file) gets Mbed TLS's own self-signed rule; the store, read
+     * through a callback, gets the same rule from trust_exact_self_signed */
     if (connection->custom_ca_requested)
         mbedtls_ssl_conf_ca_chain(&connection->config, &connection->custom_ca, NULL);
-    else
+    else {
         mbedtls_ssl_conf_ca_cb(&connection->config, vitals_ca_index_find, &browser.ca_index);
+        mbedtls_ssl_conf_verify(&connection->config, trust_exact_self_signed, &browser.ca_index);
+    }
     result = mbedtls_ssl_conf_alpn_protocols(&connection->config, alpn);
     if (result != 0) return VITALS_CURLE_SSL_CONNECT_ERROR;
     result = mbedtls_ssl_setup(&connection->ssl, &connection->config);

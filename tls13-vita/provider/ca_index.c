@@ -221,3 +221,29 @@ cleanup:
     *candidates = head;
     return 0;
 }
+
+int vitals_ca_trusts_exact(mbedtls_x509_crt_ca_cb_t find, void *context,
+    const mbedtls_x509_crt *certificate) {
+    mbedtls_x509_crt *candidates = NULL;
+    int trusted = 0;
+
+    if (find == NULL || certificate == NULL || certificate->raw.p == NULL ||
+        certificate->issuer_raw.len != certificate->subject_raw.len ||
+        memcmp(certificate->issuer_raw.p, certificate->subject_raw.p, certificate->subject_raw.len) != 0)
+        return 0;
+    /* Its issuer is itself, so the trusted certificates with its subject include any copy of it */
+    if (find(context, certificate, &candidates) == 0) {
+        for (const mbedtls_x509_crt *candidate = candidates; candidate != NULL; candidate = candidate->next) {
+            if (candidate->raw.len == certificate->raw.len &&
+                memcmp(candidate->raw.p, certificate->raw.p, certificate->raw.len) == 0) {
+                trusted = 1;
+                break;
+            }
+        }
+    }
+    if (candidates != NULL) {
+        mbedtls_x509_crt_free(candidates);
+        mbedtls_free(candidates);
+    }
+    return trusted;
+}

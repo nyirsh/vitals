@@ -213,12 +213,12 @@ int main(int argc, char **argv) {
         strcmp(scenario, "default-callback-wrong-host") == 0 ||
         strcmp(scenario, "expired") == 0 || strcmp(scenario, "wrong-host-peer-disabled") == 0 ||
         strcmp(scenario, "sha1-wrong-host") == 0 || strcmp(scenario, "sha1-untrusted") == 0 ||
-        strcmp(scenario, "sha1-expired") == 0) {
+        strcmp(scenario, "sha1-expired") == 0 || strcmp(scenario, "self-signed-untrusted") == 0) {
         assert((result == VITALS_CURLE_SSL_CACERT || result == VITALS_CURLE_PEER_FAILED_VERIFICATION) && !done);
         assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) != 0);
         if (strcmp(scenario, "sha1-wrong-host") == 0)
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 62);
-        if (strcmp(scenario, "sha1-untrusted") == 0)
+        if (strcmp(scenario, "sha1-untrusted") == 0 || strcmp(scenario, "self-signed-untrusted") == 0)
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 20);
         if (strcmp(scenario, "sha1-expired") == 0)
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 10);

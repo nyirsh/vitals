@@ -34,4 +34,11 @@ void vitals_ca_index_free(VitalsCaIndex *index);
 int vitals_ca_index_find(void *context, const mbedtls_x509_crt *child,
     mbedtls_x509_crt **candidates);
 
+/* 1 when certificate is self-signed and its exact copy is among the trusted certificates find
+ * returns: such a server certificate is trusted as itself, even when it is not a CA
+ * Mbed TLS applies this rule to a fixed trusted list but not when trust comes from a callback, so
+ * the providers apply it themselves */
+int vitals_ca_trusts_exact(mbedtls_x509_crt_ca_cb_t find, void *context,
+    const mbedtls_x509_crt *certificate);
+
 #endif

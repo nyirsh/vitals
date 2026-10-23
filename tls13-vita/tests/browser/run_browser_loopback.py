@@ -23,11 +23,13 @@ def run_case(binary, directory, scenario, version):
     port = listener.getsockname()[1]
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = context.maximum_version = version
-    certificate = "expired.pem" if scenario == "expired" else "server.pem"
+    certificate, key = ("expired.pem" if scenario == "expired" else "server.pem"), "server.key"
     if scenario.startswith("sha1-"):
         context.set_ciphers("DEFAULT:@SECLEVEL=0")
         certificate = "sha1-expired.pem" if scenario == "sha1-expired" else "sha1-server.pem"
-    context.load_cert_chain(directory / certificate, directory / "server.key")
+    if scenario.startswith("self-signed"):
+        certificate, key = "self.pem", "self.key"
+    context.load_cert_chain(directory / certificate, directory / key)
     context.set_alpn_protocols(["http/1.1"])
     names, protocols, errors = [], [], []
     context.set_servername_callback(lambda sock, name, ignored: names.append(name))
@@ -35,7 +37,7 @@ def run_case(binary, directory, scenario, version):
                                    "default-callback-wrong-host", "bad-record", "changed-write", "timeout",
                                    "legacy-callback", "legacy-existing", "cancel-handshake", "missing-ca",
                                    "expired", "wrong-host-peer-disabled", "empty-ca",
-                                   "sha1-wrong-host", "sha1-untrusted", "sha1-expired"}
+                                   "sha1-wrong-host", "sha1-untrusted", "sha1-expired", "self-signed-untrusted"}
 
     def serve():
         try:
@@ -87,7 +89,8 @@ def run_case(binary, directory, scenario, version):
     else:
         trust = directory / ("other.pem" if scenario in {"untrusted", "default-callback-untrusted",
                                                           "peer-disabled", "sha1-untrusted"}
-                             else "sha1-ca.pem" if scenario.startswith("sha1-") else "ca.pem")
+                             else "sha1-ca.pem" if scenario.startswith("sha1-")
+                             else "self-store.pem" if scenario == "self-signed" else "ca.pem")
     expected = "TLSv1.3" if version == ssl.TLSVersion.TLSv1_3 else "TLSv1.2"
     try:
         result = subprocess.run([str(binary), str(trust), str(port), scenario, expected],
@@ -116,6 +119,9 @@ def main():
               [ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3]]
     cases += [(name, ssl.TLSVersion.TLSv1_3) for name in
               ["sha1-wrong-host", "sha1-untrusted", "sha1-expired"]]
+    # A server's own self-signed certificate in the store, and the same certificate when it isn't
+    cases += [("self-signed", version) for version in [ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3]]
+    cases += [("self-signed-untrusted", ssl.TLSVersion.TLSv1_3)]
     cases += [(name, ssl.TLSVersion.TLSv1_3) for name in ["blocking", "second-socket", "wrong-host", "untrusted",
         "peer-disabled", "host-disabled", "ipv4-host", "ipv6-host", "abrupt", "bad-record", "timeout",
         "write-retry", "changed-write", "legacy-callback", "legacy-existing"]]
