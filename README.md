@@ -204,7 +204,7 @@ Each normal build also checks that the kernel plugin contains no floating-point 
 
 **Thanks to Reiko Asakura for [reAuth](https://github.com/psv-plugins-archive/reAuth)!** `vitals-reauth` just follows `reAuth` approach: the same hook in the shell and the Store library, and the same host redirect.
 
-Also special thanks to Team Molecule, for all of the workd and love they poured into the PS Vita.
+Also special thanks to Team Molecule, for all of the and love they poured into the PS Vita, and to everyone who works on [VitaSDK](https://vitasdk.org) and its packages, which every part of `vitals` is built with.
 
 ## License
 
