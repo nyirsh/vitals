@@ -36,7 +36,7 @@ Keeping compatibility with only one firmware makes things a lot easier, and the 
 
 Once `vitals` is installed, from the same application you'll be able to:
 
-- **Reinstall**: to install `vitals` updates or repair an installation
+- **Reinstall** (or **Update**, when the installed version differs): installs this version over the existing one, to update `vitals` or repair an installation
 - **Uninstall**: this removes all of `vitals` files and configurations
 - **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current
 - **Test connections**: is `vitals` installed correctly and running just fine?
@@ -105,7 +105,7 @@ Each run saves a report to `ux0:data/vitals/`. The test works on any firmware an
 
 ## Why a separate project
 
-`vitals` started as meshup of my url redirector project and devnoname120's `tls_fixer` and owes it the hardest parts: the Mbed TLS port, the providers and the injection. It's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
+`vitals` started as a mashup of my URL redirector project and devnoname120's `tls_fixer`, and owes `tls_fixer` the hardest parts: running Mbed TLS inside Sony's HTTP stack, the providers and the injection. It's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
 
 - **Different memory design.** `tls_fixer` gives every app its own private copy of Sony's HTTP and SSL libraries, which costs a game about 440 KiB on top of the provider. `vitals` keeps the SSL library shared and handles the certificates games load at the HTTP level instead, so games that were running out of memory (like Sound Shapes) now fit. The comments left in the code and in the specs made me feel like it was a deliberate choice from devnoname120 I was going against.
 - **Different scope.** `tls_fixer` supports several firmware versions, and keeps experimental, diagnostic and self-disarming code for testing on hardware. `vitals` targets firmware 3.65 only, with that code removed and a simpler kernel plugin modeled on `iTLS-Enso`.
@@ -198,7 +198,7 @@ Each normal build also checks that the kernel plugin contains no floating-point 
 
 ## Credits
 
-**vitals is a continuation of [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, who did the most difficult part of the job.** The TLS providers, the `Mbed TLS` port to the Vita, the kernel plugin's injection and module checks, the certificate merging, the certificate updater and the original Vital Signs connection test are his work. vitals renames the project and continues it.
+**vitals is a continuation of [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, who did the most difficult part of the job.** The TLS providers, the integration of `Mbed TLS` with Sony's HTTP library and the browser, the kernel plugin's injection and module checks, the certificate merging, the certificate updater and the original Vital Signs connection test are his work. vitals renames the project and continues it.
 
 **Thanks to SKGleba for the [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso) plugin!** His work updating the Vita's certificates is the foundation of `vitals`, along with his original installer and module-redirection code. Existing author notices are preserved in the source.
 
