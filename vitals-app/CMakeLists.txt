@@ -73,7 +73,7 @@ target_link_libraries(vitals-app PRIVATE libcurl_static
     ScePvf_stub SceHttp_stub SceSsl_stub SceNet_stub SceNetCtl_stub
     SceSysmodule_stub SceDisplay_stub SceCtrl_stub ScePower_stub SceVshBridge_stub SceRtc_stub
     SceLibKernel_stub SceIofilemgr_stub SceKernelThreadMgr_stub SceKernelModulemgr_stub
-    SceSysmem_stub SceProcessmgr_stub)
+    SceSysmem_stub SceProcessmgr_stub SceAppUtil_stub)
 
 # UNSAFE: installing needs system access (firmware version, vs0 and ur0 writes, reboot)
 vita_create_self(eboot.bin vitals-app UNSAFE)

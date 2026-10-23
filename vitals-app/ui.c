@@ -9,6 +9,14 @@ static const uint32_t bg = RGB(16, 20, 27), panel = RGB(27, 34, 45), white = RGB
                       red = RGB(255, 115, 125), blue = RGB(111, 186, 255),
                       amber = RGB(242, 198, 116), orange = RGB(255, 173, 80),
                       highlight = RGB(40, 52, 70);
+static const char *confirm_name = "Cross", *back_name = "Circle";
+void app_set_circle_confirms(int circle_confirms)
+{
+    confirm_name = circle_confirms ? "Circle" : "Cross";
+    back_name = circle_confirms ? "Cross" : "Circle";
+}
+const char *app_confirm_name(void) { return confirm_name; }
+const char *app_back_name(void) { return back_name; }
 static void rect(uint32_t *p, int x, int y, int w, int h, uint32_t c)
 {
     for (int yy = y; yy < y + h && yy < CHECK_HEIGHT; ++yy)
@@ -311,10 +319,13 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
         text(p, 28, 492, line, muted, 13);
     }
     rect(p, 0, 509, 960, 35, panel);
-    text(p, 28, 516,
-         busy ? "Triangle  Cancel     Hold arrows / stick  Scroll     Square  Details     Circle  Back"
-              : "Cross  Retry     Hold arrows / stick  Scroll     Square  Details     Circle  Back",
-         white, 16);
+    if (busy)
+        snprintf(line, sizeof(line), "Triangle  Cancel     Hold arrows / stick  Scroll     Square  Details     %s  Back",
+                 back_name);
+    else
+        snprintf(line, sizeof(line), "%s  Retry     Hold arrows / stick  Scroll     Square  Details     %s  Back",
+                 confirm_name, back_name);
+    text(p, 28, 516, line, white, 16);
 }
 
 /* The status card in the top right corner: "<label> <mark> <status>" */
@@ -403,7 +414,9 @@ void app_draw_home(uint32_t *p, const AppHome *home)
     /* The main credits from the README, centred above the controls */
     static const char credits[] = "Thanks to devnoname120, SKGleba, Reiko Asakura and Team Molecule";
     text(p, (960 - check_font_width(credits, 15)) / 2, 480, credits, muted, 15);
-    footer(p, home->hints != NULL ? home->hints : "Arrows  Choose     Cross  Select     Circle  Exit");
+    char hints[96];
+    snprintf(hints, sizeof(hints), "Arrows  Choose     %s  Select     %s  Exit", confirm_name, back_name);
+    footer(p, home->hints != NULL ? home->hints : hints);
 }
 void app_draw_task(uint32_t *p, const AppTask *task)
 {
@@ -416,7 +429,9 @@ void app_draw_task(uint32_t *p, const AppTask *task)
                         i + 1 == task->count && task->state == CHECK_RUNNING ? white : muted, 864);
     mark(p, 30, 467, task->state);
     text(p, 60, 460, task->status, tone(task->state), 21);
+    char back[32];
+    snprintf(back, sizeof(back), "%s  Back", back_name);
     footer(p, task->state == CHECK_RUNNING ? "Please wait and keep your Vita turned on."
-              : task->state == CHECK_FAIL  ? "Circle  Back"
+              : task->state == CHECK_FAIL  ? back
                                            : "");
 }

@@ -5,6 +5,7 @@
 #include "release_version.h"
 #include "ui.h"
 #include "version_check.h"
+#include <psp2/apputil.h>
 #include <psp2/ctrl.h>
 #include <psp2/display.h>
 #include <psp2/kernel/processmgr.h>
@@ -14,6 +15,7 @@
 #include <psp2/net/netctl.h>
 #include <psp2/power.h>
 #include <psp2/sysmodule.h>
+#include <psp2/system_param.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,6 +62,27 @@ static int debug_level = -1, debug_choice;
 static const char *const debug_names[VITALS_DEBUG_LEVEL_COUNT] = {"Off", "Basic", "Full"};
 
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
+
+/* Cross confirms and Circle goes back, unless the system setting swaps them (as on Japanese
+ * consoles); read once at start-up */
+static unsigned confirm_button = SCE_CTRL_CROSS, back_button = SCE_CTRL_CIRCLE;
+static int app_util_ready;
+static void read_button_setting(void)
+{
+    SceAppUtilInitParam init;
+    SceAppUtilBootParam boot;
+    int enter = SCE_SYSTEM_PARAM_ENTER_BUTTON_CROSS;
+    memset(&init, 0, sizeof(init));
+    memset(&boot, 0, sizeof(boot));
+    app_util_ready = sceAppUtilInit(&init, &boot) >= 0;
+    if (app_util_ready && sceAppUtilSystemParamGetInt(SCE_SYSTEM_PARAM_ID_ENTER_BUTTON, &enter) >= 0 &&
+        enter == SCE_SYSTEM_PARAM_ENTER_BUTTON_CIRCLE)
+    {
+        confirm_button = SCE_CTRL_CIRCLE;
+        back_button = SCE_CTRL_CROSS;
+        app_set_circle_confirms(1);
+    }
+}
 
 /* Shows the finished canvas at the next vblank; the screen has only one buffer */
 static void present(void)
@@ -261,7 +284,7 @@ static void run_operation(enum Action action)
     task.state = CHECK_FAIL;
     task.status = status;
     draw_task();
-    while (!(read_presses() & SCE_CTRL_CIRCLE))
+    while (!(read_presses() & back_button))
         sceKernelDelayThread(30000);
 }
 
@@ -306,7 +329,7 @@ static void run_test(void)
         }
         if (ready)
             busy = vitals_check_poll(&view, notice, sizeof(notice));
-        if (pressed & SCE_CTRL_CIRCLE)
+        if (pressed & back_button)
         {
             leaving = 1;
             if (busy)
@@ -328,7 +351,7 @@ static void run_test(void)
         else
             scroll = check_scroll_move(scroll, page == 0 ? scroll_steps : 0,
                                        view.handshake.cipher_count, CHECK_VISIBLE_CIPHERS);
-        if (ready && !busy && !leaving && (pressed & SCE_CTRL_CROSS))
+        if (ready && !busy && !leaving && (pressed & confirm_button))
         {
             vitals_check_start();
             busy = 1;
@@ -379,6 +402,7 @@ int main(void)
     display_active = 1;
     sceDisplayWaitSetFrameBuf();
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+    read_button_setting();
 
     char firmware[32];
     int supported = vitals_install_firmware_supported(firmware, sizeof(firmware));
@@ -451,11 +475,18 @@ int main(void)
             }
         if (selected >= count)
             selected = count - 1;
-        /* On the debug item, Cross only does something once another level is chosen */
+        /* On the debug item, the confirm button only does something once another level is chosen */
+        static char debug_hints[96];
         const char *hints = NULL;
         if (actions[selected] == ACTION_DEBUG)
-            hints = debug_choice != debug_level ? "Arrows  Choose     Cross  Apply and reboot     Circle  Exit"
-                                                : "Arrows  Choose     Circle  Exit";
+        {
+            if (debug_choice != debug_level)
+                snprintf(debug_hints, sizeof(debug_hints), "Arrows  Choose     %s  Apply and reboot     %s  Exit",
+                         app_confirm_name(), app_back_name());
+            else
+                snprintf(debug_hints, sizeof(debug_hints), "Arrows  Choose     %s  Exit", app_back_name());
+            hints = debug_hints;
+        }
         AppHome home = {installed, outdated, installed_version, debug_level > 0 ? debug_names[debug_level] : NULL,
                         supported, firmware, items, count, selected, hints, newer_release()};
         app_draw_home(canvas, &home);
@@ -464,10 +495,10 @@ int main(void)
         /* A newer release found meanwhile redraws the menu without waiting for a button */
         const char *shown_release = home.latest_release;
         while (!(pressed = read_presses() & (SCE_CTRL_UP | SCE_CTRL_DOWN | SCE_CTRL_LEFT | SCE_CTRL_RIGHT |
-                                             SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) &&
+                                             confirm_button | back_button)) &&
                newer_release() == shown_release)
             sceKernelDelayThread(30000);
-        if (pressed & SCE_CTRL_CIRCLE)
+        if (pressed & back_button)
             break;
         if (pressed & SCE_CTRL_UP && selected > 0)
             --selected;
@@ -475,7 +506,7 @@ int main(void)
             ++selected;
         else if (pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT))
         {
-            /* Left and Right only choose a debug level; nothing changes until Cross */
+            /* Left and Right only choose a debug level; nothing changes until the confirm button */
             if (actions[selected] == ACTION_DEBUG)
             {
                 if (pressed & SCE_CTRL_LEFT && debug_choice > 0)
@@ -484,7 +515,7 @@ int main(void)
                     ++debug_choice;
             }
         }
-        else if (pressed & SCE_CTRL_CROSS)
+        else if (pressed & confirm_button)
         {
             enum Action action = actions[selected];
             if (action == ACTION_EXIT)
@@ -504,6 +535,8 @@ int main(void)
     }
     exit_code = 0;
 cleanup:
+    if (app_util_ready)
+        sceAppUtilShutdown();
     stop_release_check();
     vitals_check_close();
     network_stop();

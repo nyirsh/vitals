@@ -40,6 +40,11 @@ typedef struct {
     enum CheckState state;
     const char *status;
 } AppTask;
+/* The confirm and back buttons' names in the controls shown on screen: Cross and Circle, or
+ * swapped where the system setting makes Circle confirm (as on Japanese consoles) */
+void app_set_circle_confirms(int circle_confirms);
+const char *app_confirm_name(void);
+const char *app_back_name(void);
 void app_draw_home(uint32_t *pixels, const AppHome *home);
 void app_draw_task(uint32_t *pixels, const AppTask *task);
 /* The connection test, as drawn by Vital Signs */
