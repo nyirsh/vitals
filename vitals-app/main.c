@@ -492,27 +492,48 @@ int main(void)
         app_draw_home(canvas, &home);
         present();
         unsigned pressed = 0;
-        /* A newer release found meanwhile redraws the menu without waiting for a button */
+        /* The D-pad or either stick moves, with a repeat while held, as on the test screen; a
+         * newer release found meanwhile redraws the menu without waiting for a button */
         const char *shown_release = home.latest_release;
-        while (!(pressed = read_presses() & (SCE_CTRL_UP | SCE_CTRL_DOWN | SCE_CTRL_LEFT | SCE_CTRL_RIGHT |
-                                             confirm_button | back_button)) &&
-               newer_release() == shown_release)
+        static CheckScrollRepeat vertical, sideways;
+        int moves = 0, turns = 0;
+        for (;;)
+        {
+            SceCtrlData pads[64];
+            int pad_count = sceCtrlReadBufferPositive(0, pads, 64);
+            uint64_t sample_ms = now_ms();
+            for (int i = 0; i < pad_count && i < 64; ++i)
+            {
+                unsigned buttons = pads[i].buttons;
+                pressed |= buttons & ~held;
+                held = buttons;
+                moves += check_scroll_repeat(&vertical,
+                                             check_scroll_direction(buttons & SCE_CTRL_UP, buttons & SCE_CTRL_DOWN,
+                                                                    pads[i].ly, pads[i].ry),
+                                             sample_ms);
+                turns += check_scroll_repeat(&sideways,
+                                             check_scroll_direction(buttons & SCE_CTRL_LEFT, buttons & SCE_CTRL_RIGHT,
+                                                                    pads[i].lx, pads[i].rx),
+                                             sample_ms);
+            }
+            if ((pressed & (confirm_button | back_button)) || moves || turns || newer_release() != shown_release)
+                break;
             sceKernelDelayThread(30000);
+        }
         if (pressed & back_button)
             break;
-        if (pressed & SCE_CTRL_UP && selected > 0)
-            --selected;
-        else if (pressed & SCE_CTRL_DOWN && selected + 1 < count)
-            ++selected;
-        else if (pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT))
+        if (moves)
+        {
+            int target = (int)selected + moves;
+            selected = target < 0 ? 0 : target >= (int)count ? count - 1 : (unsigned)target;
+        }
+        else if (turns)
         {
             /* Left and Right only choose a debug level; nothing changes until the confirm button */
             if (actions[selected] == ACTION_DEBUG)
             {
-                if (pressed & SCE_CTRL_LEFT && debug_choice > 0)
-                    --debug_choice;
-                else if (pressed & SCE_CTRL_RIGHT && debug_choice + 1 < VITALS_DEBUG_LEVEL_COUNT)
-                    ++debug_choice;
+                int target = debug_choice + turns;
+                debug_choice = target < 0 ? 0 : target >= VITALS_DEBUG_LEVEL_COUNT ? VITALS_DEBUG_LEVEL_COUNT - 1 : target;
             }
         }
         else if (pressed & confirm_button)
