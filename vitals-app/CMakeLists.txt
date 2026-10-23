@@ -43,6 +43,8 @@ add_executable(vitals-app
     main.c
     install.c
     module_version.c
+    release_version.c
+    version_check.c
     config_edit.c
     check.c
     ui.c

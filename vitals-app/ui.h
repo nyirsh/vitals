@@ -21,6 +21,8 @@ typedef struct {
     unsigned count, selected;
     /* The controls shown at the bottom; NULL for the usual ones */
     const char *hints;
+    /* A newer published release than this app ("1.3"), or NULL */
+    const char *latest_release;
 } AppHome;
 /* An install, uninstall or certificate update in progress or finished */
 typedef struct {
@@ -29,6 +31,8 @@ typedef struct {
     const char *installed_version;
     /* The installed debug output level's name ("Basic", "Full"); NULL when it is off or unknown */
     const char *debug_output;
+    /* A newer published release than this app ("1.3"), or NULL */
+    const char *latest_release;
     const char *title;
     const char *const *lines;
     unsigned count;

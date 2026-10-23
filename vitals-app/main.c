@@ -2,7 +2,9 @@
 #include "font.h"
 #include "input.h"
 #include "install.h"
+#include "release_version.h"
 #include "ui.h"
+#include "version_check.h"
 #include <psp2/ctrl.h>
 #include <psp2/display.h>
 #include <psp2/kernel/processmgr.h>
@@ -81,36 +83,45 @@ static unsigned read_presses(void)
     return pressed;
 }
 
-/* The network is started once and shared by the certificate download and the test */
+/* The network is started once and shared by the certificate download, the test and the
+ * new-version check */
 static void *net_memory;
 static int net_loaded, net_ready, ctl_ready, net_result = 1;
-static int network_start(void)
+/* Waits up to 10 seconds for a connection; *cancel set by another thread ends the wait early
+ * without recording a result, so the next caller waits again */
+static int network_start_until(const volatile int *cancel)
 {
     if (net_result <= 0)
         return net_result;
     int rc = 0;
-    if (sceSysmoduleIsLoaded(SCE_SYSMODULE_NET) != SCE_SYSMODULE_LOADED)
+    if (!ctl_ready)
     {
-        rc = sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+        if (!net_loaded && sceSysmoduleIsLoaded(SCE_SYSMODULE_NET) != SCE_SYSMODULE_LOADED)
+        {
+            rc = sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+            if (rc < 0)
+                goto done;
+            net_loaded = 1;
+        }
+        if (!net_ready)
+        {
+            net_memory = malloc(1024 * 1024);
+            if (!net_memory)
+            {
+                rc = -1;
+                goto done;
+            }
+            SceNetInitParam net = {net_memory, 1024 * 1024, 0};
+            rc = sceNetInit(&net);
+            if (rc < 0)
+                goto done;
+            net_ready = 1;
+        }
+        rc = sceNetCtlInit();
         if (rc < 0)
             goto done;
-        net_loaded = 1;
+        ctl_ready = 1;
     }
-    net_memory = malloc(1024 * 1024);
-    if (!net_memory)
-    {
-        rc = -1;
-        goto done;
-    }
-    SceNetInitParam net = {net_memory, 1024 * 1024, 0};
-    rc = sceNetInit(&net);
-    if (rc < 0)
-        goto done;
-    net_ready = 1;
-    rc = sceNetCtlInit();
-    if (rc < 0)
-        goto done;
-    ctl_ready = 1;
     uint64_t deadline = now_ms() + 10000;
     for (;;)
     {
@@ -118,6 +129,8 @@ static int network_start(void)
         rc = sceNetCtlInetGetState(&state);
         if (rc < 0 || state == SCE_NETCTL_STATE_CONNECTED)
             break;
+        if (cancel != NULL && *cancel)
+            return -1;
         if (now_ms() > deadline)
         {
             rc = (int)0x80431068;
@@ -128,6 +141,51 @@ static int network_start(void)
 done:
     net_result = rc < 0 ? rc : 0;
     return net_result;
+}
+static int network_start(void) { return network_start_until(NULL); }
+
+/* The new-version check: a background thread asks GitHub, then GitLab, for the latest release
+ * when the app opens; only a newer release than this app is shown, and nothing is downloaded */
+static SceUID release_thread = -1;
+static volatile int release_cancel, release_done;
+static char latest_release[16];
+static int check_release(SceSize size, void *arguments)
+{
+    static const char *const urls[] = {VITALS_RELEASE_URL_GITHUB, VITALS_RELEASE_URL_GITLAB};
+    char version[16];
+    (void)size;
+    (void)arguments;
+    if (network_start_until(&release_cancel) == 0 &&
+        vitals_fetch_latest_release(urls, sizeof(urls) / sizeof(urls[0]), "app0:mozilla-certs.pem",
+                                    "vitals/" VITALS_VERSION, 6, &release_cancel, version, sizeof(version)) == 0 &&
+        vitals_release_newer(version, VITALS_VERSION) == 1)
+        memcpy(latest_release, version, sizeof(latest_release));
+    __atomic_store_n(&release_done, 1, __ATOMIC_RELEASE);
+    return sceKernelExitThread(0);
+}
+static void start_release_check(void)
+{
+    release_thread = sceKernelCreateThread("vitals release check", check_release, 0x10000100, 256 * 1024, 0, 0, NULL);
+    if (release_thread >= 0 && sceKernelStartThread(release_thread, 0, NULL) < 0)
+    {
+        sceKernelDeleteThread(release_thread);
+        release_thread = -1;
+    }
+}
+/* Ends the check before anything else uses the network or curl: the transfer stops at once */
+static void stop_release_check(void)
+{
+    if (release_thread < 0)
+        return;
+    release_cancel = 1;
+    sceKernelWaitThreadEnd(release_thread, NULL, NULL);
+    sceKernelDeleteThread(release_thread);
+    release_thread = -1;
+}
+/* The newer release, once the check found one; NULL until then and otherwise */
+static const char *newer_release(void)
+{
+    return __atomic_load_n(&release_done, __ATOMIC_ACQUIRE) && latest_release[0] != '\0' ? latest_release : NULL;
 }
 static void network_stop(void)
 {
@@ -151,6 +209,7 @@ static void draw_task(void)
     task.installed = installed;
     task.outdated = outdated;
     task.installed_version = installed_version;
+    task.latest_release = newer_release();
     task.debug_output = debug_level > 0 ? debug_names[debug_level] : NULL;
     app_draw_task(canvas, &task);
     present();
@@ -319,6 +378,7 @@ int main(void)
     int supported = vitals_install_firmware_supported(firmware, sizeof(firmware));
     unsigned selected = 0;
     int refresh = 1;
+    start_release_check();
     for (;;)
     {
         /* Installing is offered only on 3.65; the test works everywhere */
@@ -391,12 +451,15 @@ int main(void)
             hints = debug_choice != debug_level ? "Arrows  Choose     Cross  Apply and reboot     Circle  Exit"
                                                 : "Arrows  Choose     Circle  Exit";
         AppHome home = {installed, outdated, installed_version, debug_level > 0 ? debug_names[debug_level] : NULL,
-                        supported, firmware, items, count, selected, hints};
+                        supported, firmware, items, count, selected, hints, newer_release()};
         app_draw_home(canvas, &home);
         present();
         unsigned pressed = 0;
+        /* A newer release found meanwhile redraws the menu without waiting for a button */
+        const char *shown_release = home.latest_release;
         while (!(pressed = read_presses() & (SCE_CTRL_UP | SCE_CTRL_DOWN | SCE_CTRL_LEFT | SCE_CTRL_RIGHT |
-                                             SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)))
+                                             SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)) &&
+               newer_release() == shown_release)
             sceKernelDelayThread(30000);
         if (pressed & SCE_CTRL_CIRCLE)
             break;
@@ -420,6 +483,9 @@ int main(void)
             enum Action action = actions[selected];
             if (action == ACTION_EXIT)
                 break;
+            /* The release check never runs alongside the test or an operation */
+            if (action != ACTION_DEBUG || debug_choice != debug_level)
+                stop_release_check();
             if (action == ACTION_TEST)
                 run_test();
             else if (action != ACTION_DEBUG || debug_choice != debug_level)
@@ -432,6 +498,7 @@ int main(void)
     }
     exit_code = 0;
 cleanup:
+    stop_release_check();
     vitals_check_close();
     network_stop();
     if (font_ready)

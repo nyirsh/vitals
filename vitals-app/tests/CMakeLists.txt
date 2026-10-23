@@ -39,6 +39,11 @@ target_include_directories(vitals_app_module_version_tests PRIVATE include ${APP
 target_link_libraries(vitals_app_module_version_tests PRIVATE ZLIB::ZLIB)
 add_test(NAME vitals_app_module_version COMMAND vitals_app_module_version_tests)
 
+# The release number in GitHub's and GitLab's release responses, for the new-version notice
+add_executable(vitals_app_release_version_tests test_release_version.c ${APP_DIR}/release_version.c)
+target_include_directories(vitals_app_release_version_tests PRIVATE ${APP_DIR})
+add_test(NAME vitals_app_release_version COMMAND vitals_app_release_version_tests)
+
 # The locking adapter only needs OpenSSL's headers; Homebrew's default OpenSSL on macOS, the
 # system's on Linux (libssl-dev)
 find_path(OPENSSL_HEADERS openssl/crypto.h

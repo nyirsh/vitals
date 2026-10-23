@@ -260,14 +260,21 @@ static void status_card(uint32_t *p, const char *label, const char *status, enum
 }
 /* outdated: a different version's plugin is installed than the one this app carries;
  * installed_version is its release number, empty when unknown */
+/* latest_release: a newer published release than this app, shown next to its version */
 static void header(uint32_t *p, int installed, int outdated, const char *installed_version,
-                   const char *debug_output)
+                   const char *debug_output, const char *latest_release)
 {
     char line[64];
     rect(p, 0, 0, 960, 544, bg);
     text(p, 28, 17, "vitals", white, 32);
     snprintf(line, sizeof(line), "Version %s", VITALS_VERSION);
     text(p, 30, 58, line, muted, 17);
+    if (latest_release != NULL)
+    {
+        int left = 30 + check_font_width(line, 17);
+        snprintf(line, sizeof(line), "  -  %s available on GitHub / GitLab", latest_release);
+        text(p, left, 58, line, amber, 17);
+    }
     char status[48];
     int known = installed_version != NULL && installed_version[0] != '\0';
     if (outdated && known && strcmp(installed_version, VITALS_VERSION) != 0)
@@ -292,7 +299,7 @@ static void footer(uint32_t *p, const char *hints)
 }
 void app_draw_home(uint32_t *p, const AppHome *home)
 {
-    header(p, home->installed, home->outdated, home->installed_version, home->debug_output);
+    header(p, home->installed, home->outdated, home->installed_version, home->debug_output, home->latest_release);
     int y = 97;
     if (!home->firmware_supported)
     {
@@ -326,7 +333,7 @@ void app_draw_home(uint32_t *p, const AppHome *home)
 }
 void app_draw_task(uint32_t *p, const AppTask *task)
 {
-    header(p, task->installed, task->outdated, task->installed_version, task->debug_output);
+    header(p, task->installed, task->outdated, task->installed_version, task->debug_output, task->latest_release);
     text(p, 28, 97, task->title, white, 23);
     card(p, 28, 135, 904, 306, panel);
     unsigned first = task->count > APP_TASK_VISIBLE_LINES ? task->count - APP_TASK_VISIBLE_LINES : 0;
