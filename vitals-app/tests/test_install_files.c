@@ -270,7 +270,10 @@ static void test_conflicting_installs_are_removed(void)
                 "*KERNEL\r\nux0:tai/reAuth.skprx\r\n");
     put(CA, "ITLS BUNDLE\n");
     put(CA_BACKUP, SONY_CA);
+    /* iTLS-Enso's full set, including its 3.60 DNS fix and replacement Store library */
     const char *others[] = {"ur0:tai/itls.skprx", "ur0:tai/itls.suprx", "vs0:/data/external/itls/libhttp.suprx",
+                            "vs0:/data/external/itls/libssl.suprx", "vs0:/data/external/itls/ScePsp2Compat.suprx",
+                            "vs0:/data/external/itls/old_dns_fix.suprx", "vs0:/data/external/itls/np_commerce2.suprx",
                             "ur0:tai/tls_fixer.skprx", "vs0:/data/external/tls_fixer/native/tls_fixer.suprx",
                             "ux0:tai/reAuth.skprx", "ur0:data/reAuth/reAuth.suprx", "ur0:data/reAuth/libhttp.suprx"};
     for (size_t i = 0; i < sizeof(others) / sizeof(others[0]); ++i)

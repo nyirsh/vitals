@@ -103,7 +103,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
         unsigned v = 3 - col;
         int left = 28 + (int)col * 232;
         const CheckResult *r = &s->protocols[v];
-        card(p, left, 97, 208, 101, panel);
+        card(p, left, 97, 208, 88, panel);
         snprintf(line, sizeof(line), "TLS 1.%u", v);
         text(p, left + 16, 109, line, white, 24);
         CheckProtocolDisplay display = check_protocol_display(v, r);
@@ -121,20 +121,60 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
                            : ps->state == CHECK_RUNNING ? "Checking..."
                            : ps->state == CHECK_INFO    ? "Not tested"
                                                         : "Waiting";
-    card(p, 28, 214, 904, 48, panel);
-    text(p, 44, 226, "PlayStation servers", white, 18);
-    text(p, 270, 226, "native-vita.np.ac.playstation.net", muted, 18);
+    card(p, 28, 193, 904, 38, panel);
+    text(p, 44, 202, "PlayStation servers", white, 18);
+    text(p, 270, 202, "native-vita.np.ac.playstation.net", muted, 18);
     int ps_label_left = 916 - check_font_width(ps_label, 18);
-    mark(p, ps_label_left - 30, 230, ps->state);
-    text(p, ps_label_left, 226, ps_label, tone(ps->state), 18);
-    text(p, 28, 276, "TLS REPORT", muted, 14);
+    mark(p, ps_label_left - 30, 206, ps->state);
+    text(p, ps_label_left, 202, ps_label, tone(ps->state), 18);
+
+    /* The host redirects in one line: how many passed out of how many are listed */
+    unsigned passed = 0, failed = 0, finished = 0, not_tested = 0;
+    for (unsigned i = 0; i < s->redirect_count; ++i)
+    {
+        enum CheckState state = s->redirects[i].result.state;
+        passed += state == CHECK_PASS;
+        failed += state == CHECK_FAIL;
+        not_tested += state == CHECK_INFO;
+        finished += state == CHECK_PASS || state == CHECK_FAIL || state == CHECK_INFO;
+    }
+    char redirect_label[48];
+    enum CheckState redirect_state;
+    if (s->redirect_count == 0)
+    {
+        redirect_state = CHECK_WAIT;
+        snprintf(redirect_label, sizeof(redirect_label), "%s", s->complete ? "None listed" : "Waiting");
+    }
+    else if (finished < s->redirect_count)
+    {
+        redirect_state = finished || s->redirects[0].result.state == CHECK_RUNNING ? CHECK_RUNNING : CHECK_WAIT;
+        snprintf(redirect_label, sizeof(redirect_label), redirect_state == CHECK_RUNNING ? "Checking %u/%u" : "Waiting",
+                 finished, s->redirect_count);
+    }
+    else if (not_tested == s->redirect_count)
+    {
+        redirect_state = CHECK_INFO;
+        snprintf(redirect_label, sizeof(redirect_label), "Not tested");
+    }
+    else
+    {
+        redirect_state = failed || not_tested ? CHECK_FAIL : CHECK_PASS;
+        snprintf(redirect_label, sizeof(redirect_label), "%u/%u", passed, s->redirect_count);
+    }
+    card(p, 28, 237, 904, 38, panel);
+    text(p, 44, 246, "Redirections", white, 18);
+    text(p, 270, 246, "ux0:data/vitals/redirects.txt", muted, 18);
+    int redirect_label_left = 916 - check_font_width(redirect_label, 18);
+    mark(p, redirect_label_left - 30, 250, redirect_state);
+    text(p, redirect_label_left, 246, redirect_label, tone(redirect_state), 18);
+    text(p, 28, 283, "TLS REPORT", muted, 14);
     if (s->connection.state == CHECK_PASS)
     {
-        text(p, 28, 296, s->handshake.cipher.name, white, 21);
+        text(p, 28, 302, s->handshake.cipher.name, white, 21);
         snprintf(line, sizeof(line), "%s   /   %s   /   0x%04X", s->handshake.version.name,
                  s->handshake.group.name[0] ? s->handshake.group.name : "Key exchange not reported",
                  s->handshake.cipher.id);
-        text(p, 28, 326, line, muted, 16);
+        text(p, 28, 330, line, muted, 16);
     }
     else
     {
@@ -144,16 +184,16 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
                                                                : "Ready to test";
         if (!s->started && notice && notice[0])
             msg = notice;
-        text(p, 28, 296, msg, s->connection.state == CHECK_FAIL ? red : white, 21);
+        text(p, 28, 302, msg, s->connection.state == CHECK_FAIL ? red : white, 21);
         if (s->connection.state == CHECK_FAIL)
         {
             snprintf(line, sizeof(line), "HTTP %d / Req 0x%08X / SSL 0x%08X",
                      s->connection.http_code, (unsigned)s->connection.error,
                      (unsigned)s->connection.ssl_error);
-            text(p, 28, 326, line, muted, 16);
+            text(p, 28, 330, line, muted, 16);
         }
         else
-            text(p, 28, 326, "Certificate verification on / Fresh connections", muted, 16);
+            text(p, 28, 330, "Certificate verification on / Fresh connections", muted, 16);
     }
     rect(p, 28, 356, 904, 1, panel);
     if (page == 0)
