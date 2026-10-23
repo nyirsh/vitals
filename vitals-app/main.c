@@ -381,7 +381,7 @@ int main(void)
     start_release_check();
     for (;;)
     {
-        /* Installing is offered only on 3.65; the test works everywhere */
+        /* Installing is offered only on 3.60 and 3.65; the test works everywhere */
         enum Action actions[7];
         AppMenuItem items[7];
         unsigned count = 0;

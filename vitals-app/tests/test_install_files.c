@@ -333,8 +333,28 @@ static void test_failed_renames(int removing)
     }
 }
 
+/* Installing is offered on 3.60 and 3.65 only */
+static void test_supported_firmware(void)
+{
+    static const struct
+    {
+        unsigned int version;
+        int supported;
+    } firmware[] = {{0x03600000u, 1}, {0x03650000u, 1}, {0x03600011u, 1}, {0x03610000u, 0},
+                    {0x03630000u, 0}, {0x03680000u, 0}, {0x03740000u, 0}, {0x03550000u, 0}};
+    for (size_t i = 0; i < sizeof(firmware) / sizeof(firmware[0]); ++i)
+    {
+        char description[32];
+        vita_files_firmware = firmware[i].version;
+        assert(vitals_install_firmware_supported(description, sizeof(description)) == firmware[i].supported);
+        assert(description[0] != '\0');
+    }
+    vita_files_firmware = 0x03650000u;
+}
+
 int main(void)
 {
+    test_supported_firmware();
     test_install_reinstall_uninstall();
     test_debug_levels();
     test_conflicting_installs_are_removed();

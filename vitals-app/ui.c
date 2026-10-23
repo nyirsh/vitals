@@ -308,7 +308,7 @@ void app_draw_home(uint32_t *p, const AppHome *home)
         mark(p, 46, y + 14, CHECK_WARNING);
         snprintf(line, sizeof(line), "Unsupported firmware: %s", home->firmware);
         text(p, 76, y + 8, line, amber, 21);
-        text(p, 76, y + 40, "vitals only supports firmware 3.65, so installing is disabled. "
+        text(p, 76, y + 40, "vitals only supports firmware 3.60 and 3.65, so installing is disabled. "
                             "The connection test still works.",
              muted, 16);
         y += 86;

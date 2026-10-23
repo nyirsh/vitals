@@ -26,8 +26,15 @@ static const uint8_t argument_checks[] = {
     0xb2, 0x81, 0x30, 0x46, 0xff, 0xf7, 0x4a, 0xfe,
     0x00, 0x28, 0xc0, 0xf2, 0x7b, 0x81
 };
+/* These three differ between the firmware families: their calls reach code that moved */
+static const uint8_t current_pid_360[] = {
+    0x09, 0xf0, 0x0a, 0xe9, 0x06, 0x46, 0x43, 0xe7
+};
 static const uint8_t current_pid[] = {
     0x09, 0xf0, 0x60, 0xe9, 0x06, 0x46, 0x43, 0xe7
+};
+static const uint8_t process_open_360[] = {
+    0x01, 0x22, 0x00, 0x23, 0x08, 0xf0, 0x46, 0xee, 0x05, 0x46, 0x64, 0xe7
 };
 static const uint8_t process_open[] = {
     0x01, 0x22, 0x00, 0x23, 0x08, 0xf0, 0x9c, 0xee, 0x05, 0x46, 0x64, 0xe7
@@ -48,6 +55,14 @@ static const uint8_t start_arguments[] = {
     0xbe, 0xf1, 0x00, 0x0f, 0x25, 0xd0, 0xde, 0xf8,
     0x00, 0x30, 0x10, 0x2b, 0x1c, 0xbf
 };
+static const uint8_t start_dispatch_360[] = {
+    0x0d, 0xf1, 0x14, 0x0e, 0x00, 0x20, 0x4a, 0x46,
+    0x2b, 0x46, 0xcd, 0xe9, 0x00, 0xe0, 0x51, 0x46,
+    0x0b, 0xf1, 0x08, 0x00, 0xff, 0xf7, 0xf9, 0xf8,
+    0x81, 0x46, 0x40, 0x46, 0x08, 0xf0, 0xb6, 0xeb,
+    0x05, 0x9b, 0x01, 0x2b, 0x1c, 0xd0, 0x02, 0x2b,
+    0x15, 0xd0, 0xb9, 0xf1
+};
 static const uint8_t start_dispatch[] = {
     0x0d, 0xf1, 0x14, 0x0e, 0x00, 0x20, 0x4a, 0x46,
     0x2b, 0x46, 0xcd, 0xe9, 0x00, 0xe0, 0x51, 0x46,
@@ -62,16 +77,18 @@ typedef struct HookSignature {
     const uint8_t *bytes;
     const uint8_t *mask;
     size_t size;
+    /* The 3.60 family's bytes where they differ; NULL when they are the same */
+    const uint8_t *bytes_360;
 } HookSignature;
 
 static const HookSignature signatures[] = {
-    {VITALS_MODULEMGR_LOAD_OFFSET, entry, entry_mask, sizeof(entry)},
-    {0x21f8, argument_checks, NULL, sizeof(argument_checks)},
-    {0x2384, current_pid, NULL, sizeof(current_pid)},
-    {0x23f8, process_open, NULL, sizeof(process_open)},
-    {VITALS_MODULEMGR_START_OFFSET, start_entry, start_entry_mask, sizeof(start_entry)},
-    {0x287a, start_arguments, NULL, sizeof(start_arguments)},
-    {0x29b2, start_dispatch, NULL, sizeof(start_dispatch)},
+    {VITALS_MODULEMGR_LOAD_OFFSET, entry, entry_mask, sizeof(entry), NULL},
+    {0x21f8, argument_checks, NULL, sizeof(argument_checks), NULL},
+    {0x2384, current_pid, NULL, sizeof(current_pid), current_pid_360},
+    {0x23f8, process_open, NULL, sizeof(process_open), process_open_360},
+    {VITALS_MODULEMGR_START_OFFSET, start_entry, start_entry_mask, sizeof(start_entry), NULL},
+    {0x287a, start_arguments, NULL, sizeof(start_arguments), NULL},
+    {0x29b2, start_dispatch, NULL, sizeof(start_dispatch), start_dispatch_360},
 };
 
 int vitals_validate_loader_hook(SceUID module_id) {
@@ -100,7 +117,8 @@ int vitals_validate_loader_hook(SceUID module_id) {
         if (signature->offset > segment->filesz ||
             signature->size > segment->filesz - signature->offset) return -1;
         const volatile uint8_t *code = (const volatile uint8_t *)(base + signature->offset);
-        const uint8_t *expected = signature->bytes;
+        const uint8_t *expected = profile->family == VITALS_KERNEL_FAMILY_360 && signature->bytes_360 != NULL
+            ? signature->bytes_360 : signature->bytes;
         for (size_t n = 0; n < signature->size; ++n) {
             uint8_t mask = signature->mask == NULL ? 0xff : signature->mask[n];
             if (((code[n] ^ expected[n]) & mask) != 0) return -1;

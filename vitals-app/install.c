@@ -527,12 +527,12 @@ static int remove_legacy_install(void)
     return result;
 }
 
-/* vitals is built and tested for 3.65 only; its module checks and the bundled Sony
- * modules target that firmware */
-#define SUPPORTED_FIRMWARE UINT32_C(0x03650000)
+/* vitals supports 3.60 and 3.65; its kernel plugin and browser provider recognise exactly
+ * those firmware versions */
+static const uint32_t supported_firmware[] = {UINT32_C(0x03600000), UINT32_C(0x03650000)};
 
-/* Returns 1 on 3.65; otherwise 0, with the detected firmware (or that it couldn't be read)
- * in description */
+/* Returns 1 on 3.60 or 3.65; otherwise 0, with the detected firmware (or that it couldn't be
+ * read) in description */
 int vitals_install_firmware_supported(char *description, size_t size)
 {
     SceKernelFwInfo firmware;
@@ -545,7 +545,12 @@ int vitals_install_firmware_supported(char *description, size_t size)
         return 0;
     }
     snprintf(description, size, "%.*s", (int)sizeof(firmware.versionString), firmware.versionString);
-    return (firmware.version & UINT32_C(0xffff0000)) == SUPPORTED_FIRMWARE;
+    for (size_t i = 0; i < sizeof(supported_firmware) / sizeof(supported_firmware[0]); ++i)
+    {
+        if ((firmware.version & UINT32_C(0xffff0000)) == supported_firmware[i])
+            return 1;
+    }
+    return 0;
 }
 
 /* SKGleba's iTLS-Enso, which vitals grew out of

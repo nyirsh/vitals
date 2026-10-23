@@ -4,9 +4,18 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* SceKernelModulemgr exists in two forms: 3.60 and 3.61 (family 0), and 3.63 and later
+ * (family 1); they differ in a few instructions and in the library that exports its functions */
+enum {
+    VITALS_KERNEL_FAMILY_360,
+    VITALS_KERNEL_FAMILY_365,
+    VITALS_KERNEL_FAMILY_COUNT
+};
+
 typedef struct VitalsKernelProfile {
     uint32_t module_nid;
     size_t text_size, metadata_offset;
+    unsigned int family;
 } VitalsKernelProfile;
 
 typedef struct VitalsWebKitProfile {
@@ -16,20 +25,28 @@ typedef struct VitalsWebKitProfile {
     const unsigned char *callback_signature;
 } VitalsWebKitProfile;
 
-/* vitals supports firmware 3.65 only (the installer refuses others)
- * These identify its SceKernelModulemgr and SceWebKit; other firmware is left alone */
+/* vitals supports firmware 3.60 and 3.65 (the installer refuses others)
+ * These identify their SceKernelModulemgr and SceWebKit; other firmware is left alone
+ * The values come from tls_fixer, which supported a wider range */
 static const VitalsKernelProfile vitals_kernel_profiles[] = {
-    {0x781c6f50, 0xf034, 0xba80},
+    {0x726c6635, 0xef84, 0xb9d0, VITALS_KERNEL_FAMILY_360}, /* 3.60 */
+    {0x781c6f50, 0xf034, 0xba80, VITALS_KERNEL_FAMILY_365}, /* 3.65 */
 };
 
+static const unsigned char vitals_webkit_callback_360[] = {
+    0x10,0xb5,0x08,0x1c,0x11,0x1c,0xf1,0xf2,0xba,0xe5,0x00,0x20,0x10,0xbd
+};
 static const unsigned char vitals_webkit_callback_365[] = {
     0x10,0xb5,0x08,0x1c,0x11,0x1c,0xf1,0xf2,0xa8,0xe5,0x00,0x20,0x10,0xbd
 };
 
 static const VitalsWebKitProfile vitals_webkit_profiles[] = {
-    {0xa33a93f7,0xaf2e9c,0xce34,0x115c0,0x85fae4,0x16c7ba,0xa98064,vitals_webkit_callback_365}, /* retail */
-    {0xe32c493d,0xaf2e9c,0xce34,0x115c0,0x85fae4,0x16c7ba,0xa98064,vitals_webkit_callback_365}, /* testkit */
-    {0x8deccd66,0xaf2e9c,0xce34,0x115c0,0x85fae4,0x16c7ba,0xa98064,vitals_webkit_callback_365}, /* devkit */
+    {0x20163df2,0xaf2ebc,0xce34,0x115c0,0x85fb04,0x16c7b6,0xa98084,vitals_webkit_callback_360}, /* retail 3.60 */
+    {0x87f5a440,0xaf2ebc,0xce34,0x115c0,0x85fb04,0x16c7b6,0xa98084,vitals_webkit_callback_360}, /* testkit 3.60 */
+    {0x1a29ef0d,0xaf2ebc,0xce34,0x115c0,0x85fb04,0x16c7b6,0xa98084,vitals_webkit_callback_360}, /* devkit 3.60 */
+    {0xa33a93f7,0xaf2e9c,0xce34,0x115c0,0x85fae4,0x16c7ba,0xa98064,vitals_webkit_callback_365}, /* retail 3.65 */
+    {0xe32c493d,0xaf2e9c,0xce34,0x115c0,0x85fae4,0x16c7ba,0xa98064,vitals_webkit_callback_365}, /* testkit 3.65 */
+    {0x8deccd66,0xaf2e9c,0xce34,0x115c0,0x85fae4,0x16c7ba,0xa98064,vitals_webkit_callback_365}, /* devkit 3.65 */
 };
 
 static inline uint32_t vitals_profile_u32(const unsigned char *bytes) {

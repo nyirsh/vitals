@@ -21,12 +21,11 @@ The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current
 >
 > - back up your Vita, including `ur0:tai/config.txt`;
 > - make sure you know how to start your Vita without plugins (hold **L** while it boots) and how to recover it if something goes wrong;
-> - only install it on firmware 3.65, the only firmware it is built and tested for.
+> - only install it on firmware 3.60 or 3.65, the only firmware it is built and tested for.
 
 ## Installation
 
-You need a hacked PS Vita on **firmware 3.65** with taiHEN. `vitals` was developed and tested on real hardware with 3.65 only.  
-Keeping compatibility with only one firmware makes things a lot easier, and the version has been chosen by looking at what [Vita Hacks Guide](https://vita.hacks.guide/) recommends, if you're not on that version and you want to use this software, please follow their guides and update. On any other firmware the installation simply won't start.
+You need a hacked PS Vita on **firmware 3.60 or 3.65** with taiHEN. Supporting only these two versions keeps things a lot simpler; 3.65 is what [Vita Hacks Guide](https://vita.hacks.guide/) recommends, so if you're on another version and want to use this software, please follow their guides and update. On any other firmware the installation simply won't start.
 
 - Download `vitals-app.vpk` from the releases page on [GitHub](https://github.com/nyirsh/vitals/releases) or [GitLab](https://gitlab.com/nyirsh/vitals/-/releases)
 - Transfer it to your vita and install it (`VitaShell` can do both)
@@ -62,7 +61,7 @@ TLS 1.0 and 1.1 are deliberately disabled.
 - **Much less heap memory taken.** `tls_fixer` reserved a fixed 2 MiB heap inside every app that uses `sceHttp`, which is a lot on a console where games have little memory to spare. `vitals` reserves only 128 KiB and that fixes most of the crashes.
 - **Certificates are looked up on demand.** `tls_fixer` parsed the whole certificate store (176 certificates!) into memory when each app started. `vitals` only builds a small index at start-up and reads a root certificate from the file when a handshake actually needs it. Apps and the browser start faster, and the parsed store no longer takes memory.
 - **Games with their own certificates work.** When an app loaded its own CA certificates, `tls_fixer` sent all of that app's new connections back to Sony's old TLS stack, which fails against current servers. `vitals` keeps its modern TLS and trusts the app's certificates in addition to the system store. This is what lets games redirected to community servers, such as Sound Shapes, sign in via https instead of http.
-- **A simpler kernel plugin**, modeled on `iTLS-Enso` module redirection, with the experimental, diagnostic and multi-firmware code removed. It targets firmware 3.65 only.
+- **A simpler kernel plugin**, modeled on `iTLS-Enso` module redirection, with the experimental, diagnostic and multi-firmware code removed. It targets firmware 3.60 and 3.65 only.
 - **Host redirects for servers:** a simple list lets you redirect connections for a given host to a new one (see [Host redirects](#host-redirects))
 - **PSN sign-in redirect built in:** the shell and the Store are sent to the new PSN sign-in host, without a separate reAuth installation, saving even more memory.
 - **Easier to build and maintain:** refactored code, pinned and hash-verified `Mbed TLS` and curl downloads, a Makefile per component, `make update-certs` to refresh the bundled certificates, and `make test` to allow easy automated sanity checks.
@@ -126,7 +125,7 @@ Each run saves a report to `ux0:data/vitals/`. The test works on any firmware an
 `vitals` started as a mashup of my URL redirector project and devnoname120's `tls_fixer`, and owes `tls_fixer` the hardest parts: running Mbed TLS inside Sony's HTTP stack, the providers and the injection. It's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
 
 - **Different memory design.** `tls_fixer` gives every app its own private copy of Sony's HTTP and SSL libraries, which costs a game about 440 KiB on top of the provider. `vitals` keeps the SSL library shared and handles the certificates games load at the HTTP level instead, so games that were running out of memory (like Sound Shapes) now fit. The comments left in the code and in the specs made me feel like it was a deliberate choice from devnoname120 I was going against.
-- **Different scope.** `tls_fixer` supports several firmware versions, and keeps experimental, diagnostic and self-disarming code for testing on hardware. `vitals` targets firmware 3.65 only, with that code removed and a simpler kernel plugin modeled on `iTLS-Enso`.
+- **Different scope.** `tls_fixer` supports several firmware versions, and keeps experimental, diagnostic and self-disarming code for testing on hardware. `vitals` targets firmware 3.60 and 3.65 only, with that code removed and a simpler kernel plugin modeled on `iTLS-Enso`.
 - **Features that don't exist upstream:** the configurable host redirects, the built-in PSN sign-in redirect, the redirect list read through the kernel for sandboxed games, and a single app for installing, updating certificates and testing.
 - **They replace each other.** Both take over the same system modules and use different install paths, so only one can be installed at a time. The `vitals` installer removes `tls_fixer` for that reason.
 

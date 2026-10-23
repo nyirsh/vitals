@@ -18,9 +18,16 @@ static int ready;
 int vitals_native_module_api_init(void) {
     tai_module_info_t identity;
     const VitalsKernelProfile *profile = NULL;
-    /* SceModulemgrForKernel as exported by 3.65 */
-    static const uint32_t library = UINT32_C(0x92c9ffc2);
-    static const uint32_t nids[4] = {0xdaa90093, 0xb72c75a4, 0xfca9fdb1, 0xf1de6949};
+    /* SceModulemgrForKernel as each firmware family exports it: get info, get list, unload and
+     * is-shared */
+    static const uint32_t libraries[VITALS_KERNEL_FAMILY_COUNT] = {
+        [VITALS_KERNEL_FAMILY_360] = UINT32_C(0xc445fa63),
+        [VITALS_KERNEL_FAMILY_365] = UINT32_C(0x92c9ffc2),
+    };
+    static const uint32_t nids[VITALS_KERNEL_FAMILY_COUNT][4] = {
+        [VITALS_KERNEL_FAMILY_360] = {0xd269f915, 0x97cf7b4e, 0x5972e2cc, 0x99890202},
+        [VITALS_KERNEL_FAMILY_365] = {0xdaa90093, 0xb72c75a4, 0xfca9fdb1, 0xf1de6949},
+    };
     uintptr_t addresses[4] = {0};
     __atomic_store_n(&ready, 0, __ATOMIC_RELEASE);
     memset(&identity, 0, sizeof(identity));
@@ -35,7 +42,8 @@ int vitals_native_module_api_init(void) {
     }
     if (profile == NULL) return -1;
     for (size_t i = 0; i < 4; ++i) {
-        if (module_get_export_func(KERNEL_PID, "SceKernelModulemgr", library, nids[i], &addresses[i]) < 0 ||
+        if (module_get_export_func(KERNEL_PID, "SceKernelModulemgr", libraries[profile->family],
+                nids[profile->family][i], &addresses[i]) < 0 ||
             addresses[i] == 0) return -1;
     }
     get_info = (int (*)(SceUID, SceUID, SceKernelModuleInfo *))addresses[0];
