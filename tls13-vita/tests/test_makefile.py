@@ -29,6 +29,19 @@ class ProviderMakefileTests(unittest.TestCase):
         self.assertIn("-DVITALS_DEBUG=2", output)
         self.assertIn("-DVITALS_HTTP_HEAP_KIB=256", output)
 
+    def test_each_debug_level_builds_apart(self):
+        # The app carries every level, so they must not overwrite each other
+        for level, folder in (("0", "tls13-vita "), ("1", "tls13-vita-debug1 "), ("2", "tls13-vita-debug2 ")):
+            output = dry_run(ROOT / "tls13-vita", f"DEBUG={level}")
+            self.assertIn(f"-B {BUILD}/{folder}", output)
+            self.assertIn(f"-DVITALS_DEBUG={level}", output)
+
+    def test_the_app_builds_every_debug_level(self):
+        output = dry_run(ROOT / "vitals-app", "modules")
+        for level in ("0", "1", "2"):
+            self.assertIn(f"-C ../tls13-vita DEBUG={level}", output)
+            self.assertIn(f"-C ../vitals-reauth DEBUG={level}", output)
+
 
 if __name__ == "__main__":
     unittest.main()

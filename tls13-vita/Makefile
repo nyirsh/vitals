@@ -1,13 +1,15 @@
 # Builds the TLS providers: vitals_http.suprx (system HTTP) and vitals.suprx (browser)
 # Everything is built in build/ at the repository root
 BUILD_DIR := $(abspath ../build)
-OUT_DIR = $(BUILD_DIR)/tls13-vita
 VITA_TOOLCHAIN = $(VITASDK)/share/vita.toolchain.cmake
 
 # Provider heap (KiB) per injected process
 HTTP_HEAP_KIB ?= 128
 # Debug output on the Vita's debug console: 0 none, 1 summaries and failures, 2 everything
+# Each level builds in its own folder (tls13-vita, tls13-vita-debug1, tls13-vita-debug2), as the
+# app carries all three
 DEBUG ?= 0
+OUT_DIR = $(BUILD_DIR)/tls13-vita$(if $(filter 0,$(DEBUG)),,-debug$(DEBUG))
 
 # CMake tracks what is out of date; the settings are passed every time so a stale cache
 # cannot change the build
@@ -43,6 +45,6 @@ ifneq ($(shell uname -s),Linux)
 endif
 
 clean:
-	rm -rf $(OUT_DIR) $(TEST_DIR)
+	rm -rf $(BUILD_DIR)/tls13-vita $(BUILD_DIR)/tls13-vita-debug1 $(BUILD_DIR)/tls13-vita-debug2 $(TEST_DIR)
 
 .PHONY: all clean test

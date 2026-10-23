@@ -13,16 +13,22 @@ typedef struct {
     int installed;
     int outdated;
     const char *installed_version;
+    /* The installed debug output level's name ("Basic", "Full"); NULL when it is off or unknown */
+    const char *debug_output;
     int firmware_supported;
     const char *firmware;
     const AppMenuItem *items;
     unsigned count, selected;
+    /* The controls shown at the bottom; NULL for the usual ones */
+    const char *hints;
 } AppHome;
 /* An install, uninstall or certificate update in progress or finished */
 typedef struct {
     int installed;
     int outdated;
     const char *installed_version;
+    /* The installed debug output level's name ("Basic", "Full"); NULL when it is off or unknown */
+    const char *debug_output;
     const char *title;
     const char *const *lines;
     unsigned count;

@@ -11,10 +11,12 @@ all: modules
 	cmake --build $(OUT_DIR)
 
 # The plugin, providers and redirect have their own Makefiles; CMake decides what to rebuild
+# The providers and redirect are built at every debug level, which the app lets users switch
+# between
 modules:
 	$(MAKE) -C ../vitals-plugin
-	$(MAKE) -C ../tls13-vita
-	$(MAKE) -C ../vitals-reauth
+	$(foreach level,0 1 2,$(MAKE) -C ../tls13-vita DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-reauth DEBUG=$(level) &&) true
 
 # Refreshes the bundled Mozilla certificates (assets/) from curl; review and commit the result
 update-certs:

@@ -19,6 +19,14 @@ int vitals_install_detect(void);
 int vitals_install_plugin_current(void);
 /* The release number the installed kernel plugin carries ("1.2"), or a negative error */
 int vitals_install_plugin_version(char *version, size_t size);
+/* Debug output on the console: 0 off, 1 summaries and failures, 2 everything; each level has its
+ * own build of the providers and vitals-reauth, all carried by the app */
+#define VITALS_DEBUG_LEVEL_COUNT 3
+/* The level of the installed modules, or -1 when they match none of the app's builds */
+int vitals_install_debug_level(void);
+/* Replaces the providers and vitals-reauth with the given level's builds
+ * The caller reboots the Vita after a success */
+int vitals_install_set_debug_level(int level, VitalsInstallNote note);
 /* Runs option (FULL or CERTIFICATES)
  * The caller reboots the Vita after a success */
 int vitals_install_run(enum VitalsOption option, int removing, VitalsInstallNote note);

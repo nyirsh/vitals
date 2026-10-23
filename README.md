@@ -142,15 +142,14 @@ Available build options:
 | Option          | Default | Effect                                 |
 | --------------- | ------- | -------------------------------------- |
 | `HTTP_HEAP_KIB` | `128`   | memory (KiB) the TLS provider reserves |
-| `DEBUG`         | `0`     | debug output level (see below)         |
 
-`DEBUG` levels, for both providers (lines start with `vitals_http:` for apps and games, `vitals_browser:` for the browser):
+Debug output levels, for both providers (lines start with `vitals_http:` for apps and games, `vitals_browser:` for the browser):
 
-- **0:** nothing, use this for releases
-- **1:** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure
-- **2:** everything in level 1, plus every step of every connection (retries, locks, each socket read and write) and messages from `Mbed TLS`. This produces a lot of output and slows connections down, use it only to investigate a problem
+- **Off (0):** nothing, the default
+- **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure
+- **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write) and messages from `Mbed TLS`. This produces a lot of output and slows connections down, use it only to investigate a problem
 
-`make debug-lite` and `make debug-full` are shortcuts for `make DEBUG=1` and `make DEBUG=2`. All three build into the same `build/` folder.
+Every build includes all three levels; choose one on the console from the app's **Debug output** option, which reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
 
 ### Updating `Mbed TLS` or `curl`
 

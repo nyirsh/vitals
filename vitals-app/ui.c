@@ -260,7 +260,8 @@ static void status_card(uint32_t *p, const char *label, const char *status, enum
 }
 /* outdated: a different version's plugin is installed than the one this app carries;
  * installed_version is its release number, empty when unknown */
-static void header(uint32_t *p, int installed, int outdated, const char *installed_version)
+static void header(uint32_t *p, int installed, int outdated, const char *installed_version,
+                   const char *debug_output)
 {
     char line[64];
     rect(p, 0, 0, 960, 544, bg);
@@ -273,11 +274,16 @@ static void header(uint32_t *p, int installed, int outdated, const char *install
         snprintf(status, sizeof(status), "%s -> %s", installed_version, VITALS_VERSION);
     else if (outdated)
         snprintf(status, sizeof(status), known ? "%s, other build" : "update available", installed_version);
+    else if (installed && debug_output != NULL)
+        snprintf(status, sizeof(status), "%s, %s debug", known ? installed_version : "installed", debug_output);
     else if (installed)
         snprintf(status, sizeof(status), "%s", known ? installed_version : "installed");
     else
         snprintf(status, sizeof(status), "not installed");
-    status_card(p, "vitals:", status, outdated ? CHECK_WARNING : installed ? CHECK_PASS : CHECK_FAIL);
+    /* A debug build stands out in amber */
+    status_card(p, "vitals:", status,
+                outdated ? CHECK_WARNING : installed ? (debug_output != NULL ? CHECK_INFO : CHECK_PASS)
+                                                     : CHECK_FAIL);
 }
 static void footer(uint32_t *p, const char *hints)
 {
@@ -286,7 +292,7 @@ static void footer(uint32_t *p, const char *hints)
 }
 void app_draw_home(uint32_t *p, const AppHome *home)
 {
-    header(p, home->installed, home->outdated, home->installed_version);
+    header(p, home->installed, home->outdated, home->installed_version, home->debug_output);
     int y = 97;
     if (!home->firmware_supported)
     {
@@ -300,24 +306,27 @@ void app_draw_home(uint32_t *p, const AppHome *home)
              muted, 16);
         y += 86;
     }
+    /* Six items only fit above the credits with shorter cards */
+    int compact = home->count > 5;
+    int height = compact ? 54 : 62, step = compact ? 62 : 72;
     for (unsigned i = 0; i < home->count; ++i)
     {
         int selected = i == home->selected;
-        card(p, 28, y, 904, 62, selected ? highlight : panel);
+        card(p, 28, y, 904, height, selected ? highlight : panel);
         if (selected)
-            rect(p, 28, y + 12, 4, 38, blue);
-        text(p, 48, y + 7, home->items[i].label, selected ? white : muted, 21);
-        text(p, 48, y + 37, home->items[i].description, muted, 16);
-        y += 72;
+            rect(p, 28, y + 12, 4, height - 24, blue);
+        text(p, 48, y + (compact ? 4 : 7), home->items[i].label, selected ? white : muted, 21);
+        text(p, 48, y + (compact ? 30 : 37), home->items[i].description, muted, 16);
+        y += step;
     }
     /* The main credits from the README, centred above the controls */
     static const char credits[] = "Thanks to devnoname120, SKGleba, Reiko Asakura and Team Molecule";
     text(p, (960 - check_font_width(credits, 15)) / 2, 480, credits, muted, 15);
-    footer(p, "Up / Down  Choose     Cross  Select     Circle  Exit");
+    footer(p, home->hints != NULL ? home->hints : "Arrows  Choose     Cross  Select     Circle  Exit");
 }
 void app_draw_task(uint32_t *p, const AppTask *task)
 {
-    header(p, task->installed, task->outdated, task->installed_version);
+    header(p, task->installed, task->outdated, task->installed_version, task->debug_output);
     text(p, 28, 97, task->title, white, 23);
     card(p, 28, 135, 904, 306, panel);
     unsigned first = task->count > APP_TASK_VISIBLE_LINES ? task->count - APP_TASK_VISIBLE_LINES : 0;

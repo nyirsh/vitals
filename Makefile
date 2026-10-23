@@ -3,7 +3,9 @@
 #   tls13-vita/     TLS providers (options: HTTP_HEAP_KIB, DEBUG)
 #   vitals-reauth/  PSN sign-in host redirect (vitals-reauth.suprx)
 #   vitals-app/     the vitals app and vitals-app.vpk (builds the three above first)
-# Command-line options such as `make DEBUG=1` reach the components automatically
+# Command-line options such as `make HTTP_HEAP_KIB=256` reach the components automatically
+# Every debug level of the providers and redirect is built and packaged; the app switches between
+# them
 # Every CMake build also writes compile_commands.json, which .vscode uses for code navigation
 COMPONENTS = vitals-plugin tls13-vita vitals-reauth vitals-app
 
@@ -12,15 +14,6 @@ all: vitals-app
 
 $(COMPONENTS):
 	$(MAKE) -C $@
-
-# The app with debug output on the console: summaries and failures (DEBUG=1) or everything
-# (DEBUG=2)
-# A plain `make` afterwards builds the release version again
-debug-lite:
-	$(MAKE) vitals-app DEBUG=1
-
-debug-full:
-	$(MAKE) vitals-app DEBUG=2
 
 # Runs every component's host tests, then the checks on the shared files at the root (tests/);
 # it stops at the first failure and needs no VitaSDK
@@ -35,4 +28,4 @@ update-certs:
 clean:
 	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) clean;)
 
-.PHONY: all clean test update-certs debug-lite debug-full $(COMPONENTS)
+.PHONY: all clean test update-certs $(COMPONENTS)

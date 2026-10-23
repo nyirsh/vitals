@@ -135,6 +135,16 @@ static void fresh_console(void)
         snprintf(content, sizeof(content), "contents of %s\n", app_files[i]);
         put(path, content);
     }
+    /* The debug builds of the providers and redirect, one folder per level */
+    const char *debug_files[] = {"vitals_http.suprx", "vitals.suprx", "vitals-reauth.suprx"};
+    for (int level = 1; level <= 2; ++level)
+        for (size_t i = 0; i < sizeof(debug_files) / sizeof(debug_files[0]); ++i)
+        {
+            char path[128], content[128];
+            snprintf(path, sizeof(path), "app0:debug/%d/%s", level, debug_files[i]);
+            snprintf(content, sizeof(content), "level %d build of %s\n", level, debug_files[i]);
+            put(path, content);
+        }
 }
 
 static void expect_installed(void)
@@ -199,6 +209,53 @@ static void test_install_reinstall_uninstall(void)
     assert(is(REDIRECTS, "my.old.host my.new.host\n"));
     /* Without an installed plugin there is nothing to compare */
     assert(vitals_install_plugin_current() < 0);
+}
+
+/* The installed providers and redirect are the given level's builds */
+static void expect_debug_level(int level)
+{
+    static const char *const modules[][2] = {
+        {"vs0:/data/external/vitals/native/vitals_http.suprx", "vitals_http.suprx"},
+        {"vs0:/data/external/vitals/native/vitals.suprx", "vitals.suprx"},
+        {"ur0:tai/vitals-native/vitals.suprx", "vitals.suprx"},
+        {"vs0:/data/external/vitals/native/vitals-reauth.suprx", "vitals-reauth.suprx"},
+    };
+    for (size_t i = 0; i < sizeof(modules) / sizeof(modules[0]); ++i)
+    {
+        char expected[128];
+        if (level == 0)
+            snprintf(expected, sizeof(expected), "contents of %s\n", modules[i][1]);
+        else
+            snprintf(expected, sizeof(expected), "level %d build of %s\n", level, modules[i][1]);
+        assert(is(modules[i][0], expected));
+    }
+    assert(vitals_install_debug_level() == level);
+}
+
+/* Switching debug output replaces only the providers and redirect, in every place they are
+ * installed, and a full install puts the release builds back */
+static void test_debug_levels(void)
+{
+    fresh_console();
+    assert(vitals_install_debug_level() < 0);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_debug_level(0);
+    for (int level = 2; level >= 0; --level)
+    {
+        assert(vitals_install_set_debug_level(level, note) >= 0);
+        expect_debug_level(level);
+        assert(is("ur0:tai/vitals.skprx", "contents of vitals.skprx\n") && is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG));
+    }
+    assert(vitals_install_set_debug_level(3, note) < 0 && vitals_install_set_debug_level(-1, note) < 0);
+    expect_debug_level(0);
+    assert(vitals_install_set_debug_level(1, note) >= 0);
+    expect_debug_level(1);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_installed();
+    expect_debug_level(0);
+    /* A provider that matches none of the app's builds (another version's) has no level */
+    put("vs0:/data/external/vitals/native/vitals_http.suprx", "another version's provider\n");
+    assert(vitals_install_debug_level() < 0);
 }
 
 static void test_conflicting_installs_are_removed(void)
@@ -277,6 +334,7 @@ static void test_failed_renames(int removing)
 int main(void)
 {
     test_install_reinstall_uninstall();
+    test_debug_levels();
     test_conflicting_installs_are_removed();
     test_missing_config();
     test_failed_renames(0);
@@ -285,6 +343,7 @@ int main(void)
     char command[600];
     snprintf(command, sizeof(command), "rm -rf '%s'", root);
     assert(system(command) == 0);
-    puts("installer files: install, reinstall, uninstall, conflicting plugins, missing config, failed renames PASS");
+    puts("installer files: install, reinstall, uninstall, debug levels, conflicting plugins, missing config, "
+         "failed renames PASS");
     return 0;
 }

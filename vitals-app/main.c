@@ -28,6 +28,7 @@ enum Action
     ACTION_UNINSTALL,
     ACTION_CERTIFICATES,
     ACTION_TEST,
+    ACTION_DEBUG,
     ACTION_EXIT
 };
 static const AppMenuItem action_items[] = {
@@ -40,6 +41,7 @@ static const AppMenuItem action_items[] = {
                              "Downloads the latest trusted websites certificates"},
     [ACTION_TEST] = {"Test connections",
                      "Checks that everything is working as expected"},
+    [ACTION_DEBUG] = {"Debug output", ""},
     [ACTION_EXIT] = {"Exit", ""},
 };
 
@@ -51,6 +53,9 @@ static int installed;
 static int outdated;
 /* The installed plugin's release number, empty when it is unknown */
 static char installed_version[16];
+/* Debug output: the installed modules' level (-1 when unknown) and the one chosen in the menu */
+static int debug_level = -1, debug_choice;
+static const char *const debug_names[VITALS_DEBUG_LEVEL_COUNT] = {"Off", "Basic", "Full"};
 
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 
@@ -146,6 +151,7 @@ static void draw_task(void)
     task.installed = installed;
     task.outdated = outdated;
     task.installed_version = installed_version;
+    task.debug_output = debug_level > 0 ? debug_names[debug_level] : NULL;
     app_draw_task(canvas, &task);
     present();
 }
@@ -168,6 +174,7 @@ static void run_operation(enum Action action)
         [ACTION_REINSTALL] = "Reinstalling vitals",
         [ACTION_UNINSTALL] = "Uninstalling vitals",
         [ACTION_CERTIFICATES] = "Updating certificates",
+        [ACTION_DEBUG] = "Switching debug output",
     };
     char status[96];
     for (unsigned i = 0; i < TASK_MAX_LINES; ++i)
@@ -176,9 +183,11 @@ static void run_operation(enum Action action)
     draw_task();
     /* The test's HTTP libraries are released first, so no vitals module is in use */
     vitals_check_close();
-    int result = vitals_install_run(action == ACTION_CERTIFICATES ? VITALS_OPTION_CERTIFICATES
-                                                                  : VITALS_OPTION_FULL,
-                                    action == ACTION_UNINSTALL, task_note);
+    int result = action == ACTION_DEBUG
+                     ? vitals_install_set_debug_level(debug_choice, task_note)
+                     : vitals_install_run(action == ACTION_CERTIFICATES ? VITALS_OPTION_CERTIFICATES
+                                                                        : VITALS_OPTION_FULL,
+                                          action == ACTION_UNINSTALL, task_note);
     if (result >= 0)
     {
         task.state = CHECK_PASS;
@@ -309,17 +318,26 @@ int main(void)
     char firmware[32];
     int supported = vitals_install_firmware_supported(firmware, sizeof(firmware));
     unsigned selected = 0;
+    int refresh = 1;
     for (;;)
     {
         /* Installing is offered only on 3.65; the test works everywhere */
-        enum Action actions[6];
-        AppMenuItem items[6];
+        enum Action actions[7];
+        AppMenuItem items[7];
         unsigned count = 0;
-        installed = vitals_install_detect();
-        /* Another version's plugin counts even when that version installed fewer files */
-        outdated = vitals_install_plugin_current() == 0;
-        if (vitals_install_plugin_version(installed_version, sizeof(installed_version)) < 0)
-            installed_version[0] = '\0';
+        /* The installed files are read when the menu opens and after an operation, not on every
+         * button press */
+        if (refresh)
+        {
+            installed = vitals_install_detect();
+            /* Another version's plugin counts even when that version installed fewer files */
+            outdated = vitals_install_plugin_current() == 0;
+            if (vitals_install_plugin_version(installed_version, sizeof(installed_version)) < 0)
+                installed_version[0] = '\0';
+            debug_level = installed && !outdated ? vitals_install_debug_level() : -1;
+            debug_choice = debug_level < 0 ? 0 : debug_level;
+            refresh = 0;
+        }
         int removable = supported && (installed || outdated);
         if (supported)
         {
@@ -332,13 +350,31 @@ int main(void)
                 actions[count++] = ACTION_INSTALL;
         }
         actions[count++] = ACTION_TEST;
+        /* Only this version's own modules can be switched, so an update comes first */
+        if (supported && debug_level >= 0)
+            actions[count++] = ACTION_DEBUG;
         /* Uninstalling sits last, right above Exit, away from the everyday options */
         if (removable)
             actions[count++] = ACTION_UNINSTALL;
         actions[count++] = ACTION_EXIT;
-        static char update_description[96];
+        static char update_description[96], debug_label[48], debug_description[96];
         for (unsigned i = 0; i < count; ++i)
             items[i] = action_items[actions[i]];
+        for (unsigned i = 0; i < count; ++i)
+            if (actions[i] == ACTION_DEBUG)
+            {
+                /* What each level is for, shown for the one being chosen */
+                static const char *const debug_purposes[VITALS_DEBUG_LEVEL_COUNT] = {
+                    "For everyday use: no logs",
+                    "For debugging only: shows logs on the console",
+                    "For deep analysis only: logs everything on the console and slows things down a lot",
+                };
+                snprintf(debug_label, sizeof(debug_label), "Debug output: < %s >%s", debug_names[debug_choice],
+                         debug_choice == debug_level ? "  (installed)" : "");
+                snprintf(debug_description, sizeof(debug_description), "%s", debug_purposes[debug_choice]);
+                items[i].label = debug_label;
+                items[i].description = debug_description;
+            }
         for (unsigned i = 0; i < count; ++i)
             if (actions[i] == ACTION_UPDATE && installed_version[0] != '\0' &&
                 strcmp(installed_version, VITALS_VERSION) != 0)
@@ -349,11 +385,18 @@ int main(void)
             }
         if (selected >= count)
             selected = count - 1;
-        AppHome home = {installed, outdated, installed_version, supported, firmware, items, count, selected};
+        /* On the debug item, Cross only does something once another level is chosen */
+        const char *hints = NULL;
+        if (actions[selected] == ACTION_DEBUG)
+            hints = debug_choice != debug_level ? "Arrows  Choose     Cross  Apply and reboot     Circle  Exit"
+                                                : "Arrows  Choose     Circle  Exit";
+        AppHome home = {installed, outdated, installed_version, debug_level > 0 ? debug_names[debug_level] : NULL,
+                        supported, firmware, items, count, selected, hints};
         app_draw_home(canvas, &home);
         present();
         unsigned pressed = 0;
-        while (!(pressed = read_presses() & (SCE_CTRL_UP | SCE_CTRL_DOWN | SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)))
+        while (!(pressed = read_presses() & (SCE_CTRL_UP | SCE_CTRL_DOWN | SCE_CTRL_LEFT | SCE_CTRL_RIGHT |
+                                             SCE_CTRL_CROSS | SCE_CTRL_CIRCLE)))
             sceKernelDelayThread(30000);
         if (pressed & SCE_CTRL_CIRCLE)
             break;
@@ -361,6 +404,17 @@ int main(void)
             --selected;
         else if (pressed & SCE_CTRL_DOWN && selected + 1 < count)
             ++selected;
+        else if (pressed & (SCE_CTRL_LEFT | SCE_CTRL_RIGHT))
+        {
+            /* Left and Right only choose a debug level; nothing changes until Cross */
+            if (actions[selected] == ACTION_DEBUG)
+            {
+                if (pressed & SCE_CTRL_LEFT && debug_choice > 0)
+                    --debug_choice;
+                else if (pressed & SCE_CTRL_RIGHT && debug_choice + 1 < VITALS_DEBUG_LEVEL_COUNT)
+                    ++debug_choice;
+            }
+        }
         else if (pressed & SCE_CTRL_CROSS)
         {
             enum Action action = actions[selected];
@@ -368,8 +422,12 @@ int main(void)
                 break;
             if (action == ACTION_TEST)
                 run_test();
-            else
+            else if (action != ACTION_DEBUG || debug_choice != debug_level)
+            {
                 run_operation(action);
+                /* A failed operation returns here; what it changed is read again */
+                refresh = 1;
+            }
         }
     }
     exit_code = 0;

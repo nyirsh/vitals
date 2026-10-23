@@ -22,6 +22,19 @@ foreach(module VITALS_KERNEL_MODULE VITALS_HTTP_PROVIDER VITALS_BROWSER_PROVIDER
         message(FATAL_ERROR "${${module}} is missing; build ../vitals-plugin, ../tls13-vita and ../vitals-reauth first (make does this)")
     endif()
 endforeach()
+# The debug builds of the providers and redirect (levels 1 and 2), which the app switches to;
+# they go in debug/<level>/ next to the release modules
+set(debug_entries)
+foreach(level 1 2)
+    foreach(module tls13-vita-debug${level}/provider/vitals_http.suprx tls13-vita-debug${level}/browser/vitals.suprx
+            vitals-reauth-debug${level}/vitals-reauth.suprx)
+        if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
+            message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
+        endif()
+        get_filename_component(name "${module}" NAME)
+        list(APPEND debug_entries "${VITALS_BUILD_DIR}/${module}" "debug/${level}/${name}")
+    endforeach()
+endforeach()
 
 # libcurl, used to download the latest Mozilla CA bundle
 add_subdirectory(curl)
@@ -80,6 +93,7 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          ${VITALS_HTTP_PROVIDER} vitals_http.suprx
          ${VITALS_BROWSER_PROVIDER} vitals.suprx
          ${VITALS_REAUTH_MODULE} vitals-reauth.suprx
+         ${debug_entries}
          ../README.md README.md
          ../THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.md
          ${license_entries}

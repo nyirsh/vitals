@@ -929,24 +929,103 @@ int vitals_install_detect(void)
            path_exists("vs0:/data/external/cert/CA_LIST.cer_old");
 }
 
+/* 1 when the two files hold the same bytes, 0 when they differ, negative when either cannot be
+ * read */
+static int same_contents(const char *first_path, const char *second_path)
+{
+    char *first = NULL, *second = NULL;
+    SceSize first_size = 0, second_size = 0;
+    int result = read_file(first_path, &first, &first_size);
+
+    if (result >= 0)
+    {
+        result = read_file(second_path, &second, &second_size);
+    }
+    if (result >= 0)
+    {
+        result = first_size == second_size && memcmp(first, second, first_size) == 0;
+    }
+    free(first);
+    free(second);
+    return result;
+}
+
 int vitals_install_plugin_current(void)
 {
     /* The plugin and the modules are always installed together, so the kernel plugin alone
      * tells whether the installed vitals is the one this app carries */
-    char *installed = NULL, *bundled = NULL;
-    SceSize installed_size = 0, bundled_size = 0;
-    int result = read_file("ur0:tai/vitals.skprx", &installed, &installed_size);
+    return same_contents("ur0:tai/vitals.skprx", "app0:vitals.skprx");
+}
 
+/* The modules each debug level is built into; the app carries the release ones at the top of
+ * app0: and the others in app0:debug/<level>/ */
+enum
+{
+    DEBUG_HTTP_PROVIDER,
+    DEBUG_BROWSER_PROVIDER,
+    DEBUG_REAUTH,
+    DEBUG_MODULE_COUNT
+};
+static const char *const debug_files[DEBUG_MODULE_COUNT] = {
+    [DEBUG_HTTP_PROVIDER] = "vitals_http.suprx",
+    [DEBUG_BROWSER_PROVIDER] = "vitals.suprx",
+    [DEBUG_REAUTH] = "vitals-reauth.suprx",
+};
+
+static void debug_source(int level, unsigned module, char *path, size_t size)
+{
+    if (level == 0)
+        (void)snprintf(path, size, "app0:%s", debug_files[module]);
+    else
+        (void)snprintf(path, size, "app0:debug/%d/%s", level, debug_files[module]);
+}
+
+int vitals_install_debug_level(void)
+{
+    char source[64];
+
+    /* The three modules are always switched together, so the HTTP provider tells the level */
+    for (int level = 0; level < VITALS_DEBUG_LEVEL_COUNT; ++level)
+    {
+        debug_source(level, DEBUG_HTTP_PROVIDER, source, sizeof(source));
+        if (same_contents(new_modules[MODULE_HTTP_PROVIDER], source) == 1)
+            return level;
+    }
+    return -1;
+}
+
+int vitals_install_set_debug_level(int level, VitalsInstallNote note)
+{
+    uint8_t mount_data[0x100] = {0};
+    char source[64];
+    int result;
+
+    if (level < 0 || level >= VITALS_DEBUG_LEVEL_COUNT)
+        return -1;
+    g_note = note;
+    (void)vshIoUmount(0x300, 0, 0, 0);
+    (void)vshIoUmount(0x300, 1, 0, 0);
+    result = _vshIoMount(0x300, 0, 2, mount_data);
     if (result >= 0)
     {
-        result = read_file("app0:vitals.skprx", &bundled, &bundled_size);
+        printf("Installing the %s modules... \n", level == 0 ? "release" : "debug");
+        debug_source(level, DEBUG_HTTP_PROVIDER, source, sizeof(source));
+        result = replace_file(source, new_modules[MODULE_HTTP_PROVIDER]);
+    }
+    /* The browser provider has two copies, like a full install leaves */
+    if (result >= 0)
+    {
+        debug_source(level, DEBUG_BROWSER_PROVIDER, source, sizeof(source));
+        result = replace_file(source, browser_provider_global);
+        if (result >= 0)
+            result = replace_file(source, new_modules[MODULE_BROWSER_PROVIDER]);
     }
     if (result >= 0)
     {
-        result = installed_size == bundled_size && memcmp(installed, bundled, installed_size) == 0;
+        debug_source(level, DEBUG_REAUTH, source, sizeof(source));
+        result = replace_file(source, new_modules[MODULE_REAUTH]);
     }
-    free(installed);
-    free(bundled);
+    g_note = NULL;
     return result;
 }
 
