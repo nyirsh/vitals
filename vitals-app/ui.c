@@ -9,14 +9,8 @@ static const uint32_t bg = RGB(16, 20, 27), panel = RGB(27, 34, 45), white = RGB
                       red = RGB(255, 115, 125), blue = RGB(111, 186, 255),
                       amber = RGB(242, 198, 116), orange = RGB(255, 173, 80),
                       highlight = RGB(40, 52, 70);
-static const char *confirm_name = "Cross", *back_name = "Circle";
-void app_set_circle_confirms(int circle_confirms)
-{
-    confirm_name = circle_confirms ? "Circle" : "Cross";
-    back_name = circle_confirms ? "Cross" : "Circle";
-}
-const char *app_confirm_name(void) { return confirm_name; }
-const char *app_back_name(void) { return back_name; }
+static int circle_confirms;
+void app_set_circle_confirms(int circle) { circle_confirms = circle; }
 static void rect(uint32_t *p, int x, int y, int w, int h, uint32_t c)
 {
     for (int yy = y; yy < y + h && yy < CHECK_HEIGHT; ++yy)
@@ -83,6 +77,108 @@ static void mark_colored(uint32_t *p, int x, int y, enum CheckState s, uint32_t 
 static void mark(uint32_t *p, int x, int y, enum CheckState s)
 {
     mark_colored(p, x, y, s, tone(s));
+}
+/* A filled disc, or a ring when inner is above 0 */
+static void disc(uint32_t *p, int cx, int cy, int outer, int inner, uint32_t c)
+{
+    for (int dy = -outer; dy <= outer; ++dy)
+        for (int dx = -outer; dx <= outer; ++dx)
+        {
+            /* Measured to the pixel's half-way point, so the edge has no single-pixel bumps */
+            int distance = dx * dx + dy * dy;
+            if (distance <= outer * outer + outer && (inner == 0 || distance > inner * inner + inner))
+                rect(p, cx + dx, cy + dy, 1, 1, c);
+        }
+}
+/* A control's symbol in a 16-pixel square at x, y, drawn in the bar's white */
+static void glyph(uint32_t *p, int x, int y, AppGlyph symbol)
+{
+    const uint32_t c = white;
+    enum
+    {
+        CROSS,
+        CIRCLE,
+        TRIANGLE,
+        SQUARE,
+        DPAD,
+        STICK
+    } shape;
+    switch (symbol)
+    {
+    case APP_GLYPH_CONFIRM:
+        shape = circle_confirms ? CIRCLE : CROSS;
+        break;
+    case APP_GLYPH_BACK:
+        shape = circle_confirms ? CROSS : CIRCLE;
+        break;
+    case APP_GLYPH_TRIANGLE:
+        shape = TRIANGLE;
+        break;
+    case APP_GLYPH_SQUARE:
+        shape = SQUARE;
+        break;
+    case APP_GLYPH_DPAD:
+        shape = DPAD;
+        break;
+    case APP_GLYPH_STICK:
+        shape = STICK;
+        break;
+    default:
+        return;
+    }
+    if (shape == CROSS)
+        for (int i = 0; i < 13; ++i)
+        {
+            rect(p, x + 1 + i, y + 1 + i, 2, 2, c);
+            rect(p, x + 13 - i, y + 1 + i, 2, 2, c);
+        }
+    else if (shape == CIRCLE)
+        disc(p, x + 8, y + 8, 7, 5, c);
+    else if (shape == TRIANGLE)
+    {
+        for (int row = 0; row < 12; ++row)
+        {
+            int half = row * 7 / 11;
+            rect(p, x + 7 - half, y + 2 + row, 2, 1, c);
+            rect(p, x + 7 + half, y + 2 + row, 2, 1, c);
+        }
+        rect(p, x, y + 13, 16, 2, c);
+    }
+    else if (shape == SQUARE)
+    {
+        rect(p, x + 2, y + 2, 12, 2, c);
+        rect(p, x + 2, y + 12, 12, 2, c);
+        rect(p, x + 2, y + 2, 2, 12, c);
+        rect(p, x + 12, y + 2, 2, 12, c);
+    }
+    else if (shape == DPAD)
+    {
+        rect(p, x + 6, y + 1, 4, 14, c);
+        rect(p, x + 1, y + 6, 14, 4, c);
+    }
+    else
+    {
+        disc(p, x + 8, y + 8, 7, 5, c);
+        disc(p, x + 8, y + 8, 3, 0, c);
+    }
+}
+/* The bar at the bottom: each control's symbols, then what it does */
+static void footer(uint32_t *p, const AppHint *hints, unsigned count)
+{
+    rect(p, 0, 509, 960, 35, panel);
+    int x = 28;
+    for (unsigned i = 0; i < count; ++i)
+    {
+        AppGlyph symbols[2] = {hints[i].glyph, hints[i].also};
+        for (unsigned s = 0; s < 2; ++s)
+            if (symbols[s] != APP_GLYPH_NONE)
+            {
+                glyph(p, x, 518, symbols[s]);
+                x += 22;
+            }
+        text(p, x, 516, hints[i].label, white, 16);
+        x += check_font_width(hints[i].label, 16) + 34;
+    }
 }
 void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, int busy,
                 const char *notice)
@@ -286,7 +382,8 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
             snprintf(line, sizeof(line), "%s -> %s", redirect->from, redirect->to);
             check_font_draw(p, 30, y, line, 16, white, 530);
             snprintf(line, sizeof(line), "%s",
-                     r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..." : "Waiting");
+                     r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..."
+                                                                            : "Waiting");
             check_font_draw(p, 545, y, line, 16, tone(r->state), 840);
             if (r->elapsed_ms)
                 snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
@@ -318,16 +415,16 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
             snprintf(line, sizeof(line), "No handshake report received.");
         text(p, 28, 492, line, muted, 13);
     }
-    rect(p, 0, 509, 960, 35, panel);
     /* Which detail page this is, out of how many Square goes through */
-    if (busy)
-        snprintf(line, sizeof(line),
-                 "Triangle  Cancel     Hold arrows / stick  Scroll     Square  Details %d/%d     %s  Back",
-                 page + 1, CHECK_PAGE_COUNT, back_name);
-    else
-        snprintf(line, sizeof(line), "%s  Retry     Hold arrows / stick  Scroll     Square  Details %d/%d     %s  Back",
-                 confirm_name, page + 1, CHECK_PAGE_COUNT, back_name);
-    text(p, 28, 516, line, white, 16);
+    snprintf(line, sizeof(line), "Details %d/%d", page + 1, CHECK_PAGE_COUNT);
+    const AppHint hints[] = {
+        busy ? (AppHint){APP_GLYPH_TRIANGLE, APP_GLYPH_NONE, "Cancel"}
+             : (AppHint){APP_GLYPH_CONFIRM, APP_GLYPH_NONE, "Retry"},
+        {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Scroll"},
+        {APP_GLYPH_SQUARE, APP_GLYPH_NONE, line},
+        {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"},
+    };
+    footer(p, hints, sizeof(hints) / sizeof(hints[0]));
 }
 
 /* The status card in the top right corner: "<label> <mark> <status>" */
@@ -374,15 +471,11 @@ static void header(uint32_t *p, int installed, int outdated, const char *install
         snprintf(status, sizeof(status), "%s", known ? installed_version : "installed");
     else
         snprintf(status, sizeof(status), "not installed");
-    enum CheckState style = outdated ? CHECK_WARNING : installed ? CHECK_PASS : CHECK_FAIL;
+    enum CheckState style = outdated ? CHECK_WARNING : installed ? CHECK_PASS
+                                                                 : CHECK_FAIL;
     /* A working debug build keeps its checkmark, in amber so it stands out */
     status_card(p, "vitals:", status, style,
                 style == CHECK_PASS && debug_output != NULL ? amber : tone(style));
-}
-static void footer(uint32_t *p, const char *hints)
-{
-    rect(p, 0, 509, 960, 35, panel);
-    text(p, 28, 516, hints, white, 16);
 }
 void app_draw_home(uint32_t *p, const AppHome *home)
 {
@@ -414,11 +507,17 @@ void app_draw_home(uint32_t *p, const AppHome *home)
         y += step;
     }
     /* The main credits from the README, centred above the controls */
-    static const char credits[] = "Thanks to devnoname120, SKGleba, Reiko Asakura and Team Molecule";
+    static const char credits[] = "Thanks to devnoname120, SKGleba, Reiko Asakura, Team Molecule and all of VitaSDK contributors";
     text(p, (960 - check_font_width(credits, 15)) / 2, 480, credits, muted, 15);
-    char hints[96];
-    snprintf(hints, sizeof(hints), "Arrows  Choose     %s  Select     %s  Exit", confirm_name, back_name);
-    footer(p, home->hints != NULL ? home->hints : hints);
+    static const AppHint usual[] = {
+        {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Choose"},
+        {APP_GLYPH_CONFIRM, APP_GLYPH_NONE, "Select"},
+        {APP_GLYPH_BACK, APP_GLYPH_NONE, "Exit"},
+    };
+    if (home->hints != NULL)
+        footer(p, home->hints, home->hint_count);
+    else
+        footer(p, usual, sizeof(usual) / sizeof(usual[0]));
 }
 void app_draw_task(uint32_t *p, const AppTask *task)
 {
@@ -431,9 +530,8 @@ void app_draw_task(uint32_t *p, const AppTask *task)
                         i + 1 == task->count && task->state == CHECK_RUNNING ? white : muted, 864);
     mark(p, 30, 467, task->state);
     text(p, 60, 460, task->status, tone(task->state), 21);
-    char back[32];
-    snprintf(back, sizeof(back), "%s  Back", back_name);
-    footer(p, task->state == CHECK_RUNNING ? "Please wait and keep your Vita turned on."
-              : task->state == CHECK_FAIL  ? back
-                                           : "");
+    static const AppHint waiting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "Please wait and keep your Vita turned on."};
+    static const AppHint back = {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"};
+    footer(p, task->state == CHECK_RUNNING ? &waiting : &back,
+           task->state == CHECK_RUNNING || task->state == CHECK_FAIL ? 1u : 0u);
 }

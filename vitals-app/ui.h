@@ -13,6 +13,22 @@ typedef struct {
     const char *label;
     const char *description;
 } AppMenuItem;
+/* A control shown in the bar at the bottom: up to two button symbols, then what they do
+ * Confirm and back are Cross and Circle, or swapped where the system setting makes Circle
+ * confirm */
+typedef enum {
+    APP_GLYPH_NONE,
+    APP_GLYPH_CONFIRM,
+    APP_GLYPH_BACK,
+    APP_GLYPH_TRIANGLE,
+    APP_GLYPH_SQUARE,
+    APP_GLYPH_DPAD,
+    APP_GLYPH_STICK
+} AppGlyph;
+typedef struct {
+    AppGlyph glyph, also;
+    const char *label;
+} AppHint;
 typedef struct {
     int installed;
     int outdated;
@@ -24,7 +40,8 @@ typedef struct {
     const AppMenuItem *items;
     unsigned count, selected;
     /* The controls shown at the bottom; NULL for the usual ones */
-    const char *hints;
+    const AppHint *hints;
+    unsigned hint_count;
     /* A newer published release than this app ("1.3"), or NULL */
     const char *latest_release;
 } AppHome;
@@ -43,11 +60,9 @@ typedef struct {
     enum CheckState state;
     const char *status;
 } AppTask;
-/* The confirm and back buttons' names in the controls shown on screen: Cross and Circle, or
- * swapped where the system setting makes Circle confirm (as on Japanese consoles) */
+/* Which symbols confirm and back show: Cross and Circle, or swapped where the system setting
+ * makes Circle confirm (as on Japanese consoles) */
 void app_set_circle_confirms(int circle_confirms);
-const char *app_confirm_name(void);
-const char *app_back_name(void);
 void app_draw_home(uint32_t *pixels, const AppHome *home);
 void app_draw_task(uint32_t *pixels, const AppTask *task);
 /* The connection test, as drawn by Vital Signs */

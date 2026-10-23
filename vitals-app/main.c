@@ -475,19 +475,25 @@ int main(void)
         if (selected >= count)
             selected = count - 1;
         /* On the debug item, the confirm button only does something once another level is chosen */
-        static char debug_hints[96];
-        const char *hints = NULL;
+        static const AppHint debug_pending[] = {
+            {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Choose"},
+            {APP_GLYPH_CONFIRM, APP_GLYPH_NONE, "Apply and reboot"},
+            {APP_GLYPH_BACK, APP_GLYPH_NONE, "Exit"},
+        };
+        static const AppHint debug_current[] = {
+            {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Choose"},
+            {APP_GLYPH_BACK, APP_GLYPH_NONE, "Exit"},
+        };
+        const AppHint *hints = NULL;
+        unsigned hint_count = 0;
         if (actions[selected] == ACTION_DEBUG)
         {
-            if (debug_choice != debug_level)
-                snprintf(debug_hints, sizeof(debug_hints), "Arrows  Choose     %s  Apply and reboot     %s  Exit",
-                         app_confirm_name(), app_back_name());
-            else
-                snprintf(debug_hints, sizeof(debug_hints), "Arrows  Choose     %s  Exit", app_back_name());
-            hints = debug_hints;
+            hints = debug_choice != debug_level ? debug_pending : debug_current;
+            hint_count = debug_choice != debug_level ? sizeof(debug_pending) / sizeof(debug_pending[0])
+                                                      : sizeof(debug_current) / sizeof(debug_current[0]);
         }
         AppHome home = {installed, outdated, installed_version, debug_level > 0 ? debug_names[debug_level] : NULL,
-                        supported, firmware, items, count, selected, hints, newer_release()};
+                        supported, firmware, items, count, selected, hints, hint_count, newer_release()};
         app_draw_home(canvas, &home);
         present();
         unsigned pressed = 0;
