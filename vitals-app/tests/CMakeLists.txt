@@ -15,6 +15,8 @@ add_compile_options(-Wall -Wextra -Werror -UNDEBUG)
 include(${APP_DIR}/../version.cmake)
 add_compile_definitions(VITALS_VERSION="${VITALS_VERSION}")
 enable_testing()
+# zlib reads the compressed module headers (module_version.c)
+find_package(ZLIB REQUIRED)
 
 add_executable(vitals_app_options_tests test_options.c ${APP_DIR}/options.c)
 target_include_directories(vitals_app_options_tests PRIVATE ${APP_DIR})
@@ -26,9 +28,16 @@ add_test(NAME vitals_app_config_edit COMMAND vitals_app_config_edit_tests)
 
 # The installer's file operations, on a console mapped onto a temporary folder (vita_files.c)
 add_executable(vitals_app_install_files_tests test_install_files.c vita_files.c ${APP_DIR}/install.c
-    ${APP_DIR}/options.c ${APP_DIR}/config_edit.c)
+    ${APP_DIR}/options.c ${APP_DIR}/config_edit.c ${APP_DIR}/module_version.c)
 target_include_directories(vitals_app_install_files_tests PRIVATE include ${APP_DIR})
+target_link_libraries(vitals_app_install_files_tests PRIVATE ZLIB::ZLIB)
 add_test(NAME vitals_app_install_files COMMAND vitals_app_install_files_tests)
+
+# Reading a module's version from its file header, which the app shows for the installed plugin
+add_executable(vitals_app_module_version_tests test_module_version.c vita_files.c ${APP_DIR}/module_version.c)
+target_include_directories(vitals_app_module_version_tests PRIVATE include ${APP_DIR})
+target_link_libraries(vitals_app_module_version_tests PRIVATE ZLIB::ZLIB)
+add_test(NAME vitals_app_module_version COMMAND vitals_app_module_version_tests)
 
 # The locking adapter only needs OpenSSL's headers; Homebrew's default OpenSSL on macOS, the
 # system's on Linux (libssl-dev)

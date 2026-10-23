@@ -169,6 +169,18 @@ static void test_install_reinstall_uninstall(void)
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     assert(is(REDIRECTS, "contents of redirects.txt\n"));
+    /* The installed plugin is the one the app carries; another version's is told apart, also
+     * when only its length differs, and an update puts the app's back */
+    assert(vitals_install_plugin_current() == 1);
+    /* These stand-in files are not modules, so their version is unknown, never made up */
+    char version[16] = "unset";
+    assert(vitals_install_plugin_version(version, sizeof(version)) < 0 && strcmp(version, "unset") == 0);
+    put("ur0:tai/vitals.skprx", "contents of an older vitals.skprx\n");
+    assert(vitals_install_plugin_current() == 0);
+    put("ur0:tai/vitals.skprx", "contents of vitals.skprx\nand more\n");
+    assert(vitals_install_plugin_current() == 0);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_plugin_current() == 1);
 
     /* Reinstalling keeps one config entry, the user's redirect list and Sony's original backup */
     put(REDIRECTS, "my.old.host my.new.host\n");
@@ -185,6 +197,8 @@ static void test_install_reinstall_uninstall(void)
     assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
     expect_uninstalled();
     assert(is(REDIRECTS, "my.old.host my.new.host\n"));
+    /* Without an installed plugin there is nothing to compare */
+    assert(vitals_install_plugin_current() < 0);
 }
 
 static void test_conflicting_installs_are_removed(void)

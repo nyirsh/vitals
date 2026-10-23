@@ -258,15 +258,26 @@ static void status_card(uint32_t *p, const char *label, const char *status, enum
     mark(p, icon_left, 39, style);
     text(p, icon_left + 30, 34, status, tone(style), 20);
 }
-static void header(uint32_t *p, int installed)
+/* outdated: a different version's plugin is installed than the one this app carries;
+ * installed_version is its release number, empty when unknown */
+static void header(uint32_t *p, int installed, int outdated, const char *installed_version)
 {
     char line[64];
     rect(p, 0, 0, 960, 544, bg);
     text(p, 28, 17, "vitals", white, 32);
     snprintf(line, sizeof(line), "Version %s", VITALS_VERSION);
     text(p, 30, 58, line, muted, 17);
-    status_card(p, "vitals:", installed ? "installed" : "not installed",
-                installed ? CHECK_PASS : CHECK_FAIL);
+    char status[48];
+    int known = installed_version != NULL && installed_version[0] != '\0';
+    if (outdated && known && strcmp(installed_version, VITALS_VERSION) != 0)
+        snprintf(status, sizeof(status), "%s -> %s", installed_version, VITALS_VERSION);
+    else if (outdated)
+        snprintf(status, sizeof(status), known ? "%s, other build" : "update available", installed_version);
+    else if (installed)
+        snprintf(status, sizeof(status), "%s", known ? installed_version : "installed");
+    else
+        snprintf(status, sizeof(status), "not installed");
+    status_card(p, "vitals:", status, outdated ? CHECK_WARNING : installed ? CHECK_PASS : CHECK_FAIL);
 }
 static void footer(uint32_t *p, const char *hints)
 {
@@ -275,7 +286,7 @@ static void footer(uint32_t *p, const char *hints)
 }
 void app_draw_home(uint32_t *p, const AppHome *home)
 {
-    header(p, home->installed);
+    header(p, home->installed, home->outdated, home->installed_version);
     int y = 97;
     if (!home->firmware_supported)
     {
@@ -306,7 +317,7 @@ void app_draw_home(uint32_t *p, const AppHome *home)
 }
 void app_draw_task(uint32_t *p, const AppTask *task)
 {
-    header(p, task->installed);
+    header(p, task->installed, task->outdated, task->installed_version);
     text(p, 28, 97, task->title, white, 23);
     card(p, 28, 135, 904, 306, panel);
     unsigned first = task->count > APP_TASK_VISIBLE_LINES ? task->count - APP_TASK_VISIBLE_LINES : 0;

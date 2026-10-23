@@ -29,6 +29,7 @@ add_subdirectory(curl)
 add_executable(vitals-app
     main.c
     install.c
+    module_version.c
     config_edit.c
     check.c
     ui.c

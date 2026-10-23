@@ -11,6 +11,8 @@ typedef struct {
 } AppMenuItem;
 typedef struct {
     int installed;
+    int outdated;
+    const char *installed_version;
     int firmware_supported;
     const char *firmware;
     const AppMenuItem *items;
@@ -19,6 +21,8 @@ typedef struct {
 /* An install, uninstall or certificate update in progress or finished */
 typedef struct {
     int installed;
+    int outdated;
+    const char *installed_version;
     const char *title;
     const char *const *lines;
     unsigned count;

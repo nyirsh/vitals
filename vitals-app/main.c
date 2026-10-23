@@ -23,6 +23,7 @@ unsigned int _newlib_heap_size_user = 16u * 1024u * 1024u;
 enum Action
 {
     ACTION_INSTALL,
+    ACTION_UPDATE,
     ACTION_REINSTALL,
     ACTION_UNINSTALL,
     ACTION_CERTIFICATES,
@@ -32,6 +33,7 @@ enum Action
 static const AppMenuItem action_items[] = {
     [ACTION_INSTALL] = {"Install",
                         "Lets the browser, apps and games connect to modern secure (TLS 1.2 and 1.3) sites"},
+    [ACTION_UPDATE] = {"Update", "Replaces the installed vitals with the version this app carries"},
     [ACTION_REINSTALL] = {"Reinstall", "Use this to either update versions or fix a broken installation"},
     [ACTION_UNINSTALL] = {"Uninstall", "Removes all of the installed files"},
     [ACTION_CERTIFICATES] = {"Update certificates",
@@ -45,6 +47,10 @@ static uint32_t *canvas;
 static void *pixels;
 static unsigned held = ~0u;
 static int installed;
+/* A different kernel plugin is installed than the one this app carries */
+static int outdated;
+/* The installed plugin's release number, empty when it is unknown */
+static char installed_version[16];
 
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 
@@ -138,6 +144,8 @@ static AppTask task;
 static void draw_task(void)
 {
     task.installed = installed;
+    task.outdated = outdated;
+    task.installed_version = installed_version;
     app_draw_task(canvas, &task);
     present();
 }
@@ -156,6 +164,7 @@ static void run_operation(enum Action action)
 {
     static const char *const titles[] = {
         [ACTION_INSTALL] = "Installing vitals",
+        [ACTION_UPDATE] = "Updating vitals",
         [ACTION_REINSTALL] = "Reinstalling vitals",
         [ACTION_UNINSTALL] = "Uninstalling vitals",
         [ACTION_CERTIFICATES] = "Updating certificates",
@@ -307,24 +316,40 @@ int main(void)
         AppMenuItem items[6];
         unsigned count = 0;
         installed = vitals_install_detect();
+        /* Another version's plugin counts even when that version installed fewer files */
+        outdated = vitals_install_plugin_current() == 0;
+        if (vitals_install_plugin_version(installed_version, sizeof(installed_version)) < 0)
+            installed_version[0] = '\0';
+        int removable = supported && (installed || outdated);
         if (supported)
         {
-            if (installed)
+            if (removable)
             {
-                actions[count++] = ACTION_REINSTALL;
-                actions[count++] = ACTION_UNINSTALL;
+                actions[count++] = outdated ? ACTION_UPDATE : ACTION_REINSTALL;
                 actions[count++] = ACTION_CERTIFICATES;
             }
             else
                 actions[count++] = ACTION_INSTALL;
         }
         actions[count++] = ACTION_TEST;
+        /* Uninstalling sits last, right above Exit, away from the everyday options */
+        if (removable)
+            actions[count++] = ACTION_UNINSTALL;
         actions[count++] = ACTION_EXIT;
+        static char update_description[96];
         for (unsigned i = 0; i < count; ++i)
             items[i] = action_items[actions[i]];
+        for (unsigned i = 0; i < count; ++i)
+            if (actions[i] == ACTION_UPDATE && installed_version[0] != '\0' &&
+                strcmp(installed_version, VITALS_VERSION) != 0)
+            {
+                snprintf(update_description, sizeof(update_description),
+                         "Replaces the installed vitals %s with %s", installed_version, VITALS_VERSION);
+                items[i].description = update_description;
+            }
         if (selected >= count)
             selected = count - 1;
-        AppHome home = {installed, supported, firmware, items, count, selected};
+        AppHome home = {installed, outdated, installed_version, supported, firmware, items, count, selected};
         app_draw_home(canvas, &home);
         present();
         unsigned pressed = 0;

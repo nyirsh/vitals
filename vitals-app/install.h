@@ -14,6 +14,11 @@ typedef void (*VitalsInstallNote)(const char *line);
 int vitals_install_firmware_supported(char *description, size_t size);
 /* 1 when the plugin, every module and the certificates are installed */
 int vitals_install_detect(void);
+/* 1 when the installed kernel plugin is the one this app carries, 0 when it differs (another
+ * version), negative when either cannot be read (not installed) */
+int vitals_install_plugin_current(void);
+/* The release number the installed kernel plugin carries ("1.2"), or a negative error */
+int vitals_install_plugin_version(char *version, size_t size);
 /* Runs option (FULL or CERTIFICATES)
  * The caller reboots the Vita after a success */
 int vitals_install_run(enum VitalsOption option, int removing, VitalsInstallNote note);

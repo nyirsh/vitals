@@ -19,6 +19,7 @@
 #include "certificates.h"
 #include "config_edit.h"
 #include "install.h"
+#include "module_version.h"
 
 /* Progress messages go to the app's screen through install_note (see vitals_install_run) */
 #define printf install_note
@@ -926,6 +927,39 @@ int vitals_install_detect(void)
            path_exists(new_modules[MODULE_LIBSSL]) && path_exists(new_modules[MODULE_HTTP_PROVIDER]) &&
            path_exists(new_modules[MODULE_REAUTH]) &&
            path_exists("vs0:/data/external/cert/CA_LIST.cer_old");
+}
+
+int vitals_install_plugin_current(void)
+{
+    /* The plugin and the modules are always installed together, so the kernel plugin alone
+     * tells whether the installed vitals is the one this app carries */
+    char *installed = NULL, *bundled = NULL;
+    SceSize installed_size = 0, bundled_size = 0;
+    int result = read_file("ur0:tai/vitals.skprx", &installed, &installed_size);
+
+    if (result >= 0)
+    {
+        result = read_file("app0:vitals.skprx", &bundled, &bundled_size);
+    }
+    if (result >= 0)
+    {
+        result = installed_size == bundled_size && memcmp(installed, bundled, installed_size) == 0;
+    }
+    free(installed);
+    free(bundled);
+    return result;
+}
+
+int vitals_install_plugin_version(char *version, size_t size)
+{
+    unsigned major, minor;
+    int result = vitals_module_version("ur0:tai/vitals.skprx", &major, &minor);
+
+    if (result >= 0)
+    {
+        (void)snprintf(version, size, "%u.%u", major, minor);
+    }
+    return result;
 }
 
 int vitals_install_run(enum VitalsOption option, int removing, VitalsInstallNote note)
