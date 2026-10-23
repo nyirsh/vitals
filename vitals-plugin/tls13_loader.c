@@ -379,6 +379,9 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
     }
     if (loaded != 0)
     {
+        /* The provider never unloads, so a libhttp loaded again in the same process (after the
+         * app unloaded the first) is left to Sony's TLS */
+        ksceDebugPrintf("vitals: provider already resident pid=0x%X; it stays with its first libhttp\n", pid);
         result = 0;
         goto cleanup;
     }

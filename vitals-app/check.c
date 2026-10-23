@@ -473,12 +473,17 @@ failed:
     return rc;
 }
 
-void vitals_check_close(void)
+void vitals_check_stop(void)
 {
     if (guard >= 0)
         abort_current(1);
     join_worker();
     busy = 0;
+}
+
+void vitals_check_close(void)
+{
+    vitals_check_stop();
     if (http_ready)
         sceHttpTerm();
     if (ssl_ready)

@@ -12,6 +12,10 @@
 int vitals_check_open(void);
 /* Cancels a running test and releases what vitals_check_open set up */
 void vitals_check_close(void);
+/* Cancels a running test but keeps the HTTP libraries loaded for the next one
+ * vitals' provider stays attached to the libhttp it started with, so unloading and loading it
+ * again would leave the next test without modern TLS */
+void vitals_check_stop(void);
 /* Starts a fresh run of every check on a worker thread */
 void vitals_check_start(void);
 void vitals_check_cancel(void);

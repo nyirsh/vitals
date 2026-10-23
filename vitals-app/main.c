@@ -342,7 +342,8 @@ static void run_test(void)
         sceDisplayWaitVblankStart();
         sceKernelDelayThread(30000);
     }
-    vitals_check_close();
+    /* The libraries stay loaded for the next test; operations and exiting release them */
+    vitals_check_stop();
 }
 
 int main(void)
