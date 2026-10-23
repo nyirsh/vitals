@@ -341,8 +341,7 @@ static void run_test(void)
             vitals_check_cancel();
         if (page_presses)
         {
-            /* Ciphers, request details, handshake details and host redirects */
-            page = (int)((page + page_presses) % 4);
+            page = (int)((page + page_presses) % CHECK_PAGE_COUNT);
             scroll = 0;
         }
         /* The cipher list and the redirect list scroll */

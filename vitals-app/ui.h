@@ -5,6 +5,9 @@
 #define CHECK_HEIGHT 544
 #define CHECK_VISIBLE_CIPHERS 4
 #define CHECK_VISIBLE_REDIRECTS 5
+/* The test's detail pages, which Square cycles: ciphers, request details, handshake details and
+ * host redirects */
+#define CHECK_PAGE_COUNT 4
 #define APP_TASK_VISIBLE_LINES 12
 typedef struct {
     const char *label;

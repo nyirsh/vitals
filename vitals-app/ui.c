@@ -319,12 +319,14 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
         text(p, 28, 492, line, muted, 13);
     }
     rect(p, 0, 509, 960, 35, panel);
+    /* Which detail page this is, out of how many Square goes through */
     if (busy)
-        snprintf(line, sizeof(line), "Triangle  Cancel     Hold arrows / stick  Scroll     Square  Details     %s  Back",
-                 back_name);
+        snprintf(line, sizeof(line),
+                 "Triangle  Cancel     Hold arrows / stick  Scroll     Square  Details %d/%d     %s  Back",
+                 page + 1, CHECK_PAGE_COUNT, back_name);
     else
-        snprintf(line, sizeof(line), "%s  Retry     Hold arrows / stick  Scroll     Square  Details     %s  Back",
-                 confirm_name, back_name);
+        snprintf(line, sizeof(line), "%s  Retry     Hold arrows / stick  Scroll     Square  Details %d/%d     %s  Back",
+                 confirm_name, page + 1, CHECK_PAGE_COUNT, back_name);
     text(p, 28, 516, line, white, 16);
 }
 
