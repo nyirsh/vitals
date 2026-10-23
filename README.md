@@ -7,6 +7,10 @@ All of the heavylifting has been done by [devnoname120](https://github.com/devno
 
 The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals replaces only the TLS layer with [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) and installs an up-to-date certificate store. Sony's HTTP code keeps handling URLs, redirects, cookies and everything else, so apps work unchanged.
 
+> [!TIP]
+> **If it's not broken, don't fix it**
+> Please please please don't install this only because it's the shiny new thing and it has "security" in it. If you're happy with how your system is working and have no uses for the new functionalities that this project offer, DO NOT move away from iTLS, there's no reason to do so. Seriously.
+
 > [!CAUTION]
 > **Use `vitals` at your own risk.** It is provided as is, without any warranty, and I am not responsible for any damage, data loss or bricked console that may result from using it. While I personally tested this on two different systems of mine, I simply can't promise it will work on every single possible configuration out there.  
 > You alone are responsible for your system, its maintenance and what's installed on it.
