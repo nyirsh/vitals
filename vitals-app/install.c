@@ -844,6 +844,7 @@ static int install_certificates(int requested_state)
     printf("Fetching latest curl/Mozilla certificates...\n");
     int online = vitals_install_network_ready();
     result = vitals_prepare_certificates("app0:sony-certs.pem", "app0:mozilla-certs.pem",
+                                         VITALS_CUSTOM_CERTIFICATES_PATH,
                                          online ? VITALS_CA_UPDATE_URL : NULL, 30, &bundle);
     if (result < 0)
     {

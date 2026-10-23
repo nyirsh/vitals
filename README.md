@@ -81,6 +81,24 @@ Installing `vitals` also creates the file with instructions and examples: it is 
 Every app and game that uses Sony's HTTP library, as well as the system shell, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
 For now, only up to a maximum of 32 hosts can be redirected (trying to be cautious with memory usage and performance), maybe one day after more careful testing the restriction will be lifted. Malformed host names are also ignored.
 
+## Custom certificates
+
+To trust your own servers, for example a community server with a self-signed certificate, put their certificates in `ux0:data/vitals/custom-certs.pem`, one or more PEM blocks (`-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`). Comments and anything that isn't a certificate are ignored.
+
+The file is optional. Its certificates are added to Sony's and Mozilla's whenever the app installs, updates, reinstalls or updates certificates, so after editing it run **Update certificates**. Duplicates are added only once, a mistake in the file never stops an update, and uninstalling leaves the file in place.
+
+Each certificate must be marked as a certificate authority (`CA:TRUE`). A self-signed certificate made with `openssl req -x509` is one by default:
+
+```
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout server.key -out server.crt \
+    -subj "/CN=my.server.example" -addext "subjectAltName=DNS:my.server.example"
+```
+
+The certificate must also name the host apps connect to: combined with [host redirects](#host-redirects), that's the redirect's new host.
+
+> [!caution]
+> Every certificate in this file is trusted by every app, game and the browser. A server's own self-signed certificate is harmless, but adding someone else's certificate authority lets them impersonate any website on your console. Only add certificates you created yourself or fully trust.
+
 ## Connection test
 
 **Test connections** in the app checks what an ordinary app experiences, using only Sony's HTTP APIs, and you can run it even without `vitals` being installed:

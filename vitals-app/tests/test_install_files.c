@@ -23,10 +23,12 @@
 
 /* ---- Stand-ins for the network and the (separately tested) certificate merge ---- */
 int vitals_install_network_ready(void) { return 0; }
-int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path, const char *url,
-                                long timeout_seconds, VitalsCertificateBundle *bundle)
+int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path, const char *custom_path,
+                                const char *url, long timeout_seconds, VitalsCertificateBundle *bundle)
 {
     assert(strcmp(sony_path, "app0:sony-certs.pem") == 0 && strcmp(mozilla_path, "app0:mozilla-certs.pem") == 0);
+    /* The user's own certificates are always offered to the merge */
+    assert(custom_path != NULL && strcmp(custom_path, "ux0:data/vitals/custom-certs.pem") == 0);
     assert(url == NULL && timeout_seconds > 0);
     memset(bundle, 0, sizeof(*bundle));
     bundle->size = strlen(BUNDLE);
