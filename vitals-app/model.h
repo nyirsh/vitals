@@ -71,7 +71,11 @@ typedef struct
     unsigned redirect_count;
     CheckHandshake handshake;
     int started, complete;
+    /* The run was cancelled (Triangle, or leaving the test) before it finished */
+    int interrupted;
     int vitals_enabled; /* -1 before runtime detection, then 0 or 1 */
+    /* The run's log: 0 not saved, 1 saved (at report), -1 the last attempt failed */
+    int report_saved;
     char report[160];
 } CheckService;
 const char *check_endpoint(unsigned test);

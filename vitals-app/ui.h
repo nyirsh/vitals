@@ -29,7 +29,8 @@ typedef enum {
     APP_GLYPH_TRIANGLE,
     APP_GLYPH_SQUARE,
     APP_GLYPH_DPAD,
-    APP_GLYPH_STICK
+    APP_GLYPH_STICK,
+    APP_GLYPH_START
 } AppGlyph;
 typedef struct {
     AppGlyph glyph, also;

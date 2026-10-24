@@ -392,6 +392,9 @@ static void run_test(void)
             break;
         if (pressed & SCE_CTRL_TRIANGLE)
             vitals_check_cancel();
+        /* The log is saved only when asked, for a run that finished without being cancelled */
+        if (ready && !busy && (pressed & SCE_CTRL_START))
+            (void)vitals_check_save_report();
         if (page_presses)
         {
             page = (int)((page + page_presses) % CHECK_PAGE_COUNT);

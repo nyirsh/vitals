@@ -1,6 +1,7 @@
 #include "check.h"
 #include "probe.h"
 #include "vitals/redirect_list.h"
+#include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/kernel/modulemgr.h>
 #include <psp2/kernel/processmgr.h>
@@ -305,7 +306,8 @@ static int detect_vitals(void)
     }
     return 0;
 }
-static void save_report(const CheckService *s)
+/* Writes s's log; 0 when written, negative when the file couldn't be */
+static int save_report(const CheckService *s)
 {
     char path[160];
     snprintf(path, sizeof(path), REPORT_DIR "/%s-%08X-%llu.txt",
@@ -316,9 +318,9 @@ static void save_report(const CheckService *s)
     if (!f)
     {
         lock();
-        snprintf(notice, sizeof(notice), "Could not save report; results remain on screen.");
+        service.report_saved = -1;
         unlock();
-        return;
+        return -1;
     }
     fprintf(f,
             "vitals " VITALS_VERSION " connection test\nAPI=sceHttp\nservice=%s\nCertificate "
@@ -391,12 +393,39 @@ static void save_report(const CheckService *s)
     int failed = ferror(f);
     if (fclose(f))
         failed = 1;
+    /* A partly written log isn't kept */
+    if (failed)
+        (void)sceIoRemove(path);
     lock();
-    snprintf(service.report, sizeof(service.report), "%s", path);
-    snprintf(notice, sizeof(notice), "%s",
-             failed ? "Report write failed; results remain on screen."
-                    : "Report saved: ux0:data/vitals/  (one file per run)");
+    service.report_saved = failed ? -1 : 1;
+    if (!failed)
+        snprintf(service.report, sizeof(service.report), "%s", path);
     unlock();
+    return failed ? -1 : 0;
+}
+
+int vitals_check_save_report(void)
+{
+    if (guard < 0)
+        return -1;
+    lock();
+    const int saved = service.report_saved == 1;
+    const int ready = !busy && service.started && service.complete && !service.interrupted;
+    unlock();
+    if (saved)
+        return 1;
+    if (!ready)
+        return -1;
+    /* The finished run's results, copied so the log is written without holding the lock */
+    CheckService *snapshot = malloc(sizeof(*snapshot));
+    if (snapshot == NULL)
+        return -1;
+    lock();
+    *snapshot = service;
+    unlock();
+    int result = save_report(snapshot);
+    free(snapshot);
+    return result;
 }
 static int run_checks(SceSize argc, void *argv)
 {
@@ -509,18 +538,11 @@ static int run_checks(SceSize argc, void *argv)
     free(redirects);
     free(body);
     free(h);
-    /* No UI read of the report path races this snapshot */
-    CheckService *snapshot = malloc(sizeof(*snapshot));
-    if (snapshot)
-    {
-        lock();
-        *snapshot = service;
-        unlock();
-        save_report(snapshot);
-        free(snapshot);
-    }
+    /* The log is saved only on request (vitals_check_save_report), and only for a run that
+     * wasn't cancelled */
     lock();
     service.complete = 1;
+    service.interrupted = cancelled;
     busy = 0;
     unlock();
     return 0;

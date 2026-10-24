@@ -91,9 +91,26 @@ static void disc(uint32_t *p, int cx, int cy, int outer, int inner, uint32_t c)
         }
 }
 /* A control's symbol in a 16-pixel square at x, y, drawn in the bar's white */
+/* START is drawn as its name on a key cap, in this size */
+#define START_TEXT_SIZE 13
+/* How much room a symbol takes in the bar; START's key cap is as wide as its name */
+static int glyph_width(AppGlyph symbol)
+{
+    return symbol == APP_GLYPH_START ? check_font_width("START", START_TEXT_SIZE) + 14 + 8 : 22;
+}
 static void glyph(uint32_t *p, int x, int y, AppGlyph symbol)
 {
     const uint32_t c = white;
+    /* START: its name, dark on a white key cap with rounded corners */
+    if (symbol == APP_GLYPH_START)
+    {
+        const int width = check_font_width("START", START_TEXT_SIZE) + 14, height = 18;
+        rect(p, x + 2, y - 1, width - 4, height, c);
+        rect(p, x, y + 1, width, height - 4, c);
+        rect(p, x + 1, y, width - 2, height - 2, c);
+        text(p, x + 7, y, "START", bg, START_TEXT_SIZE);
+        return;
+    }
     enum
     {
         CROSS,
@@ -174,7 +191,7 @@ static void footer(uint32_t *p, const AppHint *hints, unsigned count)
             if (symbols[s] != APP_GLYPH_NONE)
             {
                 glyph(p, x, 518, symbols[s]);
-                x += 22;
+                x += glyph_width(symbols[s]);
             }
         text(p, x, 516, hints[i].label, white, 16);
         x += check_font_width(hints[i].label, 16) + 34;
@@ -417,14 +434,20 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
     }
     /* Which detail page this is, out of how many Square goes through */
     snprintf(line, sizeof(line), "Details %d/%d", page + 1, CHECK_PAGE_COUNT);
+    /* A finished run that wasn't cancelled can have its log saved, once */
+    const int saveable = !busy && s->started && s->complete && !s->interrupted;
+    const char *save_label = s->report_saved > 0   ? "Log saved to ux0:data/vitals/"
+                             : s->report_saved < 0 ? "Save failed, retry"
+                                                   : "Save log";
     const AppHint hints[] = {
         busy ? (AppHint){APP_GLYPH_TRIANGLE, APP_GLYPH_NONE, "Cancel"}
              : (AppHint){APP_GLYPH_CONFIRM, APP_GLYPH_NONE, "Retry"},
         {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Scroll"},
         {APP_GLYPH_SQUARE, APP_GLYPH_NONE, line},
         {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"},
+        {APP_GLYPH_START, APP_GLYPH_NONE, save_label},
     };
-    footer(p, hints, sizeof(hints) / sizeof(hints[0]));
+    footer(p, hints, sizeof(hints) / sizeof(hints[0]) - (saveable ? 0u : 1u));
 }
 
 /* The status card in the top right corner: "<label> <mark> <status>" */
