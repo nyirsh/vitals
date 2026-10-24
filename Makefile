@@ -25,7 +25,18 @@ test:
 update-certs:
 	$(MAKE) -C vitals-app update-certs
 
+# Releases a version: `make version 1.5` checks that the changelog's newest entry is 1.5, sets
+# VERSION, runs the tests, then commits, tags 1.5 and pushes the branch and the tag to origin
+# (tools/release.py)
+# The words after version are its arguments, not things to build; the script takes exactly one
+ifeq (version,$(firstword $(MAKECMDGOALS)))
+RELEASE_ARGUMENTS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+$(foreach argument,$(RELEASE_ARGUMENTS),$(eval $(argument):;@:))
+endif
+version:
+	python3 tools/release.py $(RELEASE_ARGUMENTS)
+
 clean:
 	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) clean;)
 
-.PHONY: all clean test update-certs $(COMPONENTS)
+.PHONY: all clean test update-certs version $(COMPONENTS)
