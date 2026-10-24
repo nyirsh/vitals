@@ -1,7 +1,5 @@
 # Changelog
 
-Every release of vitals, newest first.
-
 ## 1.4
 
 - Added this very same changelog!
