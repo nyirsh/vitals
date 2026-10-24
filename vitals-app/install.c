@@ -44,6 +44,10 @@ static void install_note(const char *format, ...)
 
 static const char vitals_config_block[] =
     "# VITALS\n*KERNEL\nur0:tai/vitals.skprx\n\n";
+/* The plugin as config.txt lists it, under a *KERNEL section: in vitals' own block, or wherever
+ * the user moved it */
+static const char vitals_plugin_path[] = "ur0:tai/vitals.skprx";
+static const char vitals_plugin_name[] = "vitals.skprx";
 static const char browser_provider_global[] = "ur0:tai/vitals-native/vitals.suprx";
 static const char redirect_list[] = "ux0:data/vitals/redirects.txt";
 
@@ -310,8 +314,7 @@ static int plugin_configured(void)
 
     if (read_file("ur0:tai/config.txt", &config, &config_size) >= 0)
     {
-        (void)config_size;
-        configured = strstr(config, vitals_config_block) != NULL;
+        configured = vitals_config_has_plugin(config, config_size, "*KERNEL", vitals_plugin_path);
     }
     free(config);
     return configured;
@@ -332,7 +335,8 @@ static int install_plugin_config(void)
     {
         return result;
     }
-    if (strstr(config, vitals_config_block) != NULL)
+    /* Already listed, in vitals' block or anywhere else under *KERNEL: nothing to add */
+    if (vitals_config_has_plugin(config, config_size, "*KERNEL", vitals_plugin_path))
     {
         free(config);
         return 0;
@@ -476,7 +480,30 @@ static int remove_config_block(const char *block, SceSize block_size)
 
 static int uninstall_plugin_config(void)
 {
-    return remove_config_block(vitals_config_block, (SceSize)(sizeof(vitals_config_block) - 1));
+    static const char config_path[] = "ur0:tai/config.txt";
+    char *config = NULL, *kept = NULL;
+    SceSize config_size = 0;
+    size_t kept_size = 0;
+
+    /* vitals' own block goes whole, comment included */
+    int result = remove_config_block(vitals_config_block, (SceSize)(sizeof(vitals_config_block) - 1));
+    if (result < 0 || !path_exists(config_path))
+        return result;
+    /* Then the plugin's line wherever the user moved it, keeping the sections around it */
+    result = read_file(config_path, &config, &config_size);
+    if (result < 0)
+        return result;
+    kept = malloc((size_t)config_size + 1);
+    if (kept == NULL)
+    {
+        free(config);
+        return -1;
+    }
+    if (vitals_config_remove_plugin(config, config_size, vitals_plugin_name, kept, &kept_size, NULL, NULL) > 0)
+        result = write_config(kept, (SceSize)kept_size, "", 0);
+    free(kept);
+    free(config);
+    return result;
 }
 
 /* The project was called tls_fixer before; its plugin must not load next to vitals */

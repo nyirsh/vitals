@@ -291,6 +291,40 @@ static void test_conflicting_installs_are_removed(void)
     assert(is(CA, SONY_CA) && is(CONFIG, ORIGINAL_CONFIG "*KERNEL\r\n"));
 }
 
+/* The plugin's line, wherever the user keeps it under *KERNEL, counts as vitals' entry */
+static void test_moved_plugin_line(void)
+{
+    static const char moved[] = "*KERNEL\nur0:tai/nonpdrm.skprx\nUR0:TAI/vitals.skprx\n\n*main\nur0:tai/henkaku.suprx\n";
+    static const char without[] = "*KERNEL\nur0:tai/nonpdrm.skprx\n\n*main\nur0:tai/henkaku.suprx\n";
+
+    /* Moved into the user's own section: installs and reinstalls add no second entry, and vitals
+     * counts as installed; uninstalling removes just that line */
+    fresh_console();
+    put(CONFIG, moved);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, moved) && vitals_install_detect() == 1);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, moved) && vitals_install_detect() == 1);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CONFIG, without) && vitals_install_detect() == 0);
+
+    /* Commented out, it doesn't count: the block is added, and uninstalling leaves the comment */
+    fresh_console();
+    put(CONFIG, "*KERNEL\n# ur0:tai/vitals.skprx\n");
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, VITALS_BLOCK "*KERNEL\n# ur0:tai/vitals.skprx\n") && vitals_install_detect() == 1);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CONFIG, "*KERNEL\n# ur0:tai/vitals.skprx\n"));
+
+    /* vitals' block and a copy of the line elsewhere: uninstalling removes both */
+    fresh_console();
+    put(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\nur0:tai/vitals.skprx\n");
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\nur0:tai/vitals.skprx\n"));
+    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CONFIG, ORIGINAL_CONFIG "*KERNEL\n") && vitals_install_detect() == 0);
+}
+
 static void test_missing_config(void)
 {
     /* Without a config.txt, vitals cannot be enabled, and its plugin is not left behind */
@@ -361,6 +395,7 @@ int main(void)
     test_install_reinstall_uninstall();
     test_debug_levels();
     test_conflicting_installs_are_removed();
+    test_moved_plugin_line();
     test_missing_config();
     test_failed_renames(0);
     test_failed_renames(1);
@@ -368,7 +403,7 @@ int main(void)
     char command[600];
     snprintf(command, sizeof(command), "rm -rf '%s'", root);
     assert(system(command) == 0);
-    puts("installer files: install, reinstall, uninstall, debug levels, conflicting plugins, missing config, "
-         "failed renames PASS");
+    puts("installer files: install, reinstall, uninstall, debug levels, conflicting plugins, moved plugin line, "
+         "missing config, failed renames PASS");
     return 0;
 }

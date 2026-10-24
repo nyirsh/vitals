@@ -81,6 +81,32 @@ int main(void)
     config = "*KERNEL\nur0:tai/reAuth.skprx\n";
     assert(vitals_config_remove_plugin(config, strlen(config), "reAuth.skprx", output, &size, NULL, NULL) == 1);
     assert(strcmp(output, "*KERNEL\n") == 0);
+
+    /* A plugin listed in its section: in its own block, or moved into another one, repeated
+     * headers included, in any case, with spaces and Windows line endings, or as the last line */
+    static const char path[] = "ur0:tai/vitals.skprx";
+#define HAS(text) vitals_config_has_plugin(text, strlen(text), "*KERNEL", path)
+    assert(HAS("# VITALS\n*KERNEL\nur0:tai/vitals.skprx\n\n*main\nur0:tai/henkaku.suprx\n"));
+    assert(HAS("*main\nur0:tai/henkaku.suprx\n*KERNEL\nur0:tai/nonpdrm.skprx\nur0:tai/vitals.skprx\n"));
+    assert(HAS("*KERNEL\nur0:tai/a.skprx\n*main\nur0:tai/b.suprx\n*KERNEL\nur0:tai/vitals.skprx\n"));
+    assert(HAS("  *kernel \r\n\r\n # a comment\r\n  UR0:TAI/Vitals.SKPRX  \r\n"));
+    assert(HAS("*KERNEL\nur0:tai/vitals.skprx"));
+    /* Not listed: commented out, in another section, before any header, under another path, or a
+     * file whose name only starts the same */
+    assert(!HAS("*KERNEL\n# ur0:tai/vitals.skprx\n"));
+    assert(!HAS("*KERNEL\n#ur0:tai/vitals.skprx\n"));
+    assert(!HAS("*main\nur0:tai/vitals.skprx\n"));
+    assert(!HAS("*KERNEL\nur0:tai/a.skprx\n*NPXS10015\nur0:tai/vitals.skprx\n"));
+    assert(!HAS("ur0:tai/vitals.skprx\n*KERNEL\n"));
+    assert(!HAS("*KERNEL\nux0:tai/vitals.skprx\n"));
+    assert(!HAS("*KERNEL\nur0:tai/vitals.skprx.bak\nur0:tai/old_vitals.skprx\n"));
+    assert(!HAS("*KERNELS\nur0:tai/vitals.skprx\n"));
+    assert(!HAS(""));
+#undef HAS
+    /* Only the given size is read */
+    static const char cut[] = "*KERNEL\nur0:tai/vitals.skprxEXTRA";
+    assert(vitals_config_has_plugin(cut, sizeof(cut) - 1 - 5, "*KERNEL", path));
+    assert(!vitals_config_has_plugin(cut, sizeof(cut) - 1 - 6, "*KERNEL", path));
     puts("config edit: plugin lines removed by file name; sections, comments and line endings kept PASS");
     return 0;
 }
