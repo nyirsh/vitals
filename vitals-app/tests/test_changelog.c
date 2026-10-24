@@ -85,6 +85,11 @@ int main(void)
     expect(0, CHANGELOG_ITEM, "\xc3\xa9\xc3\xa9\xc3\xa9");
     expect(1, CHANGELOG_CONTINUED, "\xc3\xa9");
 
+    /* Markdown's escapes are dropped: a backslash before punctuation shows only the punctuation */
+    assert(layout("## 1.4 \\(soon\\) v\\4\n- under \\*KERNEL\\_x\\\\ a\\b c\\", 400, 380) == 2);
+    expect(0, CHANGELOG_HEADING, "1.4 (soon) v\\4");
+    expect(1, CHANGELOG_ITEM, "under *KERNEL_x\\ a\\b c\\");
+
     /* Only the lines that fit are filled, and the count says so */
     char many[1024] = "";
     for (int i = 0; i < 80; ++i)
@@ -111,7 +116,10 @@ int main(void)
     while (heading < count && screen[heading].kind != CHANGELOG_HEADING)
         ++heading;
     assert(heading < count);
-    assert(strncmp(screen[heading].text, VITALS_VERSION " (", strlen(VITALS_VERSION) + 2) == 0);
+    /* "1.4", or "1.4 (2026-10-24)" once released */
+    const size_t version_length = strlen(VITALS_VERSION);
+    assert(strncmp(screen[heading].text, VITALS_VERSION, version_length) == 0);
+    assert(screen[heading].text[version_length] == '\0' || screen[heading].text[version_length] == ' ');
     for (size_t i = 0; i < count; ++i)
         assert(measure(screen[i].text) <= (screen[i].kind == CHANGELOG_ITEM || screen[i].kind == CHANGELOG_CONTINUED
                                                ? 840 : 864));

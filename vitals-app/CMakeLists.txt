@@ -69,6 +69,9 @@ foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_wr
         CRYPTO_THREAD_unlock CRYPTO_THREAD_lock_free CRYPTO_atomic_add)
     target_link_options(vitals-app PRIVATE "-Wl,--wrap=${function}")
 endforeach()
+# Keeps room for the tables vita-elf-create adds at the end of the code (sce_space.ld)
+target_link_options(vitals-app PRIVATE "-Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld")
+set_property(TARGET vitals-app APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld)
 target_link_libraries(vitals-app PRIVATE libcurl_static
     ssl crypto pthread z zstd m
     ScePvf_stub SceHttp_stub SceSsl_stub SceNet_stub SceNetCtl_stub

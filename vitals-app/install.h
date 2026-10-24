@@ -10,6 +10,9 @@
  * time through a callback */
 typedef void (*VitalsInstallNote)(const char *line);
 
+/* The certificate store the system's TLS and vitals use, which a certificate update rewrites */
+#define VITALS_CERTIFICATE_STORE "vs0:/data/external/cert/CA_LIST.cer"
+
 /* 1 on firmware 3.60 or 3.65; otherwise 0, with the detected firmware described in description */
 int vitals_install_firmware_supported(char *description, size_t size);
 /* 1 when the plugin, every module and the certificates are installed */

@@ -22,6 +22,25 @@ static void add(Layout *layout, ChangelogKind kind, const char *text, size_t len
     ++layout->count;
 }
 
+/* Markdown escapes punctuation with a backslash ("\\*KERNEL"); the screen shows it plain */
+static int escaped_punctuation(char c)
+{
+    return c != '\0' && strchr("\\`*_{}[]()#+-.!<>|~", c) != NULL;
+}
+
+/* Copies a line's text without Markdown's escapes, into unescaped (which holds the line) */
+static size_t unescape(const char *text, size_t length, char *unescaped)
+{
+    size_t written = 0;
+    for (size_t i = 0; i < length; ++i)
+    {
+        if (text[i] == '\\' && i + 1 < length && escaped_punctuation(text[i + 1]))
+            ++i;
+        unescaped[written++] = text[i];
+    }
+    return written;
+}
+
 /* 1 when text (length bytes) is no wider than width */
 static int fits(const char *text, size_t length, ChangelogMeasure measure, int width)
 {
@@ -109,8 +128,10 @@ size_t vitals_changelog_layout(const char *text, size_t length, ChangelogMeasure
             ++first;
         while (last > first && (text[last - 1] == ' ' || text[last - 1] == '\t' || text[last - 1] == '\r'))
             --last;
-        const char *line = text + first;
-        const size_t size = last - first;
+        /* The line as it shows, without escapes; longer lines than a screen line are cut */
+        char shown[4 * VITALS_CHANGELOG_LINE_SIZE];
+        const size_t size = unescape(text + first, last - first < sizeof(shown) ? last - first : sizeof(shown), shown);
+        const char *line = shown;
         if (size >= 3 && memcmp(line, "## ", 3) == 0)
         {
             /* A version's heading, set apart from what comes before it */

@@ -9,12 +9,14 @@
 #include <psp2/apputil.h>
 #include <psp2/ctrl.h>
 #include <psp2/display.h>
+#include <psp2/io/stat.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/net/net.h>
 #include <psp2/net/netctl.h>
 #include <psp2/power.h>
+#include <psp2/rtc.h>
 #include <psp2/sysmodule.h>
 #include <psp2/system_param.h>
 #include <stdio.h>
@@ -89,6 +91,23 @@ static unsigned placement_options(VitalsPlacement options[4])
     options[count++] = VITALS_PLACEMENT_FIRST;
     options[count++] = VITALS_PLACEMENT_LAST;
     return count;
+}
+/* When the certificate store was last written, as "2026-10-24 11:42" in the console's time; empty
+ * when it can't be read */
+static char certificates_updated[32];
+static void read_certificates_date(void)
+{
+    SceIoStat status;
+    SceRtcTick utc, local;
+    certificates_updated[0] = '\0';
+    if (sceIoGetstat(VITALS_CERTIFICATE_STORE, &status) < 0)
+        return;
+    /* Files keep their times in UTC */
+    SceDateTime when = status.st_mtime;
+    if (sceRtcGetTick(&when, &utc) >= 0 && sceRtcConvertUtcToLocalTime(&utc, &local) >= 0)
+        (void)sceRtcSetTick(&when, &local);
+    snprintf(certificates_updated, sizeof(certificates_updated), "%04u-%02u-%02u %02u:%02u", when.year, when.month,
+             when.day, when.hour, when.minute);
 }
 static int installs_plugin(int action)
 {
@@ -531,6 +550,7 @@ int main(void)
             /* The install item starts where the plugin is listed now, so it stays there unless
              * another place is chosen */
             placement_current = vitals_install_placement();
+            read_certificates_date();
             placement_choice = placement_current < 0 ? VITALS_PLACEMENT_BLOCK : (VitalsPlacement)placement_current;
             refresh = 0;
         }
@@ -555,6 +575,7 @@ int main(void)
             actions[count++] = ACTION_UNINSTALL;
         actions[count++] = ACTION_EXIT;
         static char update_description[96], debug_label[48], debug_description[96], install_label[64];
+        static char certificates_description[112];
         for (unsigned i = 0; i < count; ++i)
             items[i] = action_items[actions[i]];
         for (unsigned i = 0; i < count; ++i)
@@ -579,6 +600,14 @@ int main(void)
                 snprintf(update_description, sizeof(update_description),
                          "Replaces the installed vitals %s with %s", installed_version, VITALS_VERSION);
                 items[i].description = update_description;
+            }
+        /* When the installed certificates were last updated */
+        for (unsigned i = 0; i < count; ++i)
+            if (actions[i] == ACTION_CERTIFICATES && certificates_updated[0] != '\0')
+            {
+                snprintf(certificates_description, sizeof(certificates_description), "%s. Last updated %s",
+                         action_items[ACTION_CERTIFICATES].description, certificates_updated);
+                items[i].description = certificates_description;
             }
         /* Left and Right choose where config.txt lists vitals, as on the debug item; the selected
          * install item shows what the choice does */

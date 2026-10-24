@@ -931,7 +931,7 @@ static int install_http_modules(int requested_state)
 
 static int install_certificates(int requested_state)
 {
-    static const char certificate_path[] = "vs0:/data/external/cert/CA_LIST.cer";
+    static const char certificate_path[] = VITALS_CERTIFICATE_STORE;
     static const char backup_path[] = "vs0:/data/external/cert/CA_LIST.cer_old";
     static const char temporary_path[] = "vs0:/data/external/cert/CA_LIST.cer.prepared";
     static const char rollback_path[] = "vs0:/data/external/cert/CA_LIST.cer.vitals-remove";

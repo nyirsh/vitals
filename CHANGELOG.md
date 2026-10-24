@@ -8,6 +8,7 @@ Every release of vitals, newest first.
 - The installer finds vitals in config.txt wherever you moved its line under \*KERNEL, and no longer adds it a second time
 - Uninstalling removes vitals' line from config.txt wherever it is, not only from its own block
 - When installing, reinstalling or updating, it is now possible to choose where to place the line in config.txt
+- The app now shows when the certificates were last updated
 
 ## 1.3
 
