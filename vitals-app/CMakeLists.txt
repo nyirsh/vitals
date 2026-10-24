@@ -41,6 +41,7 @@ add_subdirectory(curl)
 
 add_executable(vitals-app
     main.c
+    changelog.c
     install.c
     module_version.c
     release_version.c
@@ -101,6 +102,7 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          ${VITALS_REAUTH_MODULE} vitals-reauth.suprx
          ${debug_entries}
          ../README.md README.md
+         ../CHANGELOG.md CHANGELOG.md
          ../THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.md
          ${license_entries}
          assets/sony-certs.pem sony-certs.pem

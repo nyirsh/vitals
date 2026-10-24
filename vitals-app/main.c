@@ -1,3 +1,4 @@
+#include "changelog.h"
 #include "check.h"
 #include "font.h"
 #include "input.h"
@@ -33,6 +34,7 @@ enum Action
     ACTION_CERTIFICATES,
     ACTION_TEST,
     ACTION_DEBUG,
+    ACTION_CHANGELOG,
     ACTION_EXIT
 };
 static const AppMenuItem action_items[] = {
@@ -46,6 +48,7 @@ static const AppMenuItem action_items[] = {
     [ACTION_TEST] = {"Test connections",
                      "Checks that everything is working as expected"},
     [ACTION_DEBUG] = {"Debug output", ""},
+    [ACTION_CHANGELOG] = {"Changelog", "What changed in each version of vitals"},
     [ACTION_EXIT] = {"Exit", ""},
 };
 
@@ -373,6 +376,75 @@ static void run_test(void)
     vitals_check_stop();
 }
 
+/* The changelog the app carries, laid out once and kept for the next visit */
+#define CHANGELOG_PATH "app0:CHANGELOG.md"
+#define CHANGELOG_MAX_SIZE (64u * 1024u)
+#define CHANGELOG_MAX_LINES 512u
+static ChangelogLine changelog_lines[CHANGELOG_MAX_LINES];
+static unsigned changelog_count;
+static int changelog_width(const char *text) { return check_font_width(text, APP_CHANGELOG_TEXT_SIZE); }
+static void load_changelog(void)
+{
+    if (changelog_count != 0)
+        return;
+    char *text = malloc(CHANGELOG_MAX_SIZE);
+    FILE *file = text != NULL ? fopen(CHANGELOG_PATH, "rb") : NULL;
+    size_t length = file != NULL ? fread(text, 1, CHANGELOG_MAX_SIZE, file) : 0;
+    if (file != NULL)
+        fclose(file);
+    if (length != 0)
+        changelog_count = (unsigned)vitals_changelog_layout(text, length, changelog_width, APP_CHANGELOG_WIDTH,
+                                                             APP_CHANGELOG_ITEM_WIDTH, changelog_lines,
+                                                             CHANGELOG_MAX_LINES);
+    free(text);
+    if (changelog_count == 0)
+    {
+        changelog_lines[0].kind = CHANGELOG_TEXT;
+        snprintf(changelog_lines[0].text, sizeof(changelog_lines[0].text),
+                 "The changelog is missing from this app (" CHANGELOG_PATH ").");
+        changelog_count = 1;
+    }
+}
+
+static void run_changelog(void)
+{
+    unsigned scroll = 0, last_scroll = ~0u;
+    CheckScrollRepeat repeat = {0};
+    load_changelog();
+    for (;;)
+    {
+        SceCtrlData pads[64];
+        int pad_count = sceCtrlReadBufferPositive(0, pads, 64);
+        unsigned pressed = 0;
+        int steps = 0;
+        uint64_t sample_ms = now_ms();
+        for (int i = 0; i < pad_count && i < 64; ++i)
+        {
+            pressed |= pads[i].buttons & ~held;
+            held = pads[i].buttons;
+            steps += check_scroll_repeat(&repeat,
+                                         check_scroll_direction(pads[i].buttons & SCE_CTRL_UP,
+                                                                pads[i].buttons & SCE_CTRL_DOWN, pads[i].ly,
+                                                                pads[i].ry),
+                                         sample_ms);
+        }
+        if (pressed & back_button)
+            break;
+        scroll = check_scroll_move(scroll, steps, changelog_count, APP_CHANGELOG_VISIBLE_LINES);
+        if (scroll != last_scroll)
+        {
+            AppChangelog view = {installed,          outdated,        installed_version,
+                                 debug_level > 0 ? debug_names[debug_level] : NULL,
+                                 newer_release(),    changelog_lines, changelog_count,
+                                 scroll};
+            app_draw_changelog(canvas, &view);
+            present();
+            last_scroll = scroll;
+        }
+        sceKernelDelayThread(30000);
+    }
+}
+
 int main(void)
 {
     int exit_code = 1, font_ready = 0, display_active = 0;
@@ -411,8 +483,8 @@ int main(void)
     for (;;)
     {
         /* Installing is offered only on 3.60 and 3.65; the test works everywhere */
-        enum Action actions[7];
-        AppMenuItem items[7];
+        enum Action actions[8];
+        AppMenuItem items[8];
         unsigned count = 0;
         /* The installed files are read when the menu opens and after an operation, not on every
          * button press */
@@ -442,6 +514,7 @@ int main(void)
         /* Only this version's own modules can be switched, so an update comes first */
         if (supported && debug_level >= 0)
             actions[count++] = ACTION_DEBUG;
+        actions[count++] = ACTION_CHANGELOG;
         /* Uninstalling sits last, right above Exit, away from the everyday options */
         if (removable)
             actions[count++] = ACTION_UNINSTALL;
@@ -546,10 +619,13 @@ int main(void)
             enum Action action = actions[selected];
             if (action == ACTION_EXIT)
                 break;
-            /* The release check never runs alongside the test or an operation */
-            if (action != ACTION_DEBUG || debug_choice != debug_level)
+            /* The release check never runs alongside the test or an operation; reading the
+             * changelog needs no network, so it keeps going */
+            if (action != ACTION_CHANGELOG && (action != ACTION_DEBUG || debug_choice != debug_level))
                 stop_release_check();
-            if (action == ACTION_TEST)
+            if (action == ACTION_CHANGELOG)
+                run_changelog();
+            else if (action == ACTION_TEST)
                 run_test();
             else if (action != ACTION_DEBUG || debug_choice != debug_level)
             {

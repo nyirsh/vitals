@@ -493,17 +493,17 @@ void app_draw_home(uint32_t *p, const AppHome *home)
              muted, 16);
         y += 86;
     }
-    /* Six items only fit above the credits with shorter cards */
-    int compact = home->count > 5;
-    int height = compact ? 54 : 62, step = compact ? 62 : 72;
+    /* Six items only fit above the credits with shorter cards, and seven with shorter still */
+    int compact = home->count > 5, tight = home->count > 6;
+    int height = tight ? 46 : compact ? 54 : 62, step = tight ? 52 : compact ? 62 : 72;
     for (unsigned i = 0; i < home->count; ++i)
     {
         int selected = i == home->selected;
         card(p, 28, y, 904, height, selected ? highlight : panel);
         if (selected)
             rect(p, 28, y + 12, 4, height - 24, blue);
-        text(p, 48, y + (compact ? 4 : 7), home->items[i].label, selected ? white : muted, 21);
-        text(p, 48, y + (compact ? 30 : 37), home->items[i].description, muted, 16);
+        text(p, 48, y + (tight ? 2 : compact ? 4 : 7), home->items[i].label, selected ? white : muted, 21);
+        text(p, 48, y + (tight ? 25 : compact ? 30 : 37), home->items[i].description, muted, 16);
         y += step;
     }
     /* The main credits from the README, centred above the controls */
@@ -534,4 +534,50 @@ void app_draw_task(uint32_t *p, const AppTask *task)
     static const AppHint back = {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"};
     footer(p, task->state == CHECK_RUNNING ? &waiting : &back,
            task->state == CHECK_RUNNING || task->state == CHECK_FAIL ? 1u : 0u);
+}
+void app_draw_changelog(uint32_t *p, const AppChangelog *changelog)
+{
+    header(p, changelog->installed, changelog->outdated, changelog->installed_version, changelog->debug_output,
+           changelog->latest_release);
+    text(p, 28, 97, "Changelog", white, 23);
+    const int scrolls = changelog->count > APP_CHANGELOG_VISIBLE_LINES;
+    if (scrolls)
+    {
+        /* Where the visible part sits in the whole list */
+        char position[48];
+        unsigned last = changelog->scroll + APP_CHANGELOG_VISIBLE_LINES;
+        snprintf(position, sizeof(position), "Lines %u-%u of %u", changelog->scroll + 1,
+                 last < changelog->count ? last : changelog->count, changelog->count);
+        text(p, 932 - check_font_width(position, 16), 104, position, muted, 16);
+    }
+    card(p, 28, 135, 904, 360, panel);
+    for (unsigned i = 0; i < APP_CHANGELOG_VISIBLE_LINES && changelog->scroll + i < changelog->count; ++i)
+    {
+        const ChangelogLine *line = &changelog->lines[changelog->scroll + i];
+        const int y = 147 + (int)i * 24;
+        switch (line->kind)
+        {
+        case CHANGELOG_HEADING:
+            check_font_draw(p, 48, y - 2, line->text, 20, white, APP_CHANGELOG_WIDTH);
+            break;
+        case CHANGELOG_ITEM:
+            text(p, 54, y, "-", blue, APP_CHANGELOG_TEXT_SIZE);
+            /* Then the change's text, level with its continued lines */
+            __attribute__((fallthrough));
+        case CHANGELOG_CONTINUED:
+            check_font_draw(p, 48 + APP_CHANGELOG_WIDTH - APP_CHANGELOG_ITEM_WIDTH, y, line->text,
+                            APP_CHANGELOG_TEXT_SIZE, muted, APP_CHANGELOG_ITEM_WIDTH);
+            break;
+        case CHANGELOG_TEXT:
+            check_font_draw(p, 48, y, line->text, APP_CHANGELOG_TEXT_SIZE, muted, APP_CHANGELOG_WIDTH);
+            break;
+        case CHANGELOG_BLANK:
+            break;
+        }
+    }
+    static const AppHint scrolling[] = {
+        {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Scroll"},
+        {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"},
+    };
+    footer(p, scrolls ? scrolling : scrolling + 1, scrolls ? 2u : 1u);
 }

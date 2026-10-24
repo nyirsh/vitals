@@ -22,6 +22,13 @@ add_executable(vitals_app_options_tests test_options.c ${APP_DIR}/options.c)
 target_include_directories(vitals_app_options_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_options COMMAND vitals_app_options_tests)
 
+# The changelog's layout, and the CHANGELOG.md the app carries
+add_executable(vitals_app_changelog_tests test_changelog.c ${APP_DIR}/changelog.c)
+target_include_directories(vitals_app_changelog_tests PRIVATE ${APP_DIR})
+target_compile_definitions(vitals_app_changelog_tests PRIVATE
+    VITALS_CHANGELOG_FILE="${APP_DIR}/../CHANGELOG.md")
+add_test(NAME vitals_app_changelog COMMAND vitals_app_changelog_tests)
+
 add_executable(vitals_app_config_edit_tests test_config_edit.c ${APP_DIR}/config_edit.c)
 target_include_directories(vitals_app_config_edit_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_config_edit COMMAND vitals_app_config_edit_tests)
