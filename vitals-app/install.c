@@ -320,13 +320,83 @@ static int plugin_configured(void)
     return configured;
 }
 
+static VitalsPlacement install_placement = VITALS_PLACEMENT_KEEP;
+
+void vitals_install_set_placement(VitalsPlacement placement)
+{
+    install_placement = placement;
+}
+
+/* The placement a config's place stands for; negative when it doesn't list the plugin */
+static int placement_of(VitalsConfigPlace place)
+{
+    switch (place)
+    {
+    case VITALS_CONFIG_BLOCK:
+        return VITALS_PLACEMENT_BLOCK;
+    case VITALS_CONFIG_FIRST:
+        return VITALS_PLACEMENT_FIRST;
+    case VITALS_CONFIG_LAST:
+        return VITALS_PLACEMENT_LAST;
+    case VITALS_CONFIG_ELSEWHERE:
+        return VITALS_PLACEMENT_KEEP;
+    case VITALS_CONFIG_NOT_LISTED:
+        break;
+    }
+    return -1;
+}
+
+static VitalsConfigPlace config_place(const char *config, SceSize size)
+{
+    return vitals_config_plugin_place(config, size, vitals_config_block, "*KERNEL", vitals_plugin_path);
+}
+
+int vitals_install_placement(void)
+{
+    char *config = NULL;
+    SceSize config_size = 0;
+    int result = read_file("ur0:tai/config.txt", &config, &config_size);
+    if (result >= 0)
+        result = placement_of(config_place(config, config_size));
+    free(config);
+    return result;
+}
+
+/* config without vitals' entries: its block, then its line wherever it is; *bare is allocated,
+ * and NUL-terminated */
+static int without_vitals(const char *config, SceSize size, char **bare, size_t *bare_size)
+{
+    char *rest = malloc((size_t)size + 1), *kept = malloc((size_t)size + 1);
+    if (rest == NULL || kept == NULL)
+    {
+        free(rest);
+        free(kept);
+        return -1;
+    }
+    const char *match = strstr(config, vitals_config_block);
+    size_t rest_size = 0;
+    for (size_t i = 0; i < size; ++i)
+    {
+        if (match != NULL && config + i == match)
+            i += sizeof(vitals_config_block) - 2;
+        else
+            rest[rest_size++] = config[i];
+    }
+    rest[rest_size] = '\0';
+    (void)vitals_config_remove_plugin(rest, rest_size, vitals_plugin_name, kept, bare_size, NULL, NULL);
+    free(rest);
+    *bare = kept;
+    return 0;
+}
+
 static int install_plugin_config(void)
 {
     static const char config_path[] = "ur0:tai/config.txt";
     static const char backup_path[] = "ur0:tai/config_previtals.txt";
     static const char temporary_path[] = "ur0:tai/config_vitals.tmp";
-    char *config = NULL;
+    char *config = NULL, *bare = NULL, *placed = NULL;
     SceSize config_size = 0;
+    size_t bare_size = 0, placed_size = 0;
     SceUID descriptor;
     int result;
 
@@ -335,11 +405,44 @@ static int install_plugin_config(void)
     {
         return result;
     }
-    /* Already listed, in vitals' block or anywhere else under *KERNEL: nothing to add */
-    if (vitals_config_has_plugin(config, config_size, "*KERNEL", vitals_plugin_path))
+    /* Already where it was asked for, or listed and to be left where it is: nothing to change */
+    VitalsConfigPlace place = config_place(config, config_size);
+    VitalsPlacement wanted = install_placement;
+    if (place != VITALS_CONFIG_NOT_LISTED &&
+        (wanted == VITALS_PLACEMENT_KEEP || placement_of(place) == (int)wanted))
     {
         free(config);
         return 0;
+    }
+    /* Otherwise the plugin goes to its new place, from wherever it was */
+    if (without_vitals(config, config_size, &bare, &bare_size) < 0)
+    {
+        free(config);
+        return -1;
+    }
+    free(config);
+    const char *first = vitals_config_block, *second = bare;
+    SceSize first_size = (SceSize)(sizeof(vitals_config_block) - 1), second_size = (SceSize)bare_size;
+    if (wanted == VITALS_PLACEMENT_FIRST || wanted == VITALS_PLACEMENT_LAST)
+    {
+        placed = malloc(bare_size + sizeof(vitals_plugin_path) + 5);
+        if (placed == NULL)
+        {
+            free(bare);
+            return -1;
+        }
+        if (vitals_config_insert_plugin(bare, bare_size, "*KERNEL", vitals_plugin_path,
+                                        wanted == VITALS_PLACEMENT_LAST, placed, &placed_size) == 0)
+        {
+            printf(wanted == VITALS_PLACEMENT_FIRST ? "Listing vitals first among the kernel plugins... \n"
+                                                     : "Listing vitals last among the kernel plugins... \n");
+            first = placed;
+            first_size = (SceSize)placed_size;
+            second = "";
+            second_size = 0;
+        }
+        else
+            printf("config.txt has no *KERNEL section to add vitals to, so it gets its own block.\n");
     }
 
     (void)remove_if_exists(temporary_path);
@@ -349,23 +452,22 @@ static int install_plugin_config(void)
         0777);
     if (descriptor < 0)
     {
-        free(config);
+        free(bare);
+        free(placed);
         return descriptor;
     }
 
-    result = write_all(
-        descriptor,
-        vitals_config_block,
-        (SceSize)(sizeof(vitals_config_block) - 1));
+    result = write_all(descriptor, first, first_size);
     if (result >= 0)
     {
-        result = write_all(descriptor, config, config_size);
+        result = write_all(descriptor, second, second_size);
     }
     if (sceIoClose(descriptor) < 0 && result >= 0)
     {
         result = -1;
     }
-    free(config);
+    free(bare);
+    free(placed);
     if (result < 0)
     {
         (void)remove_if_exists(temporary_path);

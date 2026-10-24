@@ -325,6 +325,67 @@ static void test_moved_plugin_line(void)
     assert(is(CONFIG, ORIGINAL_CONFIG "*KERNEL\n") && vitals_install_detect() == 0);
 }
 
+/* Where vitals is listed is chosen at install, and changing it moves the one line there */
+static void test_placements(void)
+{
+    static const char first[] =
+        "# taiHEN config\n*KERNEL\nur0:tai/vitals.skprx\nur0:tai/nonpdrm.skprx\n\n*main\nur0:tai/henkaku.suprx\n";
+    static const char last[] =
+        "# taiHEN config\n*KERNEL\nur0:tai/nonpdrm.skprx\nur0:tai/vitals.skprx\n\n*main\nur0:tai/henkaku.suprx\n";
+
+    fresh_console();
+    assert(vitals_install_placement() < 0);
+    vitals_install_set_placement(VITALS_PLACEMENT_FIRST);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, first) && vitals_install_placement() == VITALS_PLACEMENT_FIRST && vitals_install_detect() == 1);
+    /* The old config is kept as the backup, as before */
+    assert(is("ur0:tai/config_previtals.txt", ORIGINAL_CONFIG));
+    /* Kept where it is, or asked for where it already is: nothing changes */
+    vitals_install_set_placement(VITALS_PLACEMENT_KEEP);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
+    vitals_install_set_placement(VITALS_PLACEMENT_FIRST);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
+    /* Moved between all three places, never listed twice */
+    vitals_install_set_placement(VITALS_PLACEMENT_LAST);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, last) && vitals_install_placement() == VITALS_PLACEMENT_LAST);
+    vitals_install_set_placement(VITALS_PLACEMENT_BLOCK);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG) && vitals_install_placement() == VITALS_PLACEMENT_BLOCK);
+    vitals_install_set_placement(VITALS_PLACEMENT_FIRST);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
+    /* Uninstalling removes it from any of them */
+    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CONFIG, ORIGINAL_CONFIG) && vitals_install_placement() < 0);
+    vitals_install_set_placement(VITALS_PLACEMENT_LAST);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, last));
+    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0 && is(CONFIG, ORIGINAL_CONFIG));
+
+    /* Without a *KERNEL section of the user's, first and last fall back to vitals' own block */
+    static const char no_kernel[] = "*main\nur0:tai/henkaku.suprx\n";
+    for (int placement = VITALS_PLACEMENT_FIRST; placement <= VITALS_PLACEMENT_LAST; ++placement)
+    {
+        fresh_console();
+        put(CONFIG, no_kernel);
+        vitals_install_set_placement((VitalsPlacement)placement);
+        assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+        assert(is(CONFIG, VITALS_BLOCK "*main\nur0:tai/henkaku.suprx\n"));
+        assert(vitals_install_placement() == VITALS_PLACEMENT_BLOCK);
+    }
+
+    /* Moved by hand elsewhere: told apart, kept by default, and movable to a place of its own */
+    static const char between[] = "*KERNEL\nur0:tai/a.skprx\nur0:tai/vitals.skprx\nur0:tai/b.skprx\n";
+    fresh_console();
+    put(CONFIG, between);
+    assert(vitals_install_placement() == VITALS_PLACEMENT_KEEP);
+    vitals_install_set_placement(VITALS_PLACEMENT_KEEP);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, between));
+    vitals_install_set_placement(VITALS_PLACEMENT_LAST);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, "*KERNEL\nur0:tai/a.skprx\nur0:tai/b.skprx\nur0:tai/vitals.skprx\n"));
+    vitals_install_set_placement(VITALS_PLACEMENT_KEEP);
+}
+
 static void test_missing_config(void)
 {
     /* Without a config.txt, vitals cannot be enabled, and its plugin is not left behind */
@@ -396,6 +457,7 @@ int main(void)
     test_debug_levels();
     test_conflicting_installs_are_removed();
     test_moved_plugin_line();
+    test_placements();
     test_missing_config();
     test_failed_renames(0);
     test_failed_renames(1);
@@ -404,6 +466,6 @@ int main(void)
     snprintf(command, sizeof(command), "rm -rf '%s'", root);
     assert(system(command) == 0);
     puts("installer files: install, reinstall, uninstall, debug levels, conflicting plugins, moved plugin line, "
-         "missing config, failed renames PASS");
+         "placements, missing config, failed renames PASS");
     return 0;
 }

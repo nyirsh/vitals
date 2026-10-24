@@ -116,3 +116,144 @@ int vitals_config_has_plugin(const char *config, size_t size, const char *sectio
     }
     return 0;
 }
+
+/* One line of a config: [start, end) without its '\n', next the start of the line after it, and
+ * [first, last) the line without the spaces around it */
+typedef struct
+{
+    size_t start, end, next, first, last;
+} ConfigLine;
+
+static void read_line(const char *config, size_t size, size_t at, ConfigLine *line)
+{
+    size_t end = at;
+    while (end < size && config[end] != '\n')
+        ++end;
+    size_t first, last;
+    trim(config + at, end - at, &first, &last);
+    *line = (ConfigLine){at, end, end < size ? end + 1 : end, at + first, at + last};
+}
+
+static int is_header(const char *config, const ConfigLine *line)
+{
+    return line->first < line->last && config[line->first] == '*';
+}
+
+static int is_header_named(const char *config, const ConfigLine *line, const char *section)
+{
+    return is_header(config, line) && same_text(config + line->first, line->last - line->first, section);
+}
+
+/* A line naming a plugin: neither blank, a comment nor a header */
+static int is_plugin_line(const char *config, const ConfigLine *line)
+{
+    return line->first < line->last && config[line->first] != '#' && config[line->first] != '*';
+}
+
+/* Where the first or the last plugin line of the first or the last section headed section is,
+ * as found and *line; found is 0 when there is no such section, 1 when it has no plugin line
+ * (line is then its header) and 2 otherwise */
+static int find_section_line(const char *config, size_t size, const char *section, int last, ConfigLine *line)
+{
+    int found = 0, in_section = 0;
+    ConfigLine current;
+
+    for (size_t at = 0; at < size; at = current.next)
+    {
+        read_line(config, size, at, &current);
+        if (is_header(config, &current))
+        {
+            if (found && !last)
+                break;
+            in_section = is_header_named(config, &current, section);
+            if (in_section)
+            {
+                found = 1;
+                *line = current;
+            }
+        }
+        else if (in_section && is_plugin_line(config, &current))
+        {
+            if (found == 1 || last)
+            {
+                found = 2;
+                *line = current;
+            }
+            if (!last)
+                break;
+        }
+    }
+    return found;
+}
+
+static int contains(const char *config, size_t size, const char *text)
+{
+    size_t length = 0;
+    while (text[length] != '\0')
+        ++length;
+    for (size_t at = 0; length != 0 && at + length <= size; ++at)
+    {
+        size_t i = 0;
+        while (i < length && config[at + i] == text[i])
+            ++i;
+        if (i == length)
+            return 1;
+    }
+    return 0;
+}
+
+VitalsConfigPlace vitals_config_plugin_place(const char *config, size_t size, const char *block, const char *section,
+                                             const char *path)
+{
+    ConfigLine line;
+
+    if (!vitals_config_has_plugin(config, size, section, path))
+        return VITALS_CONFIG_NOT_LISTED;
+    if (block != NULL && contains(config, size, block))
+        return VITALS_CONFIG_BLOCK;
+    if (find_section_line(config, size, section, 0, &line) == 2 &&
+        same_text(config + line.first, line.last - line.first, path))
+        return VITALS_CONFIG_FIRST;
+    if (find_section_line(config, size, section, 1, &line) == 2 &&
+        same_text(config + line.first, line.last - line.first, path))
+        return VITALS_CONFIG_LAST;
+    return VITALS_CONFIG_ELSEWHERE;
+}
+
+int vitals_config_insert_plugin(const char *config, size_t size, const char *section, const char *path, int last,
+                                char *output, size_t *output_size)
+{
+    ConfigLine line;
+    int found = 0;
+
+    /* First goes right under the first such header; last goes after the last such section's
+     * last plugin, or its header */
+    if (last)
+        found = find_section_line(config, size, section, 1, &line) != 0;
+    else
+        for (size_t at = 0; at < size && !found; at = line.next)
+        {
+            read_line(config, size, at, &line);
+            found = is_header_named(config, &line, section);
+        }
+    if (!found)
+        return -1;
+    const int windows = line.end > line.start && config[line.end - 1] == '\r';
+    const char *ending = windows ? "\r\n" : "\n";
+    size_t written = 0;
+    for (size_t i = 0; i < line.next; ++i)
+        output[written++] = config[i];
+    /* The line it follows was the last, with no line break of its own */
+    if (line.next == line.end)
+        for (const char *c = ending; *c != '\0'; ++c)
+            output[written++] = *c;
+    for (const char *c = path; *c != '\0'; ++c)
+        output[written++] = *c;
+    for (const char *c = ending; *c != '\0'; ++c)
+        output[written++] = *c;
+    for (size_t i = line.next; i < size; ++i)
+        output[written++] = config[i];
+    output[written] = '\0';
+    *output_size = written;
+    return 0;
+}

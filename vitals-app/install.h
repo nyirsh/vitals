@@ -27,6 +27,24 @@ int vitals_install_debug_level(void);
 /* Replaces the providers and vitals-reauth with the given level's builds
  * The caller reboots the Vita after a success */
 int vitals_install_set_debug_level(int level, VitalsInstallNote note);
+/* Where an install, reinstall or update lists the kernel plugin in config.txt */
+typedef enum
+{
+    /* vitals' own *KERNEL block, at the top of the file */
+    VITALS_PLACEMENT_BLOCK,
+    /* The first line of the first *KERNEL section, so it loads before the other kernel plugins */
+    VITALS_PLACEMENT_FIRST,
+    /* The last line of the last *KERNEL section, so it loads after them */
+    VITALS_PLACEMENT_LAST,
+    /* Wherever it is listed already; a config that doesn't list it gets vitals' own block */
+    VITALS_PLACEMENT_KEEP,
+} VitalsPlacement;
+/* Where config.txt lists the plugin now: VITALS_PLACEMENT_KEEP when it is somewhere other than
+ * the three places, negative when it isn't listed (or config.txt can't be read) */
+int vitals_install_placement(void);
+/* Where the next install, reinstall or update lists the plugin; VITALS_PLACEMENT_KEEP until set
+ * Another place than the current one moves the plugin's line there, so it is listed only once */
+void vitals_install_set_placement(VitalsPlacement placement);
 /* Runs option (FULL or CERTIFICATES)
  * The caller reboots the Vita after a success */
 int vitals_install_run(enum VitalsOption option, int removing, VitalsInstallNote note);

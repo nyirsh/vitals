@@ -63,6 +63,37 @@ static char installed_version[16];
 /* Debug output: the installed modules' level (-1 when unknown) and the one chosen in the menu */
 static int debug_level = -1, debug_choice;
 static const char *const debug_names[VITALS_DEBUG_LEVEL_COUNT] = {"Off", "Basic", "Full"};
+/* Where config.txt lists the plugin: now (-1 when it doesn't), and as chosen on the install item */
+static int placement_current = -1;
+static VitalsPlacement placement_choice = VITALS_PLACEMENT_BLOCK;
+static const char *const placement_names[] = {
+    [VITALS_PLACEMENT_BLOCK] = "Own block",
+    [VITALS_PLACEMENT_FIRST] = "First in *KERNEL",
+    [VITALS_PLACEMENT_LAST] = "Last in *KERNEL",
+    [VITALS_PLACEMENT_KEEP] = "Where it is now",
+};
+static const char *const placement_purposes[] = {
+    [VITALS_PLACEMENT_BLOCK] = "Lists vitals in its own *KERNEL block, at the top of config.txt",
+    [VITALS_PLACEMENT_FIRST] = "Lists vitals first in your *KERNEL section, so it loads before your other plugins",
+    [VITALS_PLACEMENT_LAST] = "Lists vitals last in your *KERNEL section, so it loads after your other plugins",
+    [VITALS_PLACEMENT_KEEP] = "Leaves vitals' line in config.txt where you put it",
+};
+/* The placements Left and Right go through; where it is now comes first when it is none of the
+ * other three */
+static unsigned placement_options(VitalsPlacement options[4])
+{
+    unsigned count = 0;
+    if (placement_current == VITALS_PLACEMENT_KEEP)
+        options[count++] = VITALS_PLACEMENT_KEEP;
+    options[count++] = VITALS_PLACEMENT_BLOCK;
+    options[count++] = VITALS_PLACEMENT_FIRST;
+    options[count++] = VITALS_PLACEMENT_LAST;
+    return count;
+}
+static int installs_plugin(int action)
+{
+    return action == ACTION_INSTALL || action == ACTION_UPDATE || action == ACTION_REINSTALL;
+}
 
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 
@@ -497,6 +528,10 @@ int main(void)
                 installed_version[0] = '\0';
             debug_level = installed && !outdated ? vitals_install_debug_level() : -1;
             debug_choice = debug_level < 0 ? 0 : debug_level;
+            /* The install item starts where the plugin is listed now, so it stays there unless
+             * another place is chosen */
+            placement_current = vitals_install_placement();
+            placement_choice = placement_current < 0 ? VITALS_PLACEMENT_BLOCK : (VitalsPlacement)placement_current;
             refresh = 0;
         }
         int removable = supported && (installed || outdated);
@@ -519,7 +554,7 @@ int main(void)
         if (removable)
             actions[count++] = ACTION_UNINSTALL;
         actions[count++] = ACTION_EXIT;
-        static char update_description[96], debug_label[48], debug_description[96];
+        static char update_description[96], debug_label[48], debug_description[96], install_label[64];
         for (unsigned i = 0; i < count; ++i)
             items[i] = action_items[actions[i]];
         for (unsigned i = 0; i < count; ++i)
@@ -544,6 +579,18 @@ int main(void)
                 snprintf(update_description, sizeof(update_description),
                          "Replaces the installed vitals %s with %s", installed_version, VITALS_VERSION);
                 items[i].description = update_description;
+            }
+        /* Left and Right choose where config.txt lists vitals, as on the debug item; the selected
+         * install item shows what the choice does */
+        for (unsigned i = 0; i < count; ++i)
+            if (installs_plugin(actions[i]))
+            {
+                snprintf(install_label, sizeof(install_label), "%s: < %s >%s", action_items[actions[i]].label,
+                         placement_names[placement_choice],
+                         (int)placement_choice == placement_current ? "  (current)" : "");
+                items[i].label = install_label;
+                if (i == selected)
+                    items[i].description = placement_purposes[placement_choice];
             }
         if (selected >= count)
             selected = count - 1;
@@ -607,8 +654,22 @@ int main(void)
         }
         else if (turns)
         {
-            /* Left and Right only choose a debug level; nothing changes until the confirm button */
-            if (actions[selected] == ACTION_DEBUG)
+            /* Left and Right only choose a debug level or a placement; nothing changes until the
+             * confirm button */
+            if (installs_plugin(actions[selected]))
+            {
+                VitalsPlacement options[4];
+                unsigned option_count = placement_options(options), at = 0;
+                while (at + 1 < option_count && options[at] != placement_choice)
+                    ++at;
+                int target = (int)at + turns;
+                if (target < 0)
+                    target = 0;
+                if (target >= (int)option_count)
+                    target = (int)option_count - 1;
+                placement_choice = options[target];
+            }
+            else if (actions[selected] == ACTION_DEBUG)
             {
                 int target = debug_choice + turns;
                 debug_choice = target < 0 ? 0 : target >= VITALS_DEBUG_LEVEL_COUNT ? VITALS_DEBUG_LEVEL_COUNT - 1 : target;
@@ -629,6 +690,8 @@ int main(void)
                 run_test();
             else if (action != ACTION_DEBUG || debug_choice != debug_level)
             {
+                if (installs_plugin(action))
+                    vitals_install_set_placement(placement_choice);
                 run_operation(action);
                 /* A failed operation returns here; what it changed is read again */
                 refresh = 1;
