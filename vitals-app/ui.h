@@ -18,6 +18,11 @@
 typedef struct {
     const char *label;
     const char *description;
+    /* What Left and Right choose on this item ("Basic"), drawn apart from the label; NULL when
+     * there is nothing to choose */
+    const char *choice;
+    /* The choice is the one in use now */
+    int choice_current;
 } AppMenuItem;
 /* A control shown in the bar at the bottom: up to two button symbols, then what they do
  * Confirm and back are Cross and Circle, or swapped where the system setting makes Circle

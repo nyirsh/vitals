@@ -8,7 +8,7 @@ static const uint32_t bg = RGB(16, 20, 27), panel = RGB(27, 34, 45), white = RGB
                       muted = RGB(162, 177, 196), green = RGB(72, 211, 151),
                       red = RGB(255, 115, 125), blue = RGB(111, 186, 255),
                       amber = RGB(242, 198, 116), orange = RGB(255, 173, 80),
-                      highlight = RGB(40, 52, 70);
+                      highlight = RGB(40, 52, 70), dim_blue = RGB(86, 132, 184);
 static int circle_confirms;
 void app_set_circle_confirms(int circle) { circle_confirms = circle; }
 static void rect(uint32_t *p, int x, int y, int w, int h, uint32_t c)
@@ -525,7 +525,19 @@ void app_draw_home(uint32_t *p, const AppHome *home)
         card(p, 28, y, 904, height, selected ? highlight : panel);
         if (selected)
             rect(p, 28, y + 12, 4, height - 24, blue);
-        text(p, 48, y + (tight ? 2 : compact ? 4 : 7), home->items[i].label, selected ? white : muted, 21);
+        const int label_y = y + (tight ? 2 : compact ? 4 : 7);
+        text(p, 48, label_y, home->items[i].label, selected ? white : muted, 21);
+        /* A choice reads apart from its label: in blue between arrows, then whether it is the one
+         * in use now */
+        if (home->items[i].choice != NULL)
+        {
+            char choice[64];
+            snprintf(choice, sizeof(choice), "<  %s  >", home->items[i].choice);
+            int x = 48 + check_font_width(home->items[i].label, 21) + 18;
+            text(p, x, label_y, choice, selected ? blue : dim_blue, 21);
+            if (home->items[i].choice_current)
+                text(p, x + check_font_width(choice, 21) + 12, label_y + 4, "(current)", muted, 16);
+        }
         text(p, 48, y + (tight ? 25 : compact ? 30 : 37), home->items[i].description, muted, 16);
         y += step;
     }

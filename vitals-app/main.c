@@ -577,7 +577,7 @@ int main(void)
         if (removable)
             actions[count++] = ACTION_UNINSTALL;
         actions[count++] = ACTION_EXIT;
-        static char update_description[96], debug_label[48], debug_description[96], install_label[64];
+        static char update_description[96], debug_description[96];
         static char certificates_description[112];
         for (unsigned i = 0; i < count; ++i)
             items[i] = action_items[actions[i]];
@@ -590,10 +590,9 @@ int main(void)
                     "For debugging only: shows logs on the console",
                     "For deep analysis only: logs everything on the console and slows things down a lot",
                 };
-                snprintf(debug_label, sizeof(debug_label), "Debug output: < %s >%s", debug_names[debug_choice],
-                         debug_choice == debug_level ? "  (installed)" : "");
                 snprintf(debug_description, sizeof(debug_description), "%s", debug_purposes[debug_choice]);
-                items[i].label = debug_label;
+                items[i].choice = debug_names[debug_choice];
+                items[i].choice_current = debug_choice == debug_level;
                 items[i].description = debug_description;
             }
         for (unsigned i = 0; i < count; ++i)
@@ -617,10 +616,8 @@ int main(void)
         for (unsigned i = 0; i < count; ++i)
             if (installs_plugin(actions[i]))
             {
-                snprintf(install_label, sizeof(install_label), "%s: < %s >%s", action_items[actions[i]].label,
-                         placement_names[placement_choice],
-                         (int)placement_choice == placement_current ? "  (current)" : "");
-                items[i].label = install_label;
+                items[i].choice = placement_names[placement_choice];
+                items[i].choice_current = (int)placement_choice == placement_current;
                 if (i == selected)
                     items[i].description = placement_purposes[placement_choice];
             }

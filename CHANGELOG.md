@@ -9,7 +9,8 @@ Every release of vitals, newest first.
 - Uninstalling removes vitals' line from config.txt wherever it is, not only from its own block
 - When installing, reinstalling or updating, it is now possible to choose where to place the line in config.txt
 - The app now shows when the certificates were last updated
-- The connection test saves its log only when you press START, and only for a run that finished without being cancelled
+- The connection test saves its log only when you press START
+- UI improvements
 
 ## 1.3
 
