@@ -1,30 +1,60 @@
 #ifndef VITALS_MBEDTLS_USER_CONFIG_H
 #define VITALS_MBEDTLS_USER_CONFIG_H
 
-/* Provider verifies against CAs loaded on demand (see provider/ca_index.c) */
+/* Mbed TLS 3.6 for vitals-http and the browser provider: a TLS 1.2 and 1.3 client on the Vita's
+ * own primitives (../provider/platform_shims.c), verifying against CAs loaded on demand
+ * (../provider/ca_index.c) */
+
+#include <stdint.h>
+
 #define MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK
 
+#define MBEDTLS_THREADING_C
+#define MBEDTLS_THREADING_ALT
+#define MBEDTLS_NO_PLATFORM_ENTROPY
+#define MBEDTLS_ENTROPY_HARDWARE_ALT
+#define MBEDTLS_PLATFORM_MS_TIME_ALT
+#define MBEDTLS_PLATFORM_GMTIME_R_ALT
+#define MBEDTLS_PLATFORM_TIME_TYPE_MACRO int64_t
+#define MBEDTLS_PLATFORM_TIME_MACRO vitals_crypto_time
+
+/* To fit vitals-http's 128 KiB heap: a connection's outgoing records are 4 KiB at most (incoming
+ * ones stay at 16 KiB, as a server may send them that size) */
+#define MBEDTLS_SSL_OUT_CONTENT_LEN 4096
+
+/* No files, sockets, clocks or servers of its own */
+#undef MBEDTLS_FS_IO
 #undef MBEDTLS_NET_C
 #undef MBEDTLS_TIMING_C
+#undef MBEDTLS_PSA_ITS_FILE_C
+#undef MBEDTLS_PSA_CRYPTO_STORAGE_C
+#undef MBEDTLS_SELF_TEST
+#undef MBEDTLS_DEBUG_C
 #undef MBEDTLS_SSL_SRV_C
 #undef MBEDTLS_SSL_CACHE_C
-#undef MBEDTLS_SSL_TICKET_C
 #undef MBEDTLS_SSL_COOKIE_C
+#undef MBEDTLS_SSL_TICKET_C
 #undef MBEDTLS_SSL_PROTO_DTLS
 #undef MBEDTLS_SSL_DTLS_ANTI_REPLAY
 #undef MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE
 #undef MBEDTLS_SSL_DTLS_CONNECTION_ID
 #undef MBEDTLS_SSL_DTLS_HELLO_VERIFY
+#undef MBEDTLS_SSL_DTLS_SRTP
 #undef MBEDTLS_SSL_CONTEXT_SERIALIZATION
 #undef MBEDTLS_SSL_RENEGOTIATION
-#undef MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
-#undef MBEDTLS_KEY_EXCHANGE_ECDHE_PSK_ENABLED
-#undef MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_ENABLED
-#undef MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL_ENABLED
 #undef MBEDTLS_PKCS7_C
 #undef MBEDTLS_X509_CREATE_C
 #undef MBEDTLS_X509_CRT_WRITE_C
 #undef MBEDTLS_X509_CSR_WRITE_C
 #undef MBEDTLS_X509_CSR_PARSE_C
+#undef MBEDTLS_X509_CRL_PARSE_C
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+int64_t vitals_crypto_time(int64_t *output);
+#ifdef __cplusplus
+}
+#endif
 
 #endif

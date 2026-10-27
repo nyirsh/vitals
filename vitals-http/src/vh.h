@@ -374,8 +374,6 @@ int vh_platform_wait(unsigned int generation, long long timeout_us);
 int vh_platform_redirects_read(unsigned int offset, void *buffer, unsigned int size);
 /* Sets up TLS's heap, on first use; 0 or negative */
 int vh_platform_tls_init(void);
-/* tls_platform.c: Mbed TLS's mutexes, entropy and time, before its first use; 0 or negative */
-int vh_tls_platform_init(void);
 /* Where the trusted CA bundle (PEM) is read from, as this process opens it: 0, or negative when
  * there is none */
 int vh_platform_ca_path(char *path, size_t capacity);

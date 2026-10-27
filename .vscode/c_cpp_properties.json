@@ -20,8 +20,6 @@
                 "${workspaceFolder}/tls13-vita/browser",
                 "${workspaceFolder}/tls13-vita/crypto",
                 "${workspaceFolder}/build/tls13-vita/_deps/vitals_mbedtls-src/include",
-                "${workspaceFolder}/build/tls13-vita/_deps/vitals_mbedtls-src/tf-psa-crypto/include",
-                "${workspaceFolder}/build/tls13-vita/_deps/vitals_mbedtls-src/tf-psa-crypto/drivers/builtin/include",
                 "${workspaceFolder}/vitals-plugin",
                 "${workspaceFolder}/vitals-app"
             ],

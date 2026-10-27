@@ -1,6 +1,7 @@
 #include "vh.h"
 
 #include "ca_index.h"
+#include "crypto_platform.h"
 #include "diagnostics.h"
 #include "user_runtime.h"
 #include "vitals/error_map.h"
@@ -94,7 +95,7 @@ static int tls_ready(void)
     char path[VITALS_CA_INDEX_PATH_SIZE];
     if (g_state != 0)
         return g_state;
-    if (vh_platform_tls_init() != 0 || vh_tls_platform_init() != 0 || psa_crypto_init() != PSA_SUCCESS) {
+    if (vh_platform_tls_init() != 0 || vitals_crypto_platform_init() != 0 || psa_crypto_init() != PSA_SUCCESS) {
         g_state = -1;
         return g_state;
     }

@@ -9,6 +9,8 @@
 #include <psp2/kernel/threadmgr/mutex.h>
 #include <psp2/net/net.h>
 #include <psp2common/net.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
 #include <mbedtls/net_sockets.h>
 #include <mbedtls/platform_util.h>
 #include <mbedtls/ssl.h>
@@ -19,8 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if MBEDTLS_VERSION_MAJOR != 4
-#error "The browser provider's configuration targets Mbed TLS 4.x"
+#if MBEDTLS_VERSION_MAJOR != 3
+#error "The browser provider's configuration targets Mbed TLS 3.6 (tls13-vita/crypto)"
 #endif
 
 #define BROWSER_IO_CHUNK 1500
@@ -69,6 +71,9 @@ static struct {
     /* The default store is not kept parsed: only an index of it, and each handshake parses the
      * roots it needs from the file (as the HTTP provider does) */
     VitalsCaIndex ca_index;
+    /* The handshakes' random numbers, from the kernel's (platform_shims.c) */
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context random;
     int default_ca_error;
     uint32_t enabled;
     enum DefaultCaState default_ca_state;
@@ -134,8 +139,14 @@ int vitals_browser_init(const VitalsBrowserOps *ops) {
     result = vitals_crypto_platform_init();
     if (result != 0) return result;
     browser.crypto_initialized = 1;
+    /* Initialized first, so a failure below can free them */
+    mbedtls_entropy_init(&browser.entropy);
+    mbedtls_ctr_drbg_init(&browser.random);
     result = (int)psa_crypto_init();
     if (result != PSA_SUCCESS) goto failed;
+    result = mbedtls_ctr_drbg_seed(&browser.random, mbedtls_entropy_func, &browser.entropy,
+        (const unsigned char *)"vitals browser", 14);
+    if (result != 0) goto failed;
     browser.registry_mutex = sceKernelCreateMutex("vitals browser registry", 0, 0, NULL);
     browser.attach_mutex = sceKernelCreateMutex("vitals browser attach", 0, 0, NULL);
     if (browser.registry_mutex < 0 || browser.attach_mutex < 0) {
@@ -151,6 +162,8 @@ failed:
     if (browser.attach_mutex >= 0) (void)sceKernelDeleteMutex(browser.attach_mutex);
     if (browser.registry_mutex >= 0) (void)sceKernelDeleteMutex(browser.registry_mutex);
     vitals_ca_index_free(&browser.ca_index);
+    mbedtls_ctr_drbg_free(&browser.random);
+    mbedtls_entropy_free(&browser.entropy);
     mbedtls_psa_crypto_free();
     vitals_crypto_platform_free();
     memset(&browser, 0, sizeof(browser));
@@ -170,6 +183,8 @@ int vitals_browser_destroy(void) {
     result = vitals_registry_destroy(&browser.registry);
     if (result != VITALS_REGISTRY_OK) return result;
     vitals_ca_index_free(&browser.ca_index);
+    mbedtls_ctr_drbg_free(&browser.random);
+    mbedtls_entropy_free(&browser.entropy);
     mbedtls_psa_crypto_free();
     vitals_crypto_platform_free();
     (void)sceKernelDeleteMutex(browser.attach_mutex);
@@ -232,7 +247,8 @@ static int browser_recv(void *context, unsigned char *data, size_t size) {
 }
 
 static int initialize_connection(BrowserConnection *connection, uint32_t cipher_mask) {
-    static const char *const alpn[] = {"http/1.1", NULL};
+    /* Mbed TLS 3.6 takes the list without const; it only reads it */
+    static const char *alpn[] = {"http/1.1", NULL};
     static const int tls12[] = {
         MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
         MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -265,6 +281,7 @@ static int initialize_connection(BrowserConnection *connection, uint32_t cipher_
      * SHA-1 certificate signatures */
     connection->certificate_profile.allowed_mds |= MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA1);
     mbedtls_ssl_conf_cert_profile(&connection->config, &connection->certificate_profile);
+    mbedtls_ssl_conf_rng(&connection->config, mbedtls_ctr_drbg_random, &browser.random);
     mbedtls_ssl_conf_min_tls_version(&connection->config, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_max_tls_version(&connection->config, MBEDTLS_SSL_VERSION_TLS1_3);
     mbedtls_ssl_conf_ciphersuites(&connection->config, connection->ciphers);

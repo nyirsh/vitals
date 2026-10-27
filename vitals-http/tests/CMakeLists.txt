@@ -9,8 +9,8 @@ endif()
 set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(TLS13_DIR ${ROOT}/../tls13-vita)
 include(${ROOT}/../dependencies.cmake)
-vitals_download("${VITALS_MBEDTLS3_URL}" "${VITALS_MBEDTLS3_SHA256}" VITALS_MBEDTLS3_ARCHIVE)
-add_subdirectory(${ROOT}/crypto crypto)
+vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
+add_subdirectory(${TLS13_DIR}/crypto crypto)
 
 find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)
@@ -37,7 +37,7 @@ add_executable(vitals_http_tests
     ${ROOT}/src/redirect.c
     ${ROOT}/src/useragent.c
     ${ROOT}/src/tls.c
-    ${ROOT}/src/tls_platform.c
+    ${TLS13_DIR}/provider/platform_shims.c
     ${TLS13_DIR}/provider/ca_index.c
     ${TLS13_DIR}/src/error_map.c
     ${TLS13_DIR}/src/host_map.c

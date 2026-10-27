@@ -1,13 +1,10 @@
 #ifndef VITALS_THREADING_ALT_H
 #define VITALS_THREADING_ALT_H
 
-typedef struct {
+/* Mbed TLS's mutexes are the kernel's (../provider/platform_shims.c) */
+typedef struct
+{
     int uid;
-} mbedtls_platform_mutex_t;
-
-typedef struct {
-    int uid;
-    int mutex_uid;
-} mbedtls_platform_condition_variable_t;
+} mbedtls_threading_mutex_t;
 
 #endif

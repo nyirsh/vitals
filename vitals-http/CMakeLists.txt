@@ -28,13 +28,13 @@ endif()
 # The bundle the vitals app installs, which the HTTP provider trusts too
 set(VITALS_HTTP_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trusted CA bundle (PEM)")
 
-# TLS is Mbed TLS 3.6 (crypto/), with tls13-vita's CA index, certificate flags and runtime
+# TLS is Mbed TLS 3.6 (tls13-vita/crypto, shared with the browser provider), with tls13-vita's CA index, certificate flags and runtime
 set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
 include(../dependencies.cmake)
 # The release version from ../VERSION, which the module header carries
 include(../version.cmake)
-vitals_download("${VITALS_MBEDTLS3_URL}" "${VITALS_MBEDTLS3_SHA256}" VITALS_MBEDTLS3_ARCHIVE)
-add_subdirectory(crypto)
+vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
+add_subdirectory(${TLS13_DIR}/crypto crypto)
 
 add_executable(vitals_libhttp
     src/core.c
@@ -48,7 +48,7 @@ add_executable(vitals_libhttp
     src/redirect.c
     src/useragent.c
     src/tls.c
-    src/tls_platform.c
+    ${TLS13_DIR}/provider/platform_shims.c
     src/platform_vita.c
     ${TLS13_DIR}/provider/ca_index.c
     ${TLS13_DIR}/provider/user_runtime.c

@@ -2,15 +2,13 @@
 
 These notices cover the third-party software and data in vitals. The app's VPK includes this file and the [licenses](licenses/) folder. The exact versions and SHA-256 hashes of Mbed TLS and curl are pinned in [dependencies.cmake](dependencies.cmake).
 
-## Mbed TLS and TF-PSA-Crypto
+## Mbed TLS
 
-`vitals.suprx` (the browser provider) statically links `libmbedtls.a`, `libmbedx509.a` and `libtfpsacrypto.a`. They are built from the official Mbed TLS source release (currently 4.2.0, which bundles TF-PSA-Crypto 1.2.0), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. The sources are not modified; vitals only adds configuration headers and a Vita platform adapter. This distribution selects the Apache License 2.0 offered by those projects; the license texts are `licenses/Mbed-TLS-LICENSE.txt` and `licenses/TF-PSA-Crypto-LICENSE.txt`.
+`libhttp.suprx` (vitals-http) and `vitals.suprx` (the browser provider) statically link `libmbedtls.a`, `libmbedx509.a` and `libmbedcrypto.a`, built from the official Mbed TLS 3.6 LTS source release (currently 3.6.7), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. vitals modifies three of its files with [tls13-vita/crypto/offer-unknown-ciphersuites.patch](tls13-vita/crypto/offer-unknown-ciphersuites.patch), so that a ClientHello can list cipher suites Mbed TLS doesn't implement (each change is marked in the code), and adds configuration headers and a Vita platform adapter. This distribution selects the Apache License 2.0 offered by the project; the license text is `licenses/Mbed-TLS-LICENSE.txt`.
 
-The Mbed TLS source release also bundles optional third-party code (Project Everest/HACL\* Curve25519, p256-m and mldsa-native). vitals' configuration does not enable any of it, so none of that code is in the modules.
+The Mbed TLS source release also bundles optional third-party code (Project Everest/HACL\* Curve25519 and p256-m). vitals' configuration does not enable any of it, so none of that code is in the modules.
 
-`libhttp.suprx` (vitals-http) statically links `libmbedtls.a`, `libmbedx509.a` and `libmbedcrypto.a` from the official Mbed TLS 3.6 LTS source release (currently 3.6.7), downloaded the same way. vitals-http modifies three of its files with [vitals-http/crypto/offer-unknown-ciphersuites.patch](vitals-http/crypto/offer-unknown-ciphersuites.patch), so that a ClientHello can list cipher suites Mbed TLS doesn't implement (each change is marked in the code), and adds configuration headers and a Vita platform adapter. The license text is `licenses/Mbed-TLS-LICENSE.txt`, under the same Apache License 2.0 selection.
-
-Mbed TLS and TF-PSA-Crypto are independent works; no endorsement by their authors is implied.
+Mbed TLS is an independent work; no endorsement by its authors is implied.
 
 ## curl
 

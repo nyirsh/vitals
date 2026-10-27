@@ -22,7 +22,7 @@ target_compile_options(vitals PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -O2)
 target_link_options(vitals PRIVATE -nostdlib -Wl,--gc-sections
     -Wl,--undefined=module_start -Wl,--undefined=module_stop)
-target_link_libraries(vitals PRIVATE vitals_core mbedtls mbedx509 tfpsacrypto gcc
+target_link_libraries(vitals PRIVATE vitals_core mbedtls mbedx509 mbedcrypto gcc
     SceLibc_stub SceNet_stub SceRtc_stub SceLibKernel_stub SceIofilemgr_stub
     SceKernelModulemgr_stub SceKernelThreadMgr_stub SceSysmem_stub taihen_stub)
 # The module header carries the release version from ../../VERSION

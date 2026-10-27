@@ -1,19 +1,13 @@
 # Pinned third-party sources, downloaded into build/deps on first use
 # To update one, change its version and SHA-256 together; the SHA-256 is that of the release
-# archive named below (for example `sha256sum mbedtls-4.2.0.tar.bz2`)
+# archive named below (for example `sha256sum mbedtls-3.6.7.tar.bz2`)
 
-# Mbed TLS (bundles TF-PSA-Crypto), used by the TLS providers
-set(VITALS_MBEDTLS_VERSION "4.2.0")
-set(VITALS_MBEDTLS_SHA256 "2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea")
+# Mbed TLS 3.6 LTS, used by vitals-http and the browser provider (tls13-vita/crypto): unlike 4.x it
+# still has the RSA key exchange the console's own TLS offers, which PSN sign-in's CDN expects
+set(VITALS_MBEDTLS_VERSION "3.6.7")
+set(VITALS_MBEDTLS_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
 set(VITALS_MBEDTLS_URL
     "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${VITALS_MBEDTLS_VERSION}/mbedtls-${VITALS_MBEDTLS_VERSION}.tar.bz2")
-
-# Mbed TLS 3.6 LTS, used by vitals-http: unlike 4.x it still has the RSA and DHE key exchanges the
-# console's own TLS offers, which PSN sign-in's CDN expects to see
-set(VITALS_MBEDTLS3_VERSION "3.6.7")
-set(VITALS_MBEDTLS3_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
-set(VITALS_MBEDTLS3_URL
-    "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${VITALS_MBEDTLS3_VERSION}/mbedtls-${VITALS_MBEDTLS3_VERSION}.tar.bz2")
 
 # curl, used by the installer to download the latest Mozilla CA bundle
 set(VITALS_CURL_VERSION "8.17.0")

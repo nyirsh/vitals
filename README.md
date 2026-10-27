@@ -5,7 +5,7 @@
 Modern TLS (1.2 and 1.3) for the PS Vita browser, apps and games that use Sony's `sceHttp` APIs.  
 All of the heavylifting has been done by [devnoname120](https://github.com/devnoname120) with `tls_fixer`, I'm only making those weights lighter. ([more info](#why-a-separate-project))
 
-The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals replaces only the TLS layer with [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) and installs an up-to-date certificate store. Sony's HTTP code keeps handling URLs, redirects, cookies and everything else, so apps work unchanged.
+The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals gives apps and games a rewrite of Sony's HTTP library on [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), gives the browser Mbed TLS in place of its own TLS, and installs an up-to-date certificate store. Apps keep calling the same HTTP functions, so they work unchanged.
 
 > [!TIP]
 > **If it's not broken, don't fix it**
@@ -189,14 +189,14 @@ Debug output levels, for `vitals-http` and the browser provider (lines start wit
 
 - **Off (0):** nothing, the default
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
-- **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write) and messages from `Mbed TLS`. This produces a lot of output and slows connections down, use it only to investigate a problem
+- **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write). This produces a lot of output and slows connections down, use it only to investigate a problem
 
 Every build includes all three levels; choose one on the console from the app's **Debug output** option, which reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
 
 ### Updating `Mbed TLS` or `curl`
 
 Both are pinned in [dependencies.cmake](dependencies.cmake). Change the version and the SHA-256 together, where the SHA-256 is that of the new release archive (`sha256sum` of the downloaded file).  
-The next build downloads and verifies it. The providers accept any `Mbed TLS` 4.x, and `vitals-http` any 3.6 (`VITALS_MBEDTLS3_*`, which it needs for the console's own TLS 1.2 suites); a new major version will need configuration work.
+The next build downloads and verifies it. `vitals-http` and the browser provider share one `Mbed TLS` build ([tls13-vita/crypto](tls13-vita/crypto/)) and accept any 3.6 release, whose patch must still apply. They can't move to 4.x: it dropped the RSA key exchange PSN sign-in needs.
 
 ### Updating the bundled certificates
 
