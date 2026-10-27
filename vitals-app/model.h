@@ -85,7 +85,7 @@ int check_expected_legacy_block(unsigned version, const CheckResult *result);
 int check_should_retry_unverified(unsigned test, const CheckResult *result);
 void check_protocol_response(unsigned version, const char *body, size_t size, CheckResult *result);
 void check_record_retry(CheckResult *result, const CheckResult *retry);
-int check_provider_module_active(const char *name, unsigned state);
+int check_http_module_active(const char *name, const char *path, unsigned state);
 int check_protocol_body(unsigned version, const char *body, size_t size);
 int check_parse_browserleaks(const char *body, size_t size, CheckHandshake *out);
 const char *check_error_name(int error, int ssl_error, unsigned detail);

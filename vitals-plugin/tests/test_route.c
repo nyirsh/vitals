@@ -190,13 +190,13 @@ static void test_routes(void) {
         assert(installed_load(0, libhttp_paths[i], 0x1000, &options) == 88);
         assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
         assert(seen_pid == 0 && seen_flags == 0x1000 && seen_options == &options);
-        assert(injections == 0);
+        /* vitals-http has its own TLS: nothing is injected after it */
         assert(finish_start(0) == 0);
-        assert(injections == 1 && injected_pid == 99);
+        assert(injections == 0);
     }
     reset();
     assert(installed_load(123, libhttp_paths[0], 0, NULL) == 88);
-    assert(finish_start(123) == 0 && injections == 1 && injected_pid == 123 && seen_pid == 123);
+    assert(finish_start(123) == 0 && injections == 0 && seen_pid == 123);
     reset();
     load_result = -5;
     assert(installed_load(0, libhttp_paths[0], 0, NULL) == -5);
@@ -255,25 +255,19 @@ static void test_reauth_routes(void) {
     puts("PSN redirect route: shell libhttp and Store loads queue the redirect after start PASS");
 }
 
-static void test_private_flags(void) {
-    const char *paths[] = {"vs0:sys/external/libhttp.suprx", "vs0:sys/external/libssl.suprx"};
-    for (unsigned i = 0; i < 2; ++i) {
-        /* libssl always stays shared */
-        const uint32_t private_flags = i == 1 ? 0x08008001u : 0x8000u;
-        reset();
-        current_pid = 123;
-        assert(installed_load(0, paths[i], 0x08008001, NULL) == 88);
-        assert(seen_flags == private_flags);
-        reset();
-        current_pid = 123;
-        http_process_allowed = 0;
-        assert(installed_load(0, paths[i], 0x08008001, NULL) == 88);
-        assert(seen_flags == 0x08008001);
+static void test_shared_flags(void) {
+    const char *paths[] = {"vs0:sys/external/libhttp.suprx", "vs0:sys/external/libssl.suprx",
+        "wb0:/webcore/ScePsp2Compat.suprx"};
+    for (unsigned i = 0; i < 3; ++i) {
+        for (int allowed = 0; allowed < 2; ++allowed) {
+            reset();
+            current_pid = 123;
+            http_process_allowed = allowed;
+            assert(installed_load(0, paths[i], 0x08008001, NULL) == 88);
+            assert(seen_flags == 0x08008001);
+        }
     }
-    reset();
-    assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x08008001, NULL) == 88);
-    assert(seen_flags == 0x08008001);
-    puts("private loads: only eligible libhttp replacements drop shared mapping flags PASS");
+    puts("shared loads: every replacement keeps the loader's mapping flags PASS");
 }
 
 int main(void) {
@@ -284,7 +278,7 @@ int main(void) {
     assert(g_replace_iap && g_replace[MODULE_COMPAT]);
     test_routes();
     test_reauth_routes();
-    test_private_flags();
+    test_shared_flags();
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);
     return 0;
 }

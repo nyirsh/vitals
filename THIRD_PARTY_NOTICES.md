@@ -8,6 +8,8 @@ These notices cover the third-party software and data in vitals. The app's VPK i
 
 The Mbed TLS source release also bundles optional third-party code (Project Everest/HACL\* Curve25519, p256-m and mldsa-native). vitals' configuration does not enable any of it, so none of that code is in the modules.
 
+`libhttp.suprx` (vitals-http) statically links `libmbedtls.a`, `libmbedx509.a` and `libmbedcrypto.a` from the official Mbed TLS 3.6 LTS source release (currently 3.6.7), downloaded the same way. vitals-http modifies three of its files with [vitals-http/crypto/offer-unknown-ciphersuites.patch](vitals-http/crypto/offer-unknown-ciphersuites.patch), so that a ClientHello can list cipher suites Mbed TLS doesn't implement (each change is marked in the code), and adds configuration headers and a Vita platform adapter. The license text is `licenses/Mbed-TLS-LICENSE.txt`, under the same Apache License 2.0 selection.
+
 Mbed TLS and TF-PSA-Crypto are independent works; no endorsement by their authors is implied.
 
 ## curl
@@ -16,7 +18,7 @@ The app statically links libcurl (currently 8.17.0), built from the unmodified o
 
 ## OpenSSL, zlib and Zstandard
 
-libcurl uses OpenSSL, zlib and Zstandard from VitaSDK (OpenSSL 1.1.1t, zlib 1.3.2 and Zstandard 1.5.7 in the validated build). Their license texts are `licenses/OpenSSL-LICENSE.txt`, `licenses/zlib-LICENSE.txt` and `licenses/zstd-LICENSE.txt`; Zstandard's BSD option is selected. This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (<https://www.openssl.org/>). This product includes cryptographic software written by Eric Young (eay@cryptsoft.com).
+`libhttp.suprx` (vitals-http) statically links zlib from VitaSDK, for gzip bodies. libcurl uses OpenSSL, zlib and Zstandard from VitaSDK (OpenSSL 1.1.1t, zlib 1.3.2 and Zstandard 1.5.7 in the validated build). Their license texts are `licenses/OpenSSL-LICENSE.txt`, `licenses/zlib-LICENSE.txt` and `licenses/zstd-LICENSE.txt`; Zstandard's BSD option is selected. This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (<https://www.openssl.org/>). This product includes cryptographic software written by Eric Young (eay@cryptsoft.com).
 
 ## Mozilla certificate data
 

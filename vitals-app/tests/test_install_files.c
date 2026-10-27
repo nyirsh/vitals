@@ -98,14 +98,16 @@ static int is(const char *vita_path, const char *expected)
     return text != NULL && strcmp(text, expected) == 0;
 }
 
+/* Where earlier versions installed their HTTP provider */
+#define OLD_HTTP_PROVIDER "vs0:/data/external/vitals/native/vitals_http.suprx"
+
 /* What vitals installs, and the app0: file each comes from */
 static const char *const installed[][2] = {
     {"ur0:tai/vitals.skprx", "app0:vitals.skprx"},
     {"ur0:tai/vitals-native/vitals.suprx", "app0:vitals.suprx"},
     {"vs0:/data/external/vitals/ScePsp2Compat.suprx", "app0:compat.suprx"},
-    {"vs0:/data/external/vitals/libhttp.suprx", "app0:lhttp.suprx"},
+    {"vs0:/data/external/vitals/libhttp.suprx", "app0:libhttp.suprx"},
     {"vs0:/data/external/vitals/libssl.suprx", "app0:lssl.suprx"},
-    {"vs0:/data/external/vitals/native/vitals_http.suprx", "app0:vitals_http.suprx"},
     {"vs0:/data/external/vitals/native/vitals.suprx", "app0:vitals.suprx"},
     {"vs0:/data/external/vitals/native/vitals-reauth.suprx", "app0:vitals-reauth.suprx"},
 };
@@ -127,8 +129,8 @@ static void fresh_console(void)
     put(CA, SONY_CA);
     make_directories("ux0:data");
     make_directories("vs0:sys/external");
-    const char *app_files[] = {"vitals.skprx", "vitals.suprx", "compat.suprx", "lhttp.suprx", "lssl.suprx",
-                               "vitals_http.suprx", "vitals-reauth.suprx", "redirects.txt",
+    const char *app_files[] = {"vitals.skprx", "vitals.suprx", "compat.suprx", "libhttp.suprx", "lssl.suprx",
+                               "vitals-reauth.suprx", "redirects.txt",
                                "sony-certs.pem", "mozilla-certs.pem"};
     for (size_t i = 0; i < sizeof(app_files) / sizeof(app_files[0]); ++i)
     {
@@ -137,8 +139,8 @@ static void fresh_console(void)
         snprintf(content, sizeof(content), "contents of %s\n", app_files[i]);
         put(path, content);
     }
-    /* The debug builds of the providers and redirect, one folder per level */
-    const char *debug_files[] = {"vitals_http.suprx", "vitals.suprx", "vitals-reauth.suprx"};
+    /* The debug builds of vitals-http, the browser provider and the redirect, one folder per level */
+    const char *debug_files[] = {"libhttp.suprx", "vitals.suprx", "vitals-reauth.suprx"};
     for (int level = 1; level <= 2; ++level)
         for (size_t i = 0; i < sizeof(debug_files) / sizeof(debug_files[0]); ++i)
         {
@@ -178,9 +180,18 @@ static void test_install_reinstall_uninstall(void)
 {
     fresh_console();
     assert(vitals_install_detect() == 0);
+    /* An earlier version's HTTP provider, which vitals-http replaces, goes on install */
+    make_directories("vs0:/data/external/vitals/native");
+    put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
+    assert(!exists(OLD_HTTP_PROVIDER));
     assert(is(REDIRECTS, "contents of redirects.txt\n"));
+    /* While it is there, vitals doesn't count as installed */
+    put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
+    assert(vitals_install_detect() == 0);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_installed();
     /* The installed plugin is the one the app carries; another version's is told apart, also
      * when only its length differs, and an update puts the app's back */
     assert(vitals_install_plugin_current() == 1);
@@ -217,7 +228,7 @@ static void test_install_reinstall_uninstall(void)
 static void expect_debug_level(int level)
 {
     static const char *const modules[][2] = {
-        {"vs0:/data/external/vitals/native/vitals_http.suprx", "vitals_http.suprx"},
+        {"vs0:/data/external/vitals/libhttp.suprx", "libhttp.suprx"},
         {"vs0:/data/external/vitals/native/vitals.suprx", "vitals.suprx"},
         {"ur0:tai/vitals-native/vitals.suprx", "vitals.suprx"},
         {"vs0:/data/external/vitals/native/vitals-reauth.suprx", "vitals-reauth.suprx"},
@@ -255,8 +266,8 @@ static void test_debug_levels(void)
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     expect_debug_level(0);
-    /* A provider that matches none of the app's builds (another version's) has no level */
-    put("vs0:/data/external/vitals/native/vitals_http.suprx", "another version's provider\n");
+    /* A libhttp that matches none of the app's builds (another version's) has no level */
+    put("vs0:/data/external/vitals/libhttp.suprx", "another version's libhttp\n");
     assert(vitals_install_debug_level() < 0);
 }
 

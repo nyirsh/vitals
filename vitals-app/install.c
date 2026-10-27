@@ -56,16 +56,18 @@ enum
     MODULE_COMPAT,
     MODULE_LIBHTTP,
     MODULE_LIBSSL,
-    MODULE_HTTP_PROVIDER,
+    MODULE_OLD_HTTP_PROVIDER,
     MODULE_BROWSER_PROVIDER,
     MODULE_REAUTH,
 };
 
 static const char *const new_modules[] = {
     [MODULE_COMPAT] = "vs0:/data/external/vitals/ScePsp2Compat.suprx",
+    /* vitals-http, which does its own TLS */
     [MODULE_LIBHTTP] = "vs0:/data/external/vitals/libhttp.suprx",
     [MODULE_LIBSSL] = "vs0:/data/external/vitals/libssl.suprx",
-    [MODULE_HTTP_PROVIDER] = "vs0:/data/external/vitals/native/vitals_http.suprx",
+    /* The HTTP provider earlier versions injected into Sony's libhttp; vitals-http replaces both */
+    [MODULE_OLD_HTTP_PROVIDER] = "vs0:/data/external/vitals/native/vitals_http.suprx",
     [MODULE_BROWSER_PROVIDER] = "vs0:/data/external/vitals/native/vitals.suprx",
     [MODULE_REAUTH] = "vs0:/data/external/vitals/native/vitals-reauth.suprx",
 };
@@ -881,7 +883,7 @@ static int install_http_modules(int requested_state)
     if (removing)
     {
         printf("Removing the vitals HTTP, SSL, and TLS 1.3 modules... \n");
-        result = remove_if_exists(new_modules[MODULE_HTTP_PROVIDER]);
+        result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
         if (result >= 0)
         {
             result = remove_if_exists(new_modules[MODULE_REAUTH]);
@@ -904,7 +906,8 @@ static int install_http_modules(int requested_state)
             if (result < 0)
                 return result;
         }
-        result = replace_file("app0:vitals_http.suprx", new_modules[MODULE_HTTP_PROVIDER]);
+        /* Earlier versions' provider: the kernel plugin would inject it into vitals-http */
+        result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
         /* Sends PSN sign-in and the Store to their new host */
         if (result >= 0)
         {
@@ -912,7 +915,7 @@ static int install_http_modules(int requested_state)
         }
         if (result >= 0)
         {
-            result = replace_file("app0:lhttp.suprx", new_modules[MODULE_LIBHTTP]);
+            result = replace_file("app0:libhttp.suprx", new_modules[MODULE_LIBHTTP]);
         }
         if (result >= 0)
         {
@@ -1059,7 +1062,7 @@ int vitals_install_detect(void)
            path_exists("ur0:tai/vitals.skprx") && plugin_configured() &&
            path_exists(new_modules[MODULE_COMPAT]) && path_exists(new_modules[MODULE_BROWSER_PROVIDER]) &&
            path_exists(browser_provider_global) && path_exists(new_modules[MODULE_LIBHTTP]) &&
-           path_exists(new_modules[MODULE_LIBSSL]) && path_exists(new_modules[MODULE_HTTP_PROVIDER]) &&
+           path_exists(new_modules[MODULE_LIBSSL]) && !path_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]) &&
            path_exists(new_modules[MODULE_REAUTH]) &&
            path_exists("vs0:/data/external/cert/CA_LIST.cer_old");
 }
@@ -1096,13 +1099,13 @@ int vitals_install_plugin_current(void)
  * app0: and the others in app0:debug/<level>/ */
 enum
 {
-    DEBUG_HTTP_PROVIDER,
+    DEBUG_LIBHTTP,
     DEBUG_BROWSER_PROVIDER,
     DEBUG_REAUTH,
     DEBUG_MODULE_COUNT
 };
 static const char *const debug_files[DEBUG_MODULE_COUNT] = {
-    [DEBUG_HTTP_PROVIDER] = "vitals_http.suprx",
+    [DEBUG_LIBHTTP] = "libhttp.suprx",
     [DEBUG_BROWSER_PROVIDER] = "vitals.suprx",
     [DEBUG_REAUTH] = "vitals-reauth.suprx",
 };
@@ -1119,11 +1122,11 @@ int vitals_install_debug_level(void)
 {
     char source[64];
 
-    /* The three modules are always switched together, so the HTTP provider tells the level */
+    /* The three modules are always switched together, so vitals-http tells the level */
     for (int level = 0; level < VITALS_DEBUG_LEVEL_COUNT; ++level)
     {
-        debug_source(level, DEBUG_HTTP_PROVIDER, source, sizeof(source));
-        if (same_contents(new_modules[MODULE_HTTP_PROVIDER], source) == 1)
+        debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
+        if (same_contents(new_modules[MODULE_LIBHTTP], source) == 1)
             return level;
     }
     return -1;
@@ -1144,8 +1147,8 @@ int vitals_install_set_debug_level(int level, VitalsInstallNote note)
     if (result >= 0)
     {
         printf("Installing the %s modules... \n", level == 0 ? "release" : "debug");
-        debug_source(level, DEBUG_HTTP_PROVIDER, source, sizeof(source));
-        result = replace_file(source, new_modules[MODULE_HTTP_PROVIDER]);
+        debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
+        result = replace_file(source, new_modules[MODULE_LIBHTTP]);
     }
     /* The browser provider has two copies, like a full install leaves */
     if (result >= 0)

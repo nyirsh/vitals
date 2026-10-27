@@ -2,12 +2,14 @@
 #   vitals-plugin/  kernel plugin (vitals.skprx)
 #   tls13-vita/     TLS providers (options: HTTP_HEAP_KIB, DEBUG)
 #   vitals-reauth/  PSN sign-in host redirect (vitals-reauth.suprx)
-#   vitals-app/     the vitals app and vitals-app.vpk (builds the three above first)
+#   vitals-http/    libhttp written from scratch, with tls13-vita's TLS (libhttp.suprx; options:
+#                   TLS_HEAP_KIB, DEBUG)
+#   vitals-app/     the vitals app and vitals-app.vpk (builds the four above first)
 # Command-line options such as `make HTTP_HEAP_KIB=256` reach the components automatically
 # Every debug level of the providers and redirect is built and packaged; the app switches between
 # them
 # Every CMake build also writes compile_commands.json, which .vscode uses for code navigation
-COMPONENTS = vitals-plugin tls13-vita vitals-reauth vitals-app
+COMPONENTS = vitals-plugin tls13-vita vitals-reauth vitals-http vitals-app
 
 # The app builds the plugin, providers and redirect it packages, so they are not listed again
 all: vitals-app

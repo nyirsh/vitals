@@ -118,11 +118,17 @@ void check_record_retry(CheckResult *r, const CheckResult *retry) {
         r->state = CHECK_WARNING;
     /* Keep the verified attempt's errors, HTTP result and message intact */
 }
-int check_provider_module_active(const char *name, unsigned state) {
-    /* Sony reports STARTED=6
-     * Presence alone does not establish activation */
-    static const char provider[] = "vitals_http";
-    return name && state == 6 && strncmp(name, provider, sizeof(provider)) == 0;
+int check_http_module_active(const char *name, const char *path, unsigned state) {
+    /* vitals-http keeps libhttp's name; the kernel plugin's swap is what loads it from vitals'
+     * folder. Sony reports STARTED=6; presence alone does not establish activation */
+    static const char module[] = "SceLibHttp";
+    static const char folder[] = "vs0:data/external/vitals/libhttp.suprx";
+    if (name == NULL || path == NULL || state != 6 || strncmp(name, module, sizeof(module)) != 0)
+        return 0;
+    /* With or without the slash after vs0: */
+    if (strncmp(path, "vs0:/", 5) == 0)
+        return strncmp(path + 5, folder + 4, sizeof(folder) - 4) == 0;
+    return strncmp(path, folder, sizeof(folder)) == 0;
 }
 int check_protocol_body(unsigned version, const char *b, size_t n) {
     char expected[16];

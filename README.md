@@ -49,7 +49,7 @@ Before installing, the app removes the plugins known to conflict with vitals. Un
 ## What it covers
 
 - **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl)
-- **Apps and games:** a second provider takes over TLS inside `SceLibHttp` for each app that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
+- **Apps and games:** `vitals-http`, Sony's HTTP library written from scratch on `Mbed TLS` 3.6, replaces `SceLibHttp` in every process that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
 - **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. A small module, `vitals-reauth.suprx`, is loaded into the shell once it loads its HTTP library, and into apps once they load the Store library (`SceNpCommerce2`). It sends their connections for the old host to the new one, and also applies the rules in your [host redirects](#host-redirects) list. The PSN redirect stays unless the list has its own rule for that host. This is the redirect [reAuth](https://github.com/psv-plugins-archive/reAuth) does, built into `vitals`
 
 Adrenaline is left alone: its PSP emulator crashes when `vitals` takes over its HTTP library, so the plugin skips it, whichever bubble starts it, and PSP games keep Sony's own TLS.
@@ -105,7 +105,7 @@ The certificate must also name the host apps connect to: combined with [host red
 - TLS 1.0–1.3 checks against BrowserLeaks (with `vitals`, TLS 1.0 and 1.1 show as blocked, which is intended)
 - PlayStation HTTPS reachability
 - the negotiated cipher and handshake details, from the BrowserLeaks TLS report
-- whether the vitals provider is active in the app
+- whether vitals-http is loaded in the app
 
 Each run saves a report to `ux0:data/vitals/`. The test works on any firmware and changes nothing on the console.
 
@@ -113,8 +113,9 @@ Each run saves a report to `ux0:data/vitals/`. The test works on any firmware an
 
 | Folder               | Contents                                                                                           |
 | -------------------- | -------------------------------------------------------------------------------------------------- |
-| `vitals-plugin/`     | the kernel plugin (`vitals.skprx`) that redirects Sony's modules and injects the providers         |
-| `tls13-vita/`        | the two TLS providers (for the apps and the browser), their `Mbed TLS` configuration               |
+| `vitals-plugin/`     | the kernel plugin (`vitals.skprx`) that redirects Sony's modules and injects the browser provider  |
+| `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with `tls13-vita`'s TLS               |
+| `tls13-vita/`        | the TLS providers and their `Mbed TLS` configuration; `vitals-http` uses its certificate code     |
 | `vitals-reauth/`     | the PSN sign-in host redirect (`vitals-reauth.suprx`)                                              |
 | `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                     |
 | `licenses/`          | full license texts of the third-party software in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
@@ -152,15 +153,16 @@ make
 
 Use `openssl-1.1.1`: vdpm's plain `openssl` package is the older 1.0.2.
 
-Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-plugin/`, `tls13-vita/` and `vitals-reauth/` first, because the vpk bundles them.
+Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-plugin/`, `vitals-http/`, `tls13-vita/` and `vitals-reauth/` first, because the vpk bundles them.
 
 Available build options:
 
-| Option          | Default | Effect                                 |
-| --------------- | ------- | -------------------------------------- |
-| `HTTP_HEAP_KIB` | `128`   | memory (KiB) the TLS provider reserves |
+| Option          | Default | Effect                                                                     |
+| --------------- | ------- | -------------------------------------------------------------------------- |
+| `HTTP_HEAP_KIB` | `128`   | memory (KiB) the TLS provider reserves                                     |
+| `TLS_HEAP_KIB`  | `128`   | memory (KiB) `vitals-http` reserves for TLS, in a process's first https use |
 
-Debug output levels, for both providers (lines start with `vitals_http:` for apps and games, `vitals_browser:` for the browser):
+Debug output levels, for `vitals-http` and the browser provider (lines start with `vitals-http:` for apps and games, `vitals_browser:` for the browser):
 
 - **Off (0):** nothing, the default
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure
@@ -171,7 +173,7 @@ Every build includes all three levels; choose one on the console from the app's 
 ### Updating `Mbed TLS` or `curl`
 
 Both are pinned in [dependencies.cmake](dependencies.cmake). Change the version and the SHA-256 together, where the SHA-256 is that of the new release archive (`sha256sum` of the downloaded file).  
-The next build downloads and verifies it. The providers accept any `Mbed TLS` 4.x; a new major version will need configuration work.
+The next build downloads and verifies it. The providers accept any `Mbed TLS` 4.x, and `vitals-http` any 3.6 (`VITALS_MBEDTLS3_*`, which it needs for the console's own TLS 1.2 suites); a new major version will need configuration work.
 
 ### Updating the bundled certificates
 

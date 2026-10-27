@@ -300,7 +300,7 @@ static int detect_vitals(void)
             SceKernelModuleInfo info = {0};
             info.size = sizeof(info);
             if (sceKernelGetModuleInfo(ids[i], &info) == 0 &&
-                check_provider_module_active(info.module_name, info.state))
+                check_http_module_active(info.module_name, info.path, info.state))
                 return 1;
         }
     }
@@ -328,7 +328,7 @@ static int save_report(const CheckService *s)
             "reuse=disabled\nRedirects=disabled\nProtocol-only diagnostic retries may disable "
             "certificate checks; both attempts are recorded.\n",
             "BrowserLeaks + PlayStation");
-    fprintf(f, "vitals=%s (started provider in this process)\n",
+    fprintf(f, "vitals=%s (vitals-http loaded in this process)\n",
             s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled"
                                                                    : "not enabled");
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)

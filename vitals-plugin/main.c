@@ -22,8 +22,6 @@
 #include "reauth.h"
 
 #define VITALS_MAX_MODULE_PATH ((size_t)0x400)
-/* Loader flags that request a shared mapping; cleared to give a process its own copy */
-#define VITALS_SHARED_LOAD_FLAGS UINT32_C(0x08000001)
 
 enum
 {
@@ -33,6 +31,7 @@ enum
     MODULE_COUNT
 };
 
+/* libhttp's is vitals-http, which does its own TLS (tls13-vita's), in every process */
 static const char *const g_replacement_modules[MODULE_COUNT] = {
     "vs0:/data/external/vitals/ScePsp2Compat.suprx",
     "vs0:/data/external/vitals/libhttp.suprx",
@@ -93,21 +92,14 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
         path = browser_path;
     }
 
-    /* A shared libhttp outlives the process, so the provider's hooks need a private copy;
-     * clearing the shared flag is enough to get one
-     * libssl stays shared: a private copy would cost each game about 440 KiB, and the provider
-     * doesn't need one */
-    if (module == MODULE_LIBHTTP && vitals_kernel_http_process_allowed(target_pid) > 0)
-        flags &= ~VITALS_SHARED_LOAD_FLAGS;
-
+    /* vitals-http needs nothing injected, so libhttp keeps the mapping the loader asked for:
+     * shared, as Sony's is, in the shell and everywhere else */
     SceUID res = TAI_CONTINUE(SceUID, g_loader_hook_ref, pid, path, flags, ptr_to_four);
     if (res < 0)
         return res;
 
     /* Injection waits until the native start hook reports that linking finished */
-    if (module == MODULE_LIBHTTP && vitals_kernel_loader_ready())
-        (void)vitals_post_start_defer_http(target_pid, res);
-    else if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready() &&
+    if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready() &&
              vitals_browser_provider_path(path, browser_provider, sizeof(browser_provider)))
         (void)vitals_post_start_defer(target_pid, res, browser_provider);
     /* PSN sign-in host redirect, for the shell's libhttp and the Store library in apps */

@@ -10,23 +10,23 @@ set(VITALS_TITLE_ID "VITALS001")
 set(VITALS_TITLE "vitals")
 include(../version.cmake)
 
-# The kernel plugin, TLS providers and PSN redirect this VPK installs, built by ../vitals-plugin,
-# ../tls13-vita and ../vitals-reauth
+# The kernel plugin, vitals-http, browser provider and PSN redirect this VPK installs, built by
+# ../vitals-plugin, ../vitals-http, ../tls13-vita and ../vitals-reauth
 set(VITALS_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build")
 set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-plugin/vitals.skprx")
-set(VITALS_HTTP_PROVIDER "${VITALS_BUILD_DIR}/tls13-vita/provider/vitals_http.suprx")
+set(VITALS_LIBHTTP "${VITALS_BUILD_DIR}/vitals-http/libhttp.suprx")
 set(VITALS_BROWSER_PROVIDER "${VITALS_BUILD_DIR}/tls13-vita/browser/vitals.suprx")
 set(VITALS_REAUTH_MODULE "${VITALS_BUILD_DIR}/vitals-reauth/vitals-reauth.suprx")
-foreach(module VITALS_KERNEL_MODULE VITALS_HTTP_PROVIDER VITALS_BROWSER_PROVIDER VITALS_REAUTH_MODULE)
+foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_BROWSER_PROVIDER VITALS_REAUTH_MODULE)
     if(NOT EXISTS "${${module}}")
-        message(FATAL_ERROR "${${module}} is missing; build ../vitals-plugin, ../tls13-vita and ../vitals-reauth first (make does this)")
+        message(FATAL_ERROR "${${module}} is missing; build ../vitals-plugin, ../vitals-http, ../tls13-vita and ../vitals-reauth first (make does this)")
     endif()
 endforeach()
-# The debug builds of the providers and redirect (levels 1 and 2), which the app switches to;
-# they go in debug/<level>/ next to the release modules
+# The debug builds of vitals-http, the browser provider and the redirect (levels 1 and 2), which
+# the app switches to; they go in debug/<level>/ next to the release modules
 set(debug_entries)
 foreach(level 1 2)
-    foreach(module tls13-vita-debug${level}/provider/vitals_http.suprx tls13-vita-debug${level}/browser/vitals.suprx
+    foreach(module vitals-http-debug${level}/libhttp.suprx tls13-vita-debug${level}/browser/vitals.suprx
             vitals-reauth-debug${level}/vitals-reauth.suprx)
         if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
             message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
@@ -98,9 +98,8 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
          ${VITALS_KERNEL_MODULE} vitals.skprx
          assets/compat.suprx compat.suprx
-         assets/lhttp.suprx lhttp.suprx
+         ${VITALS_LIBHTTP} libhttp.suprx
          assets/lssl.suprx lssl.suprx
-         ${VITALS_HTTP_PROVIDER} vitals_http.suprx
          ${VITALS_BROWSER_PROVIDER} vitals.suprx
          ${VITALS_REAUTH_MODULE} vitals-reauth.suprx
          ${debug_entries}

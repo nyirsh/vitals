@@ -8,6 +8,13 @@ set(VITALS_MBEDTLS_SHA256 "2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d5
 set(VITALS_MBEDTLS_URL
     "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${VITALS_MBEDTLS_VERSION}/mbedtls-${VITALS_MBEDTLS_VERSION}.tar.bz2")
 
+# Mbed TLS 3.6 LTS, used by vitals-http: unlike 4.x it still has the RSA and DHE key exchanges the
+# console's own TLS offers, which PSN sign-in's CDN expects to see
+set(VITALS_MBEDTLS3_VERSION "3.6.7")
+set(VITALS_MBEDTLS3_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
+set(VITALS_MBEDTLS3_URL
+    "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${VITALS_MBEDTLS3_VERSION}/mbedtls-${VITALS_MBEDTLS3_VERSION}.tar.bz2")
+
 # curl, used by the installer to download the latest Mozilla CA bundle
 set(VITALS_CURL_VERSION "8.17.0")
 set(VITALS_CURL_SHA256 "e8e74cdeefe5fb78b3ae6e90cd542babf788fa9480029cfcee6fd9ced42b7910")
