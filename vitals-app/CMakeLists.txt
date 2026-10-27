@@ -22,12 +22,12 @@ foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_BROWSER_PROVIDER VITAL
         message(FATAL_ERROR "${${module}} is missing; build ../vitals-plugin, ../vitals-http, ../tls13-vita and ../vitals-reauth first (make does this)")
     endif()
 endforeach()
-# The debug builds of vitals-http, the browser provider and the redirect (levels 1 and 2), which
-# the app switches to; they go in debug/<level>/ next to the release modules
+# The debug builds of vitals-http, the browser provider, the redirect and the kernel plugin (levels
+# 1 and 2), which the app switches to; they go in debug/<level>/ next to the release modules
 set(debug_entries)
 foreach(level 1 2)
     foreach(module vitals-http-debug${level}/libhttp.suprx tls13-vita-debug${level}/browser/vitals.suprx
-            vitals-reauth-debug${level}/vitals-reauth.suprx)
+            vitals-reauth-debug${level}/vitals-reauth.suprx vitals-plugin-debug${level}/vitals.skprx)
         if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
             message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
         endif()
@@ -112,4 +112,5 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          assets/certificate-sources.json certificate-sources.json
          assets/certs.cer certs.cer
          assets/redirects.txt redirects.txt
+         assets/dns.txt dns.txt
 )

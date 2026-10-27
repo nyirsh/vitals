@@ -50,6 +50,7 @@ static const char vitals_plugin_path[] = "ur0:tai/vitals.skprx";
 static const char vitals_plugin_name[] = "vitals.skprx";
 static const char browser_provider_global[] = "ur0:tai/vitals-native/vitals.suprx";
 static const char redirect_list[] = "ux0:data/vitals/redirects.txt";
+static const char dns_list[] = "ux0:data/vitals/dns.txt";
 
 enum
 {
@@ -928,6 +929,13 @@ static int install_http_modules(int requested_state)
             if (copy_file("app0:redirects.txt", redirect_list) < 0)
                 printf("Could not create %s; host redirects stay off.\n", redirect_list);
         }
+        /* The same for the DNS rules, which apply to every lookup, not only the HTTP library's */
+        if (result >= 0 && !path_exists(dns_list))
+        {
+            (void)sceIoMkdir("ux0:data/vitals", 0777);
+            if (copy_file("app0:dns.txt", dns_list) < 0)
+                printf("Could not create %s; DNS rules stay off.\n", dns_list);
+        }
     }
     return result;
 }
@@ -1088,13 +1096,6 @@ static int same_contents(const char *first_path, const char *second_path)
     return result;
 }
 
-int vitals_install_plugin_current(void)
-{
-    /* The plugin and the modules are always installed together, so the kernel plugin alone
-     * tells whether the installed vitals is the one this app carries */
-    return same_contents("ur0:tai/vitals.skprx", "app0:vitals.skprx");
-}
-
 /* The modules each debug level is built into; the app carries the release ones at the top of
  * app0: and the others in app0:debug/<level>/ */
 enum
@@ -1102,12 +1103,14 @@ enum
     DEBUG_LIBHTTP,
     DEBUG_BROWSER_PROVIDER,
     DEBUG_REAUTH,
+    DEBUG_PLUGIN,
     DEBUG_MODULE_COUNT
 };
 static const char *const debug_files[DEBUG_MODULE_COUNT] = {
     [DEBUG_LIBHTTP] = "libhttp.suprx",
     [DEBUG_BROWSER_PROVIDER] = "vitals.suprx",
     [DEBUG_REAUTH] = "vitals-reauth.suprx",
+    [DEBUG_PLUGIN] = "vitals.skprx",
 };
 
 static void debug_source(int level, unsigned module, char *path, size_t size)
@@ -1118,11 +1121,28 @@ static void debug_source(int level, unsigned module, char *path, size_t size)
         (void)snprintf(path, size, "app0:debug/%d/%s", level, debug_files[module]);
 }
 
+int vitals_install_plugin_current(void)
+{
+    char source[64];
+
+    /* The plugin and the modules are always installed together, so the kernel plugin alone
+     * tells whether the installed vitals is the one this app carries, at whichever debug level */
+    for (int level = 0; level < VITALS_DEBUG_LEVEL_COUNT; ++level)
+    {
+        debug_source(level, DEBUG_PLUGIN, source, sizeof(source));
+        int same = same_contents(vitals_plugin_path, source);
+        /* An unreadable installed plugin (or the app's release copy) is an error, as before */
+        if (same == 1 || (same < 0 && level == 0))
+            return same;
+    }
+    return 0;
+}
+
 int vitals_install_debug_level(void)
 {
     char source[64];
 
-    /* The three modules are always switched together, so vitals-http tells the level */
+    /* The modules are always switched together, so vitals-http tells the level */
     for (int level = 0; level < VITALS_DEBUG_LEVEL_COUNT; ++level)
     {
         debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
@@ -1162,6 +1182,13 @@ int vitals_install_set_debug_level(int level, VitalsInstallNote note)
     {
         debug_source(level, DEBUG_REAUTH, source, sizeof(source));
         result = replace_file(source, new_modules[MODULE_REAUTH]);
+    }
+    /* The kernel plugin's own debug output (every DNS query); it is loaded at boot, so this one
+     * applies after a reboot */
+    if (result >= 0)
+    {
+        debug_source(level, DEBUG_PLUGIN, source, sizeof(source));
+        result = replace_file(source, vitals_plugin_path);
     }
     g_note = NULL;
     return result;

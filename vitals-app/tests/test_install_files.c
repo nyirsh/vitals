@@ -16,6 +16,7 @@
 #define CA "vs0:/data/external/cert/CA_LIST.cer"
 #define CA_BACKUP "vs0:/data/external/cert/CA_LIST.cer_old"
 #define REDIRECTS "ux0:data/vitals/redirects.txt"
+#define DNS_RULES "ux0:data/vitals/dns.txt"
 #define VITALS_BLOCK "# VITALS\n*KERNEL\nur0:tai/vitals.skprx\n\n"
 #define SONY_CA "SONY ORIGINAL CERTIFICATES\n"
 #define BUNDLE "VITALS MERGED CERTIFICATES\n"
@@ -130,7 +131,7 @@ static void fresh_console(void)
     make_directories("ux0:data");
     make_directories("vs0:sys/external");
     const char *app_files[] = {"vitals.skprx", "vitals.suprx", "compat.suprx", "libhttp.suprx", "lssl.suprx",
-                               "vitals-reauth.suprx", "redirects.txt",
+                               "vitals-reauth.suprx", "redirects.txt", "dns.txt",
                                "sony-certs.pem", "mozilla-certs.pem"};
     for (size_t i = 0; i < sizeof(app_files) / sizeof(app_files[0]); ++i)
     {
@@ -139,8 +140,9 @@ static void fresh_console(void)
         snprintf(content, sizeof(content), "contents of %s\n", app_files[i]);
         put(path, content);
     }
-    /* The debug builds of vitals-http, the browser provider and the redirect, one folder per level */
-    const char *debug_files[] = {"libhttp.suprx", "vitals.suprx", "vitals-reauth.suprx"};
+    /* The debug builds of vitals-http, the browser provider, the redirect and the kernel plugin, one
+     * folder per level */
+    const char *debug_files[] = {"libhttp.suprx", "vitals.suprx", "vitals-reauth.suprx", "vitals.skprx"};
     for (int level = 1; level <= 2; ++level)
         for (size_t i = 0; i < sizeof(debug_files) / sizeof(debug_files[0]); ++i)
         {
@@ -161,7 +163,7 @@ static void expect_installed(void)
         assert(is(installed[i][0], expected));
     }
     assert(is(CA, BUNDLE) && is(CA_BACKUP, SONY_CA));
-    assert(exists(REDIRECTS));
+    assert(exists(REDIRECTS) && exists(DNS_RULES));
     assert(vitals_install_detect() == 1);
     /* Nothing temporary is left behind */
     assert(!exists("ur0:tai/config_vitals.tmp") && !exists("vs0:/data/external/cert/CA_LIST.cer.prepared"));
@@ -186,7 +188,7 @@ static void test_install_reinstall_uninstall(void)
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     assert(!exists(OLD_HTTP_PROVIDER));
-    assert(is(REDIRECTS, "contents of redirects.txt\n"));
+    assert(is(REDIRECTS, "contents of redirects.txt\n") && is(DNS_RULES, "contents of dns.txt\n"));
     /* While it is there, vitals doesn't count as installed */
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
     assert(vitals_install_detect() == 0);
@@ -207,9 +209,10 @@ static void test_install_reinstall_uninstall(void)
 
     /* Reinstalling keeps one config entry, the user's redirect list and Sony's original backup */
     put(REDIRECTS, "my.old.host my.new.host\n");
+    put(DNS_RULES, "my.blocked.host block\n");
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
-    assert(is(REDIRECTS, "my.old.host my.new.host\n"));
+    assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
 
     /* Updating certificates replaces the store and touches nothing else */
     put(CA, "OLDER VITALS BUNDLE\n");
@@ -219,7 +222,7 @@ static void test_install_reinstall_uninstall(void)
     /* Uninstalling restores taiHEN's config and Sony's certificates, and keeps the user's list */
     assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
     expect_uninstalled();
-    assert(is(REDIRECTS, "my.old.host my.new.host\n"));
+    assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
     /* Without an installed plugin there is nothing to compare */
     assert(vitals_install_plugin_current() < 0);
 }
@@ -232,6 +235,7 @@ static void expect_debug_level(int level)
         {"vs0:/data/external/vitals/native/vitals.suprx", "vitals.suprx"},
         {"ur0:tai/vitals-native/vitals.suprx", "vitals.suprx"},
         {"vs0:/data/external/vitals/native/vitals-reauth.suprx", "vitals-reauth.suprx"},
+        {"ur0:tai/vitals.skprx", "vitals.skprx"},
     };
     for (size_t i = 0; i < sizeof(modules) / sizeof(modules[0]); ++i)
     {
@@ -243,10 +247,12 @@ static void expect_debug_level(int level)
         assert(is(modules[i][0], expected));
     }
     assert(vitals_install_debug_level() == level);
+    /* A debug build of the plugin is still this app's */
+    assert(vitals_install_plugin_current() == 1);
 }
 
-/* Switching debug output replaces only the providers and redirect, in every place they are
- * installed, and a full install puts the release builds back */
+/* Switching debug output replaces only the providers, the redirect and the kernel plugin, in every
+ * place they are installed, and a full install puts the release builds back */
 static void test_debug_levels(void)
 {
     fresh_console();
@@ -257,7 +263,7 @@ static void test_debug_levels(void)
     {
         assert(vitals_install_set_debug_level(level, note) >= 0);
         expect_debug_level(level);
-        assert(is("ur0:tai/vitals.skprx", "contents of vitals.skprx\n") && is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG));
+        assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG));
     }
     assert(vitals_install_set_debug_level(3, note) < 0 && vitals_install_set_debug_level(-1, note) < 0);
     expect_debug_level(0);

@@ -1,13 +1,17 @@
 # Builds the vitals kernel plugin (vitals.skprx)
 # Everything is built in build/ at the repository root
 BUILD_DIR := $(abspath ../build)
-OUT_DIR = $(BUILD_DIR)/vitals-plugin
+# Debug output on the Vita's debug console: 0 the plugin's usual lines, 1 and up also every DNS
+# query a process sends; the app installs the build matching its Debug output setting
+DEBUG ?= 0
+OUT_DIR = $(BUILD_DIR)/vitals-plugin$(if $(filter 0,$(DEBUG)),,-debug$(DEBUG))
 HTTP_PROVIDER_PATH = vs0:/data/external/vitals/native/vitals_http.suprx
 
 # CMake tracks what is out of date; the settings are passed every time so a stale cache
 # cannot change the build
 all:
-	cmake -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DVITALS_HTTP_PROVIDER_PATH=$(HTTP_PROVIDER_PATH)
+	cmake -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DVITALS_HTTP_PROVIDER_PATH=$(HTTP_PROVIDER_PATH) \
+		-DVITALS_DEBUG=$(DEBUG)
 	cmake --build $(OUT_DIR)
 
 # Host tests of the plugin against mocks of the Vita kernel, then those of its build check and
@@ -21,6 +25,6 @@ test:
 	python3 -m unittest discover -s tests -p 'test_*.py'
 
 clean:
-	rm -rf $(OUT_DIR) $(TEST_DIR)
+	rm -rf $(BUILD_DIR)/vitals-plugin $(BUILD_DIR)/vitals-plugin-debug1 $(BUILD_DIR)/vitals-plugin-debug2 $(TEST_DIR)
 
 .PHONY: all clean test

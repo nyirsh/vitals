@@ -30,11 +30,17 @@ add_executable(vitals.elf
 	post_start.c
 	reauth.c
 	redirects.c
+	dns_watch.c
+	dns_message.c
 	tls13_loader.c
 	../tls13-vita/src/path.c
+	../tls13-vita/src/host_map.c
+	../tls13-vita/src/redirect_list.c
 )
+set(VITALS_DEBUG 0 CACHE STRING "Debug output: 0, 1 or 2 (1 and up log every DNS query)")
 target_compile_definitions(vitals.elf PRIVATE
 	VITALS_HTTP_PROVIDER_PATH="${VITALS_HTTP_PROVIDER_PATH}"
+	VITALS_DEBUG=${VITALS_DEBUG}
 )
 target_link_libraries(vitals.elf
 	SceSysclibForDriver_stub

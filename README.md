@@ -79,6 +79,21 @@ Installing `vitals` also creates the file with instructions and examples: it is 
 
 Every app and game that uses Sony's HTTP library, as well as the system shell, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
 
+## DNS rules
+
+`redirects.txt` is for the HTTP library only. For every other lookup (a game's own UDP or TCP connections, and the other system libraries), put rules in `ux0:data/vitals/dns.txt`, one `host target` pair per line, where the target is another host name, an IPv4 address, or `block`:
+
+```
+# host                      target
+old.server.example          new.server.example
+game.server.example         203.0.113.5
+telemetry.example           block
+```
+
+The kernel plugin watches the DNS queries every process sends. For a host name target it asks for that name instead and answers with its addresses under the original name; for an address it answers with that address; for `block` it answers that the name doesn't exist. Installing `vitals` creates the file with these instructions, commented out; it is never overwritten, and uninstalling leaves it in place. Changes apply to new lookups within a few seconds, and an answer already given may stay cached for up to 5 minutes.
+
+The app still connects by the original name, so an HTTPS server must have a certificate for that name (apps using the HTTP library are better served by `redirects.txt`, which also checks the certificate against the new name). Only names are covered, not addresses a game has written in, and only IPv4 (A) lookups.
+
 ## User-Agent
 
 Every request carries the app's own User-Agent followed by `libhttp/3.74 (PS Vita)`, as the latest firmware's library sends. To send something else in place of that last part, put it on a line of `ux0:data/vitals/useragent.txt`:
@@ -177,7 +192,7 @@ Available build options:
 Debug output levels, for `vitals-http` and the browser provider (lines start with `vitals-http:` for apps and games, `vitals_browser:` for the browser):
 
 - **Off (0):** nothing, the default
-- **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure
+- **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
 - **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write) and messages from `Mbed TLS`. This produces a lot of output and slows connections down, use it only to investigate a problem
 
 Every build includes all three levels; choose one on the console from the app's **Debug output** option, which reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).

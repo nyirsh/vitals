@@ -12,10 +12,9 @@ all: modules
 	cmake --build $(OUT_DIR)
 
 # The plugin, vitals-http, providers and redirect have their own Makefiles; CMake decides what to
-# rebuild. vitals-http, the providers and the redirect are built at every debug level, which the
-# app lets users switch between
+# rebuild. All of them are built at every debug level, which the app lets users switch between
 modules:
-	$(MAKE) -C ../vitals-plugin
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-plugin DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../tls13-vita DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-reauth DEBUG=$(level) &&) true

@@ -11,13 +11,20 @@ typedef struct {
 } tai_module_info_t;
 int taiGetModuleInfoForKernel(SceUID, const char *, tai_module_info_t *);
 #define KERNEL_PID 0x10005
+#define VITALS_TAI_CONTINUE1(type, reference, ...) \
+    ((type (*)(void *))(reference))(__VA_ARGS__)
+#define VITALS_TAI_CONTINUE3(type, reference, ...) \
+    ((type (*)(int, const void *, unsigned int))(reference))(__VA_ARGS__)
 #define VITALS_TAI_CONTINUE4(type, reference, ...) \
     ((type (*)(SceUID, const char *, uint32_t, int *))(reference))(__VA_ARGS__)
 #define VITALS_TAI_CONTINUE7(type, reference, ...) \
     ((type (*)(SceUID, SceUID, SceSize, const void *, uint32_t, const void *, int *))(reference))(__VA_ARGS__)
 #define VITALS_TAI_ARITY(_1, _2, _3, _4, _5, _6, _7, selected, ...) selected
 #define TAI_CONTINUE(type, reference, ...) \
-    VITALS_TAI_ARITY(__VA_ARGS__, VITALS_TAI_CONTINUE7, unused6, unused5, VITALS_TAI_CONTINUE4) \
+    VITALS_TAI_ARITY(__VA_ARGS__, VITALS_TAI_CONTINUE7, unused6, unused5, VITALS_TAI_CONTINUE4, VITALS_TAI_CONTINUE3, \
+                     unused2, VITALS_TAI_CONTINUE1) \
         (type, reference, __VA_ARGS__)
 int taiHookFunctionOffsetForKernel(SceUID, tai_hook_ref_t *, SceUID, int, size_t, int, const void *);
+int taiHookFunctionExportForKernel(SceUID, tai_hook_ref_t *, const char *, uint32_t, uint32_t, const void *);
+int taiHookReleaseForKernel(SceUID, tai_hook_ref_t);
 #endif

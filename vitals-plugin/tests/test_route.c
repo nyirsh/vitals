@@ -31,6 +31,9 @@ static TestLoadFunction installed_load;
 SceUID ksceKernelGetProcessId(void) { return current_pid; }
 int ksceDebugPrintf(const char *format, ...) { (void)format; return 0; }
 int ksceIoGetstat(const char *path, SceIoStat *status) { (void)path; (void)status; return stat_result; }
+static int dns_starts, dns_stops;
+SceUID vitals_dns_watch_start(void) { ++dns_starts; return 9; }
+void vitals_dns_watch_stop(void) { ++dns_stops; }
 SceUID ksceKernelSearchModuleByName(const char *name) {
     assert(strcmp(name, "SceKernelModulemgr") == 0);
     return 11;
@@ -178,7 +181,9 @@ static void test_startup_failures(void) {
     g_start_hook_id = -1;
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_SUCCESS);
     assert(loader_destructions == 1 && !mutex_live);
-    puts("kernel startup: no-replacement, validation, start-hook and load-hook failures PASS");
+    /* The DNS hooks start and stop with the plugin */
+    assert(dns_starts >= 1 && dns_stops >= 1);
+    puts("kernel startup: no-replacement, validation, start-hook and load-hook failures, DNS hooks PASS");
 }
 
 static void test_routes(void) {

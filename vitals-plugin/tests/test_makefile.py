@@ -20,6 +20,12 @@ class PluginMakefileTests(unittest.TestCase):
         output = dry_run(ROOT / "vitals-plugin")
         self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin", output)
         self.assertIn("-DVITALS_HTTP_PROVIDER_PATH=vs0:/data/external/vitals/native/vitals_http.suprx", output)
+        self.assertIn("-DVITALS_DEBUG=0", output)
+
+    def test_debug_levels_build_apart(self):
+        output = dry_run(ROOT / "vitals-plugin", "DEBUG=2")
+        self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin-debug2", output)
+        self.assertIn("-DVITALS_DEBUG=2", output)
 
 
 if __name__ == "__main__":

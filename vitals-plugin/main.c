@@ -20,6 +20,7 @@
 #include "native_module_api.h"
 #include "post_start.h"
 #include "reauth.h"
+#include "dns_watch.h"
 
 #define VITALS_MAX_MODULE_PATH ((size_t)0x400)
 
@@ -155,6 +156,8 @@ int module_start(SceSize argc, const void *args)
     /* The start hook may already be running on another thread; its code must stay mapped */
     if (g_loader_hook_id < 0)
         ksceDebugPrintf("vitals: loader hook failed: 0x%08X\n", g_loader_hook_id);
+    /* The DNS rules (ux0:data/vitals/dns.txt), for every lookup in every process */
+    (void)vitals_dns_watch_start();
     return SCE_KERNEL_START_SUCCESS;
 
 failed:
@@ -173,6 +176,7 @@ int module_stop(SceSize argc, const void *args)
     /* Deferred injections and in-flight hook calls can outlive a release */
     if (g_loader_hook_id >= 0 || g_start_hook_id >= 0)
         return SCE_KERNEL_STOP_FAIL;
+    vitals_dns_watch_stop();
     (void)vitals_post_start_destroy();
     vitals_reauth_destroy();
     vitals_kernel_loader_destroy();

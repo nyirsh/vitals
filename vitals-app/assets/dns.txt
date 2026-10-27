@@ -1,0 +1,13 @@
+# vitals DNS rules, for every app, game and the system
+# One "host target" pair per line; the target is one of:
+#   another host name   the host's address is looked up under that name instead
+#   an IPv4 address     the host resolves to that address
+#   block               the host doesn't exist
+# The app still connects by the original name, so for HTTPS the server's certificate must be valid
+# for it; for apps using Sony's HTTP library, redirects.txt is the better place
+# Changes apply to new lookups within a few seconds; a name already looked up may stay cached for
+# up to 5 minutes
+#
+# old.server.example        new.server.example
+# game.server.example       203.0.113.5
+# telemetry.example         block

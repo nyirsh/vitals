@@ -39,6 +39,7 @@ int ksceKernelGetMemBlockBase(SceUID, void **);
 int ksceKernelFreeMemBlock(SceUID);
 int ksceKernelCopyToUserProc(SceUID, void *, const void *, SceSize);
 int ksceKernelCopyToUser(void *, const void *, SceSize);
+int ksceKernelCopyFromUser(void *, const void *, SceSize);
 int ksceKernelCopyFromUserProc(SceUID, void *, const void *, SceSize);
 int ksceSha256BlockInit(SceSha256Context *);
 int ksceSha256BlockUpdate(SceSha256Context *, const void *, SceSize);
