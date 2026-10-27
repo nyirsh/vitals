@@ -1338,6 +1338,16 @@ void vh_request_sent(VhObject *object, int result)
 int vh_request_read(VhRequest *request, unsigned char *data, size_t size)
 {
     int count = read_body(request, data, size);
+    /* A body of known length fills the buffer up to its end, as apps (Sound Shapes) read one
+     * Content-Length in one call; one that streams (chunked, or until close) returns what came */
+    while (count > 0 && (size_t)count < size && request->body_mode == VH_BODY_LENGTH && !request->aborted) {
+        int more = read_body(request, data + count, size - (size_t)count);
+        if (more < 0)
+            return failed(request, more);
+        if (more == 0)
+            break;
+        count += more;
+    }
 #if VITALS_DEBUG >= 1
     if (count > 0 && request->status_code >= 400 && !request->body_logged) {
         char text[161];

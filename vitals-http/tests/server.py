@@ -102,6 +102,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"until close " * 100)
             self.close_connection = True
+        elif path == "/split":
+            # A Content-Length body in three pieces, apart in time, as TLS records may come
+            self.send_response(200)
+            self.send_header("Content-Length", "3000")
+            self.end_headers()
+            for part in (b"a" * 1000, b"b" * 1000, b"c" * 1000):
+                self.wfile.write(part)
+                self.wfile.flush()
+                time.sleep(0.2)
         elif path == "/slow":
             time.sleep(5)
             self.send_body(200, b"late")

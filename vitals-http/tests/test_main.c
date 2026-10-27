@@ -189,6 +189,14 @@ static void test_bodies(int template_)
     CHECK_EQ(read_all(request, body, sizeof(body), 1), length);
     sceHttpDeleteRequest(request);
 
+    /* A Content-Length body arriving in pieces comes whole from one read, as Sound Shapes needs */
+    request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/split"), 0);
+    CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
+    CHECK_EQ(sceHttpReadData(request, body, 4096), 3000);
+    CHECK(body[0] == 'a' && body[1500] == 'b' && body[2999] == 'c');
+    CHECK_EQ(sceHttpReadData(request, body, 4096), 0);
+    sceHttpDeleteRequest(request);
+
     /* gzip: decompressed only when asked for through the API */
     length = fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/gzip"), NULL, &status, body, sizeof(body), NULL);
     CHECK_EQ(length, 11 * 2000);
