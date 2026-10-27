@@ -11,3 +11,7 @@ vitals_kernel:
       syscall: true
       functions:
         - vitals_redirects_read
+    vitals_useragent:
+      syscall: true
+      functions:
+        - vitals_useragent_read

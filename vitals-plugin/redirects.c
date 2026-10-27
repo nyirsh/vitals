@@ -3,13 +3,14 @@
 #include <stddef.h>
 
 #include "vitals/redirects.h"
+#include "vitals/useragent.h"
 
 /* SCE_ERROR_ERRNO_EINVAL */
 #define VITALS_REDIRECTS_INVALID ((int)0x80010016)
 
-/* Games run in a sandbox that keeps them out of ux0:data, while the kernel is not; the list is
+/* Games run in a sandbox that keeps them out of ux0:data, while the kernel is not; a file is
  * opened for each read, so edits apply to the next game that starts */
-int vitals_redirects_read(unsigned int offset, void *buffer, unsigned int size) {
+static int read_file(const char *path, unsigned int offset, void *buffer, unsigned int size) {
     char data[VITALS_REDIRECTS_CHUNK];
     int state, result;
 
@@ -20,7 +21,7 @@ int vitals_redirects_read(unsigned int offset, void *buffer, unsigned int size) 
         size = sizeof(data);
     }
     ENTER_SYSCALL(state);
-    SceUID fd = ksceIoOpen(VITALS_REDIRECTS_PATH, SCE_O_RDONLY, 0);
+    SceUID fd = ksceIoOpen(path, SCE_O_RDONLY, 0);
     if (fd < 0) {
         result = fd;
     } else {
@@ -33,4 +34,12 @@ int vitals_redirects_read(unsigned int offset, void *buffer, unsigned int size) 
     }
     EXIT_SYSCALL(state);
     return result;
+}
+
+int vitals_redirects_read(unsigned int offset, void *buffer, unsigned int size) {
+    return read_file(VITALS_REDIRECTS_PATH, offset, buffer, size);
+}
+
+int vitals_useragent_read(void *buffer, unsigned int size) {
+    return read_file(VITALS_USERAGENT_PATH, 0, buffer, size);
 }

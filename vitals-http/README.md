@@ -16,6 +16,8 @@ make DEBUG=1    # build/vitals-http-debug1/: start-up, connections and failures 
 make test       # host tests (needs VITASDK for <psp2/net/http.h>; skipped without it)
 ```
 
+`USER_AGENT` (`libhttp/3.74 (PS Vita)` by default) sets what follows each app's own User-Agent
+when there is no `ux0:data/vitals/useragent.txt`, e.g. `make USER_AGENT="libhttp/3.74 (PS Vita) MyFork/1.0"`.
 `TLS_HEAP_KIB` (128 by default) sets the TLS heap, one memory block per process, apart from the pool
 the app gives `sceHttpInit`. An open https connection takes about 40 KiB of it.
 
@@ -31,6 +33,7 @@ the app gives `sceHttpInit`. An open https connection takes about 40 KiB of it.
 | [src/inflate.c](src/inflate.c) | gzip bodies, with zlib |
 | [src/async.c](src/async.c) | non-blocking requests (a worker thread per call) and the epoll API |
 | [src/redirect.c](src/redirect.c) | the host redirect list, `ux0:data/vitals/redirects.txt` |
+| [src/useragent.c](src/useragent.c) | the User-Agent suffix, `ux0:data/vitals/useragent.txt` |
 | [src/private.c](src/private.c) | stubs for the 23 exports nothing names |
 | [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, `sceHttpsLoadCert` |
 | [src/tls_platform.c](src/tls_platform.c) | Mbed TLS's mutexes, entropy and time, on the kernel and the RTC |
@@ -83,6 +86,13 @@ pool until `sceHttpTerm`. With `DEBUG=1`, the number of rules and each rewrite a
 A request to a host the list redirects to waits at least 30 seconds for the server to answer,
 whatever shorter receive timeout the app set: community servers can be slower than the
 official ones the game's timeouts were made for.
+
+## User-Agent suffix
+
+A template's User-Agent is the app's own followed by `libhttp/3.74 (PS Vita)`, or by the first
+line of `ux0:data/vitals/useragent.txt` that isn't empty or a `#` comment (trimmed, at most 127
+printable ASCII characters; anything else and the default is kept). Like the redirect list, it is
+read through the kernel plugin (`vitals_useragent_read`), once per `sceHttpInit`.
 
 ## Non-blocking requests
 

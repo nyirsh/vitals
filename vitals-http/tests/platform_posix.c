@@ -23,7 +23,17 @@
 #define VH_CONNECT_SLICE_MS 100
 
 /* The CA bundle and the host redirect list, which the test names */
-const char *vh_test_ca_path, *vh_test_redirects_path;
+const char *vh_test_ca_path, *vh_test_redirects_path, *vh_test_useragent_path;
+
+int vh_platform_useragent_read(void *buffer, unsigned int size)
+{
+    FILE *file = vh_test_useragent_path != NULL ? fopen(vh_test_useragent_path, "rb") : NULL;
+    if (file == NULL)
+        return (int)0x80010002;
+    size_t got = fread(buffer, 1, size, file);
+    fclose(file);
+    return (int)got;
+}
 
 int vh_platform_redirects_read(unsigned int offset, void *buffer, unsigned int size)
 {

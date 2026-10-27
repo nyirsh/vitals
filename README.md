@@ -78,6 +78,17 @@ soundshapes.psvita.online.scea.com  sound.ture.fish
 Installing `vitals` also creates the file with instructions and examples: it is never overwritten, and uninstalling leaves it in place. Changes apply the next time a game starts.
 
 Every app and game that uses Sony's HTTP library, as well as the system shell, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
+
+## User-Agent
+
+Every request carries the app's own User-Agent followed by `libhttp/3.74 (PS Vita)`, as the latest firmware's library sends. To send something else in place of that last part, put it on a line of `ux0:data/vitals/useragent.txt`:
+
+```
+# replaces "libhttp/3.74 (PS Vita)"
+libhttp/3.74 (PS Vita) MyFork/1.0
+```
+
+The first line that isn't empty or a `#` comment is used, trimmed, up to 127 printable ASCII characters; a line with anything else is ignored. Apps that set their own whole User-Agent keep it. Changes apply the next time an app starts.
 For now, only up to a maximum of 32 hosts can be redirected (trying to be cautious with memory usage and performance), maybe one day after more careful testing the restriction will be lifted. Malformed host names are also ignored.
 
 ## Custom certificates
@@ -161,6 +172,7 @@ Available build options:
 | --------------- | ------- | -------------------------------------------------------------------------- |
 | `HTTP_HEAP_KIB` | `128`   | memory (KiB) the TLS provider reserves                                     |
 | `TLS_HEAP_KIB`  | `128`   | memory (KiB) `vitals-http` reserves for TLS, in a process's first https use |
+| `USER_AGENT`    | `libhttp/3.74 (PS Vita)` | what `vitals-http` puts after each app's own User-Agent, unless `useragent.txt` gives another; up to 127 printable ASCII characters, without quotes, backslashes, backticks, `#`, `$` or `;` |
 
 Debug output levels, for `vitals-http` and the browser provider (lines start with `vitals-http:` for apps and games, `vitals_browser:` for the browser):
 

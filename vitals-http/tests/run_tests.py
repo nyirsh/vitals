@@ -53,6 +53,8 @@ def main():
         openssl(directory, "pkey", "-in", "client.key", "-outform", "DER", "-out", "client.der")
         # Host redirects: a host that doesn't exist, sent to this machine
         (directory / "redirects.txt").write_text("# test list\nold.vitals.test localhost\n")
+        # A User-Agent suffix, after a comment and a blank line, with spaces and CRLF to trim
+        (directory / "useragent.txt").write_text("# suffix\n\n  Custom/1.0 (Test) \r\nnot this\n")
         port = free_port()
         server = subprocess.Popen([sys.executable, "-I", str(HERE / "server.py"), str(port),
                                    str(directory / "server.pem"), str(directory / "server.key"),
@@ -65,7 +67,7 @@ def main():
             return subprocess.run([binary, str(port), str(directory / "server.pem"),
                                    str(directory / "root.pem"), str(directory / "client.pem"),
                                    str(directory / "client.der"), str(directory / "hello.hex"),
-                                   str(directory / "redirects.txt")],
+                                   str(directory / "redirects.txt"), str(directory / "useragent.txt")],
                                   timeout=150).returncode
         finally:
             server.kill()

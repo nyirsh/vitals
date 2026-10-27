@@ -53,11 +53,12 @@ int sceHttpCreateTemplate(const char *userAgent, int httpVer, int autoProxyConf)
         else {
             /* As Sony's: the app's agent, then this library's and the console's, as a request
              * header of the template that the app can replace or remove. Sony's puts the
-             * firmware's version in it; this one always gives the latest firmware's */
-            char agent[VH_USER_AGENT_MAX + 32];
+             * firmware's version in it; this one always gives the latest firmware's, unless
+             * useragent.txt gives another */
+            char agent[VH_USER_AGENT_MAX + VH_SUFFIX_MAX];
             object->as.template_.http_version = httpVer;
-            snprintf(agent, sizeof(agent), "%s%slibhttp/" VH_USER_AGENT_VERSION " (PS Vita)",
-                     userAgent != NULL ? userAgent : "", userAgent != NULL && userAgent[0] != '\0' ? " " : "");
+            snprintf(agent, sizeof(agent), "%s%s%s", userAgent != NULL ? userAgent : "",
+                     userAgent != NULL && userAgent[0] != '\0' ? " " : "", vh_user_agent_suffix());
             result = sceHttpAddRequestHeader(object->id, "User-Agent", agent, SCE_HTTP_HEADER_OVERWRITE);
             if (result < 0)
                 vh_destroy(object);

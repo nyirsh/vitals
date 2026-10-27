@@ -35,6 +35,7 @@ add_executable(vitals_http_tests
     ${ROOT}/src/async.c
     ${ROOT}/src/private.c
     ${ROOT}/src/redirect.c
+    ${ROOT}/src/useragent.c
     ${ROOT}/src/tls.c
     ${ROOT}/src/tls_platform.c
     ${TLS13_DIR}/provider/ca_index.c

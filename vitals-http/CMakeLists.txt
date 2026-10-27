@@ -16,6 +16,15 @@ if(NOT VITALS_HTTP_TLS_HEAP_KIB MATCHES "^[0-9]+$" OR VITALS_HTTP_TLS_HEAP_KIB L
     message(FATAL_ERROR "VITALS_HTTP_TLS_HEAP_KIB must be 64..4096")
 endif()
 math(EXPR VITALS_HTTP_TLS_HEAP_BYTES "${VITALS_HTTP_TLS_HEAP_KIB} * 1024")
+
+# What follows an app's own User-Agent unless ux0:data/vitals/useragent.txt gives another: printable
+# ASCII without the characters that would break the C string or the build's quoting
+set(VITALS_HTTP_USER_AGENT "libhttp/3.74 (PS Vita)" CACHE STRING "User-Agent suffix after the app's own")
+string(LENGTH "${VITALS_HTTP_USER_AGENT}" VITALS_HTTP_USER_AGENT_LENGTH)
+if(VITALS_HTTP_USER_AGENT_LENGTH EQUAL 0 OR VITALS_HTTP_USER_AGENT_LENGTH GREATER 127
+   OR NOT VITALS_HTTP_USER_AGENT MATCHES "^[ -~]+$" OR VITALS_HTTP_USER_AGENT MATCHES "[\"\\#$;`']")
+    message(FATAL_ERROR "VITALS_HTTP_USER_AGENT must be 1..127 printable ASCII characters, without \" \\ # $ ; ` '")
+endif()
 # The bundle the vitals app installs, which the HTTP provider trusts too
 set(VITALS_HTTP_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trusted CA bundle (PEM)")
 
@@ -37,6 +46,7 @@ add_executable(vitals_libhttp
     src/async.c
     src/private.c
     src/redirect.c
+    src/useragent.c
     src/tls.c
     src/tls_platform.c
     src/platform_vita.c
@@ -52,6 +62,7 @@ target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_LOG_PREFIX="vitals-http"
     VITALS_HTTP_HEAP_BYTES=${VITALS_HTTP_TLS_HEAP_BYTES}u
     VITALS_HTTP_CA_PATH="${VITALS_HTTP_CA_PATH}"
+    VH_DEFAULT_SUFFIX="${VITALS_HTTP_USER_AGENT}"
 )
 target_compile_options(vitals_libhttp PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -Os)

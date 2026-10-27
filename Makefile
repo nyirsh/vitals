@@ -3,7 +3,7 @@
 #   tls13-vita/     TLS providers (options: HTTP_HEAP_KIB, DEBUG)
 #   vitals-reauth/  PSN sign-in host redirect (vitals-reauth.suprx)
 #   vitals-http/    libhttp written from scratch, with tls13-vita's TLS (libhttp.suprx; options:
-#                   TLS_HEAP_KIB, DEBUG)
+#                   TLS_HEAP_KIB, USER_AGENT, DEBUG)
 #   vitals-app/     the vitals app and vitals-app.vpk (builds the four above first)
 # Command-line options such as `make HTTP_HEAP_KIB=256` reach the components automatically
 # Every debug level of the providers and redirect is built and packaged; the app switches between

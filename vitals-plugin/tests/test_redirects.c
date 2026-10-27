@@ -1,4 +1,5 @@
 #include "vitals/redirects.h"
+#include "vitals/useragent.h"
 #include <kernel_mock.h>
 #include <assert.h>
 #include <stdio.h>
@@ -8,12 +9,12 @@
 #define INVALID ((int)0x80010016)
 
 int syscall_depth;
-static const char *file_text;
+static const char *file_text, *file_path = "ux0:data/vitals/redirects.txt";
 static int read_error, copy_error, opens, closes;
 static SceSize largest_read;
 
 int ksceIoOpen(const char *path, int flags, int mode) {
-    assert(strcmp(path, "ux0:data/vitals/redirects.txt") == 0 && flags == SCE_O_RDONLY && mode == 0);
+    assert(strcmp(path, file_path) == 0 && flags == SCE_O_RDONLY && mode == 0);
     /* The file is only touched inside the syscall state */
     assert(syscall_depth == 1);
     if (file_text == NULL) return NOT_FOUND;
@@ -103,10 +104,24 @@ static void test_errors(void) {
     check_state_restored();
 }
 
+/* The User-Agent suffix comes from its own file, from its start */
+static void test_useragent(void) {
+    char buffer[64];
+    file_path = "ux0:data/vitals/useragent.txt";
+    reset("Custom/1.0 (Vita)\n");
+    assert(vitals_useragent_read(buffer, sizeof(buffer)) == 18 && memcmp(buffer, "Custom/1.0 (Vita)\n", 18) == 0);
+    reset(NULL);
+    assert(vitals_useragent_read(buffer, sizeof(buffer)) == NOT_FOUND);
+    assert(vitals_useragent_read(NULL, 16) == INVALID);
+    check_state_restored();
+    file_path = "ux0:data/vitals/redirects.txt";
+}
+
 int main(void) {
     test_reads_in_pieces();
     test_large_requests_are_cut();
     test_errors();
+    test_useragent();
     puts("kernel redirect list reads PASS");
     return 0;
 }

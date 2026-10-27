@@ -255,6 +255,7 @@ int sceHttpTerm(void)
                 vh_destroy(g_objects[i]);
     vh_cookie_clear();
     vh_redirect_clear();
+    vh_user_agent_clear();
     vh_epoll_clear();
     vh_tls_unload_certs();
     g_initialized = 0;

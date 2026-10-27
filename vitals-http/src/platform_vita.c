@@ -3,6 +3,7 @@
 #include "diagnostics.h"
 #include "user_runtime.h"
 #include "vitals/redirects.h"
+#include "vitals/useragent.h"
 
 #include <string.h>
 
@@ -156,6 +157,11 @@ int vh_platform_tls_init(void)
 int vh_platform_redirects_read(unsigned int offset, void *buffer, unsigned int size)
 {
     return vitals_redirects_read(offset, buffer, size);
+}
+
+int vh_platform_useragent_read(void *buffer, unsigned int size)
+{
+    return vitals_useragent_read(buffer, size);
 }
 
 unsigned long long vh_platform_clock_us(void)

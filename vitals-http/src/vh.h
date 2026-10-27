@@ -24,6 +24,8 @@
 #define VH_METHOD_MAX 16u
 /* The firmware version the User-Agent names: the latest, whatever the console runs */
 #define VH_USER_AGENT_VERSION "3.74"
+/* The longest User-Agent suffix ux0:data/vitals/useragent.txt can give, with its NUL */
+#define VH_SUFFIX_MAX 128u
 
 #define VH_ERROR_UNSUPPORTED ((int)SCE_HTTP_ERROR_UNKNOWN)
 /* A non-blocking call that hasn't finished; the SDK header doesn't name it */
@@ -266,6 +268,9 @@ char *vh_redirect_url(const char *url);
 /* Forgets the list, for sceHttpTerm, with the lock held */
 void vh_redirect_clear(void);
 int vh_redirect_is_target(const char *host);
+const char *vh_user_agent_suffix(void);
+void vh_user_agent_clear(void);
+int vh_platform_useragent_read(void *buffer, unsigned int size);
 /* The least receive timeout for a redirected host: community servers can take longer to answer
  * than the official ones a game's timeouts were made for */
 #define VH_REDIRECT_RECV_TIMEOUT_US 30000000u

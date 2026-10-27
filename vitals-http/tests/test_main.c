@@ -14,7 +14,7 @@ static char g_base[64], g_secure_base[64];
 static const char *g_cert_path;
 static const char *g_client_cert_path, *g_client_key_path, *g_hello_path;
 /* platform_posix.c's CA bundle and host redirect list */
-extern const char *vh_test_ca_path, *vh_test_redirects_path;
+extern const char *vh_test_ca_path, *vh_test_redirects_path, *vh_test_useragent_path;
 
 #define CHECK(condition)                                                  \
     do                                                                    \
@@ -796,6 +796,22 @@ static void test_user_agent(void)
     sceHttpDeleteTemplate(template_);
 }
 
+/* The request header a template made with this agent sends */
+static const char *user_agent_of(const char *agent)
+{
+    static char headers[4096];
+    char *header;
+    unsigned int size;
+    int status, request = 0;
+    int template_ = sceHttpCreateTemplate(agent, SCE_HTTP_VERSION_1_1, 0);
+    int connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/headers"), NULL, &status, headers, sizeof(headers), &request);
+    sceHttpRequestGetAllHeaders(request, &header, &size);
+    snprintf(headers, sizeof(headers), "%.*s", (int)size, header);
+    sceHttpDeleteTemplate(template_);
+    return headers;
+}
+
 static size_t read_file(const char *path, char *out, size_t capacity)
 {
     FILE *file = fopen(path, "rb");
@@ -951,7 +967,7 @@ static void test_uri(void)
 
 int main(int argc, char **argv)
 {
-    if (argc < 8)
+    if (argc < 9)
         return 2;
     g_port = atoi(argv[1]);
     g_cert_path = argv[2];
@@ -993,6 +1009,14 @@ int main(int argc, char **argv)
     CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
     CHECK_EQ(stats.currentInuseSize, 0);
     printf("pool: peak %u of %u bytes\n", stats.maxInuseSize, stats.poolSize);
+    CHECK_EQ(sceHttpTerm(), 0);
+
+    /* ux0:data/vitals/useragent.txt, read on the next sceHttpInit */
+    printf("user agent file\n");
+    vh_test_useragent_path = argv[8];
+    CHECK_EQ(sceHttpInit(1024 * 1024), 0);
+    CHECK(strstr(user_agent_of("Game/2.0"), "User-Agent: Game/2.0 Custom/1.0 (Test)\r\n") != NULL);
+    CHECK(strstr(user_agent_of(NULL), "User-Agent: Custom/1.0 (Test)\r\n") != NULL);
     CHECK_EQ(sceHttpTerm(), 0);
 
     printf("%d checks, %d failed\n", g_checks, g_failures);
