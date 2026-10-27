@@ -128,7 +128,7 @@ void *vh_platform_alloc(size_t size)
 
 void vh_platform_free(void *pointer)
 {
-    if (g_pool != NULL)
+    if (g_pool != NULL && pointer != NULL)
         sceClibMspaceFree(g_pool, pointer);
 }
 

@@ -979,12 +979,11 @@ int main(int argc, char **argv)
     test_console_profile(template_);
     test_host_redirects(template_);
 
-    /* Everything deleted, nothing left in the pool but the host redirect list */
+    /* Everything deleted, nothing left in the pool (the host redirect list is outside it) */
     CHECK_EQ(sceHttpDeleteTemplate(template_), 0);
     SceHttpMemoryPoolStats stats;
     CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
-    CHECK(vh_redirect_pool_use() > 0);
-    CHECK_EQ(stats.currentInuseSize, vh_redirect_pool_use());
+    CHECK_EQ(stats.currentInuseSize, 0);
     printf("pool: peak %u of %u bytes\n", stats.maxInuseSize, stats.poolSize);
     CHECK_EQ(sceHttpTerm(), 0);
 

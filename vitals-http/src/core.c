@@ -47,11 +47,6 @@ void *vh_alloc(size_t size)
     return block == NULL ? NULL : block + 1;
 }
 
-unsigned int vh_alloc_footprint(size_t size)
-{
-    return (unsigned int)(sizeof(VhBlock) + size);
-}
-
 void vh_free(void *pointer)
 {
     if (pointer == NULL)
@@ -270,7 +265,10 @@ int sceHttpTerm(void)
 
 int sceHttpGetMemoryPoolStats(SceHttpMemoryPoolStats *currentStat)
 {
-    VH_TRACE();
+    /* Apps poll this, often each frame: only changes are logged */
+#if VITALS_DEBUG >= 2
+    static unsigned int reported_used = UINT32_MAX, reported_peak;
+#endif
     if (currentStat == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -280,6 +278,12 @@ int sceHttpGetMemoryPoolStats(SceHttpMemoryPoolStats *currentStat)
         currentStat->maxInuseSize = g_pool_peak;
         currentStat->currentInuseSize = g_pool_used;
         currentStat->reserved = 0;
+#if VITALS_DEBUG >= 2
+        if (g_pool_used != reported_used || g_pool_peak != reported_peak)
+            VITALS_VERBOSE("pool stats size=%u used=%u peak=%u", g_pool_size, g_pool_used, g_pool_peak);
+        reported_used = g_pool_used;
+        reported_peak = g_pool_peak;
+#endif
     }
     vh_unlock();
     return result;

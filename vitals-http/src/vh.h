@@ -265,12 +265,10 @@ const char *vh_redirect_host(const char *host);
 char *vh_redirect_url(const char *url);
 /* Forgets the list, for sceHttpTerm, with the lock held */
 void vh_redirect_clear(void);
-unsigned int vh_redirect_pool_use(void);
 int vh_redirect_is_target(const char *host);
 /* The least receive timeout for a redirected host: community servers can take longer to answer
  * than the official ones a game's timeouts were made for */
 #define VH_REDIRECT_RECV_TIMEOUT_US 30000000u
-unsigned int vh_alloc_footprint(size_t size);
 
 /* ---- cookie.c ---- */
 

@@ -8,11 +8,11 @@
 
 /* The host redirect list (ux0:data/vitals/redirects.txt), as the HTTP provider applied it: read
  * through the kernel plugin, since games can't open ux0:data, and applied to the host names
- * connections and URL requests are made with. Read once per sceHttpInit, into the pool */
+ * connections and URL requests are made with. Read once per sceHttpInit, into the pool's memory
+ * but outside its accounting: apps wait for an empty pool, as Sony's is once all is deleted */
 
 static VitalsHostMap g_map;
 static char *g_names;
-static size_t g_names_capacity;
 static int g_loaded;
 
 typedef struct ListReader
@@ -32,14 +32,14 @@ static int keep_rule(void *context, const VitalsHostRule *rule)
     size_t needed = reader->used + rule->from_length + rule->to_length + 2u;
     if (needed > reader->capacity) {
         size_t capacity = needed * 2;
-        char *grown = vh_alloc(capacity);
+        char *grown = vh_platform_alloc(capacity);
         if (grown == NULL) {
             reader->failed = 1;
             return 1;
         }
         if (reader->names != NULL)
             memcpy(grown, reader->names, reader->used);
-        vh_free(reader->names);
+        vh_platform_free(reader->names);
         reader->names = grown;
         reader->capacity = capacity;
     }
@@ -63,16 +63,16 @@ static void load(void)
     if (g_loaded || vh_initialized() != 0)
         return;
     g_loaded = 1;
-    ListReader *reader = vh_alloc(sizeof(*reader));
-    char *work = vh_alloc(VITALS_REDIRECT_LIST_WORK_SIZE);
+    ListReader *reader = vh_platform_alloc(sizeof(*reader));
+    char *work = vh_platform_alloc(VITALS_REDIRECT_LIST_WORK_SIZE);
     if (reader == NULL || work == NULL) {
-        vh_free(reader);
-        vh_free(work);
+        vh_platform_free(reader);
+        vh_platform_free(work);
         return;
     }
     memset(reader, 0, sizeof(*reader));
     int result = vitals_redirect_list_read(vh_platform_redirects_read, work, keep_rule, reader);
-    vh_free(work);
+    vh_platform_free(work);
     if (result < 0)
         VITALS_LOG("redirect list not read: rc=%08X", (unsigned int)result);
     if (result >= 0 && !reader->failed && reader->count > 0) {
@@ -81,26 +81,18 @@ static void load(void)
                                               reader->from_length[i], reader->to_length[i]};
         g_map.count = reader->count;
         g_names = reader->names;
-        g_names_capacity = reader->capacity;
         VITALS_LOG("redirects loaded=%u", (unsigned int)g_map.count);
     } else
-        vh_free(reader->names);
-    vh_free(reader);
+        vh_platform_free(reader->names);
+    vh_platform_free(reader);
 }
 
 void vh_redirect_clear(void)
 {
-    vh_free(g_names);
+    vh_platform_free(g_names);
     g_names = NULL;
-    g_names_capacity = 0;
     memset(&g_map, 0, sizeof(g_map));
     g_loaded = 0;
-}
-
-/* What the list keeps in the pool until sceHttpTerm */
-unsigned int vh_redirect_pool_use(void)
-{
-    return g_names == NULL ? 0 : vh_alloc_footprint(g_names_capacity);
 }
 
 /* Whether host is one the list sends others to, with the lock held */
@@ -136,6 +128,7 @@ char *vh_redirect_url(const char *url)
     load();
     if (vitals_host_map_rewrite_url(&g_map, url, NULL, 0, &needed) != -1)
         return NULL;
+    /* The caller's, freed with vh_free */
     char *copy = vh_alloc(needed);
     if (copy == NULL || vitals_host_map_rewrite_url(&g_map, url, copy, needed, &needed) != 1) {
         vh_free(copy);
