@@ -99,8 +99,9 @@ static int is(const char *vita_path, const char *expected)
     return text != NULL && strcmp(text, expected) == 0;
 }
 
-/* Where earlier versions installed their HTTP provider */
+/* Where earlier versions installed their HTTP provider and PSN redirect */
 #define OLD_HTTP_PROVIDER "vs0:/data/external/vitals/native/vitals_http.suprx"
+#define OLD_REAUTH "vs0:/data/external/vitals/native/vitals-reauth.suprx"
 
 /* What vitals installs, and the app0: file each comes from */
 static const char *const installed[][2] = {
@@ -110,7 +111,6 @@ static const char *const installed[][2] = {
     {"vs0:/data/external/vitals/libhttp.suprx", "app0:libhttp.suprx"},
     {"vs0:/data/external/vitals/libssl.suprx", "app0:lssl.suprx"},
     {"vs0:/data/external/vitals/native/vitals.suprx", "app0:vitals.suprx"},
-    {"vs0:/data/external/vitals/native/vitals-reauth.suprx", "app0:vitals-reauth.suprx"},
 };
 #define INSTALLED_COUNT (sizeof(installed) / sizeof(installed[0]))
 
@@ -131,7 +131,7 @@ static void fresh_console(void)
     make_directories("ux0:data");
     make_directories("vs0:sys/external");
     const char *app_files[] = {"vitals.skprx", "vitals.suprx", "compat.suprx", "libhttp.suprx", "lssl.suprx",
-                               "vitals-reauth.suprx", "redirects.txt", "dns.txt",
+                               "redirects.txt", "dns.txt",
                                "sony-certs.pem", "mozilla-certs.pem"};
     for (size_t i = 0; i < sizeof(app_files) / sizeof(app_files[0]); ++i)
     {
@@ -142,7 +142,7 @@ static void fresh_console(void)
     }
     /* The debug builds of vitals-http, the browser provider, the redirect and the kernel plugin, one
      * folder per level */
-    const char *debug_files[] = {"libhttp.suprx", "vitals.suprx", "vitals-reauth.suprx", "vitals.skprx"};
+    const char *debug_files[] = {"libhttp.suprx", "vitals.suprx", "vitals.skprx"};
     for (int level = 1; level <= 2; ++level)
         for (size_t i = 0; i < sizeof(debug_files) / sizeof(debug_files[0]); ++i)
         {
@@ -182,15 +182,20 @@ static void test_install_reinstall_uninstall(void)
 {
     fresh_console();
     assert(vitals_install_detect() == 0);
-    /* An earlier version's HTTP provider, which vitals-http replaces, goes on install */
+    /* An earlier version's HTTP provider and PSN redirect, which vitals-http replaces, go on
+     * install */
     make_directories("vs0:/data/external/vitals/native");
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
+    put(OLD_REAUTH, "an earlier version's redirect\n");
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
-    assert(!exists(OLD_HTTP_PROVIDER));
+    assert(!exists(OLD_HTTP_PROVIDER) && !exists(OLD_REAUTH));
     assert(is(REDIRECTS, "contents of redirects.txt\n") && is(DNS_RULES, "contents of dns.txt\n"));
     /* While it is there, vitals doesn't count as installed */
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
+    assert(vitals_install_detect() == 0);
+    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    put(OLD_REAUTH, "an earlier version's redirect\n");
     assert(vitals_install_detect() == 0);
     assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
@@ -234,7 +239,6 @@ static void expect_debug_level(int level)
         {"vs0:/data/external/vitals/libhttp.suprx", "libhttp.suprx"},
         {"vs0:/data/external/vitals/native/vitals.suprx", "vitals.suprx"},
         {"ur0:tai/vitals-native/vitals.suprx", "vitals.suprx"},
-        {"vs0:/data/external/vitals/native/vitals-reauth.suprx", "vitals-reauth.suprx"},
         {"ur0:tai/vitals.skprx", "vitals.skprx"},
     };
     for (size_t i = 0; i < sizeof(modules) / sizeof(modules[0]); ++i)
@@ -251,8 +255,8 @@ static void expect_debug_level(int level)
     assert(vitals_install_plugin_current() == 1);
 }
 
-/* Switching debug output replaces only the providers, the redirect and the kernel plugin, in every
- * place they are installed, and a full install puts the release builds back */
+/* Switching debug output replaces only vitals-http, the browser provider and the kernel plugin, in
+ * every place they are installed, and a full install puts the release builds back */
 static void test_debug_levels(void)
 {
     fresh_console();

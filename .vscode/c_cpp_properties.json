@@ -5,11 +5,11 @@
             "compileCommands": [
                 "${workspaceFolder}/build/vitals-plugin/compile_commands.json",
                 "${workspaceFolder}/build/tls13-vita/compile_commands.json",
-                "${workspaceFolder}/build/vitals-reauth/compile_commands.json",
+                "${workspaceFolder}/build/vitals-http/compile_commands.json",
                 "${workspaceFolder}/build/vitals-app/compile_commands.json",
                 "${workspaceFolder}/build/vitals-plugin-tests/compile_commands.json",
                 "${workspaceFolder}/build/tls13-vita-tests/compile_commands.json",
-                "${workspaceFolder}/build/vitals-reauth-tests/compile_commands.json",
+                "${workspaceFolder}/build/vitals-http-tests/compile_commands.json",
                 "${workspaceFolder}/build/vitals-app-tests/compile_commands.json"
             ],
             "compilerPath": "/usr/local/vitasdk/bin/arm-vita-eabi-gcc",

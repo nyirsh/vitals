@@ -28,11 +28,6 @@ SceUID ksceIoOpenForPid(SceUID pid, const char *filename, int flags, unsigned in
 _Static_assert(sizeof(tai_module_info_t) == 0x38, "taiHEN ARM32 module-info extent");
 #endif
 
-#define VITALS_LIBHTTP_PATH "vs0:/data/external/vitals/libhttp.suprx"
-#ifndef VITALS_HTTP_PROVIDER_PATH
-#define VITALS_HTTP_PROVIDER_PATH "vs0:/data/external/vitals/native/vitals_http.suprx"
-#endif
-#define VITALS_PROVIDER_PATH VITALS_HTTP_PROVIDER_PATH
 #define VITALS_HASH_BUFFER_SIZE UINT32_C(1024)
 #define VITALS_HASH_WORKSPACE_SIZE UINT32_C(4096)
 #define VITALS_MAX_PROCESS_MODULES UINT32_C(256)
@@ -41,41 +36,6 @@ _Static_assert(sizeof(tai_module_info_t) == 0x38, "taiHEN ARM32 module-info exte
 
 _Static_assert(sizeof(SceKernelAllocMemBlockKernelOpt) == 0x58, "Native allocation option extent");
 _Static_assert(offsetof(SceKernelAllocMemBlockKernelOpt, pid) == 0x24, "Native allocation PID offset");
-
-static const uint8_t g_expected_libhttp_sha256[SCE_SHA256_DIGEST_SIZE] = {
-    0x42,
-    0xBC,
-    0x7E,
-    0x34,
-    0x07,
-    0x79,
-    0x64,
-    0xAC,
-    0x7E,
-    0xDC,
-    0x43,
-    0x65,
-    0xAB,
-    0xAD,
-    0x8A,
-    0xF9,
-    0xBF,
-    0x41,
-    0x79,
-    0x3A,
-    0x34,
-    0xD2,
-    0xC7,
-    0xEF,
-    0xD6,
-    0x31,
-    0x97,
-    0x6F,
-    0x7D,
-    0x27,
-    0x39,
-    0xC1,
-};
 
 static const uint8_t g_expected_browser_sha256[SCE_SHA256_DIGEST_SIZE] = {
     0x73,
@@ -122,17 +82,15 @@ typedef struct LoaderTarget
     uint32_t start_version;
 } LoaderTarget;
 
-static const LoaderTarget targets[] = {
-    {VITALS_LIBHTTP_PATH, VITALS_PROVIDER_PATH, "vitals_http", g_expected_libhttp_sha256,
-     VITALS_START_MAGIC, VITALS_START_VERSION},
-    {"vs0:/data/external/vitals/ScePsp2Compat.suprx", VITALS_BROWSER_PROVIDER_BOOT_PATH,
-     "vitals", g_expected_browser_sha256, VITALS_BROWSER_START_MAGIC, VITALS_BROWSER_START_VERSION}};
+/* The browser provider, injected after vitals' ScePsp2Compat (the browser engine's) starts */
+static const LoaderTarget g_browser_target = {
+    "vs0:/data/external/vitals/ScePsp2Compat.suprx", VITALS_BROWSER_PROVIDER_BOOT_PATH,
+    "vitals", g_expected_browser_sha256, VITALS_BROWSER_START_MAGIC, VITALS_BROWSER_START_VERSION};
 
-static uint8_t ready[2];
+static uint8_t ready;
 static struct
 {
     SceUID pid;
-    unsigned int target;
 } in_flight[64];
 static SceUID g_injection_mutex = -1;
 
@@ -272,26 +230,20 @@ int vitals_kernel_loader_init(void)
 {
     if (g_injection_mutex >= 0)
         return -1;
-    memset(ready, 0, sizeof(ready));
+    ready = 0;
     memset(in_flight, 0, sizeof(in_flight));
-    for (size_t i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i)
-    {
-        ready[i] = (uint8_t)target_matches(&targets[i], 0);
-    }
-    if (!ready[0] && !ready[1])
+    if (!target_matches(&g_browser_target, 0))
         return -1;
     g_injection_mutex = ksceKernelCreateMutex("vitals inject", 0, 0, NULL);
     if (g_injection_mutex < 0)
-    {
-        memset(ready, 0, sizeof(ready));
         return g_injection_mutex;
-    }
+    ready = 1;
     return 0;
 }
 
 void vitals_kernel_loader_destroy(void)
 {
-    memset(ready, 0, sizeof(ready));
+    ready = 0;
     if (g_injection_mutex >= 0)
     {
         (void)ksceKernelDeleteMutex(g_injection_mutex);
@@ -299,24 +251,17 @@ void vitals_kernel_loader_destroy(void)
     }
 }
 
-int vitals_kernel_loader_ready(void)
-{
-    return ready[0];
-}
-
 int vitals_kernel_browser_loader_ready(void)
 {
-    return ready[1];
+    return ready;
 }
 
-static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index, const char *provider_path)
+static int inject_target(SceUID pid, SceUID module_id, const char *provider_path)
 {
-    const LoaderTarget *target = &targets[target_index];
-    const char *file_path = target_index == 1
-                                ? target->provider_path
-                                : provider_path;
+    const LoaderTarget *target = &g_browser_target;
+    const char *file_path = target->provider_path;
     /* The provider loads from its global path; only the compat module is hashed in pid's overlay */
-    const SceUID module_namespace_pid = target_index == 1 ? pid : 0;
+    const SceUID module_namespace_pid = pid;
     QueryWorkspace *workspace = NULL;
     void *allocation = NULL;
     SceUID query_memory = -1;
@@ -330,7 +275,7 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
     int result;
     size_t slot = sizeof(in_flight) / sizeof(in_flight[0]);
 
-    if (!ready[target_index] || g_injection_mutex < 0 || pid <= 0 || module_id < 0 || provider_path == NULL)
+    if (!ready || g_injection_mutex < 0 || pid <= 0 || module_id < 0 || provider_path == NULL)
     {
         return -1;
     }
@@ -342,7 +287,7 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
 
     for (size_t i = 0; i < sizeof(in_flight) / sizeof(in_flight[0]); ++i)
     {
-        if (in_flight[i].pid == pid && in_flight[i].target == target_index)
+        if (in_flight[i].pid == pid)
         {
             (void)ksceKernelUnlockMutex(g_injection_mutex, 1);
             return 1;
@@ -356,7 +301,6 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
         return -1;
     }
     in_flight[slot].pid = pid;
-    in_flight[slot].target = target_index;
     (void)ksceKernelUnlockMutex(g_injection_mutex, 1);
 
     result = -1;
@@ -370,8 +314,7 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
         workspace = allocation;
     if (workspace == NULL)
         goto cleanup;
-    loaded = provider_is_loaded_by_name(pid, target_index == 1 ? "ScePsp2Compat" : "SceLibHttp",
-                                        target->provider_name, workspace);
+    loaded = provider_is_loaded_by_name(pid, "ScePsp2Compat", target->provider_name, workspace);
     if (loaded < 0)
     {
         result = loaded;
@@ -379,24 +322,19 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
     }
     if (loaded != 0)
     {
-        /* The provider never unloads, so a libhttp loaded again in the same process (after the
-         * app unloaded the first) is left to Sony's TLS */
-        ksceDebugPrintf("vitals: provider already resident pid=0x%X; it stays with its first libhttp\n", pid);
+        /* The provider never unloads, so a browser engine loaded again in the same process keeps
+         * the first one's */
+        ksceDebugPrintf("vitals: provider already resident pid=0x%X\n", pid);
         result = 0;
         goto cleanup;
     }
-    /* The HTTP provider now owns its sceClib mspace; host SceLibc is not a prerequisite */
-
     result = -1;
     LoaderTarget verification_target = *target;
-    if (target_index == 1)
-    {
-        if (!vitals_browser_module_path(provider_path, workspace->browser_module_path,
-                                           sizeof(workspace->browser_module_path)))
-            goto cleanup;
-        verification_target.provider_path = file_path;
-        verification_target.module_path = workspace->browser_module_path;
-    }
+    if (!vitals_browser_module_path(provider_path, workspace->browser_module_path,
+                                    sizeof(workspace->browser_module_path)))
+        goto cleanup;
+    verification_target.provider_path = file_path;
+    verification_target.module_path = workspace->browser_module_path;
     if (!target_matches(&verification_target, module_namespace_pid))
     {
         result = -1;
@@ -407,19 +345,12 @@ static int inject_target(SceUID pid, SceUID module_id, unsigned int target_index
     target_info->size = sizeof(*target_info);
     result = ksceKernelGetModuleInfo(pid, module_id, target_info);
     if (result < 0 || target_info->modid <= 0 ||
-        strcmp(target_info->module_name, target_index == 1 ? "ScePsp2Compat" : "SceLibHttp") != 0)
+        strcmp(target_info->module_name, "ScePsp2Compat") != 0)
     {
         result = -1;
         goto cleanup;
     }
     if (target_info->modid != workspace->name_target_uid)
-    {
-        result = -1;
-        goto cleanup;
-    }
-    /* The HTTP provider checks its libhttp mapping is private itself, through the user Sysmem
-     * API, before setting up its heap or hooks */
-    if (target_index == 0 && target_info->segments[0].vaddr == NULL)
     {
         result = -1;
         goto cleanup;
@@ -508,7 +439,6 @@ cleanup:
     if (ksceKernelLockMutex(g_injection_mutex, 1, NULL) >= 0)
     {
         in_flight[slot].pid = 0;
-        in_flight[slot].target = 0;
         (void)ksceKernelUnlockMutex(g_injection_mutex, 1);
     }
     return result;
@@ -518,7 +448,6 @@ typedef struct PreparationCall
 {
     SceUID pid;
     SceUID module_id;
-    unsigned int target_index;
     const char *provider_path;
     int result;
     int called;
@@ -528,57 +457,21 @@ static int prepare_on_native_stack(void *opaque)
 {
     PreparationCall *call = opaque;
     call->called = 1;
-    call->result = inject_target(call->pid, call->module_id, call->target_index, call->provider_path);
-    ksceDebugPrintf("vitals: inject target=%u pid=0x%X rc=0x%08X\n",
-                    call->target_index, call->pid, call->result);
+    call->result = inject_target(call->pid, call->module_id, call->provider_path);
+    ksceDebugPrintf("vitals: inject browser provider pid=0x%X rc=0x%08X\n", call->pid, call->result);
     return 0;
 }
 
-static int dispatch_preparation(SceUID pid, SceUID module_id, unsigned int target_index, const char *provider_path)
+static int dispatch_preparation(SceUID pid, SceUID module_id, const char *provider_path)
 {
-    PreparationCall call = {pid, module_id, target_index, provider_path, -1, 0};
+    PreparationCall call = {pid, module_id, provider_path, -1, 0};
     int result = ksceKernelRunWithStack(16384, prepare_on_native_stack, &call);
     if (result < 0)
         return result;
     return call.called ? call.result : -1;
 }
 
-int vitals_kernel_http_process_allowed(SceUID pid)
-{
-    if (pid <= 0)
-        return 0;
-    /* SceShell shares its HTTP library with other Sony code, and a private copy can't serve
-     * that code (the loader fails with 0x8002D018)
-     * So the shell keeps Sony's library and TLS */
-    if (pid == ksceKernelSysrootGetShellPid())
-        return 0;
-    char title_id[16] = {0};
-    int result = ksceKernelSysrootGetProcessTitleId(pid, title_id, sizeof(title_id));
-    if (result < 0)
-        return result;
-    /* Exclude the browser controller and its WebKit helper; they use the browser provider */
-    if (memcmp(title_id, "NPXS10003", sizeof("NPXS10003")) == 0 ||
-        memcmp(title_id, "NPXS10083", sizeof("NPXS10083")) == 0)
-        return 0;
-    VitalsNativeHttpConsumer consumer;
-    int shared = vitals_native_http_shared_consumer(pid, &consumer);
-    if (shared != 0)
-        return shared < 0 ? shared : 0;
-    return 1;
-}
-
-int vitals_kernel_inject_for_pid(SceUID pid, SceUID libhttp_modid)
-{
-    if (!ready[0] || g_injection_mutex < 0 || pid <= 0 || libhttp_modid < 0)
-        return -1;
-    int allowed = vitals_kernel_http_process_allowed(pid);
-    ksceDebugPrintf("vitals: http policy pid=0x%X allowed=%d\n", pid, allowed);
-    if (allowed <= 0)
-        return allowed;
-    return dispatch_preparation(pid, libhttp_modid, 0, targets[0].provider_path);
-}
-
 int vitals_kernel_inject_browser_for_pid(SceUID pid, SceUID compat_modid, const char *provider_path)
 {
-    return dispatch_preparation(pid, compat_modid, 1, provider_path);
+    return dispatch_preparation(pid, compat_modid, provider_path);
 }

@@ -1,7 +1,6 @@
 # Builds vitals-app.vpk: the vitals app (installer and connection test), packaged with the kernel
-# plugin, vitals-http, the browser provider and the PSN redirect it installs
-# Those come from ../vitals-plugin, ../vitals-http, ../tls13-vita and ../vitals-reauth, which are
-# built first
+# plugin, vitals-http and the browser provider it installs
+# Those come from ../vitals-plugin, ../vitals-http and ../tls13-vita, which are built first
 # Everything is built in build/ at the repository root
 BUILD_DIR := $(abspath ../build)
 OUT_DIR = $(BUILD_DIR)/vitals-app
@@ -17,7 +16,6 @@ modules:
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-plugin DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../tls13-vita DEBUG=$(level) &&) true
-	$(foreach level,0 1 2,$(MAKE) -C ../vitals-reauth DEBUG=$(level) &&) true
 
 # Refreshes the bundled Mozilla certificates (assets/) from curl; review and commit the result
 update-certs:

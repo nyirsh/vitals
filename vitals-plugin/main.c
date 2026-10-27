@@ -19,7 +19,6 @@
 #include "hook_guard.h"
 #include "native_module_api.h"
 #include "post_start.h"
-#include "reauth.h"
 #include "dns_watch.h"
 
 #define VITALS_MAX_MODULE_PATH ((size_t)0x400)
@@ -70,9 +69,6 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     char browser_path[VITALS_PENDING_BROWSER_PATH_SIZE];
     char browser_provider[VITALS_PENDING_BROWSER_PATH_SIZE];
     int module = -1;
-    /* Decided on the path the process asked for, before it is replaced below */
-    const int is_libhttp = path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx");
-    const int reauth = vitals_reauth_wanted(target_pid, path, is_libhttp);
 
     if (g_replace_iap && (path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
                           path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)))
@@ -103,9 +99,6 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready() &&
              vitals_browser_provider_path(path, browser_provider, sizeof(browser_provider)))
         (void)vitals_post_start_defer(target_pid, res, browser_provider);
-    /* PSN sign-in host redirect, for the shell's libhttp and the Store library in apps */
-    if (reauth)
-        (void)vitals_post_start_defer_reauth(target_pid, res);
     return res;
 }
 
@@ -136,13 +129,12 @@ int module_start(SceSize argc, const void *args)
     if (vitals_native_module_api_init() < 0)
         return SCE_KERNEL_START_FAILED;
 #endif
-    if (g_replace_iap || g_replace[MODULE_COMPAT])
+    /* The browser provider, injected after vitals' browser engine starts */
+    if (g_replace[MODULE_COMPAT])
     {
         int init = vitals_kernel_loader_init();
-        ksceDebugPrintf("vitals: loader init=%d app=%d browser=%d iap=%d\n", init,
-                        vitals_kernel_loader_ready(), vitals_kernel_browser_loader_ready(), g_replace_iap);
+        ksceDebugPrintf("vitals: loader init=%d browser=%d\n", init, vitals_kernel_browser_loader_ready());
     }
-    ksceDebugPrintf("vitals: reauth ready=%d\n", vitals_reauth_init());
 
     SceUID modid = ksceKernelSearchModuleByName("SceKernelModulemgr");
     if (modid <= 0 || vitals_validate_loader_hook(modid) < 0 || vitals_post_start_init() < 0)
@@ -163,7 +155,6 @@ int module_start(SceSize argc, const void *args)
 failed:
     ksceDebugPrintf("vitals: startup failed before hooking\n");
     (void)vitals_post_start_destroy();
-    vitals_reauth_destroy();
     vitals_kernel_loader_destroy();
     return SCE_KERNEL_START_FAILED;
 }
@@ -178,7 +169,6 @@ int module_stop(SceSize argc, const void *args)
         return SCE_KERNEL_STOP_FAIL;
     vitals_dns_watch_stop();
     (void)vitals_post_start_destroy();
-    vitals_reauth_destroy();
     vitals_kernel_loader_destroy();
     return SCE_KERNEL_STOP_SUCCESS;
 }

@@ -5,12 +5,11 @@ BUILD_DIR := $(abspath ../build)
 # query a process sends; the app installs the build matching its Debug output setting
 DEBUG ?= 0
 OUT_DIR = $(BUILD_DIR)/vitals-plugin$(if $(filter 0,$(DEBUG)),,-debug$(DEBUG))
-HTTP_PROVIDER_PATH = vs0:/data/external/vitals/native/vitals_http.suprx
 
 # CMake tracks what is out of date; the settings are passed every time so a stale cache
 # cannot change the build
 all:
-	cmake -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DVITALS_HTTP_PROVIDER_PATH=$(HTTP_PROVIDER_PATH) \
+	cmake -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DVITALS_DEBUG=$(DEBUG)
 	cmake --build $(OUT_DIR)
 

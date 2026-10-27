@@ -16,10 +16,9 @@ def dry_run(directory, *arguments):
 
 @unittest.skipUnless(shutil.which("make"), "make is required")
 class PluginMakefileTests(unittest.TestCase):
-    def test_kernel_passes_provider_path(self):
+    def test_kernel_passes_its_settings(self):
         output = dry_run(ROOT / "vitals-plugin")
         self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin", output)
-        self.assertIn("-DVITALS_HTTP_PROVIDER_PATH=vs0:/data/external/vitals/native/vitals_http.suprx", output)
         self.assertIn("-DVITALS_DEBUG=0", output)
 
     def test_debug_levels_build_apart(self):

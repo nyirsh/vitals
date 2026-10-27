@@ -21,13 +21,11 @@ class ProviderMakefileTests(unittest.TestCase):
         output = dry_run(ROOT / "tls13-vita")
         self.assertIn(f"cmake -Wno-deprecated -S . -B {BUILD}/tls13-vita", output)
         self.assertIn("-DVITALS_DEBUG=0", output)
-        self.assertIn("-DVITALS_HTTP_HEAP_KIB=128", output)
         self.assertIn("--target vitals.suprx-self", output)
 
     def test_root_options_reach_the_providers(self):
-        output = dry_run(ROOT, "tls13-vita", "DEBUG=2", "HTTP_HEAP_KIB=256")
+        output = dry_run(ROOT, "tls13-vita", "DEBUG=2")
         self.assertIn("-DVITALS_DEBUG=2", output)
-        self.assertIn("-DVITALS_HTTP_HEAP_KIB=256", output)
 
     def test_each_debug_level_builds_apart(self):
         # The app carries every level, so they must not overwrite each other
@@ -40,7 +38,7 @@ class ProviderMakefileTests(unittest.TestCase):
         output = dry_run(ROOT / "vitals-app", "modules")
         for level in ("0", "1", "2"):
             self.assertIn(f"-C ../tls13-vita DEBUG={level}", output)
-            self.assertIn(f"-C ../vitals-reauth DEBUG={level}", output)
+            self.assertIn(f"-C ../vitals-plugin DEBUG={level}", output)
 
 
 if __name__ == "__main__":

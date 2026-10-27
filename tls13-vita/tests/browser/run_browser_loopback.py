@@ -6,13 +6,52 @@ import resource
 import socket
 import ssl
 import subprocess
-import sys
 import tempfile
 import threading
 import time
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "transport"))
-from run_loopback import certificates, openssl
+
+def openssl(directory, *arguments):
+    subprocess.run(["openssl", *arguments], cwd=directory, check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+
+
+def certificates(directory):
+    openssl(directory, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
+            "-nodes", "-keyout", "ca.key", "-out", "ca.pem", "-days", "2", "-subj", "/CN=vitals test root")
+    openssl(directory, "req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", "server.key",
+            "-out", "server.csr", "-subj", "/CN=localhost")
+    (directory / "server.ext").write_text(
+        "basicConstraints=CA:FALSE\nsubjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1\n"
+        "keyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n")
+    openssl(directory, "x509", "-req", "-in", "server.csr", "-CA", "ca.pem", "-CAkey", "ca.key",
+            "-CAcreateserial", "-days", "2", "-extfile", "server.ext", "-out", "server.pem")
+    openssl(directory, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
+            "-nodes", "-keyout", "other.key", "-out", "other.pem", "-days", "2", "-subj", "/CN=other root")
+    # A server's own self-signed certificate, not a CA, trusted because it is itself in the store
+    openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-sha256", "-days", "2",
+            "-keyout", "self.key", "-out", "self.pem", "-subj", "/CN=localhost",
+            "-addext", "basicConstraints=critical,CA:FALSE",
+            "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1")
+    (directory / "self-store.pem").write_bytes((directory / "ca.pem").read_bytes() +
+                                               (directory / "self.pem").read_bytes())
+    openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
+            "-keyout", "sha1-ca.key", "-out", "sha1-ca.pem", "-days", "2",
+            "-subj", "/CN=vitals SHA1 test root")
+    openssl(directory, "x509", "-req", "-in", "server.csr", "-CA", "sha1-ca.pem",
+            "-CAkey", "sha1-ca.key", "-CAcreateserial", "-sha1", "-days", "2",
+            "-extfile", "server.ext", "-out", "sha1-server.pem")
+    (directory / "sha1-index.txt").write_text("")
+    (directory / "sha1-serial").write_text("01\n")
+    (directory / "sha1-ca.conf").write_text(
+        "[ca]\ndefault_ca=sign\n[sign]\ndatabase=sha1-index.txt\nserial=sha1-serial\n"
+        "new_certs_dir=.\npolicy=policy\n[policy]\ncommonName=supplied\n")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    openssl(directory, "ca", "-config", "sha1-ca.conf", "-batch", "-notext",
+            "-cert", "sha1-ca.pem", "-keyfile", "sha1-ca.key", "-md", "sha1",
+            "-startdate", (now - datetime.timedelta(days=3)).strftime("%Y%m%d%H%M%SZ"),
+            "-enddate", (now - datetime.timedelta(days=1)).strftime("%Y%m%d%H%M%SZ"),
+            "-extfile", "server.ext", "-in", "server.csr", "-out", "sha1-expired.pem")
 
 
 def run_case(binary, directory, scenario, version):

@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 static int mutex_live, locked, create_failure, lock_failure, delete_failure;
-static unsigned int locks, injections, pid_queries, http_injections, reauths;
+static unsigned int locks, injections, pid_queries;
 static SceUID expected_pid = 99, expected_module = 88;
 static const char *expected_path = "wb0:/vitals/vitals.suprx";
 static int injection_result;
@@ -43,19 +43,6 @@ int vitals_kernel_inject_browser_for_pid(SceUID pid, SceUID module, const char *
     return injection_result;
 }
 
-int vitals_reauth_inject(SceUID pid) {
-    assert(!locked && pid == expected_pid);
-    ++reauths;
-    return -91;
-}
-
-int vitals_kernel_inject_for_pid(SceUID pid, SceUID module) {
-    assert(!locked && pid == expected_pid && module == expected_module);
-    ++http_injections;
-    assert(vitals_post_start_complete(pid, module, 0) == 0);
-    return injection_result;
-}
-
 int main(void) {
     assert(vitals_post_start_complete(0, 88, 0) == 0 && locks == 0 && pid_queries == 0);
     assert(vitals_post_start_defer(99, 88, expected_path) < 0);
@@ -89,18 +76,12 @@ int main(void) {
     assert(vitals_post_start_complete(99, 88, 0) < 0 && injections == 1);
     lock_failure = 0;
     assert(vitals_post_start_complete(99, 88, 0) == 0 && injections == 2);
-    assert(vitals_post_start_defer_http(99, 88) == 0 && http_injections == 0);
-    assert(vitals_post_start_defer_http(99, 88) == 1);
-    assert(vitals_post_start_defer(99, 88, expected_path) < 0);
-    assert(vitals_post_start_complete(99, 88, -73) == -73 && http_injections == 0);
-    assert(vitals_post_start_defer_http(99, 88) == 0);
-    assert(vitals_post_start_complete(99, 88, 0) == 0 && http_injections == 1);
-    assert(vitals_post_start_complete(99, 88, 0) == 0 && http_injections == 1);
-    injection_result = -81;
-    assert(vitals_post_start_defer_http(99, 88) == 0);
-    assert(vitals_post_start_complete(99, 88, 0) == -81 && http_injections == 2);
+    /* A failed start injects nothing; the injection's own result is returned */
     assert(vitals_post_start_defer(99, 88, expected_path) == 0);
-    assert(vitals_post_start_complete(99, 88, 0) == -81);
+    assert(vitals_post_start_complete(99, 88, -73) == -73 && injections == 2);
+    injection_result = -81;
+    assert(vitals_post_start_defer(99, 88, expected_path) == 0);
+    assert(vitals_post_start_complete(99, 88, 0) == -81 && injections == 3);
     assert(vitals_post_start_defer(0, 88, expected_path) < 0);
     assert(vitals_post_start_defer(99, 0, expected_path) < 0);
     assert(vitals_post_start_defer(99, 88, NULL) < 0);
@@ -108,35 +89,12 @@ int main(void) {
     memset(path, 'x', sizeof(path));
     assert(vitals_post_start_defer(99, 88, path) < 0);
 
-    /* A redirect alone: injected after start, with its own result */
-    injection_result = 0;
-    unsigned int before_http = http_injections, before_browser = injections;
-    assert(vitals_post_start_defer_reauth(99, 88) == 0);
-    assert(vitals_post_start_defer_reauth(99, 88) == 1);
-    assert(vitals_post_start_complete(99, 88, -73) == -73 && reauths == 0);
-    assert(vitals_post_start_defer_reauth(99, 88) == 0);
-    assert(vitals_post_start_complete(99, 88, 0) == -91 && reauths == 1);
-    assert(http_injections == before_http && injections == before_browser);
-    /* Combined with the provider injection of the same module, in either order; the provider's
-     * result is the one returned */
-    assert(vitals_post_start_defer_http(99, 88) == 0);
-    assert(vitals_post_start_defer_reauth(99, 88) == 0);
-    assert(vitals_post_start_complete(99, 88, 0) == 0 && reauths == 2 && http_injections == before_http + 1);
-    assert(vitals_post_start_defer_reauth(99, 88) == 0);
-    assert(vitals_post_start_defer_http(99, 88) == 0);
-    assert(vitals_post_start_defer(99, 88, expected_path) < 0);
-    assert(vitals_post_start_complete(99, 88, 0) == 0 && reauths == 3 && http_injections == before_http + 2);
-    assert(vitals_post_start_defer_reauth(99, 88) == 0);
-    assert(vitals_post_start_defer(99, 88, expected_path) == 0);
-    assert(vitals_post_start_complete(99, 88, 0) == 0 && reauths == 4 && injections == before_browser + 1);
-    assert(vitals_post_start_complete(99, 88, 0) == 0 && reauths == 4);
-    assert(vitals_post_start_defer_reauth(0, 88) < 0 && vitals_post_start_defer_reauth(99, 0) < 0);
     delete_failure = 1;
     assert(vitals_post_start_destroy() == -62 && mutex_live);
     delete_failure = 0;
     assert(vitals_post_start_destroy() == 0 && !mutex_live);
     assert(vitals_post_start_init() == 0 && vitals_post_start_destroy() == 0);
-    assert(vitals_post_start_defer_reauth(99, 88) < 0);
+    assert(vitals_post_start_defer(99, 88, expected_path) < 0);
     puts("post-start queue: native completion precedes injection; ownership, bounds, cleanup and reentry PASS");
     return 0;
 }

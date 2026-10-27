@@ -9,13 +9,10 @@
 
 #include <taihen.h>
 
-static const uint8_t http_hash[32] = {
-    0x42,0xbc,0x7e,0x34,0x07,0x79,0x64,0xac,0x7e,0xdc,0x43,0x65,0xab,0xad,0x8a,0xf9,
-    0xbf,0x41,0x79,0x3a,0x34,0xd2,0xc7,0xef,0xd6,0x31,0x97,0x6f,0x7d,0x27,0x39,0xc1};
 static const uint8_t compat_hash[32] = {
     0x73,0x88,0x62,0x13,0x38,0x19,0xfc,0x37,0xbc,0x21,0xf7,0x14,0xda,0x7c,0xa7,0x6c,
     0x72,0xd7,0x3a,0x62,0x0a,0xfa,0xfb,0xe6,0xa9,0x40,0xd8,0x7d,0xd4,0xe6,0xdc,0x58};
-static int browser_file = 1, http_file = 1, corrupt_browser, corrupt_http;
+static int browser_file = 1, corrupt_browser;
 static int read_once[2], locked, mutex_live, loads, unloads;
 static int load_error, start_error, reenter, close_error;
 static int target_info_error, target_user_id = 188;
@@ -42,12 +39,6 @@ static int argument_live, argument_alloc_fail, argument_base_fail, argument_null
 static int argument_copy_fail, argument_readback_fail, argument_corrupt, argument_free_fail;
 static unsigned int argument_allocations, argument_frees, argument_copies;
 static SceUID argument_current_pid = 99;
-static const char *process_title = "TLSFIXAPP";
-static int process_title_error;
-static unsigned int process_title_queries;
-static SceUID shell_pid = 77;
-static int main_shared;
-static unsigned int main_shared_queries;
 
 static void expect_hash_stage(const char *stage) { (void)stage; }
 
@@ -165,7 +156,7 @@ int ksceIoGetstat(const char *path, SceIoStat *status) {
     }
     if (runtime_namespace_required && query_live && strstr(path, "/" VITALS_BROWSER_PROVIDER_FILENAME))
         return (int32_t)UINT32_C(0x80010002);
-    return (strstr(path, "/" VITALS_BROWSER_PROVIDER_FILENAME) ? browser_file : http_file) ? 0 : -1;
+    return browser_file ? 0 : -1;
 }
 int ksceIoOpen(const char *path, int flags, int mode) {
     int index = strstr(path, "ScePsp2Compat") != NULL;
@@ -237,8 +228,10 @@ int ksceSha256BlockUpdate(SceSha256Context *context, const void *data, SceSize s
 int ksceSha256BlockResult(SceSha256Context *context, uint8_t *digest) {
     expect_hash_stage("hash.finish.enter");
     require_workspace(context, sizeof(*context));
-    memcpy(digest, context->kind ? compat_hash : http_hash, 32);
-    if (context->kind ? corrupt_browser : corrupt_http) digest[0] ^= 1;
+    /* Only vitals' ScePsp2Compat is hashed (stream byte 1) */
+    assert(context->kind == 1);
+    memcpy(digest, compat_hash, 32);
+    if (corrupt_browser) digest[0] ^= 1;
     return 0;
 }
 int timingsafe_memcmp(const void *left, const void *right, size_t size) {
@@ -246,20 +239,6 @@ int timingsafe_memcmp(const void *left, const void *right, size_t size) {
     return memcmp(left, right, size);
 }
 SceUID ksceKernelGetProcessId(void) { return argument_current_pid; }
-SceUID ksceKernelSysrootGetShellPid(void) { return shell_pid; }
-int vitals_native_http_shared_consumer(SceUID pid, VitalsNativeHttpConsumer *consumer) {
-    assert(pid == 99 && !locked);
-    if (consumer != NULL) memset(consumer, 0, sizeof(*consumer));
-    ++main_shared_queries;
-    return main_shared;
-}
-int ksceKernelSysrootGetProcessTitleId(SceUID pid, char *title, SceSize size) {
-    assert(pid == 99 && size == 16 && !locked);
-    ++process_title_queries;
-    if (process_title_error < 0) return process_title_error;
-    memcpy(title, process_title, strlen(process_title) + 1);
-    return 0;
-}
 int ksceKernelCopyToUserProc(SceUID pid, void *destination, const void *source, SceSize size) {
     assert(pid == 99 && argument_live && destination == argument_memory && source != destination);
     assert(size == sizeof(VitalsStartArgs) && !locked && query_live);
@@ -299,28 +278,18 @@ int ksceKernelGetModuleInfo(SceUID pid, SceUID id, SceKernelModuleInfo *info) {
     if (target_info_error) return -1;
     info->modid = target_user_id;
     info->segments[0].vaddr = (void *)(uintptr_t)0x81000000;
-    strcpy(info->module_name, target_wrong_name ? "unexpected" :
-        (strstr(expected_path, "/" VITALS_BROWSER_PROVIDER_FILENAME) ? "ScePsp2Compat" : "SceLibHttp"));
+    strcpy(info->module_name, target_wrong_name ? "unexpected" : "ScePsp2Compat");
     return 0;
-}
-static int http_shared_result;
-int ksceKernelGetModuleIsSharedByAddr(SceUID pid, void *address) {
-    assert(pid == 99 && address == (void *)(uintptr_t)0x81000000 && !locked);
-    return http_shared_result;
 }
 SceUID ksceKernelLoadStartModuleForPid(SceUID pid, const char *path, SceSize size, const void *data,
     int flags, const void *options, int *status) {
     const VitalsBrowserStartArgs *args = data;
     assert(pid == 99 && size == sizeof(*args) && options == NULL && !locked);
     assert(argument_live && data == argument_memory);
-    int browser_provider = strstr(path, "/" VITALS_BROWSER_PROVIDER_FILENAME) != NULL;
-    const char *expected_file = browser_provider
-        ? VITALS_BROWSER_PROVIDER_BOOT_PATH : expected_path;
     assert(flags == 0);
     assert(args->compat_modid == 188 && args->reserved == 0);
-    assert(args->version == 1 && strcmp(path, expected_file) == 0);
-    if (browser_provider) assert(args->magic == VITALS_BROWSER_START_MAGIC);
-    else assert(args->magic == VITALS_START_MAGIC);
+    assert(args->version == 1 && strcmp(path, VITALS_BROWSER_PROVIDER_BOOT_PATH) == 0);
+    assert(args->magic == VITALS_BROWSER_START_MAGIC);
     ++loads;
     if (reenter) {
         assert(vitals_kernel_inject_browser_for_pid(pid, 88, expected_path) == 1);
@@ -342,17 +311,11 @@ static void reset(void) {
     assert(!query_live && query_allocations == query_frees);
     stream_blocks = 1;
     loads = unloads = 0;
-    process_title = "TLSFIXAPP";
-    process_title_error = 0;
-    process_title_queries = 0;
-    shell_pid = 77;
-    main_shared = 0;
-    main_shared_queries = 0;
-    load_error = start_error = reenter = corrupt_browser = corrupt_http = close_error = 0;
+    load_error = start_error = reenter = corrupt_browser = close_error = 0;
     target_info_error = 0;
     target_wrong_name = 0;
     target_user_id = 188;
-    browser_file = http_file = 1;
+    browser_file = 1;
     expected_path = "wb0:/vitals/" VITALS_BROWSER_PROVIDER_FILENAME;
     expected_module_path = "wb0:/vitals/ScePsp2Compat.suprx";
     runtime_namespace_required = namespace_provider_error = namespace_hash_error = 0;
@@ -415,9 +378,8 @@ static void test_extended_stack_contract(void) {
 /* Failure paths the loader must survive, run by the production test */
 static void test_loader_failure_paths(void) {
     reset();
-    http_file = 0;
     assert(vitals_kernel_loader_init() == 0);
-    assert(!vitals_kernel_loader_ready() && vitals_kernel_browser_loader_ready());
+    assert(vitals_kernel_browser_loader_ready());
     reenter = 1;
     assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) == 0 && loads == 1);
     reenter = 0;

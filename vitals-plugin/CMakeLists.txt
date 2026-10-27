@@ -5,11 +5,6 @@ set(CMAKE_C_COMPILER "arm-vita-eabi-gcc")
 set(CMAKE_CXX_COMPILER "arm-vita-eabi-g++")
 
 project(HENkaku)
-set(VITALS_HTTP_PROVIDER_PATH "vs0:/data/external/vitals/native/vitals_http.suprx"
-    CACHE STRING "Where the kernel plugin loads the HTTP provider from")
-if(NOT VITALS_HTTP_PROVIDER_PATH MATCHES "^(vs0|ux0|ur0):/[A-Za-z0-9_./-]+$")
-    message(FATAL_ERROR "HTTP provider requires an absolute vs0, ux0 or ur0 path")
-endif()
 
 set(CMAKE_C_FLAGS "-Wl,-q -Wall -Wextra -Werror -O3 -std=gnu11 -mgeneral-regs-only")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
@@ -28,7 +23,6 @@ add_executable(vitals.elf
 	native_module_api.c
 	hook_guard.c
 	post_start.c
-	reauth.c
 	redirects.c
 	dns_watch.c
 	dns_message.c
@@ -39,7 +33,6 @@ add_executable(vitals.elf
 )
 set(VITALS_DEBUG 0 CACHE STRING "Debug output: 0, 1 or 2 (1 and up log every DNS query)")
 target_compile_definitions(vitals.elf PRIVATE
-	VITALS_HTTP_PROVIDER_PATH="${VITALS_HTTP_PROVIDER_PATH}"
 	VITALS_DEBUG=${VITALS_DEBUG}
 )
 target_link_libraries(vitals.elf
@@ -67,7 +60,7 @@ add_custom_target(vitals.skprx ALL
 	COMMAND vita-elf-create -e ${CMAKE_CURRENT_BINARY_DIR}/vitals.yml vitals.elf vitals.velf
 	COMMAND vita-make-fself -c vitals.velf vitals.skprx
 )
-# The user stub for the plugin's system call, which the HTTP provider links (../tls13-vita)
+# The user stub for the plugin's system calls, which vitals-http links (../vitals-http)
 add_custom_target(vitals_stubs ALL
 	COMMAND vita-elf-export kernel vitals.elf ${CMAKE_CURRENT_BINARY_DIR}/vitals.yml vitals_exports.yml
 	COMMAND vita-libs-gen vitals_exports.yml stubs

@@ -4,7 +4,7 @@ These notices cover the third-party software and data in vitals. The app's VPK i
 
 ## Mbed TLS and TF-PSA-Crypto
 
-`vitals_http.suprx` and `vitals.suprx` statically link `libmbedtls.a`, `libmbedx509.a` and `libtfpsacrypto.a`. They are built from the official Mbed TLS source release (currently 4.2.0, which bundles TF-PSA-Crypto 1.2.0), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. The sources are not modified; vitals only adds configuration headers and a Vita platform adapter. This distribution selects the Apache License 2.0 offered by those projects; the license texts are `licenses/Mbed-TLS-LICENSE.txt` and `licenses/TF-PSA-Crypto-LICENSE.txt`.
+`vitals.suprx` (the browser provider) statically links `libmbedtls.a`, `libmbedx509.a` and `libtfpsacrypto.a`. They are built from the official Mbed TLS source release (currently 4.2.0, which bundles TF-PSA-Crypto 1.2.0), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. The sources are not modified; vitals only adds configuration headers and a Vita platform adapter. This distribution selects the Apache License 2.0 offered by those projects; the license texts are `licenses/Mbed-TLS-LICENSE.txt` and `licenses/TF-PSA-Crypto-LICENSE.txt`.
 
 The Mbed TLS source release also bundles optional third-party code (Project Everest/HACL\* Curve25519, p256-m and mldsa-native). vitals' configuration does not enable any of it, so none of that code is in the modules.
 
@@ -26,4 +26,4 @@ The app statically links libcurl (currently 8.17.0), built from the unmodified o
 
 ## Sony material
 
-The Sony certificate bundle (`sony-certs.pem`) and the Sony system modules shipped in `vitals-app/assets/` (`compat.suprx`, `lhttp.suprx`, `lssl.suprx`) are Sony material. They are not covered by any of the licenses above. When merging certificates, the app keeps the selected certificates and removes duplicates; it does not import the console's existing trust store.
+The Sony certificate bundle (`sony-certs.pem`) and the Sony system modules shipped in `vitals-app/assets/` (`compat.suprx`, `lssl.suprx`) are Sony material. They are not covered by any of the licenses above. When merging certificates, the app keeps the selected certificates and removes duplicates; it does not import the console's existing trust store.

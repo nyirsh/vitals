@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(vitals C)
 
 option(VITALS_BUILD_HOST_TESTS "Build host unit tests" OFF)
-option(VITALS_BUILD_VITA_PROVIDER "Build the Vita user provider" OFF)
+option(VITALS_BUILD_VITA_PROVIDER "Build the browser's Vita provider" OFF)
 option(VITALS_BUILD_TRANSPORT_TESTS "Build host tests with the real TLS engine" OFF)
 # A few tests place memory at fixed low addresses (the Vita's 32-bit pointers), which only Linux
 # allows; elsewhere they are left out
@@ -42,7 +42,6 @@ add_library(vitals_core STATIC
     src/path.c
     src/redirect_list.c
     src/registry.c
-    src/x509_names.c
 )
 
 target_include_directories(vitals_core
@@ -82,10 +81,6 @@ if(VITALS_BUILD_HOST_TESTS)
     )
 
     add_test(NAME vitals_core COMMAND vitals_tests)
-    add_executable(vitals_x509_name_tests tests/test_x509_names.c)
-    target_link_libraries(vitals_x509_name_tests PRIVATE vitals_core)
-    target_compile_options(vitals_x509_name_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
-    add_test(NAME vitals_x509_names COMMAND vitals_x509_name_tests)
     add_executable(vitals_registry_lifetime_tests tests/test_registry_lifetime.c)
     target_link_libraries(vitals_registry_lifetime_tests PRIVATE vitals_core)
     target_compile_options(vitals_registry_lifetime_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
@@ -108,11 +103,6 @@ if(VITALS_BUILD_HOST_TESTS)
     target_compile_options(vitals_host_map_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
     add_test(NAME vitals_host_map COMMAND vitals_host_map_tests)
     # The provider's redirect hooks, with portable stand-ins for the Vita file functions and taiHEN
-    add_executable(vitals_host_redirect_tests tests/redirect/test_host_redirect.c)
-    target_include_directories(vitals_host_redirect_tests PRIVATE tests/redirect/include provider)
-    target_link_libraries(vitals_host_redirect_tests PRIVATE vitals_core)
-    target_compile_options(vitals_host_redirect_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
-    add_test(NAME vitals_host_redirect COMMAND vitals_host_redirect_tests)
     add_subdirectory(tests/runtime)
 endif()
 
@@ -131,6 +121,5 @@ if(VITALS_BUILD_VITA_PROVIDER)
     if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
         message(FATAL_ERROR "VITALS_BUILD_VITA_PROVIDER requires the VitaSDK toolchain")
     endif()
-    add_subdirectory(provider)
     add_subdirectory(browser)
 endif()

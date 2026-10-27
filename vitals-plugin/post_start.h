@@ -9,9 +9,6 @@
 int vitals_post_start_init(void);
 int vitals_post_start_destroy(void);
 int vitals_post_start_defer(SceUID pid, SceUID module, const char *path);
-int vitals_post_start_defer_http(SceUID pid, SceUID module);
-/* Also loads the PSN redirect module once the module has started; combines with the others */
-int vitals_post_start_defer_reauth(SceUID pid, SceUID module);
 int vitals_post_start_complete(SceUID pid, SceUID module, int native_result);
 
 #endif

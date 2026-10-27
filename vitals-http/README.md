@@ -75,7 +75,7 @@ that ask for one; each connection parses its own copy. One that doesn't parse is
 
 ## Host redirects
 
-The pairs in `ux0:data/vitals/redirects.txt` (`from-host to-host` per line, as the HTTP provider
+The pairs in `ux0:data/vitals/redirects.txt` (`from-host to-host` per line, as earlier versions
 read them) are applied to the host a connection is made with: `sceHttpCreateConnection`'s host
 name, and the host in a URL passed to `sceHttpCreateConnectionWithURL`, `sceHttpCreateRequestWithURL`
 or `sceHttpCreateRequest2WithURL`. Games can't open `ux0:data`, so the list is read through the

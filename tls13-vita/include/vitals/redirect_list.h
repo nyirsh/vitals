@@ -5,7 +5,7 @@
 #include "vitals/redirects.h"
 
 /* Reading the host redirect list one line at a time, in pieces of VITALS_REDIRECTS_CHUNK bytes,
- * so its size does not matter; shared by the HTTP provider and vitals-reauth */
+ * so its size does not matter; shared by vitals-http and the kernel plugin's DNS rules */
 
 /* Longer than any valid pair (two 253-character names and a space between them) */
 #define VITALS_REDIRECT_LIST_LINE_LIMIT 512u

@@ -1,10 +1,8 @@
-# Builds the TLS providers: vitals_http.suprx (system HTTP) and vitals.suprx (browser)
+# Builds the browser's TLS provider, vitals.suprx (apps and games use vitals-http, ../vitals-http)
 # Everything is built in build/ at the repository root
 BUILD_DIR := $(abspath ../build)
 VITA_TOOLCHAIN = $(VITASDK)/share/vita.toolchain.cmake
 
-# Provider heap (KiB) per injected process
-HTTP_HEAP_KIB ?= 128
 # Debug output on the Vita's debug console: 0 none, 1 summaries and failures, 2 everything
 # Each level builds in its own folder (tls13-vita, tls13-vita-debug1, tls13-vita-debug2), as the
 # app carries all three
@@ -18,8 +16,6 @@ all:
 	cmake -Wno-deprecated -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DVITALS_BUILD_VITA_PROVIDER=ON \
 		-DVITALS_DEBUG=$(DEBUG) \
-		-DVITALS_HTTP_HEAP_KIB=$(HTTP_HEAP_KIB) \
-		-DVITALS_HTTP_CA_PATH=vs0:/data/external/cert/CA_LIST.cer \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DCMAKE_TOOLCHAIN_FILE=$(VITA_TOOLCHAIN)
 	cmake --build $(OUT_DIR)

@@ -59,7 +59,7 @@ enum
     MODULE_LIBSSL,
     MODULE_OLD_HTTP_PROVIDER,
     MODULE_BROWSER_PROVIDER,
-    MODULE_REAUTH,
+    MODULE_OLD_REAUTH,
 };
 
 static const char *const new_modules[] = {
@@ -70,7 +70,8 @@ static const char *const new_modules[] = {
     /* The HTTP provider earlier versions injected into Sony's libhttp; vitals-http replaces both */
     [MODULE_OLD_HTTP_PROVIDER] = "vs0:/data/external/vitals/native/vitals_http.suprx",
     [MODULE_BROWSER_PROVIDER] = "vs0:/data/external/vitals/native/vitals.suprx",
-    [MODULE_REAUTH] = "vs0:/data/external/vitals/native/vitals-reauth.suprx",
+    /* The PSN redirect earlier versions injected; vitals-http applies redirects.txt itself */
+    [MODULE_OLD_REAUTH] = "vs0:/data/external/vitals/native/vitals-reauth.suprx",
 };
 
 static int path_exists(const char *path)
@@ -887,7 +888,7 @@ static int install_http_modules(int requested_state)
         result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
         if (result >= 0)
         {
-            result = remove_if_exists(new_modules[MODULE_REAUTH]);
+            result = remove_if_exists(new_modules[MODULE_OLD_REAUTH]);
         }
         if (result >= 0)
         {
@@ -907,13 +908,10 @@ static int install_http_modules(int requested_state)
             if (result < 0)
                 return result;
         }
-        /* Earlier versions' provider: the kernel plugin would inject it into vitals-http */
+        /* Earlier versions' provider and PSN redirect, which vitals-http replaces */
         result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
-        /* Sends PSN sign-in and the Store to their new host */
         if (result >= 0)
-        {
-            result = replace_file("app0:vitals-reauth.suprx", new_modules[MODULE_REAUTH]);
-        }
+            result = remove_if_exists(new_modules[MODULE_OLD_REAUTH]);
         if (result >= 0)
         {
             result = replace_file("app0:libhttp.suprx", new_modules[MODULE_LIBHTTP]);
@@ -1071,7 +1069,7 @@ int vitals_install_detect(void)
            path_exists(new_modules[MODULE_COMPAT]) && path_exists(new_modules[MODULE_BROWSER_PROVIDER]) &&
            path_exists(browser_provider_global) && path_exists(new_modules[MODULE_LIBHTTP]) &&
            path_exists(new_modules[MODULE_LIBSSL]) && !path_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]) &&
-           path_exists(new_modules[MODULE_REAUTH]) &&
+           !path_exists(new_modules[MODULE_OLD_REAUTH]) &&
            path_exists("vs0:/data/external/cert/CA_LIST.cer_old");
 }
 
@@ -1102,14 +1100,12 @@ enum
 {
     DEBUG_LIBHTTP,
     DEBUG_BROWSER_PROVIDER,
-    DEBUG_REAUTH,
     DEBUG_PLUGIN,
     DEBUG_MODULE_COUNT
 };
 static const char *const debug_files[DEBUG_MODULE_COUNT] = {
     [DEBUG_LIBHTTP] = "libhttp.suprx",
     [DEBUG_BROWSER_PROVIDER] = "vitals.suprx",
-    [DEBUG_REAUTH] = "vitals-reauth.suprx",
     [DEBUG_PLUGIN] = "vitals.skprx",
 };
 
@@ -1177,11 +1173,6 @@ int vitals_install_set_debug_level(int level, VitalsInstallNote note)
         result = replace_file(source, browser_provider_global);
         if (result >= 0)
             result = replace_file(source, new_modules[MODULE_BROWSER_PROVIDER]);
-    }
-    if (result >= 0)
-    {
-        debug_source(level, DEBUG_REAUTH, source, sizeof(source));
-        result = replace_file(source, new_modules[MODULE_REAUTH]);
     }
     /* The kernel plugin's own debug output (every DNS query); it is loaded at boot, so this one
      * applies after a reboot */

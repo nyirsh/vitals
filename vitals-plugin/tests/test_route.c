@@ -20,11 +20,7 @@ static int stat_result;
 static int loader_initializations, loader_destructions;
 static int hook_validation_result, hook_installations;
 static int start_install_error, load_install_error;
-static int http_process_allowed = 1;
 static int mutex_live, mutex_locked;
-static int reauth_wanted, reauth_injections, reauth_is_libhttp;
-static SceUID reauth_pid;
-static char reauth_path[256];
 static TestStartFunction installed_start;
 static TestLoadFunction installed_load;
 
@@ -44,33 +40,14 @@ int vitals_validate_loader_hook(SceUID module) {
 }
 int vitals_kernel_loader_init(void) { ++loader_initializations; return 0; }
 void vitals_kernel_loader_destroy(void) { ++loader_destructions; }
-int vitals_kernel_loader_ready(void) { return 1; }
-int vitals_kernel_http_process_allowed(SceUID pid) { return pid > 0 && http_process_allowed; }
 int vitals_kernel_browser_loader_ready(void) { return 1; }
-int vitals_kernel_inject_for_pid(SceUID pid, SceUID module) {
+int vitals_kernel_inject_browser_for_pid(SceUID pid, SceUID module, const char *path) {
     /* Injection only follows a completed native start */
     assert(module == 88 && native_starts > 0 && !mutex_locked);
+    strcpy(provider_path, path);
     injected_pid = pid;
     ++injections;
     return 0;
-}
-int vitals_reauth_init(void) { return 1; }
-void vitals_reauth_destroy(void) {}
-int vitals_reauth_wanted(SceUID pid, const char *path, int is_libhttp) {
-    reauth_pid = pid;
-    reauth_is_libhttp = is_libhttp;
-    strcpy(reauth_path, path);
-    return reauth_wanted;
-}
-int vitals_reauth_inject(SceUID pid) {
-    /* Like the providers, the reAuth injection follows a completed native start */
-    assert(native_starts > 0 && !mutex_locked && pid == reauth_pid);
-    ++reauth_injections;
-    return 0;
-}
-int vitals_kernel_inject_browser_for_pid(SceUID pid, SceUID module, const char *path) {
-    strcpy(provider_path, path);
-    return vitals_kernel_inject_for_pid(pid, module);
 }
 SceUID ksceKernelCreateMutex(const char *name, unsigned int attr, int count, const void *options) {
     assert(name != NULL && attr == 0 && count == 0 && options == NULL && !mutex_live);
@@ -143,11 +120,7 @@ static void reset(void) {
     seen_flags = 0;
     injections = native_starts = 0;
     load_result = 88;
-    http_process_allowed = 1;
     selected_path[0] = provider_path[0] = '\0';
-    reauth_wanted = reauth_injections = reauth_is_libhttp = 0;
-    reauth_pid = -1;
-    reauth_path[0] = '\0';
 }
 static int finish_start(SceUID pid) {
     int status = -999;
@@ -229,48 +202,14 @@ static void test_routes(void) {
     puts("kernel module route: redirection and post-start injection for current and explicit PIDs PASS");
 }
 
-static void test_reauth_routes(void) {
-    /* The decision sees the path the process asked for, not the replacement */
-    reset();
-    current_pid = 50;
-    reauth_wanted = 1;
-    http_process_allowed = 0;
-    assert(installed_load(0, "vs0:sys/external/libhttp.suprx", 0, NULL) == 88);
-    assert(reauth_pid == 50 && reauth_is_libhttp == 1);
-    assert(strcmp(reauth_path, "vs0:sys/external/libhttp.suprx") == 0);
-    assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
-    assert(reauth_injections == 0);
-    assert(finish_start(0) == 0 && reauth_injections == 1);
-
-    reset();
-    reauth_wanted = 1;
-    assert(installed_load(0, "vs0:sys/external/np_commerce2.suprx", 0, NULL) == 88);
-    assert(reauth_pid == 99 && reauth_is_libhttp == 0);
-    assert(finish_start(0) == 0 && reauth_injections == 1 && injections == 0);
-
-    reset();
-    reauth_wanted = 1;
-    load_result = -5;
-    assert(installed_load(0, "vs0:sys/external/np_commerce2.suprx", 0, NULL) == -5);
-    assert(finish_start(0) == 0 && reauth_injections == 0);
-
-    reset();
-    assert(installed_load(0, "vs0:sys/external/np_commerce2.suprx", 0, NULL) == 88);
-    assert(finish_start(0) == 0 && reauth_injections == 0);
-    puts("PSN redirect route: shell libhttp and Store loads queue the redirect after start PASS");
-}
-
 static void test_shared_flags(void) {
     const char *paths[] = {"vs0:sys/external/libhttp.suprx", "vs0:sys/external/libssl.suprx",
         "wb0:/webcore/ScePsp2Compat.suprx"};
     for (unsigned i = 0; i < 3; ++i) {
-        for (int allowed = 0; allowed < 2; ++allowed) {
-            reset();
-            current_pid = 123;
-            http_process_allowed = allowed;
-            assert(installed_load(0, paths[i], 0x08008001, NULL) == 88);
-            assert(seen_flags == 0x08008001);
-        }
+        reset();
+        current_pid = 123;
+        assert(installed_load(0, paths[i], 0x08008001, NULL) == 88);
+        assert(seen_flags == 0x08008001);
     }
     puts("shared loads: every replacement keeps the loader's mapping flags PASS");
 }
@@ -282,7 +221,6 @@ int main(void) {
     assert(hook_installations == 2 && loader_initializations == 1 && mutex_live);
     assert(g_replace_iap && g_replace[MODULE_COMPAT]);
     test_routes();
-    test_reauth_routes();
     test_shared_flags();
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);
     return 0;

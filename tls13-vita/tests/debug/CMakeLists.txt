@@ -1,11 +1,8 @@
-# Every log line compiles: the provider and browser sources are built with debug output on (levels
+# Every log line compiles: the browser module's sources are built with debug output on (levels
 # 1 and 2), against stand-ins declared as in VitaSDK; a broken or mismatched log line fails the
 # test build. Only compiled, never run
 set(debug_sources
-    ../../provider/ca_file.c ../../provider/ca_index.c ../../provider/cert_hooks.c
-    ../../provider/host_redirect.c ../../provider/http_trace.c ../../provider/platform_shims.c
-    ../../provider/private_mapping.c ../../provider/provider.c ../../provider/transport.c
-    ../../provider/trust_store.c ../../provider/vita_net.c
+    ../../provider/ca_file.c ../../provider/ca_index.c ../../provider/platform_shims.c
     ../../browser/backend.c ../../browser/config.c ../../browser/module.c ../../browser/webkit_callback.c)
 foreach(level 1 2)
     add_library(vitals_debug_${level}_build OBJECT ${debug_sources})

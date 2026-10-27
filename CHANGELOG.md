@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5
+
+- Sony's HTTP library is replaced by vitals own full rewrite in every app, game and the system itself
+- Redirected hosts get a higher timeout, in case community servers are slow to answer
+- Added DNS resolution redirection
+- Added the ability to change User-Agent
+- Removed reauth, it is now redundant
+
 ## 1.4
 
 - Added this very same changelog!

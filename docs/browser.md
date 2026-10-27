@@ -2,8 +2,8 @@
 
 This document follows the two modules that give the browser modern TLS: vitals' copy of the
 browser engine's networking module (`ScePsp2Compat`, `compat.suprx`) and the browser provider
-(`vitals.suprx`). Its companions are [libhttp.md](libhttp.md) (the same idea for apps and games),
-[libssl.md](libssl.md) and [reauth.md](reauth.md).
+(`vitals.suprx`). Its companion is [libssl.md](libssl.md); apps and games use `vitals-http`, described
+in [vitals-http/README.md](../vitals-http/README.md).
 
 In one paragraph: the browser doesn't use libhttp; its engine does its networking through
 `ScePsp2Compat`, which carries its own libcurl. The kernel plugin swaps that module for vitals'
@@ -42,24 +42,24 @@ Everything lives until the process exits.
 
 ## 2. Boot: the kernel plugin gets ready
 
-The kernel plugin's `module_start` ([vitals-plugin/main.c:132](../vitals-plugin/main.c#L132)):
+The kernel plugin's `module_start` ([vitals-plugin/main.c](../vitals-plugin/main.c)):
 
-1. **The replacement exists** — `add_replace_flags` ([main.c:50](../vitals-plugin/main.c#L50)) sets
+1. **The replacement exists** — `add_replace_flags` ([main.c](../vitals-plugin/main.c)) sets
    `g_replace[MODULE_COMPAT]` when `vs0:/data/external/vitals/ScePsp2Compat.suprx` exists. It is
    independent of the libhttp and libssl pair.
 2. **Loader readiness** — `vitals_kernel_loader_init`
-   ([tls13_loader.c:271](../vitals-plugin/tls13_loader.c#L271)) runs `target_matches` for the
-   browser target ([tls13_loader.c:128-129](../vitals-plugin/tls13_loader.c#L128-L129)): the provider
+   ([tls13_loader.c](../vitals-plugin/tls13_loader.c)) runs `target_matches` for the
+   browser target ([tls13_loader.c](../vitals-plugin/tls13_loader.c)): the provider
    at `ur0:tai/vitals-native/vitals.suprx` must exist, and the replacement module's SHA-256 must
-   equal `g_expected_browser_sha256` ([tls13_loader.c:80](../vitals-plugin/tls13_loader.c#L80)).
-   Only then is `ready[1]` set (`browser=1` in `vitals: loader init=…`).
-3. **The module manager hooks**, as for libhttp ([libhttp.md](libhttp.md), section 2).
+   equal `g_expected_browser_sha256` ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
+   Only then is the loader ready (`browser=1` in `vitals: loader init=…`).
+3. **The module manager hooks**: the load and start hooks every replacement goes through.
 
 ## 3. A process asks for the browser engine: the load hook
 
-`load_for_pid_patched` ([main.c:67](../vitals-plugin/main.c#L67)) sees every load:
+`load_for_pid_patched` ([main.c](../vitals-plugin/main.c)) sees every load:
 
-1. **Path swap** ([main.c:89-94](../vitals-plugin/main.c#L89-L94)) —
+1. **Path swap** ([main.c](../vitals-plugin/main.c)) —
    `vitals_browser_replacement_path` ([path.c:67](../tls13-vita/src/path.c#L67)) matches any path
    ending in `webcore/ScePsp2Compat.suprx` right after a `/` or `:`, and keeps its prefix: for
    example `vs0:/data/external/webcore/ScePsp2Compat.suprx` becomes
@@ -67,44 +67,43 @@ The kernel plugin's `module_start` ([vitals-plugin/main.c:132](../vitals-plugin/
    whatever device name the process sees that folder under.
 2. **Flags left alone** — the load is shared or private as the process asked; there is no HTTP
    policy for the browser engine.
-3. **The real load** — `TAI_CONTINUE` ([main.c:103](../vitals-plugin/main.c#L103)).
-4. **Queue the injection** ([main.c:110-112](../vitals-plugin/main.c#L110-L112)): when `ready[1]` is
-   set, `vitals_browser_provider_path` ([path.c:74](../tls13-vita/src/path.c#L74)) works out
+3. **The real load** — `TAI_CONTINUE` ([main.c](../vitals-plugin/main.c)).
+4. **Queue the injection** ([main.c](../vitals-plugin/main.c)): when the loader is
+   ready, `vitals_browser_provider_path` ([path.c:74](../tls13-vita/src/path.c#L74)) works out
    `…/vitals/vitals.suprx` from the swapped path, and `vitals_post_start_defer(pid, module, path)`
-   ([post_start.c:104](../vitals-plugin/post_start.c#L104)) records it. That path only serves to find
+   ([post_start.c](../vitals-plugin/post_start.c)) records it. That path only serves to find
    the module again for its hash check (step 5.4); the provider itself is always loaded from `ur0:`.
 
 ## 4. Which processes
 
 Any process loading the engine from a `webcore` folder: the browser's WebKit process, and others
-that embed a web view. The HTTP provider's policy keeps the browser (`NPXS10003`) and its WebKit
-helper (`NPXS10083`) away from the HTTP provider ([libhttp.md](libhttp.md), section 3), so their
-TLS is this provider's alone.
+that embed a web view. Their HTTP library, like every process's, is `vitals-http`; the engine's own
+libcurl connections are this provider's.
 
 ## 5. The module has started: injecting the provider
 
-`start_for_pid_patched` ([main.c:119](../vitals-plugin/main.c#L119)) calls
-`vitals_post_start_complete` ([post_start.c:151](../vitals-plugin/post_start.c#L151)), which calls
-`vitals_kernel_inject_browser_for_pid` ([tls13_loader.c:581](../vitals-plugin/tls13_loader.c#L581))
-for the queued module. It goes through the same `inject_target`
-([tls13_loader.c:312](../vitals-plugin/tls13_loader.c#L312)) as the HTTP provider, as target 1:
+`start_for_pid_patched` ([main.c](../vitals-plugin/main.c)) calls
+`vitals_post_start_complete` ([post_start.c](../vitals-plugin/post_start.c)), which calls
+`vitals_kernel_inject_browser_for_pid` ([tls13_loader.c](../vitals-plugin/tls13_loader.c))
+for the queued module, through `inject_target`
+([tls13_loader.c](../vitals-plugin/tls13_loader.c)):
 
 1. **One injection per process at a time**, in a 4 KiB lookup workspace.
 2. **Not already there** — `ScePsp2Compat` must be found in the process, and the module `vitals`
-   must not be ([tls13_loader.c:373](../vitals-plugin/tls13_loader.c#L373)).
+   must not be ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
 3. **The provider to load** — always `ur0:tai/vitals-native/vitals.suprx`
-   ([tls13_loader.c:315-317](../vitals-plugin/tls13_loader.c#L315-L317)).
+   ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
 4. **The module's hash, in the process's own view** — the module path is worked back from the
    queued provider path (`vitals_browser_module_path`, [path.c:88](../tls13-vita/src/path.c#L88)) and
    hashed through the process's own file system view (`ksceIoOpenForPid`,
-   [tls13_loader.c:167](../vitals-plugin/tls13_loader.c#L167)), since that is the path the process
-   loaded it from ([tls13_loader.c:319](../vitals-plugin/tls13_loader.c#L319)).
+   [tls13_loader.c](../vitals-plugin/tls13_loader.c)), since that is the path the process
+   loaded it from ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
 5. **Still the right module** — the module ID handed over must be `ScePsp2Compat`.
 6. **Start arguments** — `VitalsBrowserStartArgs` (magic `0x42544C53`, version 1, the module's ID;
    [browser_abi.h:55](../tls13-vita/include/vitals/browser_abi.h#L55)) in a user memory block of
    that process.
 7. **Load and start** — `ksceKernelLoadStartModuleForPid`
-   ([tls13_loader.c:470](../vitals-plugin/tls13_loader.c#L470)); unloaded again if its start fails.
+   ([tls13_loader.c](../vitals-plugin/tls13_loader.c)); unloaded again if its start fails.
    Logged as `vitals: inject target=1 pid=… rc=…`.
 
 ## 6. The provider starts: checks and hooks
@@ -128,7 +127,7 @@ browser's process:
 5. **TLS state** — `vitals_browser_init` ([backend.c:124](../tls13-vita/browser/backend.c#L124)):
    crypto platform, PSA, mutexes and the connection registry. The certificate index is built later,
    on the first connection that needs it (`ensure_default_ca`, [backend.c:109](../tls13-vita/browser/backend.c#L109)).
-   Unlike the HTTP provider it has no heap block of its own: it allocates from the process's C
+   It has no heap block of its own: it allocates from the process's C
    library (it links `SceLibc`, [browser/CMakeLists.txt](../tls13-vita/browser/CMakeLists.txt)).
 6. **The four hooks** — by offset in `ScePsp2Compat` (`taiHookFunctionOffset`, Thumb;
    [module.c:147-161](../tls13-vita/browser/module.c#L147-L161)), on libcurl's TLS layer:
@@ -203,7 +202,7 @@ libcurl ─ close ─▶ close_notify, session removed
 |---|---|
 | [vitals-plugin/main.c](../vitals-plugin/main.c) | the load and start hooks, the module swap |
 | [tls13-vita/src/path.c](../tls13-vita/src/path.c) | the module, provider and certificate paths |
-| [vitals-plugin/tls13_loader.c](../vitals-plugin/tls13_loader.c) | hashes and injection (target 1) |
+| [vitals-plugin/tls13_loader.c](../vitals-plugin/tls13_loader.c) | hashes and injection |
 | [vitals-plugin/post_start.c](../vitals-plugin/post_start.c) | the queue between a load and its start |
 | [tls13-vita/include/vitals/browser_abi.h](../tls13-vita/include/vitals/browser_abi.h) | the engine's offsets and libcurl's structure fields |
 | [tls13-vita/browser/module.c](../tls13-vita/browser/module.c), [module_descriptor.h](../tls13-vita/browser/module_descriptor.h) | provider start, module checks, the four hooks |

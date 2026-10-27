@@ -6,25 +6,14 @@ static int target_name_result, provider_name_result = NAME_NOT_FOUND;
 static int target_name_uid = 188, provider_name_uid = 199;
 static int wrong_target_name, wrong_provider_name, missing_target_nul, missing_provider_nul;
 static unsigned int name_target_calls, name_provider_calls;
-static int libc_result, libc_uid = 177, wrong_libc_name;
-static unsigned int libc_queries;
 
 int taiGetModuleInfoForKernel(SceUID pid, const char *name, tai_module_info_t *info) {
     assert(pid == 99 && !locked && info->size == sizeof(*info));
     require_query_workspace(info, sizeof(*info));
     assert(info->modid == 0 && info->name[sizeof(info->name) - 1] == 0);
-    if (strcmp(name, "SceLibc") == 0) {
-        assert(strstr(expected_path, "/" VITALS_BROWSER_PROVIDER_FILENAME) == NULL);
-        ++libc_queries;
-        if (libc_result != 0) return libc_result;
-        info->modid = libc_uid;
-        strcpy(info->name, wrong_libc_name ? "wrong" : name);
-        return 0;
-    }
-    int target = strcmp(name, "SceLibHttp") == 0 || strcmp(name, "ScePsp2Compat") == 0;
-    int browser = strstr(expected_path, "/" VITALS_BROWSER_PROVIDER_FILENAME) != NULL;
-    assert(strcmp(name, target ? (browser ? "ScePsp2Compat" : "SceLibHttp")
-                              : (browser ? "vitals" : "vitals_http")) == 0);
+    /* The browser engine, then the provider */
+    int target = strcmp(name, "ScePsp2Compat") == 0;
+    assert(target || strcmp(name, "vitals") == 0);
     if (target) ++name_target_calls;
     else ++name_provider_calls;
     int result = target ? target_name_result : provider_name_result;

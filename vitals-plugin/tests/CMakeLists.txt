@@ -36,7 +36,6 @@ plugin_test(vitals_kernel_route test_route.c post_start.c)
 plugin_test(vitals_hook_guard test_hook_guard.c hook_guard.c)
 plugin_test(vitals_native_module_api test_native_module_api.c native_module_api.c)
 plugin_test(vitals_post_start test_post_start.c post_start.c)
-plugin_test(vitals_reauth test_reauth.c reauth.c)
 # DNS for every process: redirects for hosts on the list, and logging with debug output on
 plugin_test(vitals_dns_watch test_dns_watch.c dns_watch.c dns_message.c)
 # As the debug builds are, so the query log is tested too
