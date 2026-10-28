@@ -26,7 +26,6 @@ add_executable(vitals.elf
 	redirects.c
 	dns_watch.c
 	dns_message.c
-	diag.c
 	tls13_loader.c
 	../tls13-vita/src/path.c
 	../tls13-vita/src/host_map.c

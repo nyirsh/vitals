@@ -20,7 +20,6 @@
 #include "native_module_api.h"
 #include "post_start.h"
 #include "dns_watch.h"
-#include "diag.h"
 
 #define VITALS_MAX_MODULE_PATH ((size_t)0x400)
 
@@ -70,7 +69,6 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     char browser_path[VITALS_PENDING_BROWSER_PATH_SIZE];
     char browser_provider[VITALS_PENDING_BROWSER_PATH_SIZE];
     int module = -1;
-    const char *requested = path;
 
     if (g_replace_iap && (path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
                           path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)))
@@ -78,10 +76,6 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
         ksceDebugPrintf("vitals: libhttp load pid=0x%X flags=0x%08X path=%s\n", target_pid, flags, path);
         module = MODULE_LIBHTTP;
         path = g_replacement_modules[module];
-        /* Temporary diagnostic: Sony's libhttp for the Store, when its files are there */
-        const char *diag = vitals_diag_libhttp(target_pid);
-        if (diag != NULL)
-            path = diag;
     }
     else if (g_replace_iap && path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx"))
     {
@@ -100,7 +94,6 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     SceUID res = TAI_CONTINUE(SceUID, g_loader_hook_ref, pid, path, flags, ptr_to_four);
     if (res < 0)
         return res;
-    vitals_diag_loaded(target_pid, requested, res);
 
     /* Injection waits until the native start hook reports that linking finished */
     if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready() &&
@@ -115,7 +108,6 @@ static int start_for_pid_patched(SceUID pid, SceUID module, SceSize size,
     const SceUID target_pid = pid == 0 ? ksceKernelGetProcessId() : pid;
     int res = TAI_CONTINUE(int, g_start_hook_ref, pid, module, size, data, flags, options, status);
     (void)vitals_post_start_complete(target_pid, module, res);
-    vitals_diag_started(target_pid, module, res);
     return res;
 }
 
