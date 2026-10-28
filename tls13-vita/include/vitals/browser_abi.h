@@ -82,6 +82,8 @@ enum {
     VITALS_BROWSER_ECDSA_GCM256 = 8
 };
 
+/* The connection's host when it asks for no peer or no host verification; NULL otherwise */
+const char *vitals_browser_unverified_host(const void *connection);
 int vitals_browser_read_options(const void *connection, unsigned int socket_index,
     const char *browser_default_ciphers,
     VitalsBrowserContextCallbackValidator callback_validator,

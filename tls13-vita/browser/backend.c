@@ -27,6 +27,7 @@
 
 #define BROWSER_IO_CHUNK 1500
 #define BROWSER_POLL_SLICE_MS 50
+#define BROWSER_REJECTED_HOSTS 32
 
 enum BrowserState { BROWSER_INITIALIZING, BROWSER_HANDSHAKING, BROWSER_ACTIVE,
     BROWSER_EOF, BROWSER_FAILED };
@@ -68,6 +69,13 @@ static struct {
     VitalsRegistry registry;
     SceUID registry_mutex;
     SceUID attach_mutex;
+    /* Hosts whose certificate failed verification here, by hash, with the error each got. After
+     * such a failure the browser retries the host itself with verification off, and without a
+     * warning; those retries get the same error instead of Sony's TLS */
+    SceUID rejected_mutex;
+    uint64_t rejected_hosts[BROWSER_REJECTED_HOSTS];
+    int rejected_codes[BROWSER_REJECTED_HOSTS];
+    unsigned int rejected_next;
     /* The default store is not kept parsed: only an index of it, and each handshake parses the
      * roots it needs from the file (as the HTTP provider does) */
     VitalsCaIndex ca_index;
@@ -135,6 +143,7 @@ int vitals_browser_init(const VitalsBrowserOps *ops) {
     memset(&browser, 0, sizeof(browser));
     browser.registry_mutex = -1;
     browser.attach_mutex = -1;
+    browser.rejected_mutex = -1;
     browser.ops = *ops;
     result = vitals_crypto_platform_init();
     if (result != 0) return result;
@@ -149,7 +158,8 @@ int vitals_browser_init(const VitalsBrowserOps *ops) {
     if (result != 0) goto failed;
     browser.registry_mutex = sceKernelCreateMutex("vitals browser registry", 0, 0, NULL);
     browser.attach_mutex = sceKernelCreateMutex("vitals browser attach", 0, 0, NULL);
-    if (browser.registry_mutex < 0 || browser.attach_mutex < 0) {
+    browser.rejected_mutex = sceKernelCreateMutex("vitals browser rejected", 0, 0, NULL);
+    if (browser.registry_mutex < 0 || browser.attach_mutex < 0 || browser.rejected_mutex < 0) {
         result = VITALS_CURLE_OUT_OF_MEMORY;
         goto failed;
     }
@@ -159,6 +169,7 @@ int vitals_browser_init(const VitalsBrowserOps *ops) {
     return 0;
 
 failed:
+    if (browser.rejected_mutex >= 0) (void)sceKernelDeleteMutex(browser.rejected_mutex);
     if (browser.attach_mutex >= 0) (void)sceKernelDeleteMutex(browser.attach_mutex);
     if (browser.registry_mutex >= 0) (void)sceKernelDeleteMutex(browser.registry_mutex);
     vitals_ca_index_free(&browser.ca_index);
@@ -187,10 +198,50 @@ int vitals_browser_destroy(void) {
     mbedtls_entropy_free(&browser.entropy);
     mbedtls_psa_crypto_free();
     vitals_crypto_platform_free();
+    (void)sceKernelDeleteMutex(browser.rejected_mutex);
     (void)sceKernelDeleteMutex(browser.attach_mutex);
     (void)sceKernelDeleteMutex(browser.registry_mutex);
     memset(&browser, 0, sizeof(browser));
     return 0;
+}
+
+/* FNV-1a of the lowercased name; a collision can only refuse an unverified connection */
+static uint64_t host_hash(const char *hostname) {
+    uint64_t hash = UINT64_C(0xCBF29CE484222325);
+    for (const unsigned char *c = (const unsigned char *)hostname; *c != '\0'; ++c) {
+        hash ^= (uint64_t)(*c >= 'A' && *c <= 'Z' ? *c + ('a' - 'A') : *c);
+        hash *= UINT64_C(0x100000001B3);
+    }
+    return hash;
+}
+
+static void remember_rejected(const char *hostname, int code) {
+    uint64_t hash = host_hash(hostname);
+    size_t slot;
+    if (sceKernelLockMutex(browser.rejected_mutex, 1, NULL) < 0) return;
+    for (slot = 0; slot < BROWSER_REJECTED_HOSTS; ++slot) {
+        if (browser.rejected_codes[slot] != 0 && browser.rejected_hosts[slot] == hash) break;
+    }
+    if (slot == BROWSER_REJECTED_HOSTS) {
+        slot = browser.rejected_next;
+        browser.rejected_next = (browser.rejected_next + 1) % BROWSER_REJECTED_HOSTS;
+    }
+    browser.rejected_hosts[slot] = hash;
+    browser.rejected_codes[slot] = code;
+    (void)sceKernelUnlockMutex(browser.rejected_mutex, 1);
+}
+
+/* The error the host's certificate got here, or 0 */
+static int rejected_code(const char *hostname) {
+    uint64_t hash = host_hash(hostname);
+    int code = 0;
+    if (sceKernelLockMutex(browser.rejected_mutex, 1, NULL) < 0) return VITALS_CURLE_SSL_CONNECT_ERROR;
+    for (size_t slot = 0; slot < BROWSER_REJECTED_HOSTS && code == 0; ++slot) {
+        if (browser.rejected_codes[slot] != 0 && browser.rejected_hosts[slot] == hash)
+            code = browser.rejected_codes[slot];
+    }
+    (void)sceKernelUnlockMutex(browser.rejected_mutex, 1);
+    return code;
 }
 
 size_t vitals_browser_connection_count(void) {
@@ -339,6 +390,7 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
     VitalsBrowserOptions options;
     BrowserConnection *connection;
     size_t native_ssl = ssl_offset(index);
+    const char *unverified_host;
     int result;
 
     *handled = 0;
@@ -365,6 +417,12 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
         vitals_read_u32(native, native_ssl + VITALS_CURL_SSL_HANDLE_OFFSET) != 0 ||
         vitals_read_u32(native, native_ssl + VITALS_CURL_SSL_CONTEXT_OFFSET) != 0) {
         result = 0;
+        goto unlock;
+    }
+    unverified_host = vitals_browser_unverified_host(native);
+    if (unverified_host != NULL && (result = rejected_code(unverified_host)) != 0) {
+        VITALS_LOG("browser refused unverified retry: code=%d", result);
+        *handled = 1;
         goto unlock;
     }
     result = vitals_browser_read_options(native, (unsigned int)index, browser.ops.default_ciphers,
@@ -541,6 +599,8 @@ int vitals_browser_connect(void *native, int index, unsigned char nonblocking,
     }
 failed:
     VITALS_LOG("browser connect rejected: socket=%d code=%d", connection->socket, result);
+    if (result == VITALS_CURLE_SSL_CACERT || result == VITALS_CURLE_PEER_FAILED_VERIFICATION)
+        remember_rejected(connection->hostname, result);
     connection->state = BROWSER_FAILED;
     connection->error = result;
 finished:

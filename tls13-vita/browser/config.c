@@ -67,6 +67,20 @@ static int cipher_mask(const char *ciphers, const char *browser_default, uint32_
     return 0;
 }
 
+const char *vitals_browser_unverified_host(const void *connection) {
+    const uint8_t *easy;
+    const char *hostname;
+    size_t length;
+
+    if (connection == NULL) return NULL;
+    easy = (const uint8_t *)(uintptr_t)vitals_read_u32(connection, VITALS_CURL_EASY_OFFSET);
+    if (easy == NULL) return NULL;
+    if (easy[VITALS_CURL_VERIFY_PEER_OFFSET] != 0 && easy[VITALS_CURL_VERIFY_HOST_OFFSET] != 0) return NULL;
+    hostname = (const char *)(uintptr_t)vitals_read_u32(connection, VITALS_CURL_HOST_OFFSET);
+    length = bounded_length(hostname, 1024);
+    return length == 0 || length == SIZE_MAX ? NULL : hostname;
+}
+
 int vitals_browser_read_options(const void *connection, unsigned int socket_index,
     const char *browser_default_ciphers,
     VitalsBrowserContextCallbackValidator callback_validator,
@@ -99,6 +113,9 @@ int vitals_browser_read_options(const void *connection, unsigned int socket_inde
         uint32_t policy = (ctx_userdata == NULL ? 1u : 0u) |
             (callback_validator == NULL ? 2u : 0u) | (!verify_peer ? 4u : 0u) |
             (!verify_host ? 8u : 0u) | (ca_file != NULL ? 16u : 0u);
+        /* Which of the callback's conditions failed, to tell a retry with verification off apart */
+        VITALS_LOG("browser ctx callback: policy=0x%X peer=%u host=%u cafile=%u",
+            (unsigned int)policy, verify_peer, verify_host, ca_file != NULL ? 1u : 0u);
         if (policy != 0 || !callback_validator(ctx_callback, ctx_userdata)) {
             return legacy_configuration(VITALS_CURL_CTX_CALLBACK_OFFSET, 1);
         }

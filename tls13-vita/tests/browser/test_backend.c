@@ -222,6 +222,26 @@ int main(int argc, char **argv) {
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 20);
         if (strcmp(scenario, "sha1-expired") == 0)
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 10);
+        if (strcmp(scenario, "wrong-host") == 0 || strcmp(scenario, "expired") == 0) {
+            /* The browser's own retry, with verification off, gets the same error and never
+             * reaches Sony's TLS; other hosts still can */
+            const int rejected = result;
+            assert(vitals_browser_close(connection, index, &handled) == 0 && handled);
+            easy[VITALS_CURL_VERIFY_PEER_OFFSET] = 0;
+            easy[VITALS_CURL_VERIFY_HOST_OFFSET] = 0;
+            vitals_write_u32(easy, VITALS_CURL_CTX_CALLBACK_OFFSET, 1);
+            assert(vitals_browser_connect(connection, index, 1, &done, &handled) == rejected && handled);
+            vitals_write_u32(easy, VITALS_CURL_CTX_CALLBACK_OFFSET, 0);
+            assert(vitals_browser_connect(connection, index, 1, &done, &handled) == rejected && handled);
+            assert(vitals_browser_connection_count() == 0);
+            for (char *c = hostname; *c != '\0'; ++c) if (*c >= 'a' && *c <= 'z') *c -= 'a' - 'A';
+            assert(vitals_browser_connect(connection, index, 1, &done, &handled) == rejected && handled);
+            strcpy(hostname, "other.invalid");
+            vitals_write_u32(easy, VITALS_CURL_CTX_CALLBACK_OFFSET, 1);
+            assert(vitals_browser_connect(connection, index, 1, &done, &handled) == 0 && !handled);
+            assert(vitals_browser_connection_count() == 0);
+            goto cleanup;
+        }
         goto shutdown;
     }
     if (result != 0 || !done) {
