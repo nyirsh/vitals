@@ -153,11 +153,11 @@ A request that times out is tried again, up to 3 times in all, since slow server
 
 ## Why a separate project
 
-`vitals` started as a mashup of my URL redirector project and devnoname120's `tls_fixer`, and owes `tls_fixer` the hardest parts: running Mbed TLS inside Sony's HTTP stack, the providers and the injection. It's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
+`vitals` started as a mashup of my URL redirector project and devnoname120's `tls_fixer`, and owes `tls_fixer` the idea and the first hard parts: running Mbed TLS where Sony's TLS was, the browser provider and the injection. Since then the HTTP side has been rewritten from scratch (`vitals-http`), and it's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
 
 - **Different memory design.** `tls_fixer` gives every app its own private copy of Sony's HTTP and SSL libraries, which costs a game about 440 KiB on top of the provider. `vitals` keeps the SSL library shared and handles the certificates games load at the HTTP level instead, so games that were running out of memory (like Sound Shapes) now fit. The comments left in the code and in the specs made me feel like it was a deliberate choice from devnoname120 I was going against.
 - **Different scope.** `tls_fixer` supports several firmware versions, and keeps experimental, diagnostic and self-disarming code for testing on hardware. `vitals` targets firmware 3.60 and 3.65 only, with that code removed and a simpler kernel plugin modeled on `iTLS-Enso`.
-- **Features that don't exist upstream:** the configurable host redirects, the built-in PSN sign-in redirect, the redirect list read through the kernel for sandboxed games, and a single app for installing, updating certificates and testing.
+- **Features that don't exist upstream:** `vitals-http` in place of Sony's HTTP library, the configurable host redirects, the DNS rules, the custom User-Agent, the built-in PSN sign-in redirect, the redirect list read through the kernel for sandboxed games, and a single app for installing, updating certificates and testing.
 - **They replace each other.** Both take over the same system modules and use different install paths, so only one can be installed at a time. The `vitals` installer removes `tls_fixer` for that reason.
 
 Merging would mean asking `tls_fixer` to give up its multi-firmware and goals, or `vitals` to bring back what it removed. Keeping them apart lets each follow its own direction.
@@ -226,7 +226,7 @@ This runs every component's host tests (`make -C <folder> test` runs one compone
 - `vitals-plugin/tests/`: the kernel plugin's routing, injection and module checks, against mocks of the Vita kernel, and the build check that keeps floating-point instructions out of it
 - `tls13-vita/tests/`: the browser provider's real TLS handshakes over loopback, certificate checks, memory use, the host redirect list's parser, the Makefile's settings, and a build with debug output on, so every log line compiles
 - `vitals-http/tests/`: the HTTP library against a local HTTP and HTTPS server: requests, keep-alive, bodies, redirects, cookies, Basic and Digest auth, HTTPS (including client certificates and the console's TLS profile), non-blocking calls, host redirects and the User-Agent
-- `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing iTLS-Enso, tls_fixer and reAuth, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
+- `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
 
 The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them). A few certificate tests are skipped unless `pkg-config` and the libcurl and OpenSSL development files are installed: `pkg-config libcurl4-openssl-dev libssl-dev` on Debian/Ubuntu, `brew install pkgconf curl openssl` on macOS (the tests find Homebrew's copies themselves). The OpenSSL must be the one libcurl itself uses, as the code under test shares OpenSSL objects with curl.
 
@@ -246,7 +246,7 @@ Each normal build also checks that the kernel plugin contains no floating-point 
 
 ## Credits
 
-**vitals is a continuation of [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, who did the most difficult part of the job.** The TLS providers, the integration of `Mbed TLS` with Sony's HTTP library and the browser, the kernel plugin's injection and module checks, the certificate merging, the certificate updater and the original Vital Signs connection test are his work. vitals renames the project and continues it.
+**`vitals` started from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, and the idea is his:** giving the Vita modern TLS by running `Mbed TLS` where Sony's old TLS stack used to be. vitals has since become a project of its own: Sony's HTTP library is now rewritten from scratch as `vitals-http` instead of having its TLS swapped, and the DNS rules, host redirects and User-Agent are new. What `vitals` still carries from `tls_fixer` is the browser's TLS provider, the kernel plugin's injection, the certificate merging/updating and the original connection test applet.
 
 **Thanks to SKGleba for the [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso) plugin!** His work updating the Vita's certificates is the foundation of `vitals`, along with his original installer and module-redirection code. Existing author notices are preserved in the source.
 
@@ -260,7 +260,7 @@ All contributions to vitals are released under the [Zero-Clause BSD license](LIC
 
 Some parts keep their own terms:
 
-- **Code from tls_fixer** by devnoname120: most of vitals comes from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer), which is published without a license. That code remains devnoname120's; the 0BSD license covers it only if he agrees to it.
+- **Code from tls_fixer** by devnoname120: the parts of vitals that come from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) (listed in [Credits](#credits)) are published there without a license. That code remains devnoname120's; the 0BSD license covers it only if he agrees to it. `vitals-http` is not among them.
 - **Code from iTLS-Enso** by SKGleba: `vitals-plugin/main.c` (module redirection) and `vitals-app/install.c` (the install and uninstall operations) are derived from [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso), which is published without a license. Its code remains SKGleba's ("All Rights Reserved"); the 0BSD license does not cover the original iTLS-Enso code.
 - **Third-party libraries and data:** under their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - **Sony material:** the Sony modules and certificate bundle in `vitals-app/assets/` are not covered by any license.
