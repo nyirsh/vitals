@@ -591,11 +591,51 @@ int vh_add_header(VhSettings *settings, const char *name, const char *value, uns
     return 0;
 }
 
-/* The same, without the checks on what the header holds */
-int sceHttpAddRequestHeaderRaw(int id, const char *name, const char *value, unsigned int mode)
+/* isspace's set, which Sony's uses: no locale here */
+static int is_space(char c)
+{
+    return c == ' ' || (c >= '\t' && c <= '\r');
+}
+
+/* As Sony's: one "Name: value" line, split at its first colon, with the spaces before the name
+ * and the value skipped and nothing else checked; the value runs to the line's end */
+int sceHttpAddRequestHeaderRaw(int id, const char *header, unsigned int mode)
 {
     VH_TRACE();
-    return sceHttpAddRequestHeader(id, name, value, mode);
+    vh_lock();
+    int result = vh_initialized();
+    if (result == 0 && (mode != SCE_HTTP_HEADER_ADD || header == NULL))
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    VhSettings *settings = result == 0 ? settings_of(id, &result) : NULL;
+    if (settings != NULL) {
+        size_t length = 0, at = 0;
+        while (length < 0xffff && header[length] != '\0')
+            ++length;
+        while (at < length && is_space(header[at]))
+            ++at;
+        size_t name = at;
+        while (at < length && header[at] != ':')
+            ++at;
+        if (at == length)
+            /* Sony's has no answer for a line without a colon (it fails its allocation) */
+            result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+        else {
+            size_t colon = at++;
+            while (at < length && is_space(header[at]))
+                ++at;
+            char *name_copy = vh_strdup(header + name, colon - name);
+            char *value_copy = vh_strdup(header + at, length - at);
+            result = name_copy == NULL || value_copy == NULL
+                         ? (int)SCE_HTTP_ERROR_OUT_OF_MEMORY
+                         : vh_add_header(settings, name_copy, value_copy, SCE_HTTP_HEADER_ADD);
+            vh_free(name_copy);
+            vh_free(value_copy);
+        }
+    }
+    vh_unlock();
+    VITALS_VERBOSE("add raw header id=%d length=%u rc=%08X", id, header != NULL ? (unsigned int)strlen(header) : 0u,
+                   (unsigned int)result);
+    return result;
 }
 
 int sceHttpRemoveRequestHeader(int id, const char *name)

@@ -8,14 +8,28 @@
 extern "C" {
 #endif
 
-/* Not in the SDK header; signatures as the PS4 libhttp has them, where the Vita's is known to match */
+/* A request header, as sceHttpRequestGetAllHeaders lists them */
+typedef struct SceHttpHeaderPair
+{
+    const char *name;
+    const char *value;
+} SceHttpHeaderPair;
+
+/* Not in the SDK header; signatures as the PS4 libhttp has them, where the Vita's is known to match,
+ * and as Sony's code takes them otherwise */
 int sceHttpAbortRequestForce(int reqId);
-int sceHttpAddRequestHeaderRaw(int id, const char *name, const char *value, unsigned int mode);
+/* One "Name: value" line, added as sceHttpAddRequestHeader adds it; mode must be
+ * SCE_HTTP_HEADER_ADD */
+int sceHttpAddRequestHeaderRaw(int id, const char *header, unsigned int mode);
 int sceHttpAuthCacheFlush(void);
 int sceHttpRedirectCacheFlush(void);
 int sceHttpCreateRequest2(int connId, const char *method, const char *path, unsigned long long int contentLength);
 int sceHttpCreateRequestWithURL2(int connId, const char *method, const char *url, unsigned long long int contentLength);
-int sceHttpRequestGetAllHeaders(int reqId, char **header, unsigned int *headerSize);
+/* The request's headers as name/value pairs, *count of them; pairs may be NULL to count them. The
+ * Content-Length value is written to lengthBuffer; without it, *lengthBufferSize is set to the size
+ * it needs. The pointers last until the request's headers change */
+int sceHttpRequestGetAllHeaders(int reqId, SceHttpHeaderPair *pairs, unsigned int *count, char *lengthBuffer,
+                                unsigned int *lengthBufferSize);
 int sceHttpGetLastErrno(int reqId, int *errNum);
 int sceHttpSetNonblock(int id, int enable);
 int sceHttpGetNonblock(int id, int *enable);

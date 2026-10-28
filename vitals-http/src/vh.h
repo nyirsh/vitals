@@ -158,6 +158,8 @@ typedef struct VhRequest
     /* The status line and headers last sent, for sceHttpRequestGetAllHeaders */
     char *request_header;
     unsigned int request_header_size;
+    /* The Cookie value it went with, which Sony's keeps in the request's header list */
+    char *sent_cookie;
     int last_errno;
     /* The start of a refused response's body went to the debug log */
     int body_logged;
@@ -305,6 +307,10 @@ int vh_equal_nocase(const char *a, const char *b, size_t length);
 int vh_build_request(const VhObject *request, const VhObject *connection, const VhObject *template_,
                      unsigned long long body_size, int has_body, const char *cookie, char **text,
                      size_t *size);
+/* The headers vh_build_request sends, as sceHttpRequestGetAllHeaders lists them (the Cookie once
+ * the request has been sent with one); how many, written to pairs when it isn't NULL */
+unsigned int vh_list_request_headers(const VhObject *request, const VhObject *connection,
+                                     SceHttpHeaderPair *pairs, char *length, unsigned int *length_size);
 /* Reads a chunk-size line ("1a;ext\r\n") at the start of data; 1 with *size and *used when a
  * whole line is there, 0 when more is needed, negative when it is malformed */
 int vh_parse_chunk_size(const unsigned char *data, size_t length, unsigned long long *size, size_t *used);

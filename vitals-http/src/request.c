@@ -501,6 +501,8 @@ void vh_request_free(VhRequest *request)
     reset_response(NULL, request);
     vh_free(request->request_header);
     request->request_header = NULL;
+    vh_free(request->sent_cookie);
+    request->sent_cookie = NULL;
     vh_free(request->async_data);
     request->async_data = NULL;
     vh_free(request->upload);
@@ -892,6 +894,9 @@ static int exchange(VhObject *object, VhObject *connection, const VhObject *temp
         vh_free(request->request_header);
         request->request_header = text;
         request->request_header_size = (unsigned int)text_size;
+        vh_free(request->sent_cookie);
+        request->sent_cookie = cookie;
+        cookie = NULL;
     }
     const VhSettings *settings = &object->settings;
     VhOpen open = {
@@ -1710,23 +1715,23 @@ int sceHttpGetResponseContentLength(int reqId, unsigned long long int *contentLe
     return result;
 }
 
-int sceHttpRequestGetAllHeaders(int reqId, char **header, unsigned int *headerSize)
+/* As Sony's: the headers the request has now, sent or not; count is always set, pairs only when
+ * given, so a first call with pairs NULL tells how many to make room for */
+int sceHttpRequestGetAllHeaders(int reqId, SceHttpHeaderPair *pairs, unsigned int *count, char *lengthBuffer,
+                                unsigned int *lengthBufferSize)
 {
     VH_TRACE();
-    if (header == NULL || headerSize == NULL)
-        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
     int result = vh_initialized();
+    /* Sony's refuses only both missing, then writes the count regardless */
+    if (result == 0 && count == NULL)
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
     if (result == 0) {
         VhObject *object = vh_find(reqId, VH_REQUEST);
         if (object == NULL)
             result = (int)SCE_HTTP_ERROR_INVALID_ID;
-        else if (object->as.request.request_header == NULL)
-            result = (int)SCE_HTTP_ERROR_BEFORE_SEND;
-        else {
-            *header = object->as.request.request_header;
-            *headerSize = object->as.request.request_header_size;
-        }
+        else
+            *count = vh_list_request_headers(object, vh_parent(object), pairs, lengthBuffer, lengthBufferSize);
     }
     vh_unlock();
     return result;

@@ -121,6 +121,40 @@ int vh_build_request(const VhObject *request, const VhObject *connection, const 
     return 0;
 }
 
+unsigned int vh_list_request_headers(const VhObject *request, const VhObject *connection,
+                                     SceHttpHeaderPair *pairs, char *length, unsigned int *length_size)
+{
+    const VhRequest *r = &request->as.request;
+    const VhHeaders *headers = &request->settings.headers;
+    unsigned int count = 0;
+#define PAIR(header_name, header_value)                                                            \
+    do {                                                                                           \
+        if (pairs != NULL)                                                                         \
+            pairs[count] = (SceHttpHeaderPair){(header_name), (header_value)};                     \
+        ++count;                                                                                   \
+    } while (0)
+    /* Sony's adds the cookies to the front of the list when it sends */
+    if (r->sent_cookie != NULL && !has_header(headers, "Cookie"))
+        PAIR("Cookie", r->sent_cookie);
+    for (unsigned int i = 0; i < headers->count; ++i)
+        PAIR(headers->items[i].name, headers->items[i].value);
+    if (!has_header(headers, "Connection"))
+        PAIR("Connection", connection != NULL && connection->as.connection.keep_alive ? "Keep-Alive" : "close");
+    if (has_length(r->method) && !has_header(headers, "Content-Length")) {
+        /* As Sony's: the value goes in the app's buffer; without one, the size it needs */
+        if (length != NULL && length_size != NULL)
+            snprintf(length, *length_size, "%lld", r->content_length >= 0 ? r->content_length : 0);
+        else if (length_size != NULL)
+            *length_size = 21;
+        PAIR("Content-Length", length);
+    }
+    if (request->settings.accept_gzip == SCE_HTTP_ENABLE && !has_header(headers, "Accept-Encoding"))
+        /* Sony's name, with the colon and space its header text has after it */
+        PAIR("Accept-Encoding: ", "gzip");
+#undef PAIR
+    return count;
+}
+
 int vh_parse_chunk_size(const unsigned char *data, size_t length, unsigned long long *size, size_t *used)
 {
     unsigned long long value = 0;

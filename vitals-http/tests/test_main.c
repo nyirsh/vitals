@@ -50,6 +50,17 @@ static char *url(const char *base, const char *path)
 }
 
 /* Reads the whole body in pieces of piece bytes: its length, or the error */
+/* The status line and headers the request last sent, as they went out */
+static int sent_header(int request, char **header, unsigned int *size)
+{
+    VhObject *object = vh_find(request, VH_REQUEST);
+    if (object == NULL || object->as.request.request_header == NULL)
+        return -1;
+    *header = object->as.request.request_header;
+    *size = object->as.request.request_header_size;
+    return 0;
+}
+
 static int read_all(int request, char *out, int capacity, int piece)
 {
     int total = 0;
@@ -116,7 +127,7 @@ static void test_basic(int template_)
     CHECK(value_length == 10 && memcmp(value, "text/plain", 10) == 0);
     /* As Sony's: the offset of the value's end */
     CHECK_EQ(end, value + value_length - header);
-    CHECK_EQ(sceHttpRequestGetAllHeaders(request, &header, &header_size), 0);
+    CHECK_EQ(sent_header(request, &header, &header_size), 0);
     CHECK(strstr(header, "GET /hello HTTP/1.1\r\n") == header);
     CHECK(strstr(header, "User-Agent: vh-test libhttp/3.74 (PS Vita)\r\n") != NULL);
     CHECK(strstr(header, "Content-Length") == NULL);
@@ -275,7 +286,7 @@ static void test_redirects_and_post(int template_)
     CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_POST, url(g_base, "/post-redirect"), "x=1", &status, body, sizeof(body), &request), 11);
     char *header;
     unsigned int header_size;
-    sceHttpRequestGetAllHeaders(request, &header, &header_size);
+    sent_header(request, &header, &header_size);
     CHECK(strncmp(header, "GET /hello", 10) == 0);
     sceHttpDeleteRequest(request);
 
@@ -813,7 +824,7 @@ static void test_header_order(void)
     sceHttpAddCookie(url(g_base, "/"), "order=1", 0);
     CHECK_EQ(sceHttpSendRequest(request, "hi", 2), 0);
     read_all(request, body, sizeof(body), 64);
-    sceHttpRequestGetAllHeaders(request, &header, &size);
+    sent_header(request, &header, &size);
     char expected[512];
     snprintf(expected, sizeof(expected),
              "POST /echo HTTP/1.1\r\nCookie: order=1\r\nX-Second: 2\r\nX-First: 1\r\nHost: 127.0.0.1:%d\r\n"
@@ -826,10 +837,94 @@ static void test_header_order(void)
     sceHttpDeleteRequest(request);
     /* A GET has no Content-Length */
     CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), &request), 11);
-    sceHttpRequestGetAllHeaders(request, &header, &size);
+    sent_header(request, &header, &size);
     CHECK(memmem(header, size, "Content-Length", 14) == NULL);
     sceHttpDeleteRequest(request);
     sceHttpCookieFlush();
+    sceHttpDeleteTemplate(template_);
+}
+
+static int has_pair(const SceHttpHeaderPair *pairs, unsigned int count, const char *name, const char *value)
+{
+    for (unsigned int i = 0; i < count; ++i)
+        if (strcmp(pairs[i].name, name) == 0 && pairs[i].value != NULL && strcmp(pairs[i].value, value) == 0)
+            return 1;
+    return 0;
+}
+
+static void test_raw_and_all_headers(void)
+{
+    SceHttpHeaderPair pairs[16];
+    unsigned int count = 99, size;
+    char length[32], body[64], *header;
+    printf("raw headers and all headers\n");
+    int template_ = sceHttpCreateTemplate("Agent", SCE_HTTP_VERSION_1_1, 0);
+    int connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    int request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_POST, url(g_base, "/echo"), 2);
+
+    /* Raw: one line, split at the colon, spaces before the name and the value skipped; ADD only */
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(request, "  X-Raw:   one: two", SCE_HTTP_HEADER_ADD), 0);
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(request, "X-Raw: again", SCE_HTTP_HEADER_ADD), 0);
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(request, "X-Empty:", SCE_HTTP_HEADER_ADD), 0);
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(request, "X-Over: 1", SCE_HTTP_HEADER_OVERWRITE), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(request, "no colon", SCE_HTTP_HEADER_ADD), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(request, NULL, SCE_HTTP_HEADER_ADD), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(0x7fff, "X-A: b", SCE_HTTP_HEADER_ADD), (int)SCE_HTTP_ERROR_INVALID_ID);
+    /* On templates and connections too */
+    CHECK_EQ(sceHttpAddRequestHeaderRaw(connection, "X-Conn: c", SCE_HTTP_HEADER_ADD), 0);
+    CHECK_EQ(sceHttpRemoveRequestHeader(connection, "X-Conn"), 0);
+
+    /* All headers: count first, then the pairs; the request's own, then the library's */
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, NULL, &count, NULL, NULL), 0);
+    CHECK(count > 5 && count <= 16);
+    unsigned int counted = count;
+    size = 0;
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, &count, NULL, &size), 0);
+    CHECK_EQ(count, counted);
+    CHECK_EQ(size, 21);
+    size = sizeof(length);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, &count, length, &size), 0);
+    CHECK_EQ(count, counted);
+    CHECK(strcmp(pairs[0].name, "X-Empty") == 0 && strcmp(pairs[0].value, "") == 0);
+    CHECK(strcmp(pairs[1].name, "X-Raw") == 0 && strcmp(pairs[1].value, "again") == 0);
+    CHECK(strcmp(pairs[2].name, "X-Raw") == 0 && strcmp(pairs[2].value, "one: two") == 0);
+    CHECK(has_pair(pairs, count, "User-Agent", "Agent libhttp/3.74 (PS Vita)"));
+    CHECK(strcmp(pairs[count - 2].name, "Connection") == 0 && strcmp(pairs[count - 2].value, "Keep-Alive") == 0);
+    CHECK(strcmp(pairs[count - 1].name, "Content-Length") == 0 && pairs[count - 1].value == length);
+    CHECK(strcmp(length, "2") == 0);
+    /* What is listed is what is sent; the Cookie it went with is listed after, first */
+    sceHttpAddCookie(url(g_base, "/"), "pair=1", 0);
+    CHECK_EQ(sceHttpSendRequest(request, "hi", 2), 0);
+    read_all(request, body, sizeof(body), 64);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, &count, length, &size), 0);
+    CHECK_EQ(count, counted + 1);
+    CHECK(strcmp(pairs[0].name, "Cookie") == 0 && strcmp(pairs[0].value, "pair=1") == 0);
+    CHECK(strcmp(pairs[1].name, "X-Empty") == 0);
+    sceHttpCookieFlush();
+    CHECK_EQ(sent_header(request, &header, &size), 0);
+    CHECK(memmem(header, size, "X-Empty: \r\nX-Raw: again\r\nX-Raw: one: two\r\n", 42) != NULL);
+    CHECK(memmem(header, size, "Content-Length: 2\r\n", 19) != NULL);
+    /* Errors: both missing, the count missing, a connection's ID */
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, NULL, NULL, NULL, NULL), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, NULL, NULL, NULL), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(connection, NULL, &count, NULL, NULL), (int)SCE_HTTP_ERROR_INVALID_ID);
+    sceHttpDeleteRequest(request);
+
+    /* A GET has no Content-Length; gzip adds Accept-Encoding; without keep-alive, close */
+    request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), 0);
+    CHECK_EQ(sceHttpSetAcceptEncodingGZIPEnabled(request, SCE_HTTP_ENABLE), 0);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, &count, NULL, NULL), 0);
+    CHECK(!has_pair(pairs, count, "Content-Length", "0"));
+    for (unsigned int i = 0; i < count; ++i)
+        CHECK(strcmp(pairs[i].name, "Content-Length") != 0);
+    /* Sony's name for it ends in ": " */
+    CHECK(strcmp(pairs[count - 1].name, "Accept-Encoding: ") == 0 && strcmp(pairs[count - 1].value, "gzip") == 0);
+    sceHttpDeleteRequest(request);
+    int closing = sceHttpCreateConnectionWithURL(template_, g_base, 0);
+    request = sceHttpCreateRequestWithURL(closing, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), 0);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, &count, NULL, NULL), 0);
+    CHECK(has_pair(pairs, count, "Connection", "close"));
+    sceHttpDeleteRequest(request);
     sceHttpDeleteTemplate(template_);
 }
 
@@ -844,7 +939,7 @@ static void test_user_agent(void)
     int connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
     int request = 0;
     fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/headers"), NULL, &status, headers, sizeof(headers), &request);
-    sceHttpRequestGetAllHeaders(request, &header, &size);
+    sent_header(request, &header, &size);
     CHECK(strstr(header, "User-Agent: libhttp/3.74 (PS Vita)\r\n") != NULL);
     sceHttpDeleteRequest(request);
     /* The app's own replaces it */
@@ -864,7 +959,7 @@ static const char *user_agent_of(const char *agent)
     int template_ = sceHttpCreateTemplate(agent, SCE_HTTP_VERSION_1_1, 0);
     int connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
     fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/headers"), NULL, &status, headers, sizeof(headers), &request);
-    sceHttpRequestGetAllHeaders(request, &header, &size);
+    sent_header(request, &header, &size);
     snprintf(headers, sizeof(headers), "%.*s", (int)size, header);
     sceHttpDeleteTemplate(template_);
     return headers;
@@ -1048,6 +1143,7 @@ int main(int argc, char **argv)
     test_record_scan();
     test_user_agent();
     test_header_order();
+    test_raw_and_all_headers();
     test_basic(template_);
     test_keep_alive(template_);
     test_bodies(template_);
