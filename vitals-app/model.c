@@ -8,8 +8,7 @@ const char *check_endpoint(unsigned test) {
     static const char *urls[] = {
         "https://tls10.browserleaks.com/", "https://tls11.browserleaks.com/",
         "https://tls12.browserleaks.com/", "https://tls13.browserleaks.com/",
-        "https://tls.browserleaks.com/tls?minify=1",
-        "https://native-vita.np.ac.playstation.net/"};
+        "https://tls.browserleaks.com/tls?minify=1"};
     return test < CHECK_TEST_COUNT ? urls[test] : NULL;
 }
 static int certificate_error(const CheckResult *r) {
@@ -18,6 +17,41 @@ static int certificate_error(const CheckResult *r) {
 static int unreachable(const CheckResult *r) {
     return (uint32_t)r->error == 0x80431068 || (uint32_t)r->error == 0x80431063 ||
            ((uint32_t)r->error >= 0x80436000 && (uint32_t)r->error <= 0x804360ff);
+}
+const CheckBadssl *check_badssl(unsigned index) {
+    static const CheckBadssl tests[CHECK_BADSSL_COUNT] = {
+        {"badssl.com", "Valid certificate", 0},
+        {"sha256.badssl.com", "SHA-256 signature", 0},
+        {"ecc256.badssl.com", "ECDSA P-256 key", 0},
+        {"rsa2048.badssl.com", "RSA 2048 key", 0},
+        {"tls-v1-2.badssl.com:1012", "TLS 1.2 only", 0},
+        {"expired.badssl.com", "Expired", 1},
+        {"wrong.host.badssl.com", "Wrong host name", 1},
+        {"self-signed.badssl.com", "Self-signed", 1},
+        {"untrusted-root.badssl.com", "Untrusted root", 1},
+        {"rc4.badssl.com", "RC4 cipher", 1},
+        {"3des.badssl.com", "3DES cipher", 1},
+        {"dh512.badssl.com", "DH 512 key exchange", 1}};
+    return index < CHECK_BADSSL_COUNT ? &tests[index] : NULL;
+}
+void check_badssl_judge(const CheckBadssl *test, CheckResult *r) {
+    if (!test->refuse)
+        return;
+    if (r->http_code != 0) {
+        r->state = CHECK_FAIL;
+        snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d), should be refused", r->http_code);
+    } else if (r->error >= 0) {
+        r->state = CHECK_FAIL;
+        snprintf(r->message, sizeof(r->message), "Not refused");
+    } else if (unreachable(r) || r->restore_error) {
+        r->state = CHECK_FAIL;
+        snprintf(r->message, sizeof(r->message), "Inconclusive: %s",
+                 check_error_name(r->error, r->ssl_error, r->ssl_detail));
+    } else {
+        r->state = CHECK_PASS;
+        snprintf(r->message, sizeof(r->message), "Refused: %s",
+                 check_error_name(r->error, r->ssl_error, r->ssl_detail));
+    }
 }
 int check_expected_legacy_block(unsigned version, const CheckResult *r) {
     /* vitals blocks TLS 1.0 and 1.1, and reports this through sceHttpsGetSslError's detail value
@@ -90,7 +124,7 @@ void check_protocol_detail(unsigned version, const CheckResult *result, char *te
 }
 int check_should_retry_unverified(unsigned test, const CheckResult *r) {
     /* A TLS failure may hide a trust failure in the native stack
-     * Never retry network/HTTP/body failures, cancellation, PSN or the detailed TLS report */
+     * Never retry network/HTTP/body failures, cancellation or the detailed TLS report */
     return test < 4 && r->state == CHECK_FAIL && r->http_code == 0 &&
            (uint32_t)r->error == 0x80431075 && !r->restore_error && !r->retry.attempted &&
            !check_expected_legacy_block(test, r);

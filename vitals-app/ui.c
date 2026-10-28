@@ -197,6 +197,48 @@ static void footer(uint32_t *p, const AppHint *hints, unsigned count)
         x += check_font_width(hints[i].label, 16) + 34;
     }
 }
+/* A list of checks in one line: how many passed out of how many there are */
+static enum CheckState summarize(const enum CheckState *states, unsigned count, int complete,
+                                 char *label, size_t capacity)
+{
+    unsigned passed = 0, failed = 0, finished = 0, not_tested = 0;
+    for (unsigned i = 0; i < count; ++i)
+    {
+        passed += states[i] == CHECK_PASS;
+        failed += states[i] == CHECK_FAIL;
+        not_tested += states[i] == CHECK_INFO;
+        finished += states[i] == CHECK_PASS || states[i] == CHECK_FAIL || states[i] == CHECK_INFO;
+    }
+    if (count == 0)
+    {
+        snprintf(label, capacity, "%s", complete ? "None listed" : "Waiting");
+        return CHECK_WAIT;
+    }
+    if (finished < count)
+    {
+        enum CheckState state = finished || states[0] == CHECK_RUNNING ? CHECK_RUNNING : CHECK_WAIT;
+        snprintf(label, capacity, state == CHECK_RUNNING ? "Checking %u/%u" : "Waiting", finished, count);
+        return state;
+    }
+    if (not_tested == count)
+    {
+        snprintf(label, capacity, "Not tested");
+        return CHECK_INFO;
+    }
+    snprintf(label, capacity, "%u/%u", passed, count);
+    return failed || not_tested ? CHECK_FAIL : CHECK_PASS;
+}
+/* A summary row under the protocol tiles: name, source, then the summary on the right */
+static void summary_row(uint32_t *p, int y, const char *name, const char *source,
+                        const char *label, enum CheckState state)
+{
+    card(p, 28, y, 904, 38, panel);
+    text(p, 44, y + 9, name, white, 18);
+    text(p, 270, y + 9, source, muted, 18);
+    int label_left = 916 - check_font_width(label, 18);
+    mark(p, label_left - 30, y + 13, state);
+    text(p, label_left, y + 9, label, tone(state), 18);
+}
 void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, int busy,
                 const char *notice)
 {
@@ -236,58 +278,16 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
             text(p, x, 156, display.qualifier, muted, 16);
         }
     }
-    const CheckResult *ps = &s->playstation;
-    const char *ps_label = ps->state == CHECK_PASS      ? "Connected"
-                           : ps->state == CHECK_FAIL    ? "Failed"
-                           : ps->state == CHECK_RUNNING ? "Checking..."
-                           : ps->state == CHECK_INFO    ? "Not tested"
-                                                        : "Waiting";
-    card(p, 28, 193, 904, 38, panel);
-    text(p, 44, 202, "PlayStation servers", white, 18);
-    text(p, 270, 202, "native-vita.np.ac.playstation.net", muted, 18);
-    int ps_label_left = 916 - check_font_width(ps_label, 18);
-    mark(p, ps_label_left - 30, 206, ps->state);
-    text(p, ps_label_left, 202, ps_label, tone(ps->state), 18);
-
-    /* The host redirects in one line: how many passed out of how many are listed */
-    unsigned passed = 0, failed = 0, finished = 0, not_tested = 0;
+    enum CheckState states[CHECK_REDIRECT_MAX > CHECK_BADSSL_COUNT ? CHECK_REDIRECT_MAX : CHECK_BADSSL_COUNT];
+    char summary[48];
+    for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
+        states[i] = s->badssl[i].state;
+    enum CheckState state = summarize(states, CHECK_BADSSL_COUNT, s->complete, summary, sizeof(summary));
+    summary_row(p, 193, "Certificate checks", "badssl.com", summary, state);
     for (unsigned i = 0; i < s->redirect_count; ++i)
-    {
-        enum CheckState state = s->redirects[i].result.state;
-        passed += state == CHECK_PASS;
-        failed += state == CHECK_FAIL;
-        not_tested += state == CHECK_INFO;
-        finished += state == CHECK_PASS || state == CHECK_FAIL || state == CHECK_INFO;
-    }
-    char redirect_label[48];
-    enum CheckState redirect_state;
-    if (s->redirect_count == 0)
-    {
-        redirect_state = CHECK_WAIT;
-        snprintf(redirect_label, sizeof(redirect_label), "%s", s->complete ? "None listed" : "Waiting");
-    }
-    else if (finished < s->redirect_count)
-    {
-        redirect_state = finished || s->redirects[0].result.state == CHECK_RUNNING ? CHECK_RUNNING : CHECK_WAIT;
-        snprintf(redirect_label, sizeof(redirect_label), redirect_state == CHECK_RUNNING ? "Checking %u/%u" : "Waiting",
-                 finished, s->redirect_count);
-    }
-    else if (not_tested == s->redirect_count)
-    {
-        redirect_state = CHECK_INFO;
-        snprintf(redirect_label, sizeof(redirect_label), "Not tested");
-    }
-    else
-    {
-        redirect_state = failed || not_tested ? CHECK_FAIL : CHECK_PASS;
-        snprintf(redirect_label, sizeof(redirect_label), "%u/%u", passed, s->redirect_count);
-    }
-    card(p, 28, 237, 904, 38, panel);
-    text(p, 44, 246, "Redirections", white, 18);
-    text(p, 270, 246, "ux0:data/vitals/redirects.txt", muted, 18);
-    int redirect_label_left = 916 - check_font_width(redirect_label, 18);
-    mark(p, redirect_label_left - 30, 250, redirect_state);
-    text(p, redirect_label_left, 246, redirect_label, tone(redirect_state), 18);
+        states[i] = s->redirects[i].result.state;
+    state = summarize(states, s->redirect_count, s->complete, summary, sizeof(summary));
+    summary_row(p, 237, "Redirections", "ux0:data/vitals/redirects.txt", summary, state);
     text(p, 28, 283, "TLS REPORT", muted, 14);
     if (s->connection.state == CHECK_PASS)
     {
@@ -348,25 +348,15 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
         text(p, 28, 365, "Request details", white, 23);
         text(p, 608, 373, "Request / SSL error", muted, 16);
         text(p, 878, 373, "Time", muted, 16);
-        for (unsigned i = 0; i < 5; ++i)
+        for (unsigned i = 0; i < 4; ++i)
         {
-            const CheckResult *r = i == 4 ? &s->playstation : &s->protocols[3 - i];
+            const CheckResult *r = &s->protocols[3 - i];
             int y = 397 + (int)i * 22;
-            if (i == 4)
-                snprintf(line, sizeof(line), "PlayStation");
-            else
-                snprintf(line, sizeof(line), "TLS 1.%u", 3 - i);
+            snprintf(line, sizeof(line), "TLS 1.%u", 3 - i);
             text(p, 30, y, line, white, 18);
-            enum CheckState detail_style = r->state;
-            if (i == 4)
-                snprintf(line, sizeof(line), "%s", r->message[0] ? r->message : ps_label);
-            else
-            {
-                CheckProtocolDisplay display = check_protocol_display(3 - i, r);
-                detail_style = display.detail_style;
-                check_protocol_detail(3 - i, r, line, sizeof(line));
-            }
-            check_font_draw(p, 150, y, line, 18, tone(detail_style), 590);
+            CheckProtocolDisplay display = check_protocol_display(3 - i, r);
+            check_protocol_detail(3 - i, r, line, sizeof(line));
+            check_font_draw(p, 150, y, line, 18, tone(display.detail_style), 590);
             if (r->error || r->ssl_error)
                 snprintf(line, sizeof(line), "0x%08X / 0x%08X", (unsigned)r->error,
                          (unsigned)r->ssl_error);
@@ -381,6 +371,31 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
         }
     }
     else if (page == 3)
+    {
+        text(p, 28, 365, "Certificate checks", white, 23);
+        snprintf(line, sizeof(line), "%u hosts / Hold arrows or stick", CHECK_BADSSL_COUNT);
+        text(p, 621, 373, line, muted, 16);
+        /* The host, what it tests and whether it should load, then what it gave */
+        for (unsigned i = 0; i < CHECK_VISIBLE_REDIRECTS && scroll + i < CHECK_BADSSL_COUNT; ++i)
+        {
+            const CheckBadssl *test = check_badssl(scroll + i);
+            const CheckResult *r = &s->badssl[scroll + i];
+            int y = 400 + (int)i * 21;
+            snprintf(line, sizeof(line), "%s: %s, should %s", test->host, test->label,
+                     test->refuse ? "be refused" : "load");
+            check_font_draw(p, 30, y, line, 16, white, 530);
+            snprintf(line, sizeof(line), "%s",
+                     r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..."
+                                                                            : "Waiting");
+            check_font_draw(p, 545, y, line, 16, tone(r->state), 840);
+            if (r->elapsed_ms)
+                snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
+            else
+                snprintf(line, sizeof(line), "-");
+            text(p, 856, y, line, muted, 16);
+        }
+    }
+    else if (page == 4)
     {
         text(p, 28, 365, "Host redirects", white, 23);
         if (s->redirect_count == 0)

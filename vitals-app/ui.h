@@ -6,9 +6,9 @@
 #define CHECK_HEIGHT 544
 #define CHECK_VISIBLE_CIPHERS 4
 #define CHECK_VISIBLE_REDIRECTS 5
-/* The test's detail pages, which Square cycles: ciphers, request details, handshake details and
- * host redirects */
-#define CHECK_PAGE_COUNT 4
+/* The test's detail pages, which Square cycles: ciphers, request details, handshake details, the
+ * badssl.com certificate checks and host redirects */
+#define CHECK_PAGE_COUNT 5
 #define APP_TASK_VISIBLE_LINES 12
 #define APP_CHANGELOG_VISIBLE_LINES 14
 /* How wide the changelog's lines may be: plain text, and a change after its bullet */

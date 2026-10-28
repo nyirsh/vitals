@@ -13,15 +13,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The connection test from Vital Signs: BrowserLeaks TLS 1.0-1.3, PlayStation servers, the
- * BrowserLeaks TLS report and each host redirect, each over a fresh sceHttp connection on a
- * worker thread */
+/* The connection test from Vital Signs: BrowserLeaks TLS 1.0-1.3, the BrowserLeaks TLS report,
+ * the badssl.com battery and each host redirect, each over a fresh sceHttp connection on a worker
+ * thread */
 #define REPORT_DIR "ux0:/data/vitals"
 static CheckService service = {.vitals_enabled = -1};
 static SceUID guard = -1, worker = -1;
 static int busy, active_request = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
 static uint64_t request_begin;
 static char notice[120];
+/* A request that times out is made again, up to this many times in all */
+#define FETCH_ATTEMPTS 3
+#define ERROR_TIMED_OUT 0x80431068
 #define VERIFY_FLAGS (SCE_HTTPS_FLAG_SERVER_VERIFY | SCE_HTTPS_FLAG_CN_CHECK | \
                       SCE_HTTPS_FLAG_NOT_AFTER_CHECK | SCE_HTTPS_FLAG_NOT_BEFORE_CHECK | SCE_HTTPS_FLAG_KNOWN_CA_CHECK)
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
@@ -34,6 +37,12 @@ static int stopped(void)
     unlock();
     return c;
 }
+static void publish_badssl(unsigned index, const CheckResult *r)
+{
+    lock();
+    service.badssl[index] = *r;
+    unlock();
+}
 static void publish_redirect(unsigned index, const CheckResult *r)
 {
     lock();
@@ -45,8 +54,6 @@ static void publish(unsigned row, const CheckResult *r)
     lock();
     if (row == CHECK_REPORT)
         service.connection = *r;
-    else if (row == CHECK_PLAYSTATION)
-        service.playstation = *r;
     else
         service.protocols[row] = *r;
     unlock();
@@ -68,8 +75,8 @@ static void abort_current(int user_cancel)
 }
 /* One request to url; status_only accepts any final HTTP status without reading the body, and
  * unverified_allowed permits the protocol checks' retries without certificate checks */
-static int fetch_url(const char *url, int verify, int unverified_allowed, int status_only, char *body,
-                     size_t *length, CheckResult *r)
+static int fetch_once(const char *url, int verify, int unverified_allowed, int status_only, char *body,
+                      size_t *length, CheckResult *r)
 {
     int tmpl = -1, conn = -1, req = -1, rc = 0;
     uint64_t begin = now_ms();
@@ -132,9 +139,7 @@ static int fetch_url(const char *url, int verify, int unverified_allowed, int st
     REQUIRE(sceHttpGetStatusCode(req, &r->http_code));
     if (status_only)
     {
-        /* This root URL is not a public Store operation
-         * Any final HTTP response, including 403/404/503, proves verified HTTPS
-         * reachability; no sign-in or successful commerce operation is implied
+        /* Any final HTTP response, including 403/404/503, proves verified HTTPS reachability
          * Do not read its body */
         if (r->http_code >= 200 && r->http_code <= 599)
         {
@@ -238,6 +243,24 @@ done:
     return rc;
 #undef REQUIRE
 }
+/* fetch_once, made again while it times out: servers and the network are slow at times, which
+ * says nothing about TLS; the result is the last attempt's, with every attempt's time */
+static int fetch_url(const char *url, int verify, int unverified_allowed, int status_only, char *body,
+                     size_t *length, CheckResult *r)
+{
+    unsigned elapsed = 0, attempts = 0;
+    int rc;
+    do
+    {
+        rc = fetch_once(url, verify, unverified_allowed, status_only, body, length, r);
+        elapsed += r->elapsed_ms;
+        ++attempts;
+    } while ((uint32_t)rc == ERROR_TIMED_OUT && attempts < FETCH_ATTEMPTS && !r->restore_error &&
+             !stopped());
+    r->elapsed_ms = elapsed;
+    r->attempts = attempts;
+    return rc;
+}
 static int fetch(void *context, unsigned test, int verify, char *body, size_t *length,
                  CheckResult *r)
 {
@@ -246,7 +269,7 @@ static int fetch(void *context, unsigned test, int verify, char *body, size_t *l
     (void)context;
     snprintf(url, sizeof(url), "%s%ccheck=%llu", endpoint, strchr(endpoint, '?') ? '&' : '?',
              (unsigned long long)sceKernelGetSystemTimeWide());
-    return fetch_url(url, verify, test < 4, test == CHECK_PLAYSTATION, body, length, r);
+    return fetch_url(url, verify, test < 4, 0, body, length, r);
 }
 
 /* The host redirect list, read the way vitals' provider reads it (the app may open ux0:data
@@ -327,15 +350,13 @@ static int save_report(const CheckService *s)
             "verification=enabled for primary requests\nConnection "
             "reuse=disabled\nRedirects=disabled\nProtocol-only diagnostic retries may disable "
             "certificate checks; both attempts are recorded.\n",
-            "BrowserLeaks + PlayStation");
+            "BrowserLeaks + badssl.com");
     fprintf(f, "vitals=%s (vitals-http loaded in this process)\n",
             s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled"
                                                                    : "not enabled");
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
     {
-        const CheckResult *r = i == CHECK_REPORT        ? &s->connection
-                               : i == CHECK_PLAYSTATION ? &s->playstation
-                                                        : &s->protocols[i];
+        const CheckResult *r = i == CHECK_REPORT ? &s->connection : &s->protocols[i];
         fprintf(f,
                 "\nURL=%s\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\nssl_"
                 "detail=0x%"
@@ -343,8 +364,8 @@ static int save_report(const CheckService *s)
                 check_endpoint(i), r->state,
                 r->http_code, (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail,
                 r->elapsed_ms, r->message);
-        fprintf(f, "protocol_confirmed=%d\nverification_restore_error=0x%08X\n",
-                r->protocol_confirmed, (unsigned)r->restore_error);
+        fprintf(f, "attempts=%u\nprotocol_confirmed=%d\nverification_restore_error=0x%08X\n",
+                r->attempts, r->protocol_confirmed, (unsigned)r->restore_error);
         if (i < 4)
         {
             char detail[128];
@@ -364,15 +385,27 @@ static int save_report(const CheckService *s)
                     r->retry.http_code, (unsigned)r->retry.error, (unsigned)r->retry.ssl_error,
                     r->retry.ssl_detail, r->retry.elapsed_ms, (unsigned)r->retry.restore_error);
     }
+    fprintf(f, "\nbadssl.com=%u\n", CHECK_BADSSL_COUNT);
+    for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
+    {
+        const CheckBadssl *test = check_badssl(i);
+        const CheckResult *r = &s->badssl[i];
+        fprintf(f, "%s (%s, expected %s)\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\n"
+                   "ssl_detail=0x%08X\nelapsed_ms=%u\nattempts=%u\nresult=%s\n",
+                test->host, test->label, test->refuse ? "refused" : "loaded", r->state, r->http_code,
+                (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail, r->elapsed_ms, r->attempts,
+                r->message);
+    }
     fprintf(f, "\nHost redirects (" VITALS_REDIRECTS_PATH ")=%u\n", s->redirect_count);
     for (unsigned i = 0; i < s->redirect_count; ++i)
     {
         const CheckRedirect *redirect = &s->redirects[i];
         fprintf(f, "%s -> %s\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\nssl_detail=0x%08X\n"
-                   "elapsed_ms=%u\nresult=%s\n",
+                   "elapsed_ms=%u\nattempts=%u\nresult=%s\n",
                 redirect->from, redirect->to, redirect->result.state, redirect->result.http_code,
                 (unsigned)redirect->result.error, (unsigned)redirect->result.ssl_error,
-                redirect->result.ssl_detail, redirect->result.elapsed_ms, redirect->result.message);
+                redirect->result.ssl_detail, redirect->result.elapsed_ms, redirect->result.attempts,
+                redirect->result.message);
     }
     const CheckHandshake *h = &s->handshake;
     fprintf(f,
@@ -453,8 +486,8 @@ static int run_checks(SceSize argc, void *argv)
     unlock();
     /* Every check is independent
      * The optional report is last, so its request and parser cannot gate the
-     * protocol tiles or PlayStation reachability */
-    static const unsigned order[] = {3, 2, 1, 0, CHECK_PLAYSTATION, CHECK_REPORT};
+     * protocol tiles */
+    static const unsigned order[] = {3, 2, 1, 0, CHECK_REPORT};
     int policy_failed = 0;
     for (unsigned step = 0; step < sizeof(order) / sizeof(order[0]); ++step)
     {
@@ -502,6 +535,35 @@ static int run_checks(SceSize argc, void *argv)
         }
         policy_failed = r.restore_error < 0;
         publish((unsigned)test, &r);
+    }
+    /* badssl.com: each host with certificate checks on; the good ones must give any final HTTP
+     * status, the bad ones must be refused */
+    for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
+    {
+        const CheckBadssl *test = check_badssl(i);
+        CheckResult r = {0};
+        if (stopped() || policy_failed)
+        {
+            r.state = CHECK_INFO;
+            snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
+        }
+        else
+        {
+            char url[64];
+            size_t n = 0;
+            r.state = CHECK_RUNNING;
+            publish_badssl(i, &r);
+            snprintf(url, sizeof(url), "https://%s/", test->host);
+            if (fetch_url(url, 1, 0, 1, body, &n, &r) < 0 && stopped())
+            {
+                r.state = CHECK_INFO;
+                snprintf(r.message, sizeof(r.message), "Cancelled / not tested");
+            }
+            else
+                check_badssl_judge(test, &r);
+            policy_failed = r.restore_error < 0;
+        }
+        publish_badssl(i, &r);
     }
     /* Each redirect is requested by its old name, as a game would: vitals' provider sends it to
      * the new host and checks the certificate against the new name, so a pass proves the whole

@@ -22,6 +22,11 @@ add_executable(vitals_app_options_tests test_options.c ${APP_DIR}/options.c)
 target_include_directories(vitals_app_options_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_options COMMAND vitals_app_options_tests)
 
+# The connection test's rules: the badssl.com battery and how each of its results is judged
+add_executable(vitals_app_check_model_tests test_check_model.c ${APP_DIR}/model.c)
+target_include_directories(vitals_app_check_model_tests PRIVATE ${APP_DIR})
+add_test(NAME vitals_app_check_model COMMAND vitals_app_check_model_tests)
+
 # The changelog's layout, and the CHANGELOG.md the app carries
 add_executable(vitals_app_changelog_tests test_changelog.c ${APP_DIR}/changelog.c)
 target_include_directories(vitals_app_changelog_tests PRIVATE ${APP_DIR})

@@ -8,7 +8,6 @@
 enum CheckTest
 {
     CHECK_REPORT = 4,
-    CHECK_PLAYSTATION,
     CHECK_TEST_COUNT
 };
 
@@ -40,6 +39,7 @@ typedef struct
     unsigned ssl_detail, elapsed_ms;
     int protocol_confirmed, restore_error, verification_disabled;
     int vitals_active; /* Runtime module detection at the start of this attempt */
+    unsigned attempts; /* Requests made, timeouts retried included */
     CheckRetry retry;
     char message[128];
 } CheckResult;
@@ -64,9 +64,19 @@ typedef struct
     char from[CHECK_HOST_MAX], to[CHECK_HOST_MAX];
     CheckResult result;
 } CheckRedirect;
+/* The badssl.com battery: hosts that must load, and hosts whose certificate or ciphers must be
+ * refused */
+#define CHECK_BADSSL_COUNT 12
 typedef struct
 {
-    CheckResult protocols[4], connection, playstation;
+    const char *host; /* With its port when not 443 */
+    const char *label;
+    int refuse;
+} CheckBadssl;
+typedef struct
+{
+    CheckResult protocols[4], connection;
+    CheckResult badssl[CHECK_BADSSL_COUNT];
     CheckRedirect redirects[CHECK_REDIRECT_MAX];
     unsigned redirect_count;
     CheckHandshake handshake;
@@ -89,4 +99,9 @@ int check_http_module_active(const char *name, const char *path, unsigned state)
 int check_protocol_body(unsigned version, const char *body, size_t size);
 int check_parse_browserleaks(const char *body, size_t size, CheckHandshake *out);
 const char *check_error_name(int error, int ssl_error, unsigned detail);
+const CheckBadssl *check_badssl(unsigned index);
+/* Judges a finished badssl.com request (made with certificate checks on, any final HTTP status
+ * accepted) against what the case expects: a refusal passes only when no response came and the
+ * host was reachable */
+void check_badssl_judge(const CheckBadssl *test, CheckResult *result);
 #endif

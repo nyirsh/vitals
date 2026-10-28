@@ -400,9 +400,11 @@ static void run_test(void)
             page = (int)((page + page_presses) % CHECK_PAGE_COUNT);
             scroll = 0;
         }
-        /* The cipher list and the redirect list scroll */
-        if (page == 3)
+        /* The cipher list, the redirect list and the badssl.com list scroll */
+        if (page == 4)
             scroll = check_scroll_move(scroll, scroll_steps, view.redirect_count, CHECK_VISIBLE_REDIRECTS);
+        else if (page == 3)
+            scroll = check_scroll_move(scroll, scroll_steps, CHECK_BADSSL_COUNT, CHECK_VISIBLE_REDIRECTS);
         else
             scroll = check_scroll_move(scroll, page == 0 ? scroll_steps : 0,
                                        view.handshake.cipher_count, CHECK_VISIBLE_CIPHERS);
