@@ -454,6 +454,22 @@ static void *send_slow(void *argument)
     return NULL;
 }
 
+/* Waits until the request is inside its send, so what follows meets it busy whatever the load */
+static void wait_busy(int request)
+{
+    for (int waited = 0; waited < 5000; ++waited) {
+        vh_lock();
+        VhObject *object = vh_find(request, VH_REQUEST);
+        int busy = object != NULL && object->as.request.busy;
+        vh_unlock();
+        if (busy)
+            break;
+        usleep(1000);
+    }
+    /* A moment more, so it is waiting on the server rather than about to */
+    usleep(50000);
+}
+
 static void test_abort_and_errors(int template_)
 {
     char body[64];
@@ -462,7 +478,7 @@ static void test_abort_and_errors(int template_)
     Slow slow = {sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/slow"), 0), 1};
     pthread_t thread;
     pthread_create(&thread, NULL, send_slow, &slow);
-    usleep(300000);
+    wait_busy(slow.request);
     CHECK_EQ(sceHttpReadData(slow.request, body, sizeof(body)), SCE_HTTP_ERROR_BUSY);
     CHECK_EQ(sceHttpAbortRequest(slow.request), 0);
     pthread_join(thread, NULL);
@@ -474,7 +490,7 @@ static void test_abort_and_errors(int template_)
     int doomed = sceHttpCreateConnectionWithURL(template_, g_base, 1);
     slow.request = sceHttpCreateRequestWithURL(doomed, SCE_HTTP_METHOD_GET, url(g_base, "/slow"), 0);
     pthread_create(&thread, NULL, send_slow, &slow);
-    usleep(300000);
+    wait_busy(slow.request);
     CHECK_EQ(sceHttpDeleteConnection(doomed), 0);
     CHECK_EQ(sceHttpDeleteRequest(slow.request), SCE_HTTP_ERROR_INVALID_ID);
     pthread_join(thread, NULL);
@@ -988,10 +1004,11 @@ static void test_client_certificate(int template_)
     const SceHttpsData *list[] = {&server};
     int connection = sceHttpCreateConnectionWithURL(template_, base, 1);
 
-    /* Without one, the server ends the handshake */
+    /* Without one, the server ends the handshake: with its alert, or, when its close overtakes the
+     * alert, with a reset, which is a network error */
     CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
-    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(base, "/hello"), NULL, &status, body, sizeof(body), &request),
-             SCE_HTTP_ERROR_SSL);
+    int refused = fetch(connection, SCE_HTTP_METHOD_GET, url(base, "/hello"), NULL, &status, body, sizeof(body), &request);
+    CHECK(refused == (int)SCE_HTTP_ERROR_SSL || refused == (int)SCE_HTTP_ERROR_NETWORK);
     /* With TLS 1.3 the server checks the certificate after the client's side of the handshake, so
      * its refusal comes on the first read */
     CHECK_EQ(sceHttpsGetSslError(request, &ssl_error, &detail), 0);
@@ -1008,8 +1025,8 @@ static void test_client_certificate(int template_)
     CHECK_EQ(sceHttpsUnloadCert(), 0);
     CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
     connection = sceHttpCreateConnectionWithURL(template_, base, 1);
-    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(base, "/hello"), NULL, &status, body, sizeof(body), NULL),
-             SCE_HTTP_ERROR_SSL);
+    refused = fetch(connection, SCE_HTTP_METHOD_GET, url(base, "/hello"), NULL, &status, body, sizeof(body), NULL);
+    CHECK(refused == (int)SCE_HTTP_ERROR_SSL || refused == (int)SCE_HTTP_ERROR_NETWORK);
     sceHttpDeleteConnection(connection);
     CHECK_EQ(sceHttpsUnloadCert(), 0);
 }

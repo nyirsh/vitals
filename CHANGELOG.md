@@ -6,7 +6,9 @@
 - Redirected hosts get a higher timeout, in case community servers are slow to answer
 - Added DNS resolution redirection
 - Added the ability to change User-Agent
-- Removed reauth, it is now redundant
+- Removed reauth for it is now redundant, the PlayStation Store works with vitals' own HTTP library too!
+- Fixed an issue with the browser that allowed websites with a bad certificate to load in case after a refresh
+- The connection test now checks certificates against badssl.com
 
 ## 1.4
 

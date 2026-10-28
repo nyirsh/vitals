@@ -6,7 +6,8 @@ all 116 of them. Its TLS is Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/cryp
 trust of self-signed certificates, certificate-problem mapping and heap runtime.
 
 The kernel plugin loads it in place of Sony's libhttp in every process, shared as Sony's is, and
-the vitals app installs it as `vs0:/data/external/vitals/libhttp.suprx`.
+the vitals app installs it as `vs0:/data/external/vitals/libhttp.suprx`. Its whole lifetime, from the
+console's storage to a request's last byte, is in [docs/vitals-http.md](../docs/vitals-http.md).
 
 ## Building
 

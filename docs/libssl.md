@@ -2,7 +2,7 @@
 
 This document follows Sony's SSL library (`SceLibSsl`, `libssl.suprx`) through vitals. Its
 companion is [browser.md](browser.md); apps and games use `vitals-http`, described in
-[vitals-http/README.md](../vitals-http/README.md).
+[vitals-http.md](vitals-http.md).
 
 In one paragraph: vitals swaps libssl for the copy bundled with the app whenever a process loads
 it, leaves it **shared** and never hooks it. vitals' TLS doesn't run in libssl: `vitals-http`, which
@@ -11,16 +11,16 @@ at all. libssl is left for apps and system code that call `sceSsl` directly.
 
 ## At a glance
 
-| Module | File loaded | Loaded when | Into | Shared or private | Until |
-|---|---|---|---|---|---|
+| Module                     | File loaded                                                                           | Loaded when                   | Into                                                              | Shared or private | Until                                         |
+| -------------------------- | ------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------- | ----------------- | --------------------------------------------- |
 | `SceLibSsl` (vitals' copy) | `vs0:/data/external/vitals/libssl.suprx`, in place of `vs0:sys/external/libssl.suprx` | a process loads Sony's libssl | every process that loads it, mapped once (at `0xE…` in your logs) | always **shared** | the last process using it unloads it or exits |
 
 Nothing is injected after it, and nothing hooks it.
 
 ## 1. On disk
 
-| File on the console | Comes from | Installed by |
-|---|---|---|
+| File on the console                      | Comes from                                                                          | Installed by                                                   |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `vs0:/data/external/vitals/libssl.suprx` | `app0:lssl.suprx` ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx)) | `install_http_modules` in [install.c](../vitals-app/install.c) |
 
 Sony's own `vs0:sys/external/libssl.suprx` is never modified; the replacement happens at load
@@ -56,7 +56,7 @@ there is nothing of vitals' to release.
 
 ## 6. Files
 
-| File | Role |
-|---|---|
-| [vitals-plugin/main.c](../vitals-plugin/main.c) | the path swap |
+| File                                            | Role                            |
+| ----------------------------------------------- | ------------------------------- |
+| [vitals-plugin/main.c](../vitals-plugin/main.c) | the path swap                   |
 | [vitals-app/install.c](../vitals-app/install.c) | putting the file on the console |

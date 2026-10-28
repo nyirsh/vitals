@@ -2,6 +2,7 @@
 """Runs the host tests: makes the certificates with openssl, starts tests/server.py (HTTP on a
 port, HTTPS on the next) and runs the test binary against it."""
 import pathlib
+import random
 import socket
 import subprocess
 import sys
@@ -18,14 +19,13 @@ def openssl(directory, *arguments):
 
 def free_port():
     # Five ports in a row: plain, HTTPS, HTTPS with a client certificate, old-style TLS 1.2, and one
-    # that keeps the ClientHello
+    # that keeps the ClientHello. They are taken below the ephemeral range (32768 or 49152 up), where
+    # the system puts the tests' own outgoing sockets, and those of any other run alongside
     for _ in range(50):
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", 0))
-            port = probe.getsockname()[1]
-        sockets = [socket.socket() for _ in range(4)]
+        port = random.randrange(20000, 32000 - 5)
+        sockets = [socket.socket() for _ in range(5)]
         try:
-            for offset, other in enumerate(sockets, 1):
+            for offset, other in enumerate(sockets):
                 other.bind(("127.0.0.1", port + offset))
             return port
         except OSError:
@@ -55,14 +55,21 @@ def main():
         (directory / "redirects.txt").write_text("# test list\nold.vitals.test localhost\n")
         # A User-Agent suffix, after a comment and a blank line, with spaces and CRLF to trim
         (directory / "useragent.txt").write_text("# suffix\n\n  Custom/1.0 (Test) \r\nnot this\n")
-        port = free_port()
-        server = subprocess.Popen([sys.executable, "-I", str(HERE / "server.py"), str(port),
-                                   str(directory / "server.pem"), str(directory / "server.key"),
-                                   str(directory / "client.pem"), str(directory / "hello.hex")],
-                                  stdout=subprocess.PIPE, text=True)
+        # The ports are free when picked, but something else may take one before the server binds
+        # it; then the server stops, and another set is tried
+        for _ in range(5):
+            port = free_port()
+            server = subprocess.Popen([sys.executable, "-I", str(HERE / "server.py"), str(port),
+                                       str(directory / "server.pem"), str(directory / "server.key"),
+                                       str(directory / "client.pem"), str(directory / "hello.hex")],
+                                      stdout=subprocess.PIPE, text=True)
+            if server.stdout.readline().strip() == "ready":
+                break
+            server.kill()
+            server.wait()
+        else:
+            raise RuntimeError("the test server didn't start")
         try:
-            if server.stdout.readline().strip() != "ready":
-                raise RuntimeError("the test server didn't start")
             time.sleep(0.1)
             return subprocess.run([binary, str(port), str(directory / "server.pem"),
                                    str(directory / "root.pem"), str(directory / "client.pem"),
