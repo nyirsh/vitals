@@ -990,6 +990,254 @@ static size_t read_file(const char *path, char *out, size_t capacity)
     return size;
 }
 
+extern char vh_test_printed[16384];
+
+/* The exports no header names, as Sony's code does them */
+static void test_private(int template_)
+{
+    static char server_pem[8192], client_pem[8192], client_der[8192];
+    char body[64], mutual[64];
+    int status, value = 99;
+    SceHttpMemoryPoolStats before, after;
+    printf("private exports\n");
+    CHECK_EQ(sceHttpPrivateDebugNothing(), 0);
+    CHECK_EQ(sceHttpPrivateCertCheckNothing(), 0);
+    CHECK_EQ(sceHttpPrivateLoadedCertInit(NULL, NULL), 0);
+    CHECK_EQ(sceHttpGetMemoryPoolStats(&before), 0);
+
+    /* Settings: kept on the object, passed on to what is made from it, checked as Sony's */
+    int parent = sceHttpCreateTemplate("Private", SCE_HTTP_VERSION_1_1, 0);
+    CHECK_EQ(sceHttpPrivateSetOption19(parent, 7), 0);
+    CHECK_EQ(sceHttpPrivateSetOption21(parent, 2), 0);
+    CHECK_EQ(vh_find(parent, VH_TEMPLATE)->settings.option21, 0);
+    CHECK_EQ(sceHttpPrivateSetOption21(parent, 1), 0);
+    CHECK_EQ(sceHttpPrivateSetSocketOption(parent, 1), 0);
+    CHECK_EQ(sceHttpPrivateSetMode(parent, 1), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpPrivateSetMode(parent, 3), 0);
+    CHECK_EQ(sceHttpPrivateSetProxy(parent, 1, 0, NULL, 8080), SCE_HTTP_ERROR_INVALID_VALUE);
+    /* Kept but off (mode 0): the requests below go to the server directly */
+    CHECK_EQ(sceHttpPrivateSetProxy(parent, 0, 0, "proxy.example", 8080), 0);
+    CHECK_EQ(sceHttpPrivateSetSslContextOption(1), 0);
+    int connection = sceHttpCreateConnectionWithURL(parent, g_base, 1);
+    const VhSettings *inherited = &vh_find(connection, VH_CONNECTION)->settings;
+    CHECK_EQ(inherited->option19, 7);
+    CHECK_EQ(inherited->option21, 1);
+    CHECK_EQ(inherited->option14, 1);
+    CHECK_EQ(inherited->option14_set, 1);
+    /* Without it, connections leave the socket option alone */
+    CHECK_EQ(vh_find(template_, VH_TEMPLATE)->settings.option14_set, 0);
+    CHECK_EQ(inherited->mode, 3);
+    CHECK(inherited->proxy_host != NULL && strcmp(inherited->proxy_host, "proxy.example") == 0);
+    CHECK_EQ(inherited->proxy_port, 8080);
+    /* Sony's reads option 14 back with the wrong size: it never succeeds */
+    CHECK_EQ(sceHttpPrivateGetSocketOption(connection, &value), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(value, 99);
+    CHECK_EQ(sceHttpPrivateGetSocketOption(0x7fff, &value), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpPrivateSetOption19(0x7fff, 1), SCE_HTTP_ERROR_INVALID_ID);
+
+    /* Statistics: no socket before a request, the open one after it (keep-alive) */
+    SceHttpPrivateConnectionStats connection_stats;
+    SceHttpPrivateRequestStats request_stats;
+    CHECK_EQ(sceHttpPrivateGetConnectionStats(connection, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpPrivateGetConnectionStats(parent, &connection_stats), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpPrivateGetConnectionStats(connection, &connection_stats), 0);
+    CHECK(connection_stats.alive == 0 && connection_stats.socket == -1);
+    int request;
+    /* The proxy is off: the request goes to the server directly */
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), &request), 11);
+    /* A request can't be given the mode */
+    CHECK_EQ(sceHttpPrivateSetMode(request, 2), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpPrivateGetConnectionStats(connection, &connection_stats), 0);
+    CHECK(connection_stats.alive == 1 && connection_stats.socket >= 0 && connection_stats.shut_down == 0);
+    CHECK_EQ(connection_stats.first_socket, connection_stats.socket);
+    CHECK_EQ(sceHttpPrivateGetRequestStats(request, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpPrivateGetRequestStats(connection, &request_stats), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpPrivateGetRequestStats(request, &request_stats), 0);
+    CHECK(request_stats.socket == connection_stats.socket && request_stats.own_socket == -1);
+
+    /* The dumps: debug output, a line at a time in Sony's formats */
+    vh_test_printed[0] = '\0';
+    sceHttpPrivateDumpDebugInfo();
+    CHECK(strstr(vh_test_printed, "vitals-http: **** libhttp debug information ****\nvitals-http: MEMORY POOL\n"
+                                  "vitals-http:  current      max\n") != NULL);
+    CHECK(strstr(vh_test_printed, "vitals-http: CONNECTION\nvitals-http: num. of active connection = ") != NULL);
+    CHECK(strstr(vh_test_printed, "127.0.0.1(-)\n") != NULL);
+    CHECK(strstr(vh_test_printed, "vitals-http: REQUEST\nvitals-http: num. of current request = ") != NULL);
+    CHECK(strstr(vh_test_printed, "http  127.0.0.1 /hello\n") != NULL);
+    vh_test_printed[0] = '\0';
+    sceHttpPrivateDumpMemoryPool();
+    CHECK(strncmp(vh_test_printed, "vitals-http:  current      max\nvitals-http: ", 44) == 0);
+    vh_test_printed[0] = '\0';
+    sceHttpPrivateDumpRequests();
+    sceHttpPrivateDumpConnections();
+    CHECK(strstr(vh_test_printed, "vitals-http: id       status connId   \n") != NULL);
+    CHECK(strstr(vh_test_printed, "vitals-http: id        sock  port leased4  stat \n") != NULL);
+    CHECK(strstr(vh_test_printed, "vitals-http: ---------------------\n") != NULL);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteTemplate(parent);
+    /* Nothing is left behind in the pool, the proxy's copies included */
+    CHECK_EQ(sceHttpGetMemoryPoolStats(&after), 0);
+    CHECK_EQ(after.currentInuseSize, before.currentInuseSize);
+
+    /* The loaded certificates, one at a time: the server's certificate as a CA */
+    size_t server_size = read_file(g_cert_path, server_pem, sizeof(server_pem));
+    size_t client_size = read_file(g_client_cert_path, client_pem, sizeof(client_pem));
+    size_t key_size = read_file(g_client_key_path, client_der, sizeof(client_der));
+    CHECK_EQ(sceHttpsUnloadCert(), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL),
+             SCE_HTTP_ERROR_SSL);
+    CHECK_EQ(sceHttpPrivateLoadedCertAddCa("not a certificate", 17), 0);
+    CHECK_EQ(sceHttpPrivateLoadedCertAddCa(server_pem, (unsigned int)server_size), 0);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL), 11);
+    sceHttpDeleteConnection(connection);
+    CHECK_EQ(sceHttpPrivateLoadedCertClearCa(), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL),
+             SCE_HTTP_ERROR_SSL);
+    sceHttpDeleteConnection(connection);
+
+    /* The client certificate and its key, for a server that wants one */
+    snprintf(mutual, sizeof(mutual), "https://127.0.0.1:%d", g_port + 2);
+    CHECK_EQ(sceHttpPrivateLoadedCertAddCa(server_pem, (unsigned int)server_size), 0);
+    CHECK_EQ(sceHttpPrivateLoadedCertSetClientCert(client_pem, (unsigned int)client_size), 0);
+    CHECK_EQ(sceHttpPrivateLoadedCertSetClientKey(client_der, (unsigned int)key_size), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, mutual, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(mutual, "/hello"), NULL, &status, body, sizeof(body), NULL), 11);
+    sceHttpDeleteConnection(connection);
+    CHECK_EQ(sceHttpPrivateLoadedCertClearClient(), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, mutual, 1);
+    int refused = fetch(connection, SCE_HTTP_METHOD_GET, url(mutual, "/hello"), NULL, &status, body, sizeof(body), NULL);
+    CHECK(refused == (int)SCE_HTTP_ERROR_SSL || refused == (int)SCE_HTTP_ERROR_NETWORK);
+    sceHttpDeleteConnection(connection);
+    /* Ending the store forgets the CA certificate too */
+    CHECK_EQ(sceHttpPrivateLoadedCertTerm(), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL),
+             SCE_HTTP_ERROR_SSL);
+    sceHttpDeleteConnection(connection);
+}
+
+extern char vh_test_system_proxy_host[256];
+extern unsigned short vh_test_system_proxy_port;
+
+/* What the test proxy has done, asked of it directly */
+static void proxy_stats(char *out, int capacity)
+{
+    char base[64];
+    int status;
+    snprintf(base, sizeof(base), "http://127.0.0.1:%d", g_port + 5);
+    int template_ = sceHttpCreateTemplate("Stats", SCE_HTTP_VERSION_1_1, 0);
+    int connection = sceHttpCreateConnectionWithURL(template_, base, 0);
+    int got = fetch(connection, SCE_HTTP_METHOD_GET, url(base, "/stats"), NULL, &status, out, capacity - 1, NULL);
+    out[got > 0 ? got : 0] = '\0';
+    sceHttpDeleteTemplate(template_);
+}
+
+static void test_proxy(void)
+{
+    static char headers[4096], stats[512], pem[8192];
+    char body[64], expected[160], length[32], *header;
+    unsigned int size, count;
+    int status, request, ssl_error;
+    unsigned int detail;
+    SceHttpHeaderPair pairs[16];
+    printf("proxy\n");
+    size_t pem_size = read_file(g_cert_path, pem, sizeof(pem));
+    SceHttpsData server = {pem, (unsigned int)pem_size};
+    const SceHttpsData *list[] = {&server};
+    CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
+
+    /* Set on the template: plain http names the whole URL, and Proxy-Connection replaces Connection */
+    int template_ = sceHttpCreateTemplate("Proxied", SCE_HTTP_VERSION_1_1, 0);
+    CHECK_EQ(sceHttpPrivateSetProxy(template_, 1, 0, "127.0.0.1", (unsigned short)(g_port + 5)), 0);
+    int connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/headers"), 0);
+    CHECK_EQ(sceHttpRequestGetAllHeaders(request, pairs, &count, length, &size), 0);
+    CHECK(strcmp(pairs[count - 1].name, "Proxy-Connection") == 0);
+    CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
+    int got = read_all(request, headers, sizeof(headers) - 1, 1000);
+    headers[got > 0 ? got : 0] = '\0';
+    CHECK(strstr(headers, "Proxy-Connection: Keep-Alive") != NULL);
+    CHECK_EQ(sent_header(request, &header, &size), 0);
+    snprintf(expected, sizeof(expected), "GET http://127.0.0.1:%d/headers HTTP/1.1\r\n", g_port);
+    CHECK(size > strlen(expected) && memcmp(header, expected, strlen(expected)) == 0);
+    sceHttpDeleteRequest(request);
+    proxy_stats(stats, sizeof(stats));
+    snprintf(expected, sizeof(expected), "last=GET http://127.0.0.1:%d/headers HTTP/1.1", g_port);
+    CHECK(strstr(stats, expected) != NULL);
+    sceHttpDeleteConnection(connection);
+
+    /* https goes through a tunnel, and the server's certificate is still checked */
+    connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL), 11);
+    proxy_stats(stats, sizeof(stats));
+    snprintf(expected, sizeof(expected), "last=CONNECT 127.0.0.1:%d HTTP/1.1", g_port + 1);
+    CHECK(strstr(stats, expected) != NULL);
+    char before[512];
+    snprintf(before, sizeof(before), "%s", stats);
+    /* The tunnel is kept for the next request, as a direct socket is */
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL), 11);
+    proxy_stats(stats, sizeof(stats));
+    CHECK(strncmp(stats, before, strcspn(before, " ")) == 0);
+    sceHttpDeleteConnection(connection);
+    CHECK_EQ(sceHttpsUnloadCert(), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), &request),
+             SCE_HTTP_ERROR_SSL);
+    CHECK_EQ(sceHttpsGetSslError(request, &ssl_error, &detail), 0);
+    CHECK_EQ(ssl_error, SCE_HTTPS_ERROR_CERT);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteConnection(connection);
+
+    /* A tunnel the proxy refuses */
+    connection = sceHttpCreateConnectionWithURL(template_, "https://127.0.0.1:1", 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, "https://127.0.0.1:1/", NULL, &status, body, sizeof(body), &request),
+             SCE_HTTP_ERROR_SSL);
+    CHECK_EQ(sceHttpsGetSslError(request, &ssl_error, &detail), 0);
+    CHECK_EQ(ssl_error, SCE_HTTPS_ERROR_PROXY);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteConnection(connection);
+
+    /* Turned off again: direct */
+    CHECK_EQ(sceHttpPrivateSetProxy(template_, 0, 0, "127.0.0.1", (unsigned short)(g_port + 5)), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), &request), 11);
+    CHECK_EQ(sent_header(request, &header, &size), 0);
+    CHECK(strncmp(header, "GET /hello HTTP/1.1\r\n", 21) == 0);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteTemplate(template_);
+
+    /* The system's proxy, for templates made with autoProxyConf 1 only, and over what the object set */
+    snprintf(vh_test_system_proxy_host, sizeof(vh_test_system_proxy_host), "127.0.0.1");
+    vh_test_system_proxy_port = (unsigned short)(g_port + 5);
+    template_ = sceHttpCreateTemplate("System", SCE_HTTP_VERSION_1_1, 1);
+    CHECK_EQ(sceHttpPrivateSetProxy(template_, 1, 0, "proxy.invalid", 9), 0);
+    connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), &request), 11);
+    CHECK_EQ(sent_header(request, &header, &size), 0);
+    snprintf(expected, sizeof(expected), "GET http://127.0.0.1:%d/hello HTTP/1.1\r\n", g_port);
+    CHECK(memcmp(header, expected, strlen(expected)) == 0);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteTemplate(template_);
+    int direct = sceHttpCreateTemplate("Direct", SCE_HTTP_VERSION_1_1, 0);
+    connection = sceHttpCreateConnectionWithURL(direct, g_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), &request), 11);
+    CHECK_EQ(sent_header(request, &header, &size), 0);
+    CHECK(strncmp(header, "GET /hello HTTP/1.1\r\n", 21) == 0);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteTemplate(direct);
+    /* With none set in the system, none is used */
+    vh_test_system_proxy_host[0] = '\0';
+    template_ = sceHttpCreateTemplate("System", SCE_HTTP_VERSION_1_1, 1);
+    connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    CHECK_EQ(fetch(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), &request), 11);
+    CHECK_EQ(sent_header(request, &header, &size), 0);
+    CHECK(strncmp(header, "GET /hello HTTP/1.1\r\n", 21) == 0);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteTemplate(template_);
+}
+
 static void test_client_certificate(int template_)
 {
     static char server_pem[8192], client_pem[8192], client_der[8192];
@@ -1171,6 +1419,8 @@ int main(int argc, char **argv)
     test_https(template_);
     test_nonblocking(template_);
     test_client_certificate(template_);
+    test_private(template_);
+    test_proxy();
     test_console_profile(template_);
     test_host_redirects(template_);
 

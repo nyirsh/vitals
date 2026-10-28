@@ -18,12 +18,12 @@ def openssl(directory, *arguments):
 
 
 def free_port():
-    # Five ports in a row: plain, HTTPS, HTTPS with a client certificate, old-style TLS 1.2, and one
-    # that keeps the ClientHello. They are taken below the ephemeral range (32768 or 49152 up), where
+    # Six ports in a row: plain, HTTPS, HTTPS with a client certificate, old-style TLS 1.2, one
+    # that keeps the ClientHello, and a proxy. They are taken below the ephemeral range (32768 or 49152 up), where
     # the system puts the tests' own outgoing sockets, and those of any other run alongside
     for _ in range(50):
-        port = random.randrange(20000, 32000 - 5)
-        sockets = [socket.socket() for _ in range(5)]
+        port = random.randrange(20000, 32000 - 6)
+        sockets = [socket.socket() for _ in range(6)]
         try:
             for offset, other in enumerate(sockets):
                 other.bind(("127.0.0.1", port + offset))
@@ -33,7 +33,7 @@ def free_port():
         finally:
             for other in sockets:
                 other.close()
-    raise RuntimeError("no five free ports in a row")
+    raise RuntimeError("no six free ports in a row")
 
 
 def main():

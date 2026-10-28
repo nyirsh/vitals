@@ -638,3 +638,77 @@ void vh_tls_unload_certs(void)
     g_loaded = NULL;
     free_client();
 }
+
+/* A copy of size bytes, NUL-terminated for PEM; NULL when there are none or memory ran out */
+static unsigned char *copy_bytes(const void *data, unsigned int size)
+{
+    const SceHttpsData given = {(char *)(uintptr_t)data, size};
+    size_t copied = 0;
+    return copy_data(&given, &copied);
+}
+
+/* Sony's keeps whatever it is given and fails at its use; one that doesn't parse can't be used
+ * here either, so it is left out, with the reason logged */
+int vh_tls_add_ca(const void *data, unsigned int size)
+{
+    if (tls_ready() < 0)
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+    if (data == NULL || size == 0)
+        return 0;
+    unsigned char *copy = copy_bytes(data, size);
+    if (copy == NULL)
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+    if (g_loaded == NULL) {
+        g_loaded = mbedtls_calloc(1, sizeof(*g_loaded));
+        if (g_loaded == NULL) {
+            free(copy);
+            return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+        }
+        mbedtls_x509_crt_init(g_loaded);
+    }
+    int parsed = parse_certificate_data(g_loaded, copy, size);
+    free(copy);
+    if (parsed == MBEDTLS_ERR_X509_ALLOC_FAILED)
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+    if (parsed != 0)
+        VITALS_LOG("private CA certificate of %u bytes unreadable rc=%08X: not trusted", size, (unsigned int)parsed);
+    return 0;
+}
+
+void vh_tls_clear_cas(void)
+{
+    free_chain(g_loaded);
+    g_loaded = NULL;
+}
+
+/* Each replaces the one before, and nothing (no data, or none of it) leaves none; the pair is used
+ * once both are there, as sceHttpsLoadCert's */
+static int set_client_part(unsigned char **slot, size_t *slot_size, const void *data, unsigned int size, int secret)
+{
+    if (tls_ready() < 0)
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+    unsigned char *copy = NULL;
+    if (data != NULL && size != 0 && (copy = copy_bytes(data, size)) == NULL)
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+    if (secret && *slot != NULL)
+        mbedtls_platform_zeroize(*slot, *slot_size);
+    free(*slot);
+    *slot = copy;
+    *slot_size = copy != NULL ? size : 0;
+    return 0;
+}
+
+int vh_tls_set_client_certificate(const void *data, unsigned int size)
+{
+    return set_client_part(&g_client_certificate, &g_client_certificate_size, data, size, 0);
+}
+
+int vh_tls_set_client_key(const void *data, unsigned int size)
+{
+    return set_client_part(&g_client_key, &g_client_key_size, data, size, 1);
+}
+
+void vh_tls_clear_client(void)
+{
+    free_client();
+}

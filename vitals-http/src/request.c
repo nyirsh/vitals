@@ -39,7 +39,6 @@ static int copy_text(char *destination, size_t capacity, const char *source, siz
 int sceHttpCreateTemplate(const char *userAgent, int httpVer, int autoProxyConf)
 {
     VH_TRACE();
-    (void)autoProxyConf;
     if (httpVer != SCE_HTTP_VERSION_1_0 && httpVer != SCE_HTTP_VERSION_1_1)
         return (int)SCE_HTTP_ERROR_INVALID_VERSION;
     if (userAgent != NULL && strlen(userAgent) >= VH_USER_AGENT_MAX)
@@ -57,6 +56,7 @@ int sceHttpCreateTemplate(const char *userAgent, int httpVer, int autoProxyConf)
              * useragent.txt gives another */
             char agent[VH_USER_AGENT_MAX + VH_SUFFIX_MAX];
             object->as.template_.http_version = httpVer;
+            object->as.template_.auto_proxy = autoProxyConf;
             snprintf(agent, sizeof(agent), "%s%s%s", userAgent != NULL ? userAgent : "",
                      userAgent != NULL && userAgent[0] != '\0' ? " " : "", vh_user_agent_suffix());
             result = sceHttpAddRequestHeader(object->id, "User-Agent", agent, SCE_HTTP_HEADER_OVERWRITE);
@@ -440,11 +440,18 @@ int sceHttpSetRequestContentLength(int id, unsigned long long int contentLength)
 
 /* ---- the request's socket and response ---- */
 
-static int same_server(const VhConnection *connection, const VhRequest *request)
+/* The request goes to the connection's server, so the connection may keep its socket */
+static int same_server_kept(const VhConnection *connection, const VhRequest *request)
 {
     size_t length = strlen(connection->host);
     return connection->https == request->https && connection->port == request->port &&
            strlen(request->host) == length && vh_equal_nocase(connection->host, request->host, length);
+}
+
+/* The connection's kept socket goes where the request goes: the same server, the same way */
+static int same_server(const VhConnection *connection, const VhRequest *request)
+{
+    return same_server_kept(connection, request) && connection->transport_proxied == request->proxied;
 }
 
 /* Whether the whole body came off the socket, so the next response is what follows */
@@ -463,8 +470,10 @@ static void release_transport(VhObject *connection, VhRequest *request, int keep
     request->transport = NULL;
     VhConnection *c = connection != NULL ? &connection->as.connection : NULL;
     if (keep && request->reusable && body_finished(request) && request->pending_offset == request->pending_size &&
-        c != NULL && c->keep_alive && c->transport == NULL && same_server(c, request))
+        c != NULL && c->keep_alive && c->transport == NULL && same_server_kept(c, request)) {
         c->transport = transport;
+        c->transport_proxied = request->proxied;
+    }
     else
         vh_transport_close(transport);
 }
@@ -860,6 +869,26 @@ static void store_cookies(VhObject *object)
     }
 }
 
+/* The proxy the request goes through: the system's (from the network settings) when its template
+ * was made with autoProxyConf 1, as Sony's reads it again for every send; otherwise the one
+ * sceHttpPrivateSetProxy gave the object, when it turned one on. 1 with its host and port, or 0 */
+static int choose_proxy(VhObject *object, const VhObject *template_, char *host, size_t capacity, unsigned short *port)
+{
+    if (template_ != NULL && template_->as.template_.auto_proxy == 1)
+        return vh_platform_system_proxy(host, capacity, port);
+    int proxied = 0;
+    vh_lock();
+    const VhSettings *settings = &object->settings;
+    if (settings->proxy_mode == 1 && settings->proxy_host != NULL && settings->proxy_host[0] != '\0' &&
+        settings->proxy_port != 0 && strlen(settings->proxy_host) < capacity) {
+        memcpy(host, settings->proxy_host, strlen(settings->proxy_host) + 1);
+        *port = settings->proxy_port;
+        proxied = 1;
+    }
+    vh_unlock();
+    return proxied;
+}
+
 /* Sends the request and reads the response's headers, on the connection's open socket when it
  * has one for this server; 0 or an error */
 static int exchange(VhObject *object, VhObject *connection, const VhObject *template_, const unsigned char *body,
@@ -888,7 +917,15 @@ static int exchange(VhObject *object, VhObject *connection, const VhObject *temp
         cookie = NULL;
     }
 
+    /* Through a proxy, decided before the request text, which depends on it */
+    char proxy_host[VH_HOST_MAX];
+    unsigned short proxy_port = 0;
+    int proxied = choose_proxy(object, template_, proxy_host, sizeof(proxy_host), &proxy_port);
+    if (proxied)
+        VITALS_LOG("request %d through proxy %s:%u", object->id, proxy_host, (unsigned int)proxy_port);
+
     vh_lock();
+    request->proxied = proxied;
     int result = vh_build_request(object, connection, template_, body_size, has_body, cookie, &text, &text_size);
     if (result == 0) {
         vh_free(request->request_header);
@@ -911,6 +948,10 @@ static int exchange(VhObject *object, VhObject *connection, const VhObject *temp
         .https_options = vh_https_options_of(settings),
         .ssl_callback = settings->ssl_callback,
         .ssl_argument = settings->ssl_argument,
+        .option14 = settings->option14,
+        .option14_set = settings->option14_set,
+        .proxy_host = proxied ? proxy_host : NULL,
+        .proxy_port = proxy_port,
     };
     unsigned int header_max = settings->response_header_max;
     if (open.recv_timeout_us != 0 && open.recv_timeout_us < VH_REDIRECT_RECV_TIMEOUT_US &&

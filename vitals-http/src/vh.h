@@ -78,6 +78,16 @@ typedef struct VhSettings
     SceHttpEpollHandle epoll;
     void *epoll_argument;
     int epoll_id;
+    /* Sony's settings no header names (private.c), by its option numbers: 14 (bit 0 turns its
+     * socket option 0x40000 from 8 to 0), 19 and 21 (kept, as Sony's, with no effect known
+     * here), its proxy (17 and 18; vitals-http doesn't use proxies) and the mode a template or
+     * connection is given by 175685B8 */
+    unsigned char option14, option14_set;
+    int option19, option21, mode;
+    int proxy_mode, proxy_version;
+    unsigned short proxy_port;
+    /* Only when one is set, so objects stay small: the shell makes about twenty from a small pool */
+    char *proxy_host;
     VhHeaders headers;
 } VhSettings;
 
@@ -114,6 +124,8 @@ typedef enum VhBodyMode
 typedef struct VhTemplate
 {
     int http_version;
+    /* sceHttpCreateTemplate's autoProxyConf: 1 sends its requests through the system's proxy */
+    int auto_proxy;
 } VhTemplate;
 
 typedef struct VhConnection
@@ -122,8 +134,10 @@ typedef struct VhConnection
     char host[VH_HOST_MAX];
     unsigned short port;
     int keep_alive;
-    /* The open socket of the last request, kept for the next one when the server allows it */
+    /* The open socket of the last request, kept for the next one when the server allows it, and
+     * whether it goes through a proxy */
     VhTransport *transport;
+    int transport_proxied;
     /* Requests using the connection, which can't be deleted before them */
     unsigned int requests;
     int ssl_error;
@@ -138,6 +152,8 @@ typedef struct VhRequest
     char host[VH_HOST_MAX];
     unsigned short port;
     int https;
+    /* Its last exchange went through a proxy */
+    int proxied;
     /* Set by the app with the request or sceHttpSetRequestContentLength; -1 when not */
     long long content_length;
     VhRequestState state;
@@ -342,6 +358,12 @@ typedef struct VhOpen
     unsigned int https_options;
     SceHttpsCallback ssl_callback;
     void *ssl_argument;
+    /* Sony's option 14, and whether it was set: only then is socket option 0x40000 set */
+    unsigned char option14, option14_set;
+    /* The proxy the socket goes to instead of host, NULL for none; https goes through it with a
+     * CONNECT tunnel (vh_proxy_tunnel), and TLS is still with host */
+    const char *proxy_host;
+    unsigned short proxy_port;
 } VhOpen;
 
 /* Memory for the pool sceHttpInit asks for; the core keeps the accounting */
@@ -355,7 +377,10 @@ void vh_platform_unlock(void);
 /* A transport not yet connected, so it can be aborted while it resolves and connects; NULL when
  * memory runs out */
 VhTransport *vh_transport_create(void);
-/* Connects to the server, with TLS for https; 0 or a libhttp error */
+/* Asks the proxy the transport is connected to for a tunnel to open's host and port (CONNECT),
+ * before TLS; 0, or SCE_HTTP_ERROR_SSL with SCE_HTTPS_ERROR_PROXY when the proxy refuses */
+int vh_proxy_tunnel(VhTransport *transport, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail);
+/* Connects to the server, or to its proxy, with TLS for https; 0 or a libhttp error */
 int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail);
 /* Sends all of data; 0 or a libhttp error */
 int vh_transport_send(VhTransport *transport, const void *data, size_t size);
@@ -364,6 +389,8 @@ int vh_transport_recv(VhTransport *transport, void *data, size_t size);
 /* Makes blocking sends and receives on the transport return SCE_HTTP_ERROR_ABORTED; any thread */
 void vh_transport_abort(VhTransport *transport);
 void vh_transport_close(VhTransport *transport);
+/* The transport's socket, -1 without one, for the private statistics */
+int vh_transport_socket(const VhTransport *transport);
 /* The last network error number the transport saw, 0 when none */
 int vh_transport_errno(VhTransport *transport);
 
@@ -379,6 +406,9 @@ int vh_platform_thread(void (*function)(void *), void *argument);
 unsigned int vh_platform_generation(void);
 void vh_platform_notify(void);
 int vh_platform_wait(unsigned int generation, long long timeout_us);
+/* The system's HTTP proxy, from the network settings: 1 with its host and port when one is set,
+ * 0 when none is */
+int vh_platform_system_proxy(char *host, size_t capacity, unsigned short *port);
 /* Up to size bytes of the host redirect list from offset: their number, 0 past the end, or an error */
 int vh_platform_redirects_read(unsigned int offset, void *buffer, unsigned int size);
 /* Sets up TLS's heap, on first use; 0 or negative */
@@ -418,5 +448,12 @@ void vh_tls_close(VhTls *tls);
  * the lock held */
 int vh_tls_load_certs(int count, const SceHttpsData **list, const SceHttpsData *cert, const SceHttpsData *key);
 void vh_tls_unload_certs(void);
+/* The same store, a piece at a time, as Sony's private exports fill it (private.c); with the lock
+ * held. A certificate or key is kept as given and parsed when it is used, as Sony's are */
+int vh_tls_add_ca(const void *data, unsigned int size);
+void vh_tls_clear_cas(void);
+int vh_tls_set_client_certificate(const void *data, unsigned int size);
+int vh_tls_set_client_key(const void *data, unsigned int size);
+void vh_tls_clear_client(void);
 
 #endif

@@ -109,7 +109,9 @@ lists the headers as name and value pairs, both as Sony's do.
 3. **The socket:** the connection's open one, when the last request left it to the same server;
    otherwise a new one, through the resolver and `sceNetConnect`. A reused socket the server closed
    meanwhile is replaced once, silently. A request to a redirected host waits at least 30 seconds for
-   an answer, whatever shorter receive timeout the app set.
+   an answer, whatever shorter receive timeout the app set. Through a proxy (the network settings',
+   for a template made with `autoProxyConf` 1), the socket goes to the proxy, and `https` asks it
+   for a tunnel first ([vitals-http/README.md](../vitals-http/README.md#proxies)).
 4. **TLS**, for `https`: see the next section.
 5. **The exchange:** the text and the body go out, and the response's status line and headers come
    back. Cookies the response sets are offered to the app's callback and kept in the jar.
@@ -199,7 +201,7 @@ app's **Debug output** option.
 | `handshake ok host=… …`                                   | vitals-http   | one connection's TLS                                    |
 | `certificate host=… accepted=0`                           | vitals-http   | a server refused for its certificate                    |
 | `request <id> <method> <url> rc=… status=…`               | vitals-http   | one finished request, with the headers when it failed   |
-| `private export <NID> called …`                           | vitals-http   | Sony's code called one of the exports no header names   |
+| `private option …`, `private client certificate …`       | vitals-http   | something used one of the exports no header names       |
 
 ## 11. Files
 

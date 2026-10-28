@@ -35,7 +35,7 @@ the app gives `sceHttpInit`. An open https connection takes about 40 KiB of it.
 | [src/async.c](src/async.c) | non-blocking requests (a worker thread per call) and the epoll API |
 | [src/redirect.c](src/redirect.c) | the host redirect list, `ux0:data/vitals/redirects.txt` |
 | [src/useragent.c](src/useragent.c) | the User-Agent suffix, `ux0:data/vitals/useragent.txt` |
-| [src/private.c](src/private.c) | stubs for the 23 exports nothing names |
+| [src/private.c](src/private.c) | the 23 exports nothing names, as Sony's code does them |
 | [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, `sceHttpsLoadCert` |
 | [src/platform_vita.c](src/platform_vita.c) | module start, the pool's memory, the lock, SceNet |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |
@@ -110,15 +110,56 @@ are gone at once and the memory is freed when the worker is done.
 
 ## Unnamed exports
 
-Sony's libhttp exports 23 functions no header or NID database names (`sceHttpPrivate<NID>` here).
-Their code shows what they are: debug dumps, object statistics, settings, allocator hooks and a
-list of loaded certificates. They are stubs that never touch their arguments; the dumps and
-settings succeed, the rest return `SCE_HTTP_ERROR_UNKNOWN`. One is known: `A9A39BA1` installs
-libhttp's certificate check on a libssl context its caller made (the NetCheck dialog's own TLS);
-it succeeds without installing anything, so that context keeps only libssl's own checks, because
-failing it ends a game's PSN sign-in. With `DEBUG=1`, each call is logged,
-to find which ones Sony's own code relies on.
+Sony's libhttp exports 23 functions no header or NID database names. Here they are named
+`sceHttpPrivate<what it does>` ([src/private.c](src/private.c), each with its NID), and each does
+what Sony's code does, worked out from its disassembly. The names are this project's: apps link to
+them by NID, so they don't change anything for them.
+
+| Name (`sceHttpPrivate…`) | NID | What it does |
+| --- | --- | --- |
+| `DumpRequests` | `FE60380A` | prints every request, in Sony's format, as debug output (`DEBUG=1` or `2`; Sony's prints them in every build) |
+| `DumpConnections` | `B0E41827` | prints every connection |
+| `DumpMemoryPool` | `88116DB8` | prints the pool's current and peak use |
+| `DumpDebugInfo` | `0B0D8E7A` | prints all three, under Sony's header |
+| `DebugNothing` | `5B6A0ACE` | does nothing, as Sony's |
+| `GetConnectionStats` | `54847CFE` | a connection's socket, and whether it is open |
+| `GetRequestStats` | `80E6013D` | a request's socket |
+| `SetSocketOption` | `F30073EC` | Sony's option 14. Sony's sets socket option `0x40000` on every socket, to 8, or to 0 when bit 0 of this is set; here it is set only once something calls this, so connections otherwise keep the system's value |
+| `GetSocketOption` | `30F5D11F` | reads option 14 back; Sony's asks for it with the wrong size, so it always fails, as here |
+| `SetOption19` | `43A7CC70` | Sony's option 19, kept; what it does isn't known |
+| `SetOption21` | `C498765A` | Sony's option 21, on or off, kept; what it does isn't known |
+| `SetMode` | `175685B8` | a mode, 2 or 3, of a template or connection, kept; what it does isn't known |
+| `SetProxy` | `53B722F2` | a proxy (options 17 and 18): its host and port, used when its mode is 1 (see [Proxies](#proxies)) |
+| `SetSslContextOption` | `855D5254` | a library-wide option Sony's hands to the TLS contexts libssl makes for it; kept, as this TLS isn't libssl's |
+| `LoadedCertInit` | `E0825488` | sets up the store of loaded certificates, with the caller's allocator, which isn't needed here |
+| `LoadedCertTerm` | `11C9BCE8` | ends it: every CA certificate, the client certificate and key are forgotten |
+| `LoadedCertAddCa` | `F8885CFD` | adds a CA certificate, as `sceHttpsLoadCert` does |
+| `LoadedCertClearCa` | `0CC59EF6` | forgets the CA certificates |
+| `LoadedCertSetClientCert` | `031EBD2A` | sets the client certificate |
+| `LoadedCertSetClientKey` | `802E3C30` | sets the client key |
+| `LoadedCertClearClient` | `42108FBE` | forgets the client certificate and key |
+| `SslContextAddCertCheck` | `A9A39BA1` | installs libhttp's certificate check on a libssl context its caller made (the NetCheck dialog's own TLS). It succeeds without installing anything, so that context keeps only libssl's own checks, because failing it ends a game's PSN sign-in |
+| `CertCheckNothing` | `A4CF892E` | only succeeds, as Sony's |
+
+With `DEBUG=1`, the settings and certificate calls are logged.
+
+## Proxies
+
+As Sony's, a request goes through an HTTP proxy in two cases:
+
+- its template was made with `autoProxyConf` 1 (`sceHttpCreateTemplate`'s third argument): then
+  the proxy set in the console's network settings, read again for every request
+  (`sceNetCtlInetGetInfo`), or none when the settings have none;
+- otherwise, the proxy `sceHttpPrivateSetProxy` gave the template, connection or request, when it
+  turned it on (mode 1).
+
+Plain `http` requests are sent to the proxy with the whole URL in the request line and
+`Proxy-Connection` in place of `Connection`. `https` opens a tunnel with `CONNECT host:port`, and
+TLS runs through it with the real server, whose certificate is checked as usual: the proxy can't
+read or change what passes. A proxy that refuses the tunnel fails the request with
+`SCE_HTTP_ERROR_SSL` and `SCE_HTTPS_ERROR_PROXY`. Host redirects apply to the real server, and a
+kept socket is reused only by a request that goes the same way, through the proxy or not.
 
 ## Not supported
 
-Proxies.
+Proxies that ask for credentials (407), and SOCKS proxies.

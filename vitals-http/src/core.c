@@ -109,6 +109,8 @@ static void free_headers(VhHeaders *headers)
 void vh_settings_free(VhSettings *settings)
 {
     free_headers(&settings->headers);
+    vh_free(settings->proxy_host);
+    settings->proxy_host = NULL;
 }
 
 /* Copies everything; the headers are duplicated, and dropped where memory runs out */
@@ -116,6 +118,8 @@ void vh_settings_copy(VhSettings *destination, const VhSettings *source)
 {
     *destination = *source;
     destination->headers.count = 0;
+    /* Dropped too where memory runs out: it is never used */
+    destination->proxy_host = source->proxy_host != NULL ? vh_strdup(source->proxy_host, strlen(source->proxy_host)) : NULL;
     for (unsigned int i = 0; i < source->headers.count; ++i) {
         const VhHeader *header = &source->headers.items[i];
         char *name = vh_strdup(header->name, strlen(header->name));

@@ -102,6 +102,7 @@ target_link_libraries(vitals_libhttp PRIVATE
     SceSysmem_stub
     SceIofilemgr_stub
     SceNet_stub
+    SceNetCtl_stub
     SceRtc_stub
 )
 

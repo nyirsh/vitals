@@ -14,6 +14,7 @@
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/net/net.h>
+#include <psp2/net/netctl.h>
 #include <psp2/rtc.h>
 
 /* The engine on the Vita: a memory block with an mspace for the app's pool, a lightweight mutex,
@@ -155,6 +156,28 @@ int vh_platform_tls_init(void)
     if (!g_heap_ready && vitals_user_runtime_init() == 0)
         g_heap_ready = 1;
     return g_heap_ready ? 0 : -1;
+}
+
+/* As Sony's reads it: the proxy is on when its configuration is 1 (manual), then its port and
+ * server; without SceNetCtl started by the app, there is none */
+int vh_platform_system_proxy(char *host, size_t capacity, unsigned short *port)
+{
+    SceNetCtlInfo info;
+    if (sceNetCtlInetGetInfo(SCE_NETCTL_INFO_GET_HTTP_PROXY_CONFIG, &info) < 0 || info.http_proxy_config != 1)
+        return 0;
+    if (sceNetCtlInetGetInfo(SCE_NETCTL_INFO_GET_HTTP_PROXY_PORT, &info) < 0 || info.http_proxy_port == 0 ||
+        info.http_proxy_port > 0xffffu)
+        return 0;
+    *port = (unsigned short)info.http_proxy_port;
+    memset(&info, 0, sizeof(info));
+    if (sceNetCtlInetGetInfo(SCE_NETCTL_INFO_GET_HTTP_PROXY_SERVER, &info) < 0)
+        return 0;
+    const char *end = memchr(info.http_proxy_server, '\0', sizeof(info.http_proxy_server));
+    size_t length = end != NULL ? (size_t)(end - info.http_proxy_server) : 0;
+    if (length == 0 || length >= capacity)
+        return 0;
+    memcpy(host, info.http_proxy_server, length + 1);
+    return 1;
 }
 
 /* Through the kernel plugin: games may not open ux0:data themselves */
@@ -300,18 +323,18 @@ static int resolver_error(int error)
     }
 }
 
-static int resolve(VhTransport *transport, const VhOpen *open, SceNetInAddr *address)
+static int resolve(VhTransport *transport, const VhOpen *open, const char *host, SceNetInAddr *address)
 {
-    if (open->host[0] == '[')
+    if (host[0] == '[')
         return (int)SCE_HTTP_ERROR_RESOLVER_ENOSUPPORT;
-    if (sceNetInetPton(SCE_NET_AF_INET, open->host, address) == 1)
+    if (sceNetInetPton(SCE_NET_AF_INET, host, address) == 1)
         return 0;
     int resolver = sceNetResolverCreate("vh_resolver", NULL, 0);
     if (resolver < 0)
         return network_error(transport, resolver);
     transport->resolver = resolver;
     int result = transport->aborted ? (int)SCE_HTTP_ERROR_ABORTED
-                                    : sceNetResolverStartNtoa(resolver, open->host, address,
+                                    : sceNetResolverStartNtoa(resolver, host, address,
                                                               (int)open->resolve_timeout_us, open->resolve_retry, 0);
     transport->resolver = -1;
     sceNetResolverDestroy(resolver);
@@ -319,6 +342,8 @@ static int resolve(VhTransport *transport, const VhOpen *open, SceNetInAddr *add
         return transport->aborted ? (int)SCE_HTTP_ERROR_ABORTED : resolver_error(result);
     return 0;
 }
+
+#define VH_SO_PRIVATE_40000 0x40000
 
 static void set_option(int socket, int level, int name, int value)
 {
@@ -375,9 +400,12 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
 
     *ssl_error = 0;
     *ssl_detail = 0;
-    VITALS_VERBOSE("resolve %s", open->host);
-    int result = resolve(transport, open, &address);
-    VITALS_VERBOSE("resolved %s rc=%08X", open->host, (unsigned int)result);
+    /* The proxy, when there is one */
+    const char *host = open->proxy_host != NULL ? open->proxy_host : open->host;
+    unsigned short port = open->proxy_host != NULL ? open->proxy_port : open->port;
+    VITALS_VERBOSE("resolve %s", host);
+    int result = resolve(transport, open, host, &address);
+    VITALS_VERBOSE("resolved %s rc=%08X", host, (unsigned int)result);
     if (result < 0)
         return result;
     int socket = sceNetSocket("vh_socket", SCE_NET_AF_INET, SCE_NET_SOCK_STREAM, 0);
@@ -388,23 +416,38 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
         return (int)SCE_HTTP_ERROR_ABORTED;
 
     set_option(socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, 1);
+    /* A socket option the SDK doesn't name, which Sony's sets on every socket it opens: 8, or 0 when
+     * bit 0 of its private option 14 is set. It is set here only once something set option 14, so
+     * connections otherwise keep the system's value, as vitals-http always had them. Sony's fails
+     * the connection when it can't be set; it is only logged here */
+    if (open->option14_set) {
+        int value = (open->option14 & 1u) != 0 ? 0 : 8;
+        int set = sceNetSetsockopt(socket, SCE_NET_SOL_SOCKET, VH_SO_PRIVATE_40000, &value, sizeof(value));
+        if (set < 0)
+            VITALS_LOG("socket option 0x40000=%d refused rc=%08X", value, (unsigned int)set);
+    }
     memset(&server, 0, sizeof(server));
     server.sin_len = sizeof(server);
     server.sin_family = SCE_NET_AF_INET;
-    server.sin_port = sceNetHtons(open->port);
+    server.sin_port = sceNetHtons(port);
     server.sin_addr = address;
     result = sceNetConnect(socket, (const SceNetSockaddr *)&server, sizeof(server));
     if (result == (int)SCE_NET_ERROR_EINPROGRESS)
         result = wait_connected(transport, open->connect_timeout_us);
     else if (result < 0)
         result = network_error(transport, result);
-    VITALS_VERBOSE("connected %s:%u rc=%08X", open->host, (unsigned int)open->port, (unsigned int)result);
+    VITALS_VERBOSE("connected %s:%u rc=%08X", host, (unsigned int)port, (unsigned int)result);
     if (result < 0)
         return result;
     set_option(socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, 0);
     set_option(socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_SNDTIMEO, (int)open->send_timeout_us);
     set_option(socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_RCVTIMEO, (int)open->recv_timeout_us);
     set_option(socket, SCE_NET_IPPROTO_TCP, SCE_NET_TCP_NODELAY, 1);
+    if (open->https && open->proxy_host != NULL) {
+        result = vh_proxy_tunnel(transport, open, ssl_error, ssl_detail);
+        if (result < 0)
+            return result;
+    }
     if (open->https) {
         VITALS_VERBOSE("tls start %s options=%03X", open->host, (unsigned int)open->https_options);
         return vh_tls_start(&transport->tls, transport, open, ssl_error, ssl_detail);
@@ -474,6 +517,11 @@ int vh_transport_aborted(VhTransport *transport)
 int vh_transport_errno(VhTransport *transport)
 {
     return transport->error_number;
+}
+
+int vh_transport_socket(const VhTransport *transport)
+{
+    return transport != NULL ? transport->socket : -1;
 }
 
 void vh_transport_close(VhTransport *transport)

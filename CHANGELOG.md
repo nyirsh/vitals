@@ -9,6 +9,7 @@
 - Removed reauth for it is now redundant, the PlayStation Store works with vitals' own HTTP library too!
 - Fixed an issue with the browser that allowed websites with a bad certificate to load in case after a refresh
 - The connection test now checks certificates against badssl.com
+- Apps and games now use the proxy set in the network settings, as they do without vitals
 
 ## 1.4
 

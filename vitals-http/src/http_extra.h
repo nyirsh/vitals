@@ -85,6 +85,47 @@ int sceHttpWaitRequest(SceHttpEpollHandle eh, SceHttpNBEvent *nbev, int maxevent
 int sceHttpWaitRequestCB(SceHttpEpollHandle eh, SceHttpNBEvent *nbev, int maxevents, int timeout);
 int sceHttpAbortWaitRequest(SceHttpEpollHandle eh);
 
+/* The exports no header or NID database names, as Sony's code takes them (private.c) */
+typedef struct SceHttpPrivateConnectionStats
+{
+    int alive;      /* its socket is connected, and wasn't shut down */
+    int shut_down;
+    int socket;     /* -1 without one */
+    int first_socket;
+} SceHttpPrivateConnectionStats;
+typedef struct SceHttpPrivateRequestStats
+{
+    int socket;     /* its connection's, -1 without one */
+    int own_socket; /* Sony's per-request socket; vitals-http has none, so -1 */
+    int first_socket;
+} SceHttpPrivateRequestStats;
+typedef void *(*SceHttpPrivateAlloc)(unsigned int size);
+typedef void (*SceHttpPrivateFree)(void *pointer);
+
+int sceHttpPrivateDebugNothing(void);
+void sceHttpPrivateDumpRequests(void);
+void sceHttpPrivateDumpConnections(void);
+void sceHttpPrivateDumpMemoryPool(void);
+void sceHttpPrivateDumpDebugInfo(void);
+int sceHttpPrivateGetConnectionStats(int connId, SceHttpPrivateConnectionStats *stats);
+int sceHttpPrivateGetRequestStats(int reqId, SceHttpPrivateRequestStats *stats);
+int sceHttpPrivateSetOption19(int id, int value);
+int sceHttpPrivateSetMode(int id, int mode);
+int sceHttpPrivateSetSocketOption(int id, unsigned char value);
+int sceHttpPrivateGetSocketOption(int id, int *value);
+int sceHttpPrivateSetProxy(int id, int mode, int version, const char *host, unsigned short port);
+int sceHttpPrivateSetOption21(int id, int value);
+int sceHttpPrivateSetSslContextOption(int value);
+int sceHttpPrivateLoadedCertInit(SceHttpPrivateAlloc allocate, SceHttpPrivateFree release);
+int sceHttpPrivateLoadedCertClearClient(void);
+int sceHttpPrivateLoadedCertClearCa(void);
+int sceHttpPrivateLoadedCertTerm(void);
+int sceHttpPrivateLoadedCertAddCa(const void *data, unsigned int size);
+int sceHttpPrivateLoadedCertSetClientCert(const void *data, unsigned int size);
+int sceHttpPrivateLoadedCertSetClientKey(const void *data, unsigned int size);
+int sceHttpPrivateSslContextAddCertCheck(unsigned int context, unsigned int argument);
+int sceHttpPrivateCertCheckNothing(void);
+
 #ifdef __cplusplus
 }
 #endif

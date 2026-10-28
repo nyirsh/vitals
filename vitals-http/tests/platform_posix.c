@@ -25,6 +25,20 @@
 /* The CA bundle and the host redirect list, which the test names */
 const char *vh_test_ca_path, *vh_test_redirects_path, *vh_test_useragent_path;
 
+/* The system's proxy, as the tests set it: none while the host is empty */
+char vh_test_system_proxy_host[256];
+unsigned short vh_test_system_proxy_port;
+
+int vh_platform_system_proxy(char *host, size_t capacity, unsigned short *port)
+{
+    size_t length = strlen(vh_test_system_proxy_host);
+    if (length == 0 || length >= capacity)
+        return 0;
+    memcpy(host, vh_test_system_proxy_host, length + 1);
+    *port = vh_test_system_proxy_port;
+    return 1;
+}
+
 int vh_platform_useragent_read(void *buffer, unsigned int size)
 {
     FILE *file = vh_test_useragent_path != NULL ? fopen(vh_test_useragent_path, "rb") : NULL;
@@ -45,16 +59,21 @@ int vh_platform_redirects_read(unsigned int offset, void *buffer, unsigned int s
     return (int)got;
 }
 
-/* The debug log (VITALS_LOG), shown when VH_TEST_LOG is set */
+/* The debug log (VITALS_LOG): kept for the tests to read, and shown when VH_TEST_LOG is set */
+char vh_test_printed[16384];
+
 int sceClibPrintf(const char *format, ...)
 {
+    char line[1024];
     va_list arguments;
-    int result = 0;
-    if (getenv("VH_TEST_LOG") == NULL)
-        return 0;
     va_start(arguments, format);
-    result = vfprintf(stderr, format, arguments);
+    int result = vsnprintf(line, sizeof(line), format, arguments);
     va_end(arguments);
+    size_t used = strlen(vh_test_printed), length = strlen(line);
+    if (used + length < sizeof(vh_test_printed))
+        memcpy(vh_test_printed + used, line, length + 1);
+    if (getenv("VH_TEST_LOG") != NULL)
+        fputs(line, stderr);
     return result;
 }
 
@@ -232,13 +251,15 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
 
     *ssl_error = 0;
     *ssl_detail = 0;
-    size_t length = strlen(open->host);
-    if (length >= 2 && open->host[0] == '[') {
-        memcpy(host, open->host + 1, length - 2);
+    /* The proxy, when there is one */
+    const char *target = open->proxy_host != NULL ? open->proxy_host : open->host;
+    size_t length = strlen(target);
+    if (length >= 2 && target[0] == '[') {
+        memcpy(host, target + 1, length - 2);
         host[length - 2] = '\0';
     } else
-        strcpy(host, open->host);
-    snprintf(port, sizeof(port), "%u", (unsigned int)open->port);
+        strcpy(host, target);
+    snprintf(port, sizeof(port), "%u", (unsigned int)(open->proxy_host != NULL ? open->proxy_port : open->port));
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -279,6 +300,11 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
     int on = 1;
     setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
     setsockopt(socket_, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+    if (open->https && open->proxy_host != NULL) {
+        int tunnel = vh_proxy_tunnel(transport, open, ssl_error, ssl_detail);
+        if (tunnel < 0)
+            return tunnel;
+    }
     if (open->https)
         return vh_tls_start(&transport->tls, transport, open, ssl_error, ssl_detail);
     return 0;
@@ -343,6 +369,11 @@ int vh_transport_aborted(VhTransport *transport)
 int vh_transport_errno(VhTransport *transport)
 {
     return transport->error_number;
+}
+
+int vh_transport_socket(const VhTransport *transport)
+{
+    return transport != NULL ? transport->socket : -1;
 }
 
 void vh_transport_close(VhTransport *transport)

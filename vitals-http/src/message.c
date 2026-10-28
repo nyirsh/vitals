@@ -90,6 +90,15 @@ int vh_build_request(const VhObject *request, const VhObject *connection, const 
 
     add_string(&text, r->method);
     add(&text, " ", 1);
+    /* Through a proxy, plain http names the whole URL: the proxy makes the request for it */
+    if (r->proxied && !r->https) {
+        add_string(&text, "http://");
+        add_string(&text, r->host);
+        if (r->port != 80) {
+            snprintf(number, sizeof(number), ":%u", (unsigned int)r->port);
+            add_string(&text, number);
+        }
+    }
     add_string(&text, r->path[0] != '\0' ? r->path : "/");
     add_string(&text, template_ != NULL && template_->as.template_.http_version == SCE_HTTP_VERSION_1_0
                           ? " HTTP/1.0\r\n"
@@ -102,8 +111,10 @@ int vh_build_request(const VhObject *request, const VhObject *connection, const 
         add_header(&text, "Cookie", cookie);
     for (unsigned int i = 0; i < headers->count; ++i)
         add_header(&text, headers->items[i].name, headers->items[i].value);
-    if (!has_header(headers, "Connection"))
-        add_header(&text, "Connection", c->keep_alive ? "Keep-Alive" : "close");
+    /* As Sony's: to a proxy, plain http's is Proxy-Connection */
+    const char *connection_name = r->proxied && !r->https ? "Proxy-Connection" : "Connection";
+    if (!has_header(headers, "Connection") && !has_header(headers, "Proxy-Connection"))
+        add_header(&text, connection_name, c->keep_alive ? "Keep-Alive" : "close");
     if (has_length(r->method) && !has_header(headers, "Content-Length")) {
         snprintf(number, sizeof(number), "%llu",
                  r->content_length >= 0 ? (unsigned long long)r->content_length : body_size);
@@ -138,8 +149,13 @@ unsigned int vh_list_request_headers(const VhObject *request, const VhObject *co
         PAIR("Cookie", r->sent_cookie);
     for (unsigned int i = 0; i < headers->count; ++i)
         PAIR(headers->items[i].name, headers->items[i].value);
-    if (!has_header(headers, "Connection"))
-        PAIR("Connection", connection != NULL && connection->as.connection.keep_alive ? "Keep-Alive" : "close");
+    /* To a proxy, plain http's is Proxy-Connection: the one the request goes through, or the one
+     * set on it before it is sent */
+    const VhSettings *settings = &request->settings;
+    int via_proxy = !r->https && (r->proxied || (settings->proxy_mode == 1 && settings->proxy_host != NULL));
+    if (!has_header(headers, "Connection") && !has_header(headers, "Proxy-Connection"))
+        PAIR(via_proxy ? "Proxy-Connection" : "Connection",
+             connection != NULL && connection->as.connection.keep_alive ? "Keep-Alive" : "close");
     if (has_length(r->method) && !has_header(headers, "Content-Length")) {
         /* As Sony's: the value goes in the app's buffer; without one, the size it needs */
         if (length != NULL && length_size != NULL)
@@ -153,6 +169,51 @@ unsigned int vh_list_request_headers(const VhObject *request, const VhObject *co
         PAIR("Accept-Encoding: ", "gzip");
 #undef PAIR
     return count;
+}
+
+/* ---- a tunnel through a proxy ---- */
+
+/* The proxy's answer to CONNECT is read a byte at a time, so nothing of the TLS that follows is
+ * taken from the socket; only its status line matters */
+#define VH_TUNNEL_HEADER_MAX 8192u
+
+int vh_proxy_tunnel(VhTransport *transport, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail)
+{
+    char text[VH_HOST_MAX * 2 + 96];
+    int length = snprintf(text, sizeof(text), "CONNECT %s:%u HTTP/1.1\r\nHost: %s:%u\r\nProxy-Connection: Keep-Alive\r\n\r\n",
+                          open->host, (unsigned int)open->port, open->host, (unsigned int)open->port);
+    if (length < 0 || (size_t)length >= sizeof(text))
+        return (int)SCE_HTTP_ERROR_OUT_OF_SIZE;
+    int result = vh_transport_send(transport, text, (size_t)length);
+    if (result < 0)
+        return result;
+
+    char line[64];
+    size_t line_length = 0, received = 0;
+    unsigned int ends = 0;
+    /* Up to the blank line that ends the answer's headers */
+    while (ends < 4) {
+        char c;
+        int got = vh_transport_recv(transport, &c, 1);
+        if (got < 0)
+            return got;
+        if (got == 0 || ++received > VH_TUNNEL_HEADER_MAX)
+            return (int)SCE_HTTP_ERROR_NETWORK;
+        ends = (c == (ends % 2 == 0 ? '\r' : '\n')) ? ends + 1 : (c == '\r' ? 1 : 0);
+        if (line_length < sizeof(line) - 1 && received == line_length + 1 && c != '\r')
+            line[line_length++] = c;
+    }
+    line[line_length] = '\0';
+    /* "HTTP/1.x 200 ..." */
+    int status = 0;
+    if (line_length >= 12 && memcmp(line, "HTTP/1.", 7) == 0 && line[8] == ' ')
+        status = (line[9] - '0') * 100 + (line[10] - '0') * 10 + (line[11] - '0');
+    if (status >= 200 && status < 300)
+        return 0;
+    VITALS_LOG("proxy refused the tunnel to %s:%u: %s", open->host, (unsigned int)open->port, line);
+    *ssl_error = (int)SCE_HTTPS_ERROR_PROXY;
+    *ssl_detail = 0;
+    return (int)SCE_HTTP_ERROR_SSL;
 }
 
 int vh_parse_chunk_size(const unsigned char *data, size_t length, unsigned long long *size, size_t *used)

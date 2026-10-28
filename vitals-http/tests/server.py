@@ -172,6 +172,77 @@ def save_client_hellos(port, path):
                 out.write(data.hex())
 
 
+PROXY_STATS = {"connects": 0, "forwards": 0, "last": ""}
+
+
+def relay(source, destination):
+    try:
+        while True:
+            data = source.recv(65536)
+            if not data:
+                break
+            destination.sendall(data)
+    except OSError:
+        pass
+    finally:
+        for end in (source, destination):
+            try:
+                end.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+
+def serve_proxy_client(client):
+    # A small HTTP proxy: CONNECT opens a tunnel (refused to port 1), a request naming a whole URL
+    # is passed to its server with the path alone, and GET /stats tells what it has done
+    with client:
+        head = b""
+        while b"\r\n\r\n" not in head:
+            chunk = client.recv(4096)
+            if not chunk:
+                return
+            head += chunk
+        header, rest = head.split(b"\r\n\r\n", 1)
+        line, _, fields = header.partition(b"\r\n")
+        method, target, version = line.decode().split(" ")
+        if method == "CONNECT":
+            host, port = target.rsplit(":", 1)
+            if port == "1":
+                client.sendall(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+                return
+            PROXY_STATS["connects"] += 1
+            PROXY_STATS["last"] = line.decode()
+            upstream = socket.create_connection((host, int(port)))
+            client.sendall(b"HTTP/1.1 200 Connection established\r\n\r\n")
+        elif target.startswith("http://"):
+            PROXY_STATS["forwards"] += 1
+            PROXY_STATS["last"] = line.decode()
+            address, _, path = target[len("http://"):].partition("/")
+            host, _, port = address.partition(":")
+            upstream = socket.create_connection((host, int(port or 80)))
+            upstream.sendall(("%s /%s %s\r\n" % (method, path, version)).encode() + fields + b"\r\n\r\n" + rest)
+        else:
+            body = ("connects=%d forwards=%d last=%s" % (PROXY_STATS["connects"], PROXY_STATS["forwards"],
+                                                        PROXY_STATS["last"])).encode()
+            client.sendall(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: %d\r\n\r\n" % len(body) + body)
+            return
+        with upstream:
+            back = threading.Thread(target=relay, args=(upstream, client), daemon=True)
+            back.start()
+            relay(client, upstream)
+            back.join()
+
+
+def serve_proxy(port):
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", port))
+    listener.listen(16)
+    while True:
+        client, _ = listener.accept()
+        threading.Thread(target=serve_proxy_client, args=(client,), daemon=True).start()
+
+
 def main():
     port, cert, key, client_ca = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
     hello_path = sys.argv[5]
@@ -199,6 +270,8 @@ def main():
     threading.Thread(target=legacy.serve_forever, daemon=True).start()
     # And the next only keeps the ClientHello it gets
     threading.Thread(target=save_client_hellos, args=(port + 4, hello_path), daemon=True).start()
+    # And the last is a proxy
+    threading.Thread(target=serve_proxy, args=(port + 5,), daemon=True).start()
     print("ready", flush=True)
     plain.serve_forever()
 
