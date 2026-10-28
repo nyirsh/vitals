@@ -29,7 +29,7 @@ int sceHttpsEnableOption2(int id, unsigned int sslFlags);
 int sceHttpsDisableOption2(int id, unsigned int sslFlags);
 int sceHttpsEnableOptionPrivate(int id, unsigned int sslFlags);
 int sceHttpsDisableOptionPrivate(int id, unsigned int sslFlags);
-int sceHttpSslIsCtxCreated(int *isCreated);
+int sceHttpSslIsCtxCreated(int id, int *isCreated);
 
 /* The cookie jar's limits and persistence */
 int sceHttpCookieFlush(void);

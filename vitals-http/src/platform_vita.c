@@ -49,6 +49,10 @@ static SceKernelLwCondWork g_wait_condition;
 static volatile unsigned int g_generation;
 static int g_heap_ready;
 
+/* As Sony's libhttp, which says it was built with SDK 3.73; vita-elf-create exports this symbol
+ * as the module's SDK version */
+const unsigned int module_sdk_version __attribute__((used)) = 0x03730011;
+
 int module_start(SceSize args, void *argp)
 {
     (void)args, (void)argp;

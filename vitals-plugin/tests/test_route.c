@@ -29,6 +29,10 @@ int ksceDebugPrintf(const char *format, ...) { (void)format; return 0; }
 int ksceIoGetstat(const char *path, SceIoStat *status) { (void)path; (void)status; return stat_result; }
 static int dns_starts, dns_stops;
 SceUID vitals_dns_watch_start(void) { ++dns_starts; return 9; }
+/* The Store diagnostic (diag.c) is off in these tests */
+const char *vitals_diag_libhttp(SceUID pid) { (void)pid; return NULL; }
+void vitals_diag_loaded(SceUID pid, const char *path, SceUID module) { (void)pid; (void)path; (void)module; }
+void vitals_diag_started(SceUID pid, SceUID module, int result) { (void)pid; (void)module; (void)result; }
 void vitals_dns_watch_stop(void) { ++dns_stops; }
 SceUID ksceKernelSearchModuleByName(const char *name) {
     assert(strcmp(name, "SceKernelModulemgr") == 0);

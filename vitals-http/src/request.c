@@ -175,6 +175,9 @@ static int create_connection(int tmplId, const char *host, size_t host_length, i
         }
     }
     vh_unlock();
+    if (result < 0)
+        VITALS_LOG("create connection on %d to %.*s:%u failed rc=%08X", tmplId, (int)host_length, host,
+                   (unsigned int)port, (unsigned int)result);
     return result;
 }
 
@@ -214,6 +217,9 @@ int sceHttpCreateConnectionWithURL(int tmplId, const char *url, int enableKeepal
     char *redirected = vh_redirect_url(url);
     vh_unlock();
     int result = vh_parse_url(redirected != NULL ? redirected : url, &parts);
+    if (result < 0)
+        VITALS_LOG("create connection with url failed rc=%08X length=%u start=%.8s", (unsigned int)result,
+                   (unsigned int)strlen(url), url);
     if (result >= 0)
         result = create_connection(tmplId, parts.host, parts.host_length, parts.https, parts.port, enableKeepalive);
     vh_free(redirected);
@@ -292,7 +298,9 @@ static int create_request(int connId, const char *method, const char *target, in
         return (int)SCE_HTTP_ERROR_UNKNOWN_METHOD;
     if (content_length > 0x7fffffffffffffffull)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
-    with_url = with_url || is_url(target);
+    /* As Sony's, a "URL" that is a path names the connection's server: the PS Store asks for
+     * /nsx/sec/... that way, LiveArea and the update check too */
+    with_url = (with_url && target[0] != '/') || is_url(target);
     /* A URL's host goes through the host redirect list */
     char *redirected = NULL;
     if (with_url) {
@@ -303,6 +311,17 @@ static int create_request(int connId, const char *method, const char *target, in
             target = redirected;
     }
     int result = create_request_at(connId, method, target, with_url, content_length);
+#if VITALS_DEBUG >= 1
+    /* Why one was refused: the server and the target's length, never the path, which can carry a
+     * session or a token */
+    if (result < 0) {
+        VhUrl url;
+        int parsed = with_url && vh_parse_url(target, &url) == 0;
+        VITALS_LOG("create request %s on %d failed rc=%08X url=%d host=%.*s target length=%u start=%.8s", method,
+                   connId, (unsigned int)result, with_url, parsed ? (int)url.host_length : 0, parsed ? url.host : "",
+                   (unsigned int)strlen(target), target);
+    }
+#endif
     vh_free(redirected);
     return result;
 }
@@ -394,7 +413,9 @@ int sceHttpCreateRequestWithURL2(int connId, const char *method, const char *url
 int sceHttpDeleteRequest(int reqId)
 {
     VH_TRACE();
-    return delete_object(reqId, VH_REQUEST);
+    int result = delete_object(reqId, VH_REQUEST);
+    VITALS_VERBOSE("delete request %d rc=%08X", reqId, (unsigned int)result);
+    return result;
 }
 
 int sceHttpSetRequestContentLength(int id, unsigned long long int contentLength)
@@ -482,6 +503,9 @@ void vh_request_free(VhRequest *request)
     request->request_header = NULL;
     vh_free(request->async_data);
     request->async_data = NULL;
+    vh_free(request->upload);
+    request->upload = NULL;
+    request->upload_size = 0;
 }
 
 /* An error of the request's network calls, as the app sees it */
@@ -1277,7 +1301,17 @@ int vh_request_perform(VhObject *object, const unsigned char *body, size_t body_
 }
 
 #if VITALS_DEBUG >= 1
-/* A header block, a line at a time; with redact, Cookie and Authorization show only their size */
+/* Whether a header's name has "token" in it (X-NP-CONSOLE-TOKEN, X-NP-TITLE-TOKEN...) */
+static int names_token(const char *name, size_t length)
+{
+    for (size_t i = 0; i + 5 <= length; ++i)
+        if (vh_equal_nocase(name + i, "token", 5))
+            return 1;
+    return 0;
+}
+
+/* A header block, a line at a time; with redact, Cookie, Set-Cookie, Authorization and any
+ * header named with "token" show only their size */
 static void log_lines(const char *label, const char *text, size_t length, int redact)
 {
     char line[224];
@@ -1289,7 +1323,9 @@ static void log_lines(const char *label, const char *text, size_t length, int re
         const char *colon = memchr(text + at, ':', size);
         int secret = redact && colon != NULL &&
                      (((size_t)(colon - (text + at)) == 6 && vh_equal_nocase(text + at, "Cookie", 6)) ||
-                      ((size_t)(colon - (text + at)) == 13 && vh_equal_nocase(text + at, "Authorization", 13)));
+                      ((size_t)(colon - (text + at)) == 10 && vh_equal_nocase(text + at, "Set-Cookie", 10)) ||
+                      ((size_t)(colon - (text + at)) == 13 && vh_equal_nocase(text + at, "Authorization", 13)) ||
+                      names_token(text + at, (size_t)(colon - (text + at))));
         if (secret)
             size = (size_t)(colon - (text + at)) + 1;
         if (size != 0) {
@@ -1320,12 +1356,12 @@ void vh_request_sent(VhObject *object, int result)
                    (unsigned int)((vh_platform_clock_us() - request->started_us) / 1000u),
                    object->settings.resolve_timeout_us, object->settings.connect_timeout_us,
                    object->settings.send_timeout_us, object->settings.recv_timeout_us);
-    /* A refused or failed request, with what it sent and what came back */
-    if (result < 0 || request->status_code >= 400) {
+    /* A refused or failed request, with what it sent and what came back; with DEBUG=2, every one */
+    if (result < 0 || request->status_code >= 400 || VITALS_DEBUG >= 2) {
         if (request->request_header != NULL)
             log_lines("  sent", request->request_header, request->request_header_size, 1);
         if (request->response_header != NULL)
-            log_lines("  got", request->response_header, request->response_header_size, 0);
+            log_lines("  got", request->response_header, request->response_header_size, 1);
     }
 #endif
     request->busy = 0;
@@ -1350,13 +1386,23 @@ int vh_request_read(VhRequest *request, unsigned char *data, size_t size)
         count += more;
     }
 #if VITALS_DEBUG >= 1
-    if (count > 0 && request->status_code >= 400 && !request->body_logged) {
+    /* An error's body; with DEBUG=2, also a short one's bytes (a longer one may hold a token) */
+    if (count > 0 && (request->status_code >= 400 || (VITALS_DEBUG >= 2 && count <= 32)) && !request->body_logged) {
         char text[161];
         size_t shown = (size_t)count < sizeof(text) - 1 ? (size_t)count : sizeof(text) - 1;
         for (size_t i = 0; i < shown; ++i)
             text[i] = data[i] >= 0x20 && data[i] < 0x7f ? (char)data[i] : '.';
         text[shown] = '\0';
         VITALS_LOG("  body %s", text);
+#if VITALS_DEBUG >= 2
+        /* A short body's bytes, as a binary one shows only dots */
+        if (count <= 32) {
+            char hex[65];
+            for (int i = 0; i < count; ++i)
+                snprintf(hex + 2 * i, 3, "%02X", data[i]);
+            VITALS_VERBOSE("  body hex %s", hex);
+        }
+#endif
         request->body_logged = 1;
     }
 #endif
@@ -1436,12 +1482,45 @@ int sceHttpSendRequest(int reqId, const void *postData, unsigned int size)
         vh_unlock();
         return result;
     }
+    /* A body of declared length can come in pieces, one call each (the shell's Commerce2 sends
+     * crSess.action's like that): as Sony's, each piece but the last returns 0, and the last one
+     * sends the request and gets the response */
+    unsigned char *upload = NULL;
+    if (request->content_length > 0 && (request->upload_size != 0 || (long long)size < request->content_length)) {
+        unsigned long long total = (unsigned long long)request->upload_size + size;
+        if (total > (unsigned long long)request->content_length) {
+            vh_unlock();
+            return (int)SCE_HTTP_ERROR_INVALID_VALUE;
+        }
+        if (request->upload == NULL) {
+            request->upload = vh_alloc((size_t)request->content_length);
+            if (request->upload == NULL) {
+                vh_unlock();
+                return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
+            }
+        }
+        if (size != 0)
+            memcpy(request->upload + request->upload_size, postData, size);
+        request->upload_size = (unsigned int)total;
+        VITALS_VERBOSE("send request %d piece size=%u body=%u of %u", reqId, size, request->upload_size,
+                       (unsigned int)request->content_length);
+        if (total < (unsigned long long)request->content_length) {
+            vh_unlock();
+            return 0;
+        }
+        upload = request->upload;
+        request->upload = NULL;
+        request->upload_size = 0;
+        postData = upload;
+        size = (unsigned int)total;
+    }
     async_clear(request);
     reset_response(vh_parent(object), request);
     request->aborted = 0;
     request->last_errno = 0;
     if (object->settings.nonblock == SCE_HTTP_ENABLE) {
         result = async_begin(object, VH_ASYNC_SEND, postData, size);
+        vh_free(upload);
         vh_unlock();
         return result;
     }
@@ -1451,6 +1530,7 @@ int sceHttpSendRequest(int reqId, const void *postData, unsigned int size)
     result = vh_request_perform(object, postData, size);
 
     vh_lock();
+    vh_free(upload);
     vh_request_sent(object, result);
     vh_unlock();
     return result;
@@ -1516,6 +1596,7 @@ int sceHttpReadData(int reqId, void *data, unsigned int size)
     vh_unlock();
 
     int count = vh_request_read(request, data, size);
+    VITALS_VERBOSE("read request %d size=%u rc=%d", reqId, size, count);
 
     vh_lock();
     vh_request_read_done(object, count);
@@ -1544,7 +1625,9 @@ static int abort_request(int reqId)
 int sceHttpAbortRequest(int reqId)
 {
     VH_TRACE();
-    return abort_request(reqId);
+    int result = abort_request(reqId);
+    VITALS_VERBOSE("abort request %d rc=%08X", reqId, (unsigned int)result);
+    return result;
 }
 
 int sceHttpAbortRequestForce(int reqId)
@@ -1600,8 +1683,9 @@ int sceHttpGetAllResponseHeaders(int reqId, char **header, unsigned int *headerS
     vh_lock();
     VhRequest *request = responded(reqId, &result);
     if (request != NULL) {
+        /* As Sony's: the size counts the NUL that ends the text */
         *header = request->response_header;
-        *headerSize = request->response_header_size;
+        *headerSize = request->response_header_size + 1;
     }
     vh_unlock();
     return result;
@@ -1622,6 +1706,7 @@ int sceHttpGetResponseContentLength(int reqId, unsigned long long int *contentLe
             *contentLength = (unsigned long long)request->response_content_length;
     }
     vh_unlock();
+    VITALS_VERBOSE("content length request %d rc=%08X", reqId, (unsigned int)result);
     return result;
 }
 

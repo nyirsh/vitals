@@ -2,13 +2,16 @@
 
 #include "diagnostics.h"
 
+#include <stddef.h>
 #include <string.h>
 
 /* The library's state: initialized or not, the memory pool's accounting, and the objects */
 static int g_initialized;
 static unsigned int g_pool_size, g_pool_used, g_pool_peak;
 static VhObject *g_objects[VH_OBJECT_MAX];
-static int g_next_id = 1;
+/* As Sony's: an ID's top digit is its kind (1 template, 2 connection, 3 request) and the rest
+ * counts up per kind; apps may tell the kinds apart by it */
+static int g_next_id[3] = {1, 1, 1};
 static unsigned int g_https_options = SCE_HTTPS_FLAG_SERVER_VERIFY | SCE_HTTPS_FLAG_CN_CHECK |
                                       SCE_HTTPS_FLAG_NOT_AFTER_CHECK | SCE_HTTPS_FLAG_NOT_BEFORE_CHECK |
                                       SCE_HTTPS_FLAG_KNOWN_CA_CHECK;
@@ -175,14 +178,20 @@ VhObject *vh_create(VhKind kind, VhObject *parent)
             slot = i;
     if (slot == VH_OBJECT_MAX)
         return NULL;
-    VhObject *object = vh_alloc(sizeof(*object));
+    /* Only as large as its kind: a template the size of a request costs 2.8 KiB, and the shell's
+     * Commerce2 makes over twenty of them in a small pool, failing the PS Store when they don't fit */
+    size_t size = offsetof(VhObject, as) + (kind == VH_TEMPLATE     ? sizeof(VhTemplate)
+                                           : kind == VH_CONNECTION ? sizeof(VhConnection)
+                                                                   : sizeof(VhRequest));
+    VhObject *object = vh_alloc(size);
     if (object == NULL)
         return NULL;
-    memset(object, 0, sizeof(*object));
+    memset(object, 0, size);
     /* IDs grow and skip the ones in use, so a stale ID rarely names a new object */
+    unsigned int k = kind == VH_TEMPLATE ? 0u : kind == VH_CONNECTION ? 1u : 2u;
     do {
-        object->id = g_next_id;
-        g_next_id = g_next_id == 0x7fffffff ? 1 : g_next_id + 1;
+        object->id = (int)((k + 1u) << 28 | (unsigned int)g_next_id[k]);
+        g_next_id[k] = g_next_id[k] == 0x0fffffff ? 1 : g_next_id[k] + 1;
     } while (find_any(object->id) != NULL);
     object->kind = kind;
     if (parent != NULL) {
@@ -370,6 +379,10 @@ int sceHttpGetAutoRedirect(int id, int *enable)
 int sceHttpSetResolveTimeOut(int id, unsigned int usec)
 {
     VH_TRACE();
+    /* As Sony's: under a second becomes a second, as the console's resolver refuses less (the PS
+     * Store asks for 645161 us) */
+    if (usec != 0 && usec < 1000000u)
+        usec = 1000000u;
     VH_SET(id, settings->resolve_timeout_us = usec);
 }
 
@@ -537,6 +550,8 @@ int sceHttpAddRequestHeader(int id, const char *name, const char *value, unsigne
     if (settings != NULL)
         result = vh_add_header(settings, name, value, mode);
     vh_unlock();
+    VITALS_VERBOSE("add header id=%d %s length=%u mode=%u rc=%08X", id, name, (unsigned int)strlen(value), mode,
+                   (unsigned int)result);
     return result;
 }
 
@@ -710,13 +725,25 @@ int sceHttpsFreeCaList(SceHttpsCaList *caList)
     return vh_initialized();
 }
 
-int sceHttpSslIsCtxCreated(int *isCreated)
+/* Whether a template or connection has an SSL context, as Sony's takes it: the object's ID first.
+ * Each TLS connection makes its own here, so a template has one and a connection one when it is
+ * HTTPS */
+int sceHttpSslIsCtxCreated(int id, int *isCreated)
 {
     VH_TRACE();
-    if (isCreated == NULL)
-        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
-    *isCreated = 1;
-    return vh_initialized();
+    vh_lock();
+    int result = vh_initialized();
+    if (result == 0 && isCreated == NULL)
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    if (result == 0) {
+        VhObject *object = vh_find(id, VH_FREE);
+        if (object == NULL || object->kind == VH_REQUEST)
+            result = (int)SCE_HTTP_ERROR_INVALID_ID;
+        else
+            *isCreated = object->kind == VH_TEMPLATE || object->as.connection.https;
+    }
+    vh_unlock();
+    return result;
 }
 
 int sceHttpAuthCacheFlush(void)

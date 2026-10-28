@@ -179,6 +179,9 @@ typedef struct VhRequest
     int async_result;
     /* Its epoll event was handed out */
     int async_reported;
+    /* The body so far, when the app sends it in pieces of a declared length: sent once complete */
+    unsigned char *upload;
+    unsigned int upload_size;
     /* The body a non-blocking send sends, copied; the data a non-blocking read received */
     unsigned char *async_data;
     unsigned int async_size, async_offset;

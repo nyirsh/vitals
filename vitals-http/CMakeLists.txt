@@ -71,7 +71,7 @@ set_source_files_properties(${TLS13_DIR}/provider/user_runtime.c PROPERTIES COMP
 # No C library: the runtime's wrappers stand in for the calls this module and its libraries make
 target_link_options(vitals_libhttp PRIVATE -nostdlib -Wl,--gc-sections
     -Wl,--undefined=module_start -Wl,--undefined=module_stop
-    -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_gap.ld)
+    -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_gap.ld -Wl,--undefined=module_sdk_version)
 foreach(function malloc calloc realloc free memchr memcmp memcpy memmove memset strchr strcmp strlen
         strstr printf puts snprintf vsnprintf)
     target_link_options(vitals_libhttp PRIVATE "-Wl,--wrap=${function}")

@@ -101,9 +101,15 @@ static void test_basic(int template_)
     unsigned long long length = 0;
     CHECK_EQ(sceHttpGetResponseContentLength(request, &length), 0);
     CHECK_EQ(length, 11);
+    /* As Sony's: the top digit of an ID is its kind */
+    CHECK_EQ((unsigned int)template_ >> 28, 1u);
+    CHECK_EQ((unsigned int)request >> 28, 3u);
     char *header;
     unsigned int header_size;
     CHECK_EQ(sceHttpGetAllResponseHeaders(request, &header, &header_size), 0);
+    /* As Sony's: the status line first, and a size that counts the ending NUL */
+    CHECK(strncmp(header, "HTTP/1.", 7) == 0 && header_size > 1 && header[header_size - 1] == '\0');
+    CHECK(strlen(header) == header_size - 1);
     const char *value;
     unsigned int value_length;
     int end = sceHttpParseResponseHeader(header, header_size, "content-type", &value, &value_length);
@@ -279,6 +285,58 @@ static void test_redirects_and_post(int template_)
     CHECK_EQ(sceHttpSendRequest(request, "abc", 3), 0);
     CHECK_EQ(read_all(request, body, sizeof(body), 100), 8);
     sceHttpDeleteRequest(request);
+    /* A resolve timeout under a second is a second, as Sony's; 0 stays 0 */
+    CHECK_EQ(sceHttpSetResolveTimeOut(connection, 645161), 0);
+    CHECK_EQ(vh_find(connection, VH_CONNECTION)->settings.resolve_timeout_us, 1000000);
+    CHECK_EQ(sceHttpSetResolveTimeOut(connection, 0), 0);
+    CHECK_EQ(vh_find(connection, VH_CONNECTION)->settings.resolve_timeout_us, 0);
+    CHECK_EQ(sceHttpSetResolveTimeOut(connection, 3000000), 0);
+    CHECK_EQ(vh_find(connection, VH_CONNECTION)->settings.resolve_timeout_us, 3000000);
+
+    /* A path where a URL goes: on the connection's server, as Sony's takes it */
+    request = sceHttpCreateRequestWithURL2(connection, "GET", "/hello", 0);
+    CHECK(request > 0);
+    CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
+    CHECK_EQ(read_all(request, body, sizeof(body) - 1, 100), 11);
+    sceHttpDeleteRequest(request);
+    request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, "/hello", 0);
+    CHECK(request > 0);
+    sceHttpDeleteRequest(request);
+    CHECK_EQ(sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, "hello", 0), SCE_HTTP_ERROR_INVALID_URL);
+
+    /* An SSL context, asked of a template or a connection by its ID (the Store does so after
+     * crSess.action) */
+    int created = -1;
+    CHECK_EQ(sceHttpSslIsCtxCreated(template_, &created), 0);
+    CHECK_EQ(created, 1);
+    CHECK_EQ(sceHttpSslIsCtxCreated(connection, &created), 0);
+    CHECK_EQ(created, 0);
+    CHECK_EQ(sceHttpSslIsCtxCreated(connection, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpSslIsCtxCreated(0x30000999, &created), SCE_HTTP_ERROR_INVALID_ID);
+    int secure = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(sceHttpSslIsCtxCreated(secure, &created), 0);
+    CHECK_EQ(created, 1);
+    sceHttpDeleteConnection(secure);
+
+    /* A body of declared length in pieces, as the shell's Commerce2 sends crSess.action's: each
+     * piece but the last returns at once, the last one sends it all; one past the length is refused */
+    request = sceHttpCreateRequest2(connection, "POST", "/echo", 17);
+    CHECK(request > 0);
+    CHECK_EQ(sceHttpSendRequest(request, "first ", 6), 0);
+    CHECK_EQ(sceHttpGetStatusCode(request, &status), SCE_HTTP_ERROR_BEFORE_SEND);
+    CHECK_EQ(sceHttpSendRequest(request, "second ", 7), 0);
+    CHECK_EQ(sceHttpSendRequest(request, "end!!", 5), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpSendRequest(request, "end!", 4), 0);
+    CHECK_EQ(sceHttpGetStatusCode(request, &status), 0);
+    CHECK_EQ(status, 200);
+    CHECK_EQ(read_all(request, body, sizeof(body) - 1, 100), 22);
+    body[22] = '\0';
+    CHECK(strcmp(body, "POST:first second end!") == 0);
+    sceHttpDeleteRequest(request);
+    /* Deleted halfway: its pieces go with it */
+    request = sceHttpCreateRequest2(connection, "POST", "/echo", 10);
+    CHECK_EQ(sceHttpSendRequest(request, "half", 4), 0);
+    CHECK_EQ(sceHttpDeleteRequest(request), 0);
     CHECK_EQ(sceHttpCreateRequest2(connection, "BAD METHOD", "/", 0), SCE_HTTP_ERROR_UNKNOWN_METHOD);
     sceHttpDeleteConnection(connection);
 }
@@ -1017,6 +1075,24 @@ int main(int argc, char **argv)
     CHECK_EQ(sceHttpInit(1024 * 1024), 0);
     CHECK(strstr(user_agent_of("Game/2.0"), "User-Agent: Game/2.0 Custom/1.0 (Test)\r\n") != NULL);
     CHECK(strstr(user_agent_of(NULL), "User-Agent: Custom/1.0 (Test)\r\n") != NULL);
+    CHECK_EQ(sceHttpTerm(), 0);
+
+    /* A template costs what a template needs: the shell's Commerce2 makes over twenty in its pool,
+     * and the PS Store fails when one doesn't fit */
+    printf("small pool, many templates\n");
+    CHECK_EQ(sceHttpInit(32 * 1024), 0);
+    int templates[24];
+    for (int i = 0; i < 24; ++i) {
+        templates[i] = sceHttpCreateTemplate("commerce2/1.0", SCE_HTTP_VERSION_1_1, 0);
+        CHECK(templates[i] > 0);
+    }
+    int small_connection = sceHttpCreateConnection(templates[0], "example.com", "https", 443, 1);
+    CHECK(small_connection > 0);
+    CHECK(sceHttpCreateRequest(small_connection, SCE_HTTP_METHOD_GET, "/", 0) > 0);
+    for (int i = 0; i < 24; ++i)
+        CHECK_EQ(sceHttpDeleteTemplate(templates[i]), 0);
+    CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
+    CHECK_EQ(stats.currentInuseSize, 0);
     CHECK_EQ(sceHttpTerm(), 0);
 
     printf("%d checks, %d failed\n", g_checks, g_failures);

@@ -166,6 +166,9 @@ int sceHttpUriEscape(char *out, unsigned int *require, unsigned int prepare, con
     size_t needed = 1;
     for (const unsigned char *c = (const unsigned char *)in; *c != '\0'; ++c)
         needed += unreserved(*c) ? 1u : 3u;
+    /* Only sizes: apps escape credentials too */
+    VITALS_VERBOSE("uri escape length=%u needed=%u prepare=%u out=%s require=%s", (unsigned int)strlen(in),
+                   (unsigned int)needed, prepare, out != NULL ? "yes" : "no", require != NULL ? "yes" : "no");
     if (require != NULL)
         *require = (unsigned int)needed;
     if (out == NULL)

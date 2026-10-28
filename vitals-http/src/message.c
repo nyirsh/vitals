@@ -216,6 +216,7 @@ int sceHttpParseResponseHeader(const char *header, unsigned int headerLen, const
     }
     *fieldValue = header + start;
     *valueLen = (unsigned int)(finish - start);
+    VITALS_VERBOSE("header %s found rc=%d length=%u", fieldStr, result, *valueLen);
     return result;
 }
 
