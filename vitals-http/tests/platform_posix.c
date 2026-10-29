@@ -261,7 +261,9 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
         strcpy(host, target);
     snprintf(port, sizeof(port), "%u", (unsigned int)(open->proxy_host != NULL ? open->proxy_port : open->port));
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
+    /* IPv4 only, as the console's: localhost could otherwise come first as ::1, where the test
+     * servers don't listen */
+    hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     if (getaddrinfo(host, port, &hints, &found) != 0)
         return (int)SCE_HTTP_ERROR_RESOLVER_ENOHOST;

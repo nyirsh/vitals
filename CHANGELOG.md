@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6
+
+- Added support for http proxies
+
 ## 1.5
 
 - Sony's HTTP library is replaced by vitals own full rewrite in every app, game and the system itself
