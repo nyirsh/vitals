@@ -41,6 +41,11 @@ static SceSslMemoryPoolStats pool_before, pool_after;
 static int pool_before_rc = -1, pool_after_rc = -1;
 static unsigned callback_calls, callback_refused, callback_last_bits, callback_last_count;
 static char callback_subject[128];
+/* untrusted-root.badssl.com with badssl.com's root loaded by sceHttpsLoadCert, which must connect,
+ * then again after sceHttpsUnloadCert, which must be refused */
+#define LOADED_ROOT_PATH "app0:badssl-untrusted-root.pem"
+static int loaded_load_rc = -1, loaded_unload_rc = -1;
+static CheckResult loaded_result, unloaded_result;
 static int ssl_callback(unsigned int verify_errors, void *const certificates[], int count, void *argument)
 {
     (void)argument;
@@ -87,6 +92,39 @@ static void find_ssl_module(void)
         if (sceKernelGetModuleInfo(ids[i], &info) == 0 && strcmp(info.module_name, "SceLibSsl") == 0)
             snprintf(ssl_module, sizeof(ssl_module), "%s", info.path);
     }
+}
+static int stopped(void);
+static int fetch_url(const char *url, int verify, int unverified_allowed, int status_only, char *body,
+                     size_t *length, CheckResult *r);
+static void run_loaded_root(char *body)
+{
+    static char pem[4096];
+    size_t n = 0;
+    CheckResult loaded = {0}, unloaded = {0};
+    int load_rc = -1, unload_rc = -1;
+    FILE *file = fopen(LOADED_ROOT_PATH, "rb");
+    size_t length = file != NULL ? fread(pem, 1, sizeof(pem) - 1, file) : 0;
+    if (file != NULL)
+        fclose(file);
+    pem[length] = 0;
+    if (length > 0 && !stopped())
+    {
+        /* With its NUL, which some parsers want */
+        SceHttpsData root = {pem, (unsigned)length + 1};
+        const SceHttpsData *list[1] = {&root};
+        load_rc = sceHttpsLoadCert(1, list, NULL, NULL);
+        (void)fetch_url("https://untrusted-root.badssl.com/", 1, 0, 1, body, &n, &loaded);
+        unload_rc = sceHttpsUnloadCert();
+        (void)fetch_url("https://untrusted-root.badssl.com/", 1, 0, 1, body, &n, &unloaded);
+    }
+    else
+        snprintf(loaded.message, sizeof(loaded.message), "Not tested: " LOADED_ROOT_PATH " unreadable");
+    lock();
+    loaded_load_rc = load_rc;
+    loaded_unload_rc = unload_rc;
+    loaded_result = loaded;
+    unloaded_result = unloaded;
+    unlock();
 }
 #else
 #define REPORT_NAME "browserleaks"
@@ -427,6 +465,16 @@ static int save_report(const CheckService *s)
             pool_before.maxInuseSize, pool_before.currentInuseSize, (unsigned)pool_after_rc,
             pool_after.poolSize, pool_after.maxInuseSize, pool_after.currentInuseSize, callback_calls,
             callback_refused, callback_last_bits, callback_last_count, callback_subject);
+    fprintf(f, "loaded_root load=0x%08X unload=0x%08X\n"
+               "loaded_root_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
+               "result=%s (expected connected)\n"
+               "unloaded_root_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
+               "result=%s (expected refused)\n",
+            (unsigned)loaded_load_rc, (unsigned)loaded_unload_rc, loaded_result.state, loaded_result.http_code,
+            (unsigned)loaded_result.error, (unsigned)loaded_result.ssl_error, loaded_result.ssl_detail,
+            loaded_result.message, unloaded_result.state, unloaded_result.http_code,
+            (unsigned)unloaded_result.error, (unsigned)unloaded_result.ssl_error, unloaded_result.ssl_detail,
+            unloaded_result.message);
     unlock();
 #endif
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
@@ -647,6 +695,9 @@ static int run_checks(SceSize argc, void *argv)
         }
         publish_badssl(i, &r);
     }
+#if VITALS_SSL_TEST
+    run_loaded_root(body);
+#endif
     /* Each redirect is requested by its old name, as a game would: vitals' provider sends it to
      * the new host and checks the certificate against the new name, so a pass proves the whole
      * path; any final HTTP status counts, as only the server's reachability is tested */

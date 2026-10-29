@@ -554,11 +554,16 @@ static void test_certificate_objects(void)
     SceSslCertName *name = sceSslGetIssuerName(leaf);
     CHECK(name != NULL);
     CHECK_EQ(sceSslGetNameEntryCount(name), 2);
-    char attribute[8], entry_value[8];
+    char attribute[24], entry_value[8], small_attribute[7];
     unsigned value_length = 0;
+    /* Sony's names, SSLeay's long ones */
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 0, attribute, sizeof(attribute), NULL, 0, &value_length), 0);
+    CHECK(strcmp(attribute, "organizationName") == 0);
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 1, small_attribute, sizeof(small_attribute), NULL, 0, NULL), 0);
+    CHECK(strcmp(small_attribute, "common") == 0);
     CHECK_EQ(sceSslGetNameEntryInfo(name, 1, attribute, sizeof(attribute), entry_value, sizeof(entry_value),
                                     &value_length), 0);
-    CHECK(strcmp(attribute, "CN") == 0);
+    CHECK(strcmp(attribute, "commonName") == 0);
     CHECK(strcmp(entry_value, "vitals-") == 0);
     CHECK_EQ(value_length, strlen("vitals-ssl test CA"));
     CHECK_EQ(sceSslGetNameEntryInfo(name, 2, attribute, sizeof(attribute), entry_value, sizeof(entry_value),

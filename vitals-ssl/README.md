@@ -50,7 +50,10 @@ Its connection test is vitals-app's (BrowserLeaks TLS 1.0 to 1.3 and the badssl.
 Sony's libhttp over vitals-ssl, so `sceHttpsEnableOption`/`DisableOption`, the verify callback and
 the certificate functions all run. Its saved report (`ux0:data/vitals/vitalsssl-*.txt`) adds which
 libssl loaded, the pool before and after the run, and what an `sceHttpsSetSslCallback` saw through
-the `sceSslGet*` getters (it refuses what libhttp found wrong, as without one).
+the `sceSslGet*` getters (it refuses what libhttp found wrong, as without one). It also loads
+badssl.com's untrusted root with `sceHttpsLoadCert` (libhttp looks for issuers among the
+certificates an app loaded before the CA store), connects to `untrusted-root.badssl.com`, which
+must work, and again after `sceHttpsUnloadCert`, which must be refused.
 
 
 The NIDs are those of the libssl the app bundles ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx)),

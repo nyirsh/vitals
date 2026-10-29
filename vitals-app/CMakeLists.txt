@@ -51,6 +51,9 @@ if(VITALS_SSL_TEST)
         message(FATAL_ERROR "${VITALS_SSL_MODULE} is missing; build ../vitals-ssl with DEBUG=1 first (make SSL_TEST=1 does this)")
     endif()
     list(APPEND debug_entries "${VITALS_SSL_MODULE}" "vssl.suprx")
+    # badssl.com's untrusted root, which the test loads with sceHttpsLoadCert
+    list(APPEND debug_entries "${CMAKE_CURRENT_SOURCE_DIR}/assets/badssl-untrusted-root.pem"
+         "badssl-untrusted-root.pem")
 endif()
 
 # libcurl, used to download the latest Mozilla CA bundle
