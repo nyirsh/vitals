@@ -46,6 +46,12 @@ static char callback_subject[128];
 #define LOADED_ROOT_PATH "app0:badssl-untrusted-root.pem"
 static int loaded_load_rc = -1, loaded_unload_rc = -1;
 static CheckResult loaded_result, unloaded_result;
+/* client.badssl.com, which answers 200 with badssl.com's client certificate and 400 without:
+ * loaded with sceHttpsLoadCert, then unloaded */
+#define CLIENT_CERT_PATH "app0:badssl-client.pem"
+#define CLIENT_KEY_PATH "app0:badssl-client.key"
+static int client_load_rc = -1, client_unload_rc = -1;
+static CheckResult client_result, no_client_result;
 static int ssl_callback(unsigned int verify_errors, void *const certificates[], int count, void *argument)
 {
     (void)argument;
@@ -124,6 +130,41 @@ static void run_loaded_root(char *body)
     loaded_unload_rc = unload_rc;
     loaded_result = loaded;
     unloaded_result = unloaded;
+    unlock();
+}
+static size_t read_asset(const char *path, char *out, size_t size)
+{
+    FILE *file = fopen(path, "rb");
+    size_t length = file != NULL ? fread(out, 1, size - 1, file) : 0;
+    if (file != NULL)
+        fclose(file);
+    out[length] = 0;
+    return length;
+}
+static void run_client_certificate(char *body)
+{
+    static char certificate[4096], key[4096];
+    size_t n = 0;
+    CheckResult with = {0}, without = {0};
+    int load_rc = -1, unload_rc = -1;
+    size_t certificate_length = read_asset(CLIENT_CERT_PATH, certificate, sizeof(certificate));
+    size_t key_length = read_asset(CLIENT_KEY_PATH, key, sizeof(key));
+    if (certificate_length > 0 && key_length > 0 && !stopped())
+    {
+        SceHttpsData cert = {certificate, (unsigned)certificate_length + 1};
+        SceHttpsData private_key = {key, (unsigned)key_length + 1};
+        load_rc = sceHttpsLoadCert(0, NULL, &cert, &private_key);
+        (void)fetch_url("https://client.badssl.com/", 1, 0, 1, body, &n, &with);
+        unload_rc = sceHttpsUnloadCert();
+        (void)fetch_url("https://client.badssl.com/", 1, 0, 1, body, &n, &without);
+    }
+    else
+        snprintf(with.message, sizeof(with.message), "Not tested: " CLIENT_CERT_PATH " unreadable");
+    lock();
+    client_load_rc = load_rc;
+    client_unload_rc = unload_rc;
+    client_result = with;
+    no_client_result = without;
     unlock();
 }
 #else
@@ -475,6 +516,16 @@ static int save_report(const CheckService *s)
             loaded_result.message, unloaded_result.state, unloaded_result.http_code,
             (unsigned)unloaded_result.error, (unsigned)unloaded_result.ssl_error, unloaded_result.ssl_detail,
             unloaded_result.message);
+    fprintf(f, "client_cert load=0x%08X unload=0x%08X\n"
+               "client_cert_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
+               "result=%s (expected HTTP 200)\n"
+               "no_client_cert_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
+               "result=%s (expected HTTP 400)\n",
+            (unsigned)client_load_rc, (unsigned)client_unload_rc, client_result.state, client_result.http_code,
+            (unsigned)client_result.error, (unsigned)client_result.ssl_error, client_result.ssl_detail,
+            client_result.message, no_client_result.state, no_client_result.http_code,
+            (unsigned)no_client_result.error, (unsigned)no_client_result.ssl_error, no_client_result.ssl_detail,
+            no_client_result.message);
     unlock();
 #endif
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
@@ -697,6 +748,7 @@ static int run_checks(SceSize argc, void *argv)
     }
 #if VITALS_SSL_TEST
     run_loaded_root(body);
+    run_client_certificate(body);
 #endif
     /* Each redirect is requested by its old name, as a game would: vitals' provider sends it to
      * the new host and checks the certificate against the new name, so a pass proves the whole

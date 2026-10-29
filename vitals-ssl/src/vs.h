@@ -114,6 +114,12 @@ typedef struct VsSsl {
     unsigned char address[4];
     /* What the verify callback gave as its reason (SSL_get_verify_result), set by B0E4CB2F too */
     int verify_result;
+    /* The CA names of the server's certificate request, while the client certificate callback
+     * runs (A4EA9DE0, 243DE290) */
+    void **ca_names;
+    int ca_name_count;
+    /* The client certificate and key the callback gave, kept until the connection is freed */
+    void *client_cert, *client_key;
 } VsSsl;
 
 /* A certificate: the server's, which the connection keeps (borrowed), or one 29AAC768 parsed */
@@ -151,6 +157,7 @@ int vs_name_count(const void *name);
 const mbedtls_x509_name *vs_name_entry(const void *name, int index);
 /* Forgets which roots the CA store gave this thread, before a verify callback runs */
 void vs_certificate_lookups_reset(void);
+mbedtls_pk_context *vs_key(void *key);
 
 /* The platform: platform_vita.c on the console, tests/platform_posix.c on a host */
 /* The pool sceSslInit's size gives, which every allocation comes from; a negative SCE error when
@@ -239,5 +246,12 @@ int sceSslInternalGetCertificateAuthorityByName(const void *name, char ***entrie
 int sceSslInternalGetCertificateAuthority(unsigned int group, unsigned int mask, char ***entries, char *buffer,
                                           unsigned int size, unsigned int *total);
 int sceSslInternalCaRevoked(unsigned int group, unsigned int mask, const void **entries, unsigned int *count);
+int sceSslInternalGetCaNameCount(void *ssl);
+int sceSslInternalGetCaName(void *ssl, int index, void **name);
+void *sceSslInternalBufferNew(void);
+int sceSslInternalBufferWrite(void *buffer, const void *data, int length);
+int sceSslInternalBufferFree(void *buffer);
+int sceSslInternalKeyFromBuffer(void *buffer, const void *library, void **key, int format, int flags);
+int sceSslInternalKeyMatches(void *cert, void *key);
 
 #endif

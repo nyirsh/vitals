@@ -54,6 +54,9 @@ if(VITALS_SSL_TEST)
     # badssl.com's untrusted root, which the test loads with sceHttpsLoadCert
     list(APPEND debug_entries "${CMAKE_CURRENT_SOURCE_DIR}/assets/badssl-untrusted-root.pem"
          "badssl-untrusted-root.pem")
+    # badssl.com's published client certificate and its key (decrypted), for client.badssl.com
+    list(APPEND debug_entries "${CMAKE_CURRENT_SOURCE_DIR}/assets/badssl-client.pem" "badssl-client.pem"
+         "${CMAKE_CURRENT_SOURCE_DIR}/assets/badssl-client.key" "badssl-client.key")
 endif()
 
 # libcurl, used to download the latest Mozilla CA bundle

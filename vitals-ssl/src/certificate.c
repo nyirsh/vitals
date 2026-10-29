@@ -613,6 +613,114 @@ int sceSslInternalCertVerifySignature(void *handle, void *key_handle, int *valid
     return 0;
 }
 
+/* The client certificate's key: a buffer libhttp writes the key's bytes to, as loaded, then
+ * parsed */
+
+#define BUFFER_MAGIC 0x42435356u
+
+typedef struct VsBuffer {
+    uint32_t magic;
+    unsigned char *data;
+    size_t length, capacity;
+} VsBuffer;
+
+static int is_buffer(const VsBuffer *buffer)
+{
+    return buffer != NULL && buffer->magic == BUFFER_MAGIC;
+}
+
+/* NID 0xB8E6E249, Sony 0x8101DA37: an empty memory buffer (a memory BIO), freed with C4D984C2;
+ * NULL when there's no memory */
+void *sceSslInternalBufferNew(void)
+{
+    VsBuffer *buffer = calloc(1, sizeof(*buffer));
+    if (buffer != NULL)
+        buffer->magic = BUFFER_MAGIC;
+    return buffer;
+}
+
+/* NID 0x33AC7A16, Sony 0x81000A9D: appends bytes; how many, or a negative failure */
+int sceSslInternalBufferWrite(void *handle, const void *data, int length)
+{
+    VsBuffer *buffer = handle;
+    if (!is_buffer(buffer) || length < 0 || (data == NULL && length > 0))
+        return -1;
+    size_t wanted = buffer->length + (size_t)length + 1;
+    if (wanted > buffer->capacity) {
+        size_t capacity = buffer->capacity > 0 ? buffer->capacity : 256;
+        while (capacity < wanted)
+            capacity *= 2;
+        unsigned char *grown = realloc(buffer->data, capacity);
+        if (grown == NULL)
+            return -1;
+        buffer->data = grown;
+        buffer->capacity = capacity;
+    }
+    memcpy(buffer->data + buffer->length, data, (size_t)length);
+    buffer->length += (size_t)length;
+    /* Kept NUL-terminated, as Mbed TLS reads PEM */
+    buffer->data[buffer->length] = '\0';
+    return length;
+}
+
+/* NID 0xC4D984C2, Sony 0x8100109F: frees it */
+int sceSslInternalBufferFree(void *handle)
+{
+    VsBuffer *buffer = handle;
+    if (!is_buffer(buffer))
+        return R_NULL_ARG;
+    if (buffer->data != NULL)
+        mbedtls_platform_zeroize(buffer->data, buffer->capacity);
+    free(buffer->data);
+    buffer->magic = 0;
+    free(buffer);
+    return 0;
+}
+
+/* NID 0x7D30F0A6, Sony 0x8101F9B1: a private key from the buffer's bytes (PEM or DER), as (buffer,
+ * cert_c, &key, 6, 0x1100); freed with 46358909 */
+int sceSslInternalKeyFromBuffer(void *handle, const void *library, void **out, int format, int flags)
+{
+    VsBuffer *buffer = handle;
+    (void)library, (void)format, (void)flags;
+    if (!is_buffer(buffer) || out == NULL)
+        return R_NULL_ARG;
+    *out = NULL;
+    if (buffer->length == 0)
+        return R_FAILED;
+    VsKey *key = calloc(1, sizeof(*key));
+    if (key == NULL)
+        return R_ALLOC_FAILURE;
+    key->magic = KEY_MAGIC;
+    mbedtls_pk_init(&key->pk);
+    /* With its NUL for PEM */
+    size_t length = buffer->length + (buffer->data[0] == '-' ? 1 : 0);
+    int result = mbedtls_pk_parse_key(&key->pk, buffer->data, length, NULL, 0, vs_tls_random, NULL);
+    if (result != 0) {
+        mbedtls_pk_free(&key->pk);
+        free(key);
+        return result == MBEDTLS_ERR_PK_ALLOC_FAILED ? R_ALLOC_FAILURE : R_FAILED;
+    }
+    *out = key;
+    return 0;
+}
+
+/* NID 0xD68D8421, Sony 0x8100176F: 1 when the private key is the certificate's, 0 when it isn't */
+int sceSslInternalKeyMatches(void *cert_handle, void *key_handle)
+{
+    VsCert *cert = cert_handle;
+    VsKey *key = key_handle;
+    if (!is_cert(cert) || !is_key(key))
+        return 0;
+    return mbedtls_pk_check_pair(&cert->crt->pk, &key->pk, vs_tls_random, NULL) == 0;
+}
+
+mbedtls_pk_context *vs_key(void *handle)
+{
+    VsKey *key = handle;
+    return is_key(key) ? &key->pk : NULL;
+}
+
 /* Certificates */
 
 /* NID 0x29AAC768, Sony 0x810050D5: a certificate from DER, freed with 144FA354 */
@@ -628,6 +736,19 @@ int sceSslInternalCertFromBinary(const void *library, int flags, int format, uns
         return R_ALLOC_FAILURE;
     mbedtls_x509_crt_init(&cert->own);
     int result = mbedtls_x509_crt_parse_der(&cert->own, data, length);
+    /* PEM text too, as an app may have loaded it */
+    if (result != 0 && length > 0 && data[0] == '-') {
+        unsigned char *text = malloc(length + 1);
+        result = MBEDTLS_ERR_X509_ALLOC_FAILED;
+        if (text != NULL) {
+            memcpy(text, data, length);
+            text[length] = '\0';
+            mbedtls_x509_crt_free(&cert->own);
+            mbedtls_x509_crt_init(&cert->own);
+            result = mbedtls_x509_crt_parse(&cert->own, text, length + 1);
+            free(text);
+        }
+    }
     if (result != 0) {
         mbedtls_x509_crt_free(&cert->own);
         free(cert);

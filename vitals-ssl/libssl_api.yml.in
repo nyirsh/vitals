@@ -47,7 +47,7 @@ SceLibSsl:
         - sceSslInternalFree: 0x19B2BB58
         - sceSslInternalCertNotAfter: 0x2074A6EB
         - sceSslInternalGetLibrary: 0x2185BB05
-        - sceSslInternal243DE290: 0x243DE290
+        - sceSslInternalGetCaName: 0x243DE290
         - sceSslInternalCertNotBefore: 0x2464F9D0
         - sceSslInternalGetItem: 0x24C6257F
         - sceSslInternalCtxSetVerify: 0x260F5A85
@@ -57,7 +57,7 @@ SceLibSsl:
         - sceSslInternalGetError: 0x2F0FC3CD
         - sceSslInternalCertVerifySignature: 0x306E2A22
         - sceSslInternal33737FDC: 0x33737FDC
-        - sceSslInternal33AC7A16: 0x33AC7A16
+        - sceSslInternalBufferWrite: 0x33AC7A16
         - sceSslInternalCaRevoked: 0x349B0E73
         - sceSslInternalGetCertificateAuthorityByName: 0x3746501F
         - sceSslInternalOidText: 0x3DE4F3DB
@@ -81,7 +81,7 @@ SceLibSsl:
         - sceSslInternal6D0D3B11: 0x6D0D3B11
         - sceSslInternalTimeExport: 0x6D2A86F0
         - sceSslInternal6F3B9809: 0x6F3B9809
-        - sceSslInternal7D30F0A6: 0x7D30F0A6
+        - sceSslInternalKeyFromBuffer: 0x7D30F0A6
         - sceSslInternalCertIssuer: 0x81FA5DBE
         - sceSslInternalTimeImport: 0x88391E03
         - sceSslInternalNameInfo: 0x91C2531C
@@ -89,17 +89,17 @@ SceLibSsl:
         - sceSslInternalExtensionInfo: 0x93EAE08A
         - sceSslInternalCtxSetClientCertCallback: 0x9E38815D
         - sceSslInternalClientMethod: 0xA374CD7B
-        - sceSslInternalA4EA9DE0: 0xA4EA9DE0
+        - sceSslInternalGetCaNameCount: 0xA4EA9DE0
         - sceSslInternalClientMethod2: 0xAC1DBE40
         - sceSslInternalCtxSetCertVerifyCallback: 0xAF50B945
         - sceSslInternalSetVerifyResult: 0xB0E4CB2F
         - sceSslInternalB1745DAD: 0xB1745DAD
         - sceSslInternalEntryInfo: 0xB5A099D2
-        - sceSslInternalB8E6E249: 0xB8E6E249
+        - sceSslInternalBufferNew: 0xB8E6E249
         - sceSslInternalExtensionNew: 0xBF99D664
         - sceSslInternalC0B135F0: 0xC0B135F0
         - sceSslInternalC1299FB6: 0xC1299FB6
-        - sceSslInternalC4D984C2: 0xC4D984C2
+        - sceSslInternalBufferFree: 0xC4D984C2
         - sceSslInternalCB83EA07: 0xCB83EA07
         - sceSslInternalCBEC7D13: 0xCBEC7D13
         - sceSslInternalCtxCtrl: 0xCC7F4211
@@ -110,7 +110,7 @@ SceLibSsl:
         - sceSslInternalTimeProvider: 0xD3C049B9
         - sceSslInternalD419451B: 0xD419451B
         - sceSslInternalTimeProviderFree: 0xD4ADF069
-        - sceSslInternalD68D8421: 0xD68D8421
+        - sceSslInternalKeyMatches: 0xD68D8421
         - sceSslInternalD6D32A2F: 0xD6D32A2F
         - sceSslInternalD776E2F8: 0xD776E2F8
         - sceSslInternalDABB61EE: 0xDABB61EE

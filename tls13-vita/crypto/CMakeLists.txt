@@ -12,11 +12,17 @@ include_directories(BEFORE "${CMAKE_CURRENT_LIST_DIR}")
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
 endif()
-# Patched to offer, in a ClientHello, suites it doesn't implement (offer-unknown-ciphersuites.patch)
+# Patched to offer, in a ClientHello, suites it doesn't implement (offer-unknown-ciphersuites.patch),
+# and to let a client pick its certificate from a server's certificate request
+# (certificate-request-callback.patch)
 FetchContent_Declare(vitals_mbedtls
     URL "${VITALS_MBEDTLS_ARCHIVE}"
     URL_HASH SHA256=${VITALS_MBEDTLS_SHA256}
     PATCH_COMMAND ${CMAKE_COMMAND} -DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/offer-unknown-ciphersuites.patch
+        -DPATCH_MARKER=mbedtls_ssl_conf_offer_unknown_ciphersuites
+        -P ${CMAKE_CURRENT_LIST_DIR}/apply_patch.cmake
+    COMMAND ${CMAKE_COMMAND} -DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/certificate-request-callback.patch
+        -DPATCH_MARKER=mbedtls_ssl_conf_cert_request_cb
         -P ${CMAKE_CURRENT_LIST_DIR}/apply_patch.cmake
 )
 FetchContent_MakeAvailable(vitals_mbedtls)

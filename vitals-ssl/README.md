@@ -5,9 +5,9 @@ exported under libssl's own library and function NIDs ([libssl_api.yml.in](libss
 all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
 shared with vitals-http and the browser provider).
 
-Written so far: all 11 `SceSsl` functions, the 27 connection functions Sony's libhttp uses and the
-35 certificate functions its certificate check uses (below), plus three that do nothing in Sony's
-either. Every other
+Written so far: all 11 `SceSsl` functions and the 69 `SceSslInternal` functions Sony's libhttp
+uses (below: connections, its certificate check and its client certificate callback), plus three
+that do nothing in Sony's either. Every other
 export logs its name (with `DEBUG=1` or `2`) and fails with `SCE_SSL_ERROR_INTERNAL`
 (`0x80435026`), or returns `NULL` where it returns a pointer. Nothing installs it; the app still
 installs the copy of Sony's libssl it bundles ([docs/libssl.md](../docs/libssl.md)).
@@ -53,7 +53,9 @@ libssl loaded, the pool before and after the run, and what an `sceHttpsSetSslCal
 the `sceSslGet*` getters (it refuses what libhttp found wrong, as without one). It also loads
 badssl.com's untrusted root with `sceHttpsLoadCert` (libhttp looks for issuers among the
 certificates an app loaded before the CA store), connects to `untrusted-root.badssl.com`, which
-must work, and again after `sceHttpsUnloadCert`, which must be refused.
+must work, and again after `sceHttpsUnloadCert`, which must be refused. Then it loads badssl.com's
+published client certificate and key (the key decrypted) and requests `client.badssl.com`, which
+answers 200 when the certificate was sent and 400 when it wasn't, before and after unloading them.
 
 
 The NIDs are those of the libssl the app bundles ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx)),
@@ -104,8 +106,16 @@ of its functions. The arguments of the ones not written yet aren't known, so the
   same thread gives the next, then none: libhttp asks again when the root it got doesn't verify the
   certificate, and with the same answer would ask forever. A version 3 certificate without
   basicConstraints is not a CA here (RFC 5280, Mbed TLS), where libhttp would skip the check.
-- **Not yet**: the client certificate callback is kept, not called; session resumption (libhttp
-  turns Sony's cache off anyway); the option masks are kept, with no effect.
+- **Client certificates**: when the server asks for one, the context's client certificate callback
+  (`SSL_CTX_set_client_cert_cb`) runs with the CA names the server gave, as in Sony's, and the
+  certificate and key it gives are sent. libhttp's gives the ones `sceHttpsLoadCert` loaded, and
+  only when one of those names is the certificate's issuer. Mbed TLS doesn't pass those names on or
+  let a client pick its certificate then, so a patch adds that
+  ([tls13-vita/crypto/certificate-request-callback.patch](../tls13-vita/crypto/certificate-request-callback.patch)),
+  for TLS 1.2's CertificateRequest and TLS 1.3's `certificate_authorities`; a TLS 1.3 server that
+  sends no names gets no certificate from libhttp's callback.
+- **Not yet**: session resumption (libhttp turns Sony's cache off anyway); the option masks are
+  kept, with no effect.
 - **The handshake** runs on a thread with a 64 KiB stack, as vitals-http's does: a TLS 1.3
   handshake with elliptic curves needs more than some apps' network threads have.
 
@@ -225,21 +235,25 @@ Sony's layout: an item is `{length, bytes}`, an entry's info `{tag, length, byte
 | `064DFC99` | `(group, mask, &entries, buffer, size, &total)` → count, or `0x80010086` | the store's roots by number: a group from 1 and a bit each, group 0 with mask `0xFFFFFFFF` all of them | `sceSslInternalGetCertificateAuthority`: the bundle's roots in groups of 32 |
 | `349B0E73` | `(group, mask, &entries, &count)` | the serial numbers a root refuses, as items; Sony's has ten, for one root | `sceSslInternalCaRevoked`: none |
 
-### Loading certificates and the client certificate callback
+### Client certificate callback (`0x81009088`): the certificate and key `sceHttpsLoadCert` loaded
 
-`sceHttpsLoadCert` and the client certificate callback (`0x81009088`, which sends the certificate
-and key `sceHttpsLoadCert` loaded) use the ones above (`24C6257F` with 5 and 6, `29AAC768`,
-`144FA354`, `81FA5DBE`, `568F0E80`, `CE37B69E`, `46358909`) and these, not written yet:
+Called as `int callback(SSL *ssl, X509 **certificate, EVP_PKEY **key)`: it parses the loaded
+certificate (`29AAC768`, with `24C6257F`'s item 5) and writes the loaded key to a buffer to parse it
+(with item 6), checks they belong together, then looks for the certificate's issuer among the
+server's CA names. When one is the issuer it gives both and returns 1, which hands them to the
+connection; otherwise it frees them and returns 0, and no certificate is sent.
 
-| NID | Called from | Arguments | Likely |
+| NID | Arguments | What it is | Here |
 | --- | --- | --- | --- |
-| `A4EA9DE0` | callback | `(ssl)` → count | how many of a list the server sent (likely acceptable CA names) |
-| `243DE290` | callback | `(ssl, index, &out)` | entry *index* of that list |
-| `B8E6E249` | callback | `()` → buffer | a memory BIO or buffer object |
-| `33AC7A16` | callback | `(buffer, data, length)` → written | writes to it |
-| `7D30F0A6` | callback | `(buffer, ?, &key, 6, 0x1100)` | parses a private key from it |
-| `C4D984C2` | callback | `(buffer)` | frees it |
-| `D68D8421` | callback | `(certificate, key)` → match | checks the key belongs to the certificate |
+| `A4EA9DE0` | `(ssl)` → count | how many CA names the server's certificate request gave | `sceSslInternalGetCaNameCount`; 0 outside the callback |
+| `243DE290` | `(ssl, index, &name)` | one of them, a name object the connection keeps | `sceSslInternalGetCaName` |
+| `B8E6E249` | `()` → buffer | a memory buffer (a memory BIO) | `sceSslInternalBufferNew` |
+| `33AC7A16` | `(buffer, data, length)` → written | appends to it; libhttp loops until all is written | `sceSslInternalBufferWrite` |
+| `7D30F0A6` | `(buffer, cert_c, &key, 6, 0x1100)` | a private key from it, freed with `46358909` | `sceSslInternalKeyFromBuffer`: PEM or DER |
+| `C4D984C2` | `(buffer)` | frees it | `sceSslInternalBufferFree` |
+| `D68D8421` | `(certificate, key)` → 1 when they match | whether the key is the certificate's | `sceSslInternalKeyMatches` |
+
+`29AAC768` takes PEM text here too, as an app may load its certificate that way.
 
 `sceHttpPrivateSslContextAddCertCheck` sets the verify mode (`260F5A85`, `(ctx, 1)`) and the
 callback (`AF50B945`), both in the connection table above.

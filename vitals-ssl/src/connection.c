@@ -142,7 +142,8 @@ long sceSslInternalCtxCtrl(void *handle, int command, long value, void *pointer)
     return 0;
 }
 
-/* NID 0x9E38815D, Sony 0x81016469: SSL_CTX_set_client_cert_cb; kept, not called yet */
+/* NID 0x9E38815D, Sony 0x81016469: SSL_CTX_set_client_cert_cb, called when the server asks for a
+ * certificate as (ssl, &certificate, &key) → 1 with them */
 void sceSslInternalCtxSetClientCertCallback(void *handle, VsClientCertCallback callback)
 {
     VsContext *context = handle;
@@ -280,6 +281,10 @@ void sceSslInternalFree(void *handle)
         return;
     mbedtls_ssl_free(&ssl->tls);
     mbedtls_ssl_config_free(&ssl->config);
+    if (ssl->client_cert != NULL)
+        (void)sceSslInternalCertFree(ssl->client_cert);
+    if (ssl->client_key != NULL)
+        (void)sceSslInternalKeyFree(ssl->client_key);
     free_bios(ssl);
     context_release(ssl->context);
     mbedtls_platform_zeroize(ssl, sizeof(*ssl));
@@ -453,6 +458,7 @@ static int verify_with_callback(void *context, mbedtls_x509_crt *certificate, in
                argument != NULL ? (unsigned int)(uintptr_t)argument[0] : 0u,
                argument != NULL ? (const void *)argument[1] : NULL,
                argument != NULL && argument[1] != NULL ? argument[1] : "-");
+    (void)argument;
     int accepted = ssl->context->verify_callback(ssl, handles, count, ssl->context->verify_argument,
                                                  &ssl->verify_result);
     vs_certificate_lookups_reset();
@@ -463,6 +469,67 @@ static int verify_with_callback(void *context, mbedtls_x509_crt *certificate, in
     if (!accepted)
         *flags = refused_flags(ssl->verify_result);
     return 0;
+}
+
+/* The server asked for a certificate: the context's client certificate callback picks one, as
+ * Sony's calls it, from the CA names the server gave (each a 2-byte length, then a DER Name);
+ * libhttp's gives the certificate sceHttpsLoadCert loaded when one of them is its issuer. Without
+ * one Mbed TLS sends none */
+static int certificate_request(void *context, mbedtls_ssl_context *tls, const unsigned char *names, size_t length)
+{
+    VsSsl *ssl = context;
+    VsClientCertCallback callback = ssl->context->client_cert_callback;
+    if (callback == NULL)
+        return 0;
+    int count = 0;
+    for (size_t at = 0; at + 2 <= length;) {
+        size_t size = ((size_t)names[at] << 8) | names[at + 1];
+        if (size > length - at - 2)
+            break;
+        at += 2 + size;
+        ++count;
+    }
+    void **parsed = count > 0 ? calloc((size_t)count, sizeof(*parsed)) : NULL;
+    if (count > 0 && parsed == NULL) {
+        vs_note_out_of_memory();
+        return MBEDTLS_ERR_SSL_ALLOC_FAILED;
+    }
+    int kept = 0;
+    for (size_t at = 0; kept < count && at + 2 <= length;) {
+        size_t size = ((size_t)names[at] << 8) | names[at + 1];
+        mbedtls_x509_buf raw = {MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE, size, (unsigned char *)names + at + 2};
+        void *name = vs_name_new(&raw);
+        if (name != NULL)
+            parsed[kept++] = name;
+        at += 2 + size;
+    }
+    ssl->ca_names = parsed;
+    ssl->ca_name_count = kept;
+    void *cert = NULL, *key = NULL;
+    int chosen = callback(ssl, &cert, &key);
+    ssl->ca_names = NULL;
+    ssl->ca_name_count = 0;
+    for (int i = 0; i < kept; ++i)
+        vs_name_free(parsed[i]);
+    free(parsed);
+    const mbedtls_x509_crt *crt = vs_certificate(cert);
+    mbedtls_pk_context *pk = vs_key(key);
+    VITALS_LOG("ssl %p certificate request names=%d chosen=%d", (void *)ssl, kept, chosen);
+    if (chosen != 1 || crt == NULL || pk == NULL) {
+        if (cert != NULL)
+            (void)sceSslInternalCertFree(cert);
+        if (key != NULL)
+            (void)sceSslInternalKeyFree(key);
+        return 0;
+    }
+    /* The connection keeps them for the handshake, which uses them until it ends */
+    if (ssl->client_cert != NULL)
+        (void)sceSslInternalCertFree(ssl->client_cert);
+    if (ssl->client_key != NULL)
+        (void)sceSslInternalKeyFree(ssl->client_key);
+    ssl->client_cert = cert;
+    ssl->client_key = key;
+    return mbedtls_ssl_set_hs_own_cert(tls, (mbedtls_x509_crt *)crt, pk);
 }
 
 /* Mbed TLS for one connection, on its first connect: TLS 1.2 to 1.3, the host name the read BIO
@@ -491,6 +558,8 @@ static int setup(VsSsl *ssl)
         mbedtls_ssl_conf_ca_cb(&ssl->config, vs_find_trusted_issuers, NULL);
         mbedtls_ssl_conf_verify(&ssl->config, verify_certificate, ssl);
     }
+    if (ssl->context->client_cert_callback != NULL)
+        mbedtls_ssl_conf_cert_request_cb(&ssl->config, certificate_request, ssl);
     result = mbedtls_ssl_setup(&ssl->tls, &ssl->config);
     if (result != 0)
         return result;
@@ -713,4 +782,24 @@ void sceSslInternalSetVerifyResult(void *handle, int result)
     VsSsl *ssl = handle;
     if (is_ssl(ssl))
         ssl->verify_result = result;
+}
+
+/* NID 0xA4EA9DE0, Sony 0x810163C5: how many CA names the server's certificate request gave, while
+ * the client certificate callback runs; 0 otherwise */
+int sceSslInternalGetCaNameCount(void *handle)
+{
+    VsSsl *ssl = handle;
+    return is_ssl(ssl) ? ssl->ca_name_count : 0;
+}
+
+/* NID 0x243DE290, Sony 0x810163F7: one of them, as a name object the connection keeps */
+int sceSslInternalGetCaName(void *handle, int index, void **name)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl) || name == NULL)
+        return 10017;
+    if (index < 0 || index >= ssl->ca_name_count)
+        return 10008;
+    *name = ssl->ca_names[index];
+    return 0;
 }

@@ -21,6 +21,7 @@ extern unsigned int vs_test_refused_pool;
 static int g_checks, g_failures;
 static int g_port;
 static const char *g_server_pem, *g_other_root, *g_chain_pem, *g_bundle;
+static const char *g_client_pem, *g_client_key, *g_stranger_pem, *g_stranger_key;
 
 #define CHECK(condition)                                                                       \
     do {                                                                                       \
@@ -735,10 +736,143 @@ static void test_verify_callback(void)
     CHECK_EQ(sceSslInternalGetItem(NULL, 1, &item), 10017);
 }
 
+/* ---- client certificates ---- */
+
+static char *read_text(const char *path, size_t *length)
+{
+    FILE *file = fopen(path, "rb");
+    char *text = calloc(1, 16384);
+    *length = file != NULL && text != NULL ? fread(text, 1, 16383, file) : 0;
+    if (file != NULL)
+        fclose(file);
+    return text;
+}
+
+/* As libhttp's client certificate callback (0x81009088): the loaded certificate and key, given only
+ * when one of the server's CA names is the certificate's issuer */
+static const char *g_offer_pem, *g_offer_key;
+static int g_offer_calls, g_offer_names, g_offer_chosen;
+
+static int offer_certificate(void *ssl, void **certificate, void **key)
+{
+    ++g_offer_calls;
+    const void *library = NULL;
+    CHECK_EQ(sceSslInternalGetItem(ssl, 5, &library), 0);
+    size_t length = 0;
+    char *pem = read_text(g_offer_pem, &length);
+    void *cert = NULL, *private_key = NULL, *issuer = NULL;
+    unsigned int consumed = 0;
+    /* PEM as an app loads it */
+    CHECK_EQ(sceSslInternalCertFromBinary(library, 0, 1, (unsigned int)length, (unsigned char *)pem, &consumed,
+                                          &cert), 0);
+    free(pem);
+    char *text = read_text(g_offer_key, &length);
+    void *buffer = sceSslInternalBufferNew();
+    CHECK(buffer != NULL);
+    /* Written in two parts, as libhttp loops until all of it is */
+    CHECK_EQ(sceSslInternalBufferWrite(buffer, text, 10), 10);
+    CHECK_EQ(sceSslInternalBufferWrite(buffer, text + 10, (int)length - 10), length - 10);
+    CHECK_EQ(sceSslInternalKeyFromBuffer(buffer, library, &private_key, 6, 0x1100), 0);
+    CHECK_EQ(sceSslInternalBufferFree(buffer), 0);
+    free(text);
+    CHECK_EQ(sceSslInternalKeyMatches(cert, private_key), 1);
+    CHECK_EQ(sceSslInternalCertIssuer(cert, 1, &issuer), 0);
+    g_offer_names = sceSslInternalGetCaNameCount(ssl);
+    int chosen = 0;
+    for (int i = 0; i < g_offer_names && !chosen; ++i) {
+        void *name = NULL;
+        CHECK_EQ(sceSslInternalGetCaName(ssl, i, &name), 0);
+        chosen = sceSslInternalNameEqual(name, issuer) == 1;
+    }
+    void *name = NULL;
+    CHECK_EQ(sceSslInternalGetCaName(ssl, g_offer_names, &name), 10008);
+    sceSslInternalNameFree(issuer);
+    g_offer_chosen = chosen;
+    if (!chosen) {
+        sceSslInternalKeyFree(private_key);
+        sceSslInternalCertFree(cert);
+        return 0;
+    }
+    *certificate = cert;
+    *key = private_key;
+    return 1;
+}
+
+/* An HTTP request to s_server -www: its page when the handshake was accepted */
+static int asked_page(int port, const char *pem, const char *key)
+{
+    char page[256];
+    g_offer_pem = pem;
+    g_offer_key = key;
+    g_offer_calls = g_offer_names = g_offer_chosen = 0;
+    Connection connection = open_connection(port, "vitals-ssl.test", 0, 5000);
+    sceSslInternalCtxSetClientCertCallback(connection.context, offer_certificate);
+    int ok = 0;
+    if (sceSslInternalConnect(connection.ssl) == 1 &&
+        sceSslInternalWrite(connection.ssl, "GET / HTTP/1.0\r\n\r\n", 18) == 18) {
+        int got = sceSslInternalRead(connection.ssl, page, sizeof(page) - 1);
+        ok = got > 0 && strncmp(page, "HTTP/1.0 200", 12) == 0;
+    }
+    close_connection(&connection);
+    return ok;
+}
+
+static void test_client_certificate(void)
+{
+    for (int offset = 0; offset < 2; ++offset) {
+        int port = g_port + 3 + offset;
+        /* Signed by the CA the server names: sent, and accepted */
+        CHECK_EQ(asked_page(port, g_client_pem, g_client_key), 1);
+        CHECK_EQ(g_offer_calls, 1);
+        CHECK_EQ(g_offer_names, 1);
+        CHECK_EQ(g_offer_chosen, 1);
+        /* By another: not sent, so the server refuses */
+        CHECK_EQ(asked_page(port, g_stranger_pem, g_stranger_key), 0);
+        CHECK_EQ(g_offer_calls, 1);
+        CHECK_EQ(g_offer_chosen, 0);
+    }
+    /* A server that doesn't ask: the callback isn't called */
+    g_offer_pem = g_client_pem;
+    g_offer_key = g_client_key;
+    g_offer_calls = 0;
+    Connection connection = open_connection(g_port, "vitals-ssl.test", 0, 5000);
+    sceSslInternalCtxSetClientCertCallback(connection.context, offer_certificate);
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
+    CHECK_EQ(g_offer_calls, 0);
+    close_connection(&connection);
+    /* Outside the callback there are no names */
+    CHECK_EQ(sceSslInternalGetCaNameCount(NULL), 0);
+    /* A wrong key, and buffers */
+    size_t length = 0;
+    char *text = read_text(g_stranger_key, &length);
+    void *buffer = sceSslInternalBufferNew(), *key = NULL, *cert = NULL;
+    CHECK_EQ(sceSslInternalBufferWrite(buffer, text, (int)length), length);
+    CHECK_EQ(sceSslInternalKeyFromBuffer(buffer, NULL, &key, 6, 0x1100), 0);
+    free(text);
+    text = read_text(g_client_pem, &length);
+    unsigned int consumed = 0;
+    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, (unsigned int)length, (unsigned char *)text, &consumed, &cert),
+             0);
+    free(text);
+    CHECK_EQ(sceSslInternalKeyMatches(cert, key), 0);
+    CHECK_EQ(sceSslInternalBufferWrite(buffer, NULL, 4), (uint32_t)-1);
+    CHECK_EQ(sceSslInternalBufferFree(buffer), 0);
+    buffer = sceSslInternalBufferNew();
+    CHECK_EQ(sceSslInternalBufferWrite(buffer, "junk", 4), 4);
+    void *bad = NULL;
+    CHECK_EQ(sceSslInternalKeyFromBuffer(buffer, NULL, &bad, 6, 0x1100), 10001);
+    CHECK(bad == NULL);
+    CHECK_EQ(sceSslInternalBufferFree(buffer), 0);
+    CHECK_EQ(sceSslInternalBufferFree(NULL), 10017);
+    sceSslInternalKeyFree(key);
+    sceSslInternalCertFree(cert);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc != 6) {
-        fprintf(stderr, "usage: %s <port> <server certificate> <unrelated root> <chain> <bundle>\n", argv[0]);
+    if (argc != 10) {
+        fprintf(stderr, "usage: %s <port> <server certificate> <unrelated root> <chain> <bundle> <client "
+                        "certificate> <its key> <another one> <its key>\n", argv[0]);
         return 2;
     }
     g_port = atoi(argv[1]);
@@ -746,6 +880,10 @@ int main(int argc, char **argv)
     g_other_root = argv[3];
     g_chain_pem = argv[4];
     g_bundle = argv[5];
+    g_client_pem = argv[6];
+    g_client_key = argv[7];
+    g_stranger_pem = argv[8];
+    g_stranger_key = argv[9];
     FILE *file = fopen(g_chain_pem, "rb");
     g_chain_length = file != NULL ? fread(g_chain_text, 1, sizeof(g_chain_text) - 1, file) : 0;
     if (file != NULL)
@@ -766,6 +904,7 @@ int main(int argc, char **argv)
     test_certificate_objects();
     test_certificate_store();
     test_verify_callback();
+    test_client_certificate();
     CHECK_EQ(sceSslTerm(), 0);
     (void)g_alerts;
     (void)g_last_alert;
