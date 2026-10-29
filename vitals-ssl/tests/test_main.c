@@ -421,11 +421,11 @@ static void test_certificate_objects(void)
     CHECK_EQ(item.length, leaf_crt->serial.len);
     CHECK(item.data != NULL && memcmp(item.data, leaf_crt->serial.p, item.length) == 0);
     unsigned int length = 0;
-    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, NULL, 0, &length), 0);
+    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, 0, NULL, &length), 0);
     CHECK_EQ(length, leaf_crt->raw.len);
     unsigned char *der = malloc(length);
-    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, der, length - 1, &length), 10006);
-    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, der, length, &length), 0);
+    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, length - 1, der, &length), 10006);
+    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, length, der, &length), 0);
     CHECK(memcmp(der, leaf_crt->raw.p, length) == 0);
     free(der);
     CHECK_EQ(sceSslInternalCertInfo(leaf, 0x1234, &item), 10011);
@@ -520,9 +520,12 @@ static void test_certificate_objects(void)
     CHECK_EQ(sceSslInternalCertNotAfter(leaf, date), 0);
     CHECK_EQ(sceSslInternalTimeCompare(date, now, &order), 0);
     CHECK_EQ(order, 1);
+    /* Made within the second, so notBefore can be now */
     CHECK_EQ(sceSslInternalCertNotBefore(leaf, date), 0);
     CHECK_EQ(sceSslInternalTimeCompare(date, now, &order), 0);
-    CHECK_EQ(order, (uint32_t)-1);
+    CHECK(order == -1 || order == 0);
+    CHECK_EQ(sceSslInternalTimeCompare(now, date, &order), 0);
+    CHECK(order == 1 || order == 0);
     CHECK_EQ(sceSslInternalTimeCompare(date, date, &order), 0);
     CHECK_EQ(order, 0);
     char text[20];
@@ -630,6 +633,8 @@ static void test_certificate_store(void)
 /* A verify callback as libhttp's does the chain part: the issuer from the CA store by name, its key
  * over the server certificate's signature */
 static int g_callback_calls, g_callback_count, g_callback_refuse;
+/* As libhttp's argument starts: the flags, then the host name */
+static const void *g_check_argument[2] = {(const void *)0x65, "chain.test"};
 
 static int check_chain(void *ssl, void *certificates[], int count, void *argument, int *reason)
 {
@@ -637,7 +642,7 @@ static int check_chain(void *ssl, void *certificates[], int count, void *argumen
     g_callback_count = count;
     const void *library = NULL;
     CHECK_EQ(sceSslInternalGetItem(ssl, 1, &library), 0);
-    CHECK(library != NULL && argument == &g_callback_calls);
+    CHECK(library != NULL && argument == g_check_argument);
     if (g_callback_refuse) {
         *reason = 4;
         return 0;
@@ -670,7 +675,7 @@ static int check_chain(void *ssl, void *certificates[], int count, void *argumen
 static Connection open_checked(const char *host)
 {
     Connection connection = open_connection(g_port + 2, host, 1, 5000);
-    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, &g_callback_calls);
+    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, g_check_argument);
     return connection;
 }
 
@@ -687,6 +692,13 @@ static void test_verify_callback(void)
     CHECK_EQ(((VsSsl *)connection.ssl)->verify_result, 0);
     CHECK(read_line(connection.ssl, line, sizeof(line)) > 0);
     CHECK(strcmp(line, "sni=not-the-name.test\n") == 0);
+    close_connection(&connection);
+    /* No host on the BIO, as the firmware's libhttp: the name comes from the callback's argument */
+    connection = open_connection(g_port + 2, NULL, 1, 5000);
+    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, g_check_argument);
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
+    CHECK(read_line(connection.ssl, line, sizeof(line)) > 0);
+    CHECK(strcmp(line, "sni=chain.test\n") == 0);
     close_connection(&connection);
     /* It refuses: a TLS failure, with its reason kept */
     g_callback_refuse = 1;
@@ -710,7 +722,7 @@ static void test_verify_callback(void)
     /* Without the verify mode the callback isn't called */
     g_callback_calls = 0;
     connection = open_connection(g_port + 2, "chain.test", 0, 5000);
-    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, &g_callback_calls);
+    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, g_check_argument);
     CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
     CHECK_EQ(g_callback_calls, 0);
     close_connection(&connection);

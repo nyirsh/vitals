@@ -5,15 +5,26 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
+# The vitals-ssl test app (make SSL_TEST=1): its own title, the plugin with the test route
+# (../vitals-plugin SSL_TEST=1), which gives it Sony's libhttp on vitals-ssl, and vitals-ssl's
+# debug build as vssl.suprx; never released
+option(VITALS_SSL_TEST "Build the vitals-ssl test app" OFF)
+set(plugin_suffix "")
 # App metadata; the version is set in ../VERSION
-set(VITALS_TITLE_ID "VITALS001")
-set(VITALS_TITLE "vitals")
+if(VITALS_SSL_TEST)
+    set(VITALS_TITLE_ID "VITALSSL1")
+    set(VITALS_TITLE "vitals ssl test")
+    set(plugin_suffix "-ssltest")
+else()
+    set(VITALS_TITLE_ID "VITALS001")
+    set(VITALS_TITLE "vitals")
+endif()
 include(../version.cmake)
 
 # The kernel plugin, vitals-http and browser provider this VPK installs, built by
 # ../vitals-plugin, ../vitals-http and ../tls13-vita
 set(VITALS_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build")
-set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-plugin/vitals.skprx")
+set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-plugin${plugin_suffix}/vitals.skprx")
 set(VITALS_LIBHTTP "${VITALS_BUILD_DIR}/vitals-http/libhttp.suprx")
 set(VITALS_BROWSER_PROVIDER "${VITALS_BUILD_DIR}/tls13-vita/browser/vitals.suprx")
 foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_BROWSER_PROVIDER)
@@ -26,7 +37,7 @@ endforeach()
 set(debug_entries)
 foreach(level 1 2)
     foreach(module vitals-http-debug${level}/libhttp.suprx tls13-vita-debug${level}/browser/vitals.suprx
-            vitals-plugin-debug${level}/vitals.skprx)
+            vitals-plugin-debug${level}${plugin_suffix}/vitals.skprx)
         if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
             message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
         endif()
@@ -34,6 +45,13 @@ foreach(level 1 2)
         list(APPEND debug_entries "${VITALS_BUILD_DIR}/${module}" "debug/${level}/${name}")
     endforeach()
 endforeach()
+if(VITALS_SSL_TEST)
+    set(VITALS_SSL_MODULE "${VITALS_BUILD_DIR}/vitals-ssl-debug1/libssl.suprx")
+    if(NOT EXISTS "${VITALS_SSL_MODULE}")
+        message(FATAL_ERROR "${VITALS_SSL_MODULE} is missing; build ../vitals-ssl with DEBUG=1 first (make SSL_TEST=1 does this)")
+    endif()
+    list(APPEND debug_entries "${VITALS_SSL_MODULE}" "vssl.suprx")
+endif()
 
 # libcurl, used to download the latest Mozilla CA bundle
 add_subdirectory(curl)
@@ -63,6 +81,9 @@ add_executable(vitals-app
 target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
 target_include_directories(vitals-app PRIVATE ../tls13-vita/include)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
+if(VITALS_SSL_TEST)
+    target_compile_definitions(vitals-app PRIVATE VITALS_SSL_TEST=1)
+endif()
 # OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
 foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock
         CRYPTO_THREAD_unlock CRYPTO_THREAD_lock_free CRYPTO_atomic_add)

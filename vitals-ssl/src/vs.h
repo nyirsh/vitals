@@ -221,7 +221,7 @@ int sceSslInternalCertFromBinary(const void *library, int flags, int format, uns
                                  const unsigned char *data, unsigned int *consumed, void **out);
 int sceSslInternalCertFree(void *cert);
 int sceSslInternalCertInfo(void *cert, int item, void *out);
-int sceSslInternalCertToBinary(void *cert, int format, unsigned char *buffer, unsigned int size,
+int sceSslInternalCertToBinary(void *cert, int format, unsigned int size, unsigned char *buffer,
                                unsigned int *length);
 int sceSslInternalTimeProvider(const void *library, int type, void **out);
 int sceSslInternalTimeProviderFree(void *provider);

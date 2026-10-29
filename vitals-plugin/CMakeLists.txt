@@ -32,8 +32,11 @@ add_executable(vitals.elf
 	../tls13-vita/src/redirect_list.c
 )
 set(VITALS_DEBUG 0 CACHE STRING "Debug output: 0, 1 or 2 (1 and up log every DNS query)")
+# 1 only for the vitals-ssl test app's builds: its process gets Sony's libhttp on vitals-ssl
+set(VITALS_SSL_TEST 0 CACHE STRING "The vitals-ssl test app's route: 0 or 1")
 target_compile_definitions(vitals.elf PRIVATE
 	VITALS_DEBUG=${VITALS_DEBUG}
+	VITALS_SSL_TEST=${VITALS_SSL_TEST}
 )
 target_link_libraries(vitals.elf
 	SceSysclibForDriver_stub

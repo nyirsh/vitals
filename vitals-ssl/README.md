@@ -29,7 +29,29 @@ the certificate functions on a CA and a server certificate it signed: names, ext
 signatures, dates, the CA store, and a verify callback that checks the chain with them, as
 libhttp's does.
 
-## Exports
+### On a console
+
+With vitals installed, no process runs Sony's libhttp, which is what vitals-ssl is written for. The
+vitals-ssl test app gives one process exactly that:
+
+```bash
+make -C ../vitals-app SSL_TEST=1    # build/vitals-app-ssltest/vitals-app.vpk
+```
+
+It is vitals-app with its own title (`VITALSSL1`, "vitals ssl test"), carrying the kernel plugin
+built with its test route (`make -C ../vitals-plugin SSL_TEST=1`) and this library's `DEBUG=1`
+build as `vssl.suprx`. Install it next to vitals-app, run its Install, and reboot. In its process
+only, the plugin leaves Sony's libhttp alone and loads `ux0:app/VITALSSL1/vssl.suprx` in place of
+libssl; every other process is as with the release plugin, and deleting the app removes the
+route's target (the app then gets Sony's libssl, which makes the stock run to compare with).
+Running vitals-app's Install again puts the release plugin back.
+
+Its connection test is vitals-app's (BrowserLeaks TLS 1.0 to 1.3 and the badssl.com battery), on
+Sony's libhttp over vitals-ssl, so `sceHttpsEnableOption`/`DisableOption`, the verify callback and
+the certificate functions all run. Its saved report (`ux0:data/vitals/vitalsssl-*.txt`) adds which
+libssl loaded, the pool before and after the run, and what an `sceHttpsSetSslCallback` saw through
+the `sceSslGet*` getters (it refuses what libhttp found wrong, as without one).
+
 
 The NIDs are those of the libssl the app bundles ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx)),
 read from its export table, and so is the module NID (`0xB1620F91`; the NID database's 3.60
@@ -59,7 +81,9 @@ of its functions. The arguments of the ones not written yet aren't known, so the
   that sent nothing, 6 for 0 after the server's close_notify, 5 otherwise (libhttp then reads
   SceNet's errno).
 - **The host name**: libhttp gives it with `BIO_ctrl(bio, 100, 0, host)`, and Sony's ClientHello
-  reads it back (command 123) as SNI, unless it's an IPv4 address. Here too: a name is sent as SNI
+  reads it back (command 123) as SNI, unless it's an IPv4 address. The firmware's libhttp on a
+  console doesn't (the copy read for this was another build); there the name comes from its verify
+  callback's argument, which holds the host name its check compares. Here too: a name is sent as SNI
   and checked against the certificate; an IPv4 address isn't sent, and is checked against the
   certificate's IP address entries.
 - **Certificates**: while a context's verify mode is on (libhttp always turns it on), the server is
@@ -167,7 +191,7 @@ Sony's layout: an item is `{length, bytes}`, an entry's info `{tag, length, byte
 | `29AAC768` | `(cert_c, 0, 1, length, der, &consumed, &certificate)` | a certificate from DER | `sceSslInternalCertFromBinary` |
 | `144FA354` | `(certificate)` | frees one | `sceSslInternalCertFree`; the server's stay the connection's |
 | `64BDF1BB` | `(certificate, item, out)` | a certificate's info: 2 the serial number (an item), `0x4003` subjectAltName and `0x4005` basicConstraints into an extension object, `0x8007` the signature's algorithm (7 and 8 refused), `0x8009` the public key, `0x800A` and `0x800B` the issuer's and subject's names; `10008` without the extension | `sceSslInternalCertInfo`; 8 for MD5; a version 3 certificate without basicConstraints gets one with cA false |
-| `08ED1B25` | `(certificate, 4, buffer, size, &length)` | the DER encoding; its length with no buffer | `sceSslInternalCertToBinary` |
+| `08ED1B25` | `(certificate, 4, size, buffer, &length)` | the DER encoding; its length with no buffer | `sceSslInternalCertToBinary` |
 | `2074A6EB` | `(certificate, time)` | the notAfter into a time object | `sceSslInternalCertNotAfter` |
 | `2464F9D0` | `(certificate, time)` | the notBefore | `sceSslInternalCertNotBefore` |
 | `170D595D` | `(certificate, 1, &key)` | the public key, freed with `46358909` | `sceSslInternalCertPublicKey` |

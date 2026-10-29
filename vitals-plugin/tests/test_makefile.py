@@ -26,6 +26,12 @@ class PluginMakefileTests(unittest.TestCase):
         self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin-debug2", output)
         self.assertIn("-DVITALS_DEBUG=2", output)
 
+    def test_ssl_test_builds_apart(self):
+        output = dry_run(ROOT / "vitals-plugin", "DEBUG=1", "SSL_TEST=1")
+        self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin-debug1-ssltest", output)
+        self.assertIn("-DVITALS_SSL_TEST=1", output)
+        self.assertIn("-DVITALS_SSL_TEST=0", dry_run(ROOT / "vitals-plugin"))
+
 
 if __name__ == "__main__":
     unittest.main()

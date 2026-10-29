@@ -7,6 +7,7 @@
 #include <psp2kern/kernel/modulemgr.h>
 #include <psp2kern/kernel/processmgr.h>
 #include <psp2kern/kernel/sysclib.h>
+#include <psp2kern/kernel/sysroot.h>
 #include <psp2kern/types.h>
 #include <taihen.h>
 #include <vitasdkkern.h>
@@ -38,6 +39,30 @@ static const char *const g_replacement_modules[MODULE_COUNT] = {
     "vs0:/data/external/vitals/libssl.suprx",
 };
 
+#if VITALS_SSL_TEST
+/* Test builds only (make SSL_TEST=1): in the vitals-ssl test app, Sony's own libhttp loads, with
+ * vitals-ssl from the app's directory in place of libssl, so the app's connection test runs
+ * Sony's libhttp on it. Every other process is as in other builds */
+#define SSL_TEST_TITLE "VITALSSL1"
+static const char g_ssl_test_module[] = "ux0:app/VITALSSL1/vssl.suprx";
+/* Looked for at boot, as the replacements are; without it the test app gets Sony's libssl too */
+static uint8_t g_ssl_test_ready;
+
+static int is_ssl_test_process(SceUID pid)
+{
+    static const char wanted[] = SSL_TEST_TITLE;
+    char title[16];
+    for (size_t i = 0; i < sizeof(title); ++i)
+        title[i] = '\0';
+    (void)ksceKernelSysrootGetProcessTitleId(pid, title, sizeof(title));
+    title[sizeof(title) - 1] = '\0';
+    for (size_t i = 0; i < sizeof(wanted); ++i)
+        if (title[i] != wanted[i])
+            return 0;
+    return 1;
+}
+#endif
+
 static uint8_t g_replace[MODULE_COUNT];
 static uint8_t g_replace_iap;
 
@@ -53,6 +78,11 @@ static int add_replace_flags(void)
     for (size_t i = 0; i < MODULE_COUNT; ++i)
         g_replace[i] = ksceIoGetstat(g_replacement_modules[i], &stat) >= 0;
     g_replace_iap = g_replace[MODULE_LIBHTTP] && g_replace[MODULE_LIBSSL];
+#if VITALS_SSL_TEST
+    g_ssl_test_ready = ksceIoGetstat(g_ssl_test_module, &stat) >= 0;
+    if (g_ssl_test_ready)
+        return 1;
+#endif
     return g_replace[MODULE_COMPAT] || g_replace_iap;
 }
 
@@ -69,6 +99,19 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     char browser_path[VITALS_PENDING_BROWSER_PATH_SIZE];
     char browser_provider[VITALS_PENDING_BROWSER_PATH_SIZE];
     int module = -1;
+
+#if VITALS_SSL_TEST
+    const int is_libhttp = path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
+                           path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL);
+    const int is_libssl = path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx");
+    if ((is_libhttp || is_libssl) && is_ssl_test_process(target_pid))
+    {
+        if (is_libssl && g_ssl_test_ready)
+            path = g_ssl_test_module;
+        ksceDebugPrintf("vitals: ssl test pid=0x%X path=%s\n", target_pid, path);
+        return TAI_CONTINUE(SceUID, g_loader_hook_ref, pid, path, flags, ptr_to_four);
+    }
+#endif
 
     if (g_replace_iap && (path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
                           path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)))

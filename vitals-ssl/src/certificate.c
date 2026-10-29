@@ -716,8 +716,9 @@ int sceSslInternalCertInfo(void *handle, int item, void *out)
     }
 }
 
-/* NID 0x08ED1B25, Sony 0x81001C71: the DER encoding into buffer; its length with no buffer */
-int sceSslInternalCertToBinary(void *handle, int format, unsigned char *buffer, unsigned int size,
+/* NID 0x08ED1B25, Sony 0x81001C71: the DER encoding, as (certificate, format, size, buffer,
+ * &length); its length with no buffer */
+int sceSslInternalCertToBinary(void *handle, int format, unsigned int size, unsigned char *buffer,
                                unsigned int *length)
 {
     VsCert *cert = handle;

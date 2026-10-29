@@ -209,6 +209,7 @@ long sceSslInternalBioCtrl(void *handle, int command, long value, void *pointer)
         if (!bio->has_fd)
             return -1;
         bio->host = pointer;
+        VITALS_LOG("bio %p host %p %.64s", (void *)bio, pointer, pointer != NULL ? (const char *)pointer : "-");
         return 1;
     case VS_BIO_CTRL_GET_HOST:
         if (pointer == NULL || !bio->has_fd)
@@ -234,6 +235,7 @@ long sceSslInternalBioCtrl(void *handle, int command, long value, void *pointer)
         bio->close_on_free = (int)(value & 1);
         return 1;
     default:
+        VITALS_LOG("bio %p ctrl %d %ld %p ignored", (void *)bio, command, value, pointer);
         return 0;
     }
 }
@@ -445,6 +447,12 @@ static int verify_with_callback(void *context, mbedtls_x509_crt *certificate, in
     }
     vs_certificate_lookups_reset();
     ssl->verify_result = 0;
+    /* libhttp's argument: the flags, then the host name its check compares */
+    const char *const *argument = ssl->context->verify_argument;
+    VITALS_LOG("ssl %p verify flags=%08X host %p %.64s", (void *)ssl,
+               argument != NULL ? (unsigned int)(uintptr_t)argument[0] : 0u,
+               argument != NULL ? (const void *)argument[1] : NULL,
+               argument != NULL && argument[1] != NULL ? argument[1] : "-");
     int accepted = ssl->context->verify_callback(ssl, handles, count, ssl->context->verify_argument,
                                                  &ssl->verify_result);
     vs_certificate_lookups_reset();
@@ -487,6 +495,12 @@ static int setup(VsSsl *ssl)
     if (result != 0)
         return result;
     const char *host = is_bio(ssl->rbio) ? ssl->rbio->host : NULL;
+    /* The firmware's libhttp gives none with BIO_ctrl (the one read for this gives its check's
+     * host name, command 100): its verify callback's argument has it, the flags then the name */
+    if (host == NULL && ssl->context->verify_callback != NULL && ssl->context->verify_argument != NULL) {
+        host = ((const char *const *)ssl->context->verify_argument)[1];
+        VITALS_LOG("ssl %p host from the verify argument", (void *)ssl);
+    }
     if (host != NULL && (strlen(host) >= 256 || host[0] == '\0'))
         host = NULL;
     ssl->check_address = host != NULL && vs_platform_parse_ipv4(host, ssl->address);

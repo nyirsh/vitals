@@ -30,6 +30,67 @@ static char notice[120];
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 static void lock(void) { sceKernelLockMutex(guard, 1, NULL); }
 static void unlock(void) { sceKernelUnlockMutex(guard, 1); }
+#if VITALS_SSL_TEST
+/* The vitals-ssl test app (make SSL_TEST=1): the plugin gives this process Sony's libhttp on
+ * vitals-ssl (app0:vssl.suprx). The report says which libssl loaded, the pool before and after,
+ * and what the app's SSL callback saw through the sceSslGet* getters; the callback refuses
+ * whatever libhttp found wrong, as without one, so the results stay comparable */
+#define REPORT_NAME "vitalsssl"
+static char ssl_module[256];
+static SceSslMemoryPoolStats pool_before, pool_after;
+static int pool_before_rc = -1, pool_after_rc = -1;
+static unsigned callback_calls, callback_refused, callback_last_bits, callback_last_count;
+static char callback_subject[128];
+static int ssl_callback(unsigned int verify_errors, void *const certificates[], int count, void *argument)
+{
+    (void)argument;
+    lock();
+    ++callback_calls;
+    callback_last_bits = verify_errors;
+    callback_last_count = (unsigned)count;
+    if (verify_errors != 0)
+        ++callback_refused;
+    callback_subject[0] = 0;
+    SceSslCertName *name = count > 0 ? sceSslGetSubjectName(certificates[0]) : NULL;
+    if (name != NULL)
+    {
+        int entries = sceSslGetNameEntryCount(name);
+        size_t used = 0;
+        for (int i = 0; i < entries && used + 1 < sizeof(callback_subject); ++i)
+        {
+            char attribute[24], value[64];
+            unsigned length = 0;
+            if (sceSslGetNameEntryInfo(name, i, attribute, sizeof(attribute), value, sizeof(value), &length) < 0)
+                break;
+            int n = snprintf(callback_subject + used, sizeof(callback_subject) - used, "%s%s=%s",
+                             i ? "," : "", attribute, value);
+            if (n < 0)
+                break;
+            used += (size_t)n;
+        }
+        (void)sceSslFreeSslCertName(name);
+    }
+    unlock();
+    return verify_errors != 0 ? -1 : 0;
+}
+static void find_ssl_module(void)
+{
+    SceUID ids[128];
+    SceSize count = sizeof(ids) / sizeof(ids[0]);
+    ssl_module[0] = 0;
+    if (sceKernelGetModuleList(0xff, ids, &count) < 0)
+        return;
+    for (unsigned i = 0; i < count && i < 128; ++i)
+    {
+        SceKernelModuleInfo info = {0};
+        info.size = sizeof(info);
+        if (sceKernelGetModuleInfo(ids[i], &info) == 0 && strcmp(info.module_name, "SceLibSsl") == 0)
+            snprintf(ssl_module, sizeof(ssl_module), "%s", info.path);
+    }
+}
+#else
+#define REPORT_NAME "browserleaks"
+#endif
 static int stopped(void)
 {
     lock();
@@ -120,6 +181,9 @@ static int fetch_once(const char *url, int verify, int unverified_allowed, int s
     REQUIRE(sceHttpSetAutoRedirect(tmpl, SCE_HTTP_DISABLE));
     REQUIRE(sceHttpSetCookieEnabled(tmpl, SCE_HTTP_DISABLE));
     REQUIRE(sceHttpSetResponseHeaderMaxSize(tmpl, 16384));
+#if VITALS_SSL_TEST
+    REQUIRE(sceHttpsSetSslCallback(tmpl, ssl_callback, NULL));
+#endif
     REQUIRE(conn = sceHttpCreateConnectionWithURL(tmpl, url, SCE_HTTP_DISABLE));
     REQUIRE(req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_GET, url, 0));
     REQUIRE(sceHttpAddRequestHeader(req, "Accept-Encoding", "identity", SCE_HTTP_HEADER_OVERWRITE));
@@ -334,7 +398,7 @@ static int save_report(const CheckService *s)
 {
     char path[160];
     snprintf(path, sizeof(path), REPORT_DIR "/%s-%08X-%llu.txt",
-             "browserleaks", (unsigned)sceKernelGetProcessId(),
+             REPORT_NAME, (unsigned)sceKernelGetProcessId(),
              (unsigned long long)sceKernelGetSystemTimeWide());
     (void)sceIoMkdir(REPORT_DIR, 0777);
     FILE *f = fopen(path, "w");
@@ -354,6 +418,17 @@ static int save_report(const CheckService *s)
     fprintf(f, "vitals=%s (vitals-http loaded in this process)\n",
             s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled"
                                                                    : "not enabled");
+#if VITALS_SSL_TEST
+    lock();
+    fprintf(f, "libssl=%s\npool_before=rc 0x%08X size %u peak %u current %u\n"
+               "pool_after=rc 0x%08X size %u peak %u current %u\n"
+               "ssl_callback calls=%u refused=%u last_bits=0x%02X last_certificates=%u last_subject=%s\n",
+            ssl_module[0] ? ssl_module : "(not found)", (unsigned)pool_before_rc, pool_before.poolSize,
+            pool_before.maxInuseSize, pool_before.currentInuseSize, (unsigned)pool_after_rc,
+            pool_after.poolSize, pool_after.maxInuseSize, pool_after.currentInuseSize, callback_calls,
+            callback_refused, callback_last_bits, callback_last_count, callback_subject);
+    unlock();
+#endif
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
     {
         const CheckResult *r = i == CHECK_REPORT ? &s->connection : &s->protocols[i];
@@ -476,6 +551,13 @@ static int run_checks(SceSize argc, void *argv)
         free(h);
         return 0;
     }
+#if VITALS_SSL_TEST
+    lock();
+    callback_calls = callback_refused = callback_last_bits = callback_last_count = 0;
+    callback_subject[0] = 0;
+    pool_before_rc = sceSslGetMemoryPoolStats(&pool_before);
+    unlock();
+#endif
     /* The redirect rules are listed first, so their page fills in as they are tested */
     CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
     unsigned redirect_count = redirects != NULL ? load_redirects(redirects) : 0;
@@ -600,6 +682,11 @@ static int run_checks(SceSize argc, void *argv)
     free(redirects);
     free(body);
     free(h);
+#if VITALS_SSL_TEST
+    lock();
+    pool_after_rc = sceSslGetMemoryPoolStats(&pool_after);
+    unlock();
+#endif
     /* The log is saved only on request (vitals_check_save_report), and only for a run that
      * wasn't cancelled */
     lock();
@@ -647,6 +734,9 @@ int vitals_check_open(void)
             goto failed;
         ssl_ready = 1;
     }
+#if VITALS_SSL_TEST
+    find_ssl_module();
+#endif
     if (!http_ready)
     {
         rc = sceHttpInit(1024 * 1024);
