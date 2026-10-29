@@ -2,7 +2,8 @@
 
 #include "diagnostics.h"
 
-/* SceSsl: the public interface, as <psp2/libssl.h> declares it. Not written yet: each one fails.
+/* SceSsl's certificate functions, as <psp2/libssl.h> declares them. Not written yet: each one
+ * fails. sceSslInit, sceSslTerm and sceSslGetMemoryPoolStats are in core.c.
  * "Sony" is the function's address in the libssl the app bundles (vitals-app/assets/lssl.suprx) */
 
 int ssl_not_implemented(const char *function)
@@ -10,26 +11,6 @@ int ssl_not_implemented(const char *function)
     VITALS_LOG("%s is not implemented", function);
     (void)function;
     return SCE_SSL_ERROR_INTERNAL;
-}
-
-/* NID 0x3C733316, Sony 0x81047F09 */
-int sceSslInit(unsigned poolSize)
-{
-    (void)poolSize;
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0x03CE6E3A, Sony 0x810480AD */
-int sceSslTerm(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xBD203262, Sony 0x81048169 */
-int sceSslGetMemoryPoolStats(SceSslMemoryPoolStats *currentStat)
-{
-    (void)currentStat;
-    return ssl_not_implemented(__func__);
 }
 
 /* NID 0x901C5C15, Sony 0x810494F1 */

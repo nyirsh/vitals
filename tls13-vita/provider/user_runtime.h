@@ -20,6 +20,9 @@ typedef struct VitalsRuntimeStats {
 } VitalsRuntimeStats;
 
 int vitals_user_runtime_init(void);
+/* The same, with the memory block's name and size given: the kernel's error when it can't be
+ * allocated (a size that isn't a multiple of 4 KiB, or more than the process has) */
+int vitals_user_runtime_init_size(const char *name, unsigned int size);
 int vitals_user_runtime_destroy(void);
 int vitals_user_runtime_stats(VitalsRuntimeStats *stats);
 /* Debug level 1 and up: prints heap use through sceClibPrintf when the peak has

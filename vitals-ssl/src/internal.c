@@ -1,8 +1,8 @@
 #include "ssl.h"
 
-/* SceSslInternal: the 98 exports Sony's own modules use (libhttp alone imports 65 of them). The NID
- * database names three; the others are named after their NID until their job is worked out. None
- * of their arguments are known yet, so each takes none and fails.
+/* SceSslInternal's exports that aren't written yet: named after their NID until their job is
+ * worked out. None of their arguments are known yet, so each takes none and fails. The written
+ * ones are in core.c and connection.c
  * "Sony" is the function's address in the libssl the app bundles (vitals-app/assets/lssl.suprx),
  * whose code is mapped at 0x81000000 */
 
@@ -54,12 +54,6 @@ int sceSslInternal0C693D36(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x0DB6C206, Sony 0x81019BB1 */
-int sceSslInternal0DB6C206(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x133ED36D, Sony 0x8100F4E9 */
 int sceSslInternal133ED36D(void)
 {
@@ -68,12 +62,6 @@ int sceSslInternal133ED36D(void)
 
 /* NID 0x144FA354, Sony 0x81004F29 */
 int sceSslInternal144FA354(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0x16D7C7CA, Sony 0x81000A21 */
-int sceSslInternal16D7C7CA(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -90,20 +78,8 @@ int sceSslInternal17BF2367(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x19B2BB58, Sony 0x81019397 */
-int sceSslInternal19B2BB58(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x2074A6EB, Sony 0x81001CE9 */
 int sceSslInternal2074A6EB(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0x2185BB05, Sony 0x81048141 */
-int sceSslInternal2185BB05(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -126,12 +102,6 @@ int sceSslInternal24C6257F(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x260F5A85, Sony 0x81016587 */
-int sceSslInternal260F5A85(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x26CBEEB6, Sony 0x81018BFB */
 int sceSslInternal26CBEEB6(void)
 {
@@ -150,22 +120,16 @@ int sceSslInternal2B90012E(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x2F0FC3CD, Sony 0x8101ACC1 */
-int sceSslInternal2F0FC3CD(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x306E2A22, Sony 0x81005081 */
 int sceSslInternal306E2A22(void)
 {
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x33737FDC, Sony 0x810480A9 */
+/* NID 0x33737FDC, Sony 0x810480A9: only returns 0, as Sony's */
 int sceSslInternal33737FDC(void)
 {
-    return ssl_not_implemented(__func__);
+    return 0;
 }
 
 /* NID 0x33AC7A16, Sony 0x81000A9D */
@@ -204,12 +168,6 @@ int sceSslInternal422DFE70(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x461C5990, Sony 0x81048205 */
-int sceSslInternal461C5990(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x46358909, Sony 0x8101FB59 */
 int sceSslInternal46358909(void)
 {
@@ -222,20 +180,8 @@ int sceSslInternal4725F9E7(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x4A1557A7, Sony 0x81019A15 */
-int sceSslInternal4A1557A7(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x4AAF0D45, Sony 0x8102A239 */
 int sceSslInternal4AAF0D45(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0x4B4A2307, Sony 0x8104808D */
-int sceSslInternalIsInitalized(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -246,22 +192,15 @@ int sceSslInternal4D80D3F7(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x4F781BB6, Sony 0x81019B11 */
-int sceSslInternal4F781BB6(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0x568F0E80, Sony 0x81001AA3 */
 int sceSslInternal568F0E80(void)
 {
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x56FE376A, Sony 0x81047F05 */
-int sceSslInternal56FE376A(void)
+/* NID 0x56FE376A, Sony 0x81047F05: does nothing, as Sony's */
+void sceSslInternal56FE376A(void)
 {
-    return ssl_not_implemented(__func__);
 }
 
 /* NID 0x5E50CB55, Sony 0x81028D87 */
@@ -278,12 +217,6 @@ int sceSslInternal6046C1F3(void)
 
 /* NID 0x64BDF1BB, Sony 0x81004F83 */
 int sceSslInternal64BDF1BB(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0x67FB1CD3, Sony 0x8101648B */
-int sceSslInternal67FB1CD3(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -348,32 +281,8 @@ int sceSslInternal93EAE08A(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0x9E38815D, Sony 0x81016469 */
-int sceSslInternal9E38815D(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xA374CD7B, Sony 0x81013ED7 */
-int sceSslInternalA374CD7B(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xA4EA9DE0, Sony 0x810163C5 */
 int sceSslInternalA4EA9DE0(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xAC1DBE40, Sony 0x8100F3E7 */
-int sceSslInternalAC1DBE40(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xAF50B945, Sony 0x81016581 */
-int sceSslInternalAF50B945(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -408,10 +317,9 @@ int sceSslInternalBF99D664(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xC0B135F0, Sony 0x81047F01 */
-int sceSslInternalC0B135F0(void)
+/* NID 0xC0B135F0, Sony 0x81047F01: does nothing, as Sony's */
+void sceSslInternalC0B135F0(void)
 {
-    return ssl_not_implemented(__func__);
 }
 
 /* NID 0xC1299FB6, Sony 0x8102A13B */
@@ -438,32 +346,14 @@ int sceSslInternalCBEC7D13(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xCC7F4211, Sony 0x81019BC9 */
-int sceSslInternalCC7F4211(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xCE37B69E, Sony 0x81004FE9 */
 int sceSslInternalCE37B69E(void)
 {
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xCEE46B33, Sony 0x8101AE2D */
-int sceSslInternalCEE46B33(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xD1A82B1A, Sony 0x81028DE9 */
 int sceSslInternalD1A82B1A(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xD28834E6, Sony 0x81019741 */
-int sceSslInternalD28834E6(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -516,44 +406,8 @@ int sceSslInternalDEC6DD27(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xE5EDD91B, Sony 0x8101ADCF */
-int sceSslInternalE5EDD91B(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xE746465E, Sony 0x8101A645 */
-int sceSslInternalE746465E(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xEC9FAF42, Sony 0x81019B81 */
-int sceSslInternalEC9FAF42(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xEF9EBAC7, Sony 0x810192EF */
-int sceSslInternalEF9EBAC7(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xF030A0DE, Sony 0x81002039 */
 int sceSslInternalF030A0DE(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xF2C9B744, Sony 0x8101B08B */
-int sceSslInternalF2C9B744(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xF39A49C6, Sony 0x81019B4B */
-int sceSslInternalWrite(void)
 {
     return ssl_not_implemented(__func__);
 }
@@ -564,32 +418,14 @@ int sceSslInternalF4007DBE(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xF71DB06F, Sony 0x8101B097 */
-int sceSslInternalF71DB06F(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xFB51AE89, Sony 0x8100AD43 */
 int sceSslInternalFB51AE89(void)
 {
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xFBEB1FD7, Sony 0x81019C21 */
-int sceSslInternalFBEB1FD7(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xFEFE761C, Sony 0x8101F799 */
 int sceSslInternalFEFE761C(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
-/* NID 0xFFE2ED51, Sony 0x81000DFB */
-int sceSslInternalFFE2ED51(void)
 {
     return ssl_not_implemented(__func__);
 }

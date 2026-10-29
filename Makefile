@@ -3,8 +3,8 @@
 #   tls13-vita/     the browser's TLS provider (option: DEBUG)
 #   vitals-http/    libhttp written from scratch, with tls13-vita's TLS (libhttp.suprx; options:
 #                   TLS_HEAP_KIB, USER_AGENT, DEBUG)
-#   vitals-ssl/     libssl written from scratch (libssl.suprx; option: DEBUG); a skeleton, built
-#                   only by `make vitals-ssl`, and not packaged
+#   vitals-ssl/     libssl written from scratch (libssl.suprx; option: DEBUG); work in progress,
+#                   built only by `make vitals-ssl`, and not packaged
 #   vitals-app/     the vitals app and vitals-app.vpk (builds the plugin, tls13-vita and vitals-http
 #                   first)
 # Command-line options such as `make TLS_HEAP_KIB=256` reach the components automatically
