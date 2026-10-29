@@ -53,12 +53,13 @@ int sceHttpCreateTemplate(const char *userAgent, int httpVer, int autoProxyConf)
             /* As Sony's: the app's agent, then this library's and the console's, as a request
              * header of the template that the app can replace or remove. Sony's puts the
              * firmware's version in it; this one always gives the latest firmware's, unless
-             * useragent.txt gives another */
+             * useragent.txt gives another. The space follows any agent, an empty one too, as in
+             * Sony's (0x81007AA2) */
             char agent[VH_USER_AGENT_MAX + VH_SUFFIX_MAX];
             object->as.template_.http_version = httpVer;
             object->as.template_.auto_proxy = autoProxyConf;
             snprintf(agent, sizeof(agent), "%s%s%s", userAgent != NULL ? userAgent : "",
-                     userAgent != NULL && userAgent[0] != '\0' ? " " : "", vh_user_agent_suffix());
+                     userAgent != NULL ? " " : "", vh_user_agent_suffix());
             result = sceHttpAddRequestHeader(object->id, "User-Agent", agent, SCE_HTTP_HEADER_OVERWRITE);
             if (result < 0)
                 vh_destroy(object);

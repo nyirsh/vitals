@@ -1438,6 +1438,8 @@ int main(int argc, char **argv)
     CHECK_EQ(sceHttpInit(1024 * 1024), 0);
     CHECK(strstr(user_agent_of("Game/2.0"), "User-Agent: Game/2.0 Custom/1.0 (Test)\r\n") != NULL);
     CHECK(strstr(user_agent_of(NULL), "User-Agent: Custom/1.0 (Test)\r\n") != NULL);
+    /* An empty agent still gets the space, as Sony's */
+    CHECK(strstr(user_agent_of(""), "User-Agent:  Custom/1.0 (Test)\r\n") != NULL);
     CHECK_EQ(sceHttpTerm(), 0);
 
     /* A template costs what a template needs: the shell's Commerce2 makes over twenty in its pool,
