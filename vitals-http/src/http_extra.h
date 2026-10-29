@@ -123,7 +123,7 @@ int sceHttpPrivateLoadedCertTerm(void);
 int sceHttpPrivateLoadedCertAddCa(const void *data, unsigned int size);
 int sceHttpPrivateLoadedCertSetClientCert(const void *data, unsigned int size);
 int sceHttpPrivateLoadedCertSetClientKey(const void *data, unsigned int size);
-int sceHttpPrivateSslContextAddCertCheck(unsigned int context, unsigned int argument);
+int sceHttpPrivateSslContextAddCertCheck(void *context, void *argument);
 int sceHttpPrivateCertCheckNothing(void);
 
 #ifdef __cplusplus

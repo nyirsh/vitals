@@ -4,16 +4,20 @@ This document follows Sony's SSL library (`SceLibSsl`, `libssl.suprx`) through v
 companion is [browser.md](browser.md); apps and games use `vitals-http`, described in
 [vitals-http.md](vitals-http.md).
 
-In one paragraph: vitals swaps libssl for the copy bundled with the app whenever a process loads
-it, leaves it **shared** and never hooks it. vitals' TLS doesn't run in libssl: `vitals-http`, which
-replaces Sony's libhttp in every process, does its own TLS with Mbed TLS and doesn't import libssl
-at all. libssl is left for apps and system code that call `sceSsl` directly.
+In one paragraph: whenever a process loads libssl, vitals gives it [vitals-ssl](../vitals-ssl/),
+Sony's library written from scratch on Mbed TLS, under Sony's own library and function NIDs. It is
+left **shared** and never hooked. vitals' own TLS doesn't go through this module: `vitals-http`,
+which replaces Sony's libhttp in every process, has the same vitals-ssl code built in, with a heap
+of its own, so it works in processes that load libhttp without libssl (Adrenaline's bubble booter
+and the browser's WebKit process do). The libssl module is left for apps and system code that call
+`sceSsl` directly (SceStoreBrowser and NpCommerce2 call `sceSslInit`, `sceSslTerm` and its pool's
+stats).
 
 ## At a glance
 
-| Module                     | File loaded                                                                           | Loaded when                   | Into                                                              | Shared or private | Until                                         |
-| -------------------------- | ------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------- | ----------------- | --------------------------------------------- |
-| `SceLibSsl` (vitals' copy) | `vs0:/data/external/vitals/libssl.suprx`, in place of `vs0:sys/external/libssl.suprx` | a process loads Sony's libssl | every process that loads it, mapped once (at `0xE…` in your logs) | always **shared** | the last process using it unloads it or exits |
+| Module                    | File loaded                                                                           | Loaded when                   | Into                                                              | Shared or private | Until                                         |
+| ------------------------- | ------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------- | ----------------- | --------------------------------------------- |
+| `SceLibSsl` (vitals-ssl)  | `vs0:/data/external/vitals/libssl.suprx`, in place of `vs0:sys/external/libssl.suprx` | a process loads Sony's libssl | every process that loads it, mapped once (at `0xE…` in your logs) | always **shared** | the last process using it unloads it or exits |
 
 Nothing is injected after it, and nothing hooks it.
 
@@ -21,10 +25,12 @@ Nothing is injected after it, and nothing hooks it.
 
 | File on the console                      | Comes from                                                                          | Installed by                                                   |
 | ---------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `vs0:/data/external/vitals/libssl.suprx` | `app0:lssl.suprx` ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx)) | `install_http_modules` in [install.c](../vitals-app/install.c) |
+| `vs0:/data/external/vitals/libssl.suprx` | `app0:libssl.suprx` (`build/vitals-ssl/libssl.suprx`), or `app0:debug/<level>/libssl.suprx` for Debug output | `install_http_modules` and the debug level switch in [install.c](../vitals-app/install.c) |
 
 Sony's own `vs0:sys/external/libssl.suprx` is never modified; the replacement happens at load
-time. Uninstalling removes vitals' copy with the HTTP modules.
+time. Uninstalling removes vitals' copy with the HTTP modules. Earlier versions installed a copy of
+Sony's own libssl here ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx), kept as the
+reference vitals-ssl was written from).
 
 ## 2. Boot
 
@@ -39,24 +45,27 @@ Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-plugin/ma
 1. **Path swap**: `vs0:sys/external/libssl.suprx` or `vs0:/sys/external/libssl.suprx` becomes
    `vs0:/data/external/vitals/libssl.suprx`.
 2. **Flags left alone**: the loader's shared mapping is kept, as for every replacement.
-3. **The real load**: libssl is mapped in the **shared** region, one copy of its code for every
+3. **The real load**: vitals-ssl is mapped in the **shared** region, one copy of its code for every
    process that uses it, each process with its own data.
 4. **Nothing queued**: no injection follows a libssl load.
 
+Its memory is the pool the process gives `sceSslInit`, as Sony's is, and the CA bundle it trusts is
+`vs0:/data/external/cert/CA_LIST.cer`, the store vitals installs.
+
 ## 4. Never hooked
 
-Nothing in vitals patches libssl: `vitals-http` doesn't use it, and since it is a single shared
-copy, a patch would reach every process. libssl's sizes and the offsets of its certificate
-getters are still kept in [sony_abi.h](../tls13-vita/include/vitals/sony_abi.h), unused.
+Nothing in vitals patches libssl. libssl's sizes and the offsets of Sony's certificate getters are
+still kept in [sony_abi.h](../tls13-vita/include/vitals/sony_abi.h), unused.
 
 ## 5. The end
 
-libssl is unloaded when the last process using it unloads it or exits. Since it is never hooked,
-there is nothing of vitals' to release.
+libssl is unloaded when the last process using it unloads it or exits; `module_stop` ends what the
+process left initialized.
 
 ## 6. Files
 
 | File                                            | Role                            |
 | ----------------------------------------------- | ------------------------------- |
+| [vitals-ssl/](../vitals-ssl/)                   | the library                     |
 | [vitals-plugin/main.c](../vitals-plugin/main.c) | the path swap                   |
 | [vitals-app/install.c](../vitals-app/install.c) | putting the file on the console |

@@ -849,3 +849,14 @@ int sceSslInternalGetCaName(void *handle, int index, void **name)
     *name = ssl->ca_names[index];
     return 0;
 }
+
+/* NID 0xD776E2F8, Sony 0x81019A71: SSL_pending, through the method as Sony's (its slot 64 is
+ * SSLeay's ssl_pending): how many bytes read can return without reading the socket. The NetCheck
+ * dialog's own TLS calls it */
+int sceSslInternalPending(void *handle)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl) || !ssl->handshake_done)
+        return 0;
+    return (int)mbedtls_ssl_get_bytes_avail(&ssl->tls);
+}

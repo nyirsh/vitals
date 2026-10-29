@@ -451,6 +451,9 @@ void vh_tls_unload_certs(void);
 /* The same store, a piece at a time, as Sony's private exports fill it (private.c); with the lock
  * held. A certificate or key is kept as given and parsed when it is used, as Sony's are */
 int vh_tls_add_ca(const void *data, unsigned int size);
+/* Installs libhttp's certificate check on a libssl context its caller made, with its argument, as
+ * Sony's sceHttpPrivateSslContextAddCertCheck does; 0 or an error */
+int vh_tls_add_cert_check(void *context, void *argument);
 void vh_tls_clear_cas(void);
 int vh_tls_set_client_certificate(const void *data, unsigned int size);
 int vh_tls_set_client_key(const void *data, unsigned int size);

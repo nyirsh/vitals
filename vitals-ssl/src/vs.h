@@ -233,6 +233,7 @@ int sceSslInternalRead(void *ssl, void *buffer, int size);
 int sceSslInternalWrite(void *ssl, const void *buffer, int size);
 int sceSslInternalShutdown(void *ssl);
 int sceSslInternalGetError(void *ssl, int returned);
+int sceSslInternalPending(void *ssl);
 int sceSslInternalGetItem(void *ssl, int item, const void **out);
 void sceSslInternalSetVerifyResult(void *ssl, int result);
 int sceSslInternalCertSubject(void *cert, int format, void **name);

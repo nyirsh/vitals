@@ -145,7 +145,7 @@ A request that times out is tried again, up to 3 times in all, since slow server
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `vitals-plugin/`     | the kernel plugin (`vitals.skprx`) that redirects Sony's modules and injects the browser provider                                                                                |
 | `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with `tls13-vita`'s TLS                                                                                              |
-| `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`), work in progress: its connection and certificate functions so far, and nothing installs it                             |
+| `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`): installed as the system's libssl, and built into vitals-http                                                           |
 | `tls13-vita/`        | the browser's TLS provider and the code it shares with `vitals-http` and the kernel plugin                                                                                       |
 | `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                                                                                                   |
 | `docs/`              | how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals |

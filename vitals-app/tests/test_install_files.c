@@ -109,7 +109,7 @@ static const char *const installed[][2] = {
     {"ur0:tai/vitals-native/vitals.suprx", "app0:vitals.suprx"},
     {"vs0:/data/external/vitals/ScePsp2Compat.suprx", "app0:compat.suprx"},
     {"vs0:/data/external/vitals/libhttp.suprx", "app0:libhttp.suprx"},
-    {"vs0:/data/external/vitals/libssl.suprx", "app0:lssl.suprx"},
+    {"vs0:/data/external/vitals/libssl.suprx", "app0:libssl.suprx"},
     {"vs0:/data/external/vitals/native/vitals.suprx", "app0:vitals.suprx"},
 };
 #define INSTALLED_COUNT (sizeof(installed) / sizeof(installed[0]))
@@ -130,7 +130,7 @@ static void fresh_console(void)
     put(CA, SONY_CA);
     make_directories("ux0:data");
     make_directories("vs0:sys/external");
-    const char *app_files[] = {"vitals.skprx", "vitals.suprx", "compat.suprx", "libhttp.suprx", "lssl.suprx",
+    const char *app_files[] = {"vitals.skprx", "vitals.suprx", "compat.suprx", "libhttp.suprx", "libssl.suprx",
                                "redirects.txt", "dns.txt",
                                "sony-certs.pem", "mozilla-certs.pem"};
     for (size_t i = 0; i < sizeof(app_files) / sizeof(app_files[0]); ++i)
@@ -140,9 +140,9 @@ static void fresh_console(void)
         snprintf(content, sizeof(content), "contents of %s\n", app_files[i]);
         put(path, content);
     }
-    /* The debug builds of vitals-http, the browser provider, the redirect and the kernel plugin, one
+    /* The debug builds of vitals-http, vitals-ssl, the browser provider and the kernel plugin, one
      * folder per level */
-    const char *debug_files[] = {"libhttp.suprx", "vitals.suprx", "vitals.skprx"};
+    const char *debug_files[] = {"libhttp.suprx", "libssl.suprx", "vitals.suprx", "vitals.skprx"};
     for (int level = 1; level <= 2; ++level)
         for (size_t i = 0; i < sizeof(debug_files) / sizeof(debug_files[0]); ++i)
         {
@@ -237,6 +237,7 @@ static void expect_debug_level(int level)
 {
     static const char *const modules[][2] = {
         {"vs0:/data/external/vitals/libhttp.suprx", "libhttp.suprx"},
+        {"vs0:/data/external/vitals/libssl.suprx", "libssl.suprx"},
         {"vs0:/data/external/vitals/native/vitals.suprx", "vitals.suprx"},
         {"ur0:tai/vitals-native/vitals.suprx", "vitals.suprx"},
         {"ur0:tai/vitals.skprx", "vitals.skprx"},
@@ -255,8 +256,8 @@ static void expect_debug_level(int level)
     assert(vitals_install_plugin_current() == 1);
 }
 
-/* Switching debug output replaces only vitals-http, the browser provider and the kernel plugin, in
- * every place they are installed, and a full install puts the release builds back */
+/* Switching debug output replaces only vitals-http, vitals-ssl, the browser provider and the kernel
+ * plugin, in every place they are installed, and a full install puts the release builds back */
 static void test_debug_levels(void)
 {
     fresh_console();

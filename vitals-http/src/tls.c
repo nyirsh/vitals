@@ -324,6 +324,90 @@ int vh_tls_recv(VhTls *tls, void *data, size_t size)
     return tls_error(tls);
 }
 
+/* ---- libhttp's certificate check, on a libssl context another module made ---- */
+
+/* The argument libhttp's check takes (sceHttpPrivateSslContextAddCertCheck's), in Sony's layout:
+ * on the Vita flags at 0, the host name at 4, where the SCE result and the SCE_HTTPS_ERROR_SSL_*
+ * bits go at 8 and 12, the app's callback and its argument at 16 and 20, and a lock its caller
+ * gives at 40 and 44 */
+typedef struct VhCertCheck
+{
+    uint32_t flags;
+    const char *host;
+    int *result;
+    unsigned int *bits;
+    int (*callback)(unsigned int bits, void *const certificates[], int count, void *argument);
+    void *argument;
+    void *reserved[4];
+    int (*lock)(void *argument);
+    int (*unlock)(void *argument);
+} VhCertCheck;
+
+/* Sony's flags when the caller gives none: server verify, CN check, known CA, and its CA lookup */
+#define VH_CERT_CHECK_DEFAULT 0x65u
+/* The caller's lock is taken around the check */
+#define VH_CERT_CHECK_LOCKED 0x40000000u
+/* The SCE result of a refused certificate */
+#define VH_CERT_CHECK_REFUSED ((int)0x80435806)
+/* The reason a refusal gives libssl, which picks the alert (handshake_failure) */
+#define VH_CERT_CHECK_REASON 10
+
+/* As Sony's libhttp's (0x81014592), called by libssl for the server's chain: the checks the flags
+ * ask for, on the bundle and the certificates the app loaded, then the app's callback, which
+ * decides when there is one (it accepts what was found unless it returns a negative), as with this
+ * library's own connections */
+static int cert_check(void *ssl, void *certificates[], int count, void *argument, int *reason)
+{
+    VhCertCheck *check = argument;
+    uint32_t options = check != NULL && check->flags != 0 ? check->flags : VH_CERT_CHECK_DEFAULT;
+    int locked = check != NULL && (check->flags & VH_CERT_CHECK_LOCKED) != 0 && check->lock != NULL &&
+                 check->unlock != NULL;
+    (void)ssl;
+    if (locked)
+        (void)check->lock(check->argument);
+    uint32_t found = 0;
+    if ((options & VITALS_SCE_HTTPS_OPTION_SERVER_VERIFY) != 0) {
+        /* The store stays while it is read */
+        vh_lock();
+        found = vitalsSslCheckChain(certificates, count,
+                                    (options & VITALS_SCE_HTTPS_OPTION_CN_CHECK) != 0 && check != NULL ? check->host
+                                                                                                       : NULL,
+                                    g_store);
+        vh_unlock();
+    }
+    unsigned int bits = vitals_map_certificate_detail(vitals_filter_certificate_flags(found, options));
+    if (locked)
+        (void)check->unlock(check->argument);
+    int accepted = bits == 0;
+    if (check != NULL && check->callback != NULL)
+        accepted = check->callback(bits, certificates, count, check->argument) >= 0;
+    if (check != NULL && check->result != NULL)
+        *check->result = accepted ? 0 : VH_CERT_CHECK_REFUSED;
+    if (check != NULL && check->bits != NULL)
+        *check->bits = bits;
+    *reason = accepted ? 0 : VH_CERT_CHECK_REASON;
+    VITALS_LOG("cert check host=%s options=%08X found=%02X bits=%02X callback=%d accepted=%d",
+               check != NULL && check->host != NULL ? check->host : "-", (unsigned int)options, (unsigned int)found, bits,
+               check != NULL && check->callback != NULL, accepted);
+    return accepted;
+}
+
+/* As Sony's: the verify mode on, and the check above in place of the bundle's; always 0. The context is
+ * the libssl module's, another copy of vitals-ssl, of the same version (the two are installed
+ * together), so its context is the same structure as this copy's */
+int vh_tls_add_cert_check(void *context, void *argument)
+{
+    vh_lock();
+    int ready = tls_ready();
+    vh_unlock();
+    /* Sony's succeeds whatever happens; without TLS here the check still reads the bundle */
+    if (ready < 0)
+        VITALS_LOG("cert check installed without tls");
+    sceSslInternalCtxSetVerify(context, 1);
+    sceSslInternalCtxSetCertVerifyCallback(context, cert_check, argument);
+    return 0;
+}
+
 /* ---- sceHttpsLoadCert ---- */
 
 /* Wipes a secret before it is freed: through a volatile pointer, which the compiler can't drop */

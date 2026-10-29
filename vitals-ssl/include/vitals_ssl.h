@@ -21,6 +21,11 @@ const void *sceSslInternalClientMethod(void);
 void *sceSslInternalCtxNew(const void *library, const void *method);
 void sceSslInternalCtxFree(void *context);
 void sceSslInternalCtxSetVerify(void *context, int mode);
+/* The check that decides on a server's chain in place of the bundle's, as libhttp's: (ssl, the
+ * certificates as the server sent them, how many, argument, &reason) → 1 accepts */
+typedef int (*VitalsSslVerifyCallback)(void *ssl, void *certificates[], int count, void *argument, int *reason);
+void sceSslInternalCtxSetCertVerifyCallback(void *context, VitalsSslVerifyCallback callback, void *argument);
+void *sceSslInternalBioNewSocket(int fd, int close_flag);
 long sceSslInternalBioCtrl(void *bio, int command, long value, void *pointer);
 void *sceSslInternalNew(void *context);
 void sceSslInternalFree(void *ssl);
@@ -75,6 +80,11 @@ int vitalsSslCtxSetIdentity(void *context, const void *certificate, size_t certi
 /* Whether such data parses, without keeping it: 0 or the parser's error */
 int vitalsSslCheckCertificate(const void *data, size_t size);
 int vitalsSslCheckKey(const void *data, size_t size);
+
+/* Checks a chain a verify callback was given (the server's certificate first) against the bundle and
+ * the store's certificates (NULL for none), with exact trust of self-signed ones, and the host name
+ * when there is one: tls13-vita's VITALS_CERT_* flags, 0 when nothing is wrong */
+unsigned int vitalsSslCheckChain(void *const certificates[], int count, const char *host, void *store);
 
 /* What the server's certificate check found, as tls13-vita's VITALS_CERT_* flags: 0 when nothing
  * (or it wasn't checked) */

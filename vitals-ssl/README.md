@@ -5,12 +5,14 @@ exported under libssl's own library and function NIDs ([libssl_api.yml.in](libss
 all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
 shared with vitals-http and the browser provider).
 
-Written so far: all 11 `SceSsl` functions and the 69 `SceSslInternal` functions Sony's libhttp
-uses (below: connections, its certificate check and its client certificate callback), plus three
-that do nothing in Sony's either. Every other
+Written so far: all 11 `SceSsl` functions, the 69 `SceSslInternal` functions Sony's libhttp
+uses (below: connections, its certificate check and its client certificate callback) and
+`SSL_pending`, which the NetCheck dialog's own TLS adds, plus three that do nothing in Sony's
+either. Every other
 export logs its name (with `DEBUG=1` or `2`) and fails with `SCE_SSL_ERROR_INTERNAL`
-(`0x80435026`), or returns `NULL` where it returns a pointer. Nothing installs it; the app still
-installs the copy of Sony's libssl it bundles ([docs/libssl.md](../docs/libssl.md)).
+(`0x80435026`), or returns `NULL` where it returns a pointer. The app installs it as the system's
+libssl, in place of the copy of Sony's it used to install ([docs/libssl.md](../docs/libssl.md)),
+and vitals-http has it built in.
 
 ## Building
 
@@ -157,6 +159,7 @@ arguments come from the registers libhttp sets before the call.
 | `CEE46B33` | setup | `(ssl)` | `SSL_set_connect_state` | `sceSslInternalSetConnectState` |
 | `E5EDD91B` | handshake | `(ssl)` → rc | `SSL_connect` | `sceSslInternalConnect` |
 | `2F0FC3CD` | handshake, I/O | `(ssl, rc)` → kind | `SSL_get_error` | `sceSslInternalGetError` |
+| `D776E2F8` | not libhttp: the NetCheck dialog's own TLS | `(ssl)` → bytes | `SSL_pending`, through the method (SSLeay's slot 64): what a read can return without the socket | `sceSslInternalPending` |
 | `4F781BB6` | read | `(ssl, buffer, length ≤ 1500)` → rc | `SSL_read` | `sceSslInternalRead` |
 | `F39A49C6` | write | `(ssl, buffer, length ≤ 1500)` → rc | `SSL_write` | `sceSslInternalWrite` |
 | `EC9FAF42` | close, failed setup | `(ssl)` | `SSL_shutdown` | `sceSslInternalShutdown` |
@@ -274,6 +277,7 @@ declares both, with every object opaque:
 | `vitalsSslCtxSetDeferredVerify`, `vitalsSslGetCertificateFlags`, `vitalsSslGetVerifyResult` | the handshake goes on whatever the check finds, and the caller decides from it (its HTTPS options, the app's callback) |
 | `vitalsSslStoreNew`, `vitalsSslStoreAdd`, `vitalsSslStoreRelease`, `vitalsSslCtxSetStore` | CA certificates trusted besides the bundle (an app's `sceHttpsLoadCert` ones), also as exact self-signed certificates |
 | `vitalsSslCtxSetIdentity`, `vitalsSslCheckCertificate`, `vitalsSslCheckKey` | a client certificate sent to any server that asks, as vitals-http does |
+| `vitalsSslCheckChain` | checks a chain a verify callback was given, for vitals-http's version of libhttp's certificate check (on a context the NetCheck dialog makes in the libssl module) |
 | `vitalsSslGetTlsError`, `vitalsSslTlsErrorIsMemory`, `vitalsSslGetVersion`, `vitalsSslGetCiphersuite`, `vitalsSslCertificateRequested` | what a connection did, for errors and logs |
 
 Built in, vitals-ssl's platform is vitals-http's ([vitals-http/src/ssl_platform.c](../vitals-http/src/ssl_platform.c)).

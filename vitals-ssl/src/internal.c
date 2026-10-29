@@ -142,12 +142,6 @@ int sceSslInternalD6D32A2F(void)
     return ssl_not_implemented(__func__);
 }
 
-/* NID 0xD776E2F8, Sony 0x81019A71 */
-int sceSslInternalD776E2F8(void)
-{
-    return ssl_not_implemented(__func__);
-}
-
 /* NID 0xDABB61EE, Sony 0x8100519B */
 int sceSslInternalDABB61EE(void)
 {

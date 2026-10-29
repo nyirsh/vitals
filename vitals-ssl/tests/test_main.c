@@ -251,6 +251,15 @@ static void test_echo(void)
     write_text(connection.ssl, "hello\n");
     CHECK(read_line(connection.ssl, line, sizeof(line)) > 0);
     CHECK(strcmp(line, "hello\n") == 0);
+    /* SSL_pending: what a read has left of the record */
+    CHECK_EQ(sceSslInternalPending(connection.ssl), 0);
+    write_text(connection.ssl, "pending\n");
+    CHECK_EQ(sceSslInternalRead(connection.ssl, line, 1), 1);
+    CHECK_EQ(sceSslInternalPending(connection.ssl), 7);
+    CHECK(read_line(connection.ssl, line + 1, sizeof(line) - 1) > 0);
+    CHECK(strcmp(line, "pending\n") == 0);
+    CHECK_EQ(sceSslInternalPending(connection.ssl), 0);
+    CHECK_EQ(sceSslInternalPending(NULL), 0);
     /* More than one record each way */
     static char big[40000], back[40001];
     for (size_t i = 0; i < sizeof(big) - 1; ++i)

@@ -144,7 +144,7 @@ them by NID, so they don't change anything for them.
 | `LoadedCertSetClientCert` | `031EBD2A` | sets the client certificate |
 | `LoadedCertSetClientKey` | `802E3C30` | sets the client key |
 | `LoadedCertClearClient` | `42108FBE` | forgets the client certificate and key |
-| `SslContextAddCertCheck` | `A9A39BA1` | installs libhttp's certificate check on a libssl context its caller made (the NetCheck dialog's own TLS). It succeeds without installing anything, so that context keeps only libssl's own checks, because failing it ends a game's PSN sign-in |
+| `SslContextAddCertCheck` | `A9A39BA1` | installs libhttp's certificate check on a libssl context its caller made (the NetCheck dialog's own TLS), as Sony's: the verify mode on, and a check that does what Sony's libhttp's does with the caller's argument (its `SCE_HTTPS_FLAG_*` flags, host name, result and bits, callback and lock), on the bundle and the app's loaded certificates (`tls.c`). The context is the libssl module's, which is vitals-ssl too |
 | `CertCheckNothing` | `A4CF892E` | only succeeds, as Sony's |
 
 With `DEBUG=1`, the settings and certificate calls are logged.

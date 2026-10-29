@@ -435,16 +435,18 @@ int sceHttpPrivateLoadedCertSetClientKey(const void *data, unsigned int size)
 
 /* ---- the rest ---- */
 
-/* Sony's installs libhttp's certificate check on a libssl context its caller made (the NetCheck
- * dialog's own TLS, on Sony's libssl): (context, argument), 0x80435801 when one is missing. That
- * check is libhttp's code on libssl's certificates, which this library has neither of, so the
- * context is left as libssl made it; failing would end the game's PSN sign-in */
+/* As Sony's: installs libhttp's certificate check on a libssl context its caller made (the
+ * NetCheck dialog's own TLS, on the libssl module): (context, argument), 0x80435801 when one is
+ * missing. The context's connections are then checked as Sony's libhttp checks them (tls.c) */
 /* NID 0xA9A39BA1 */
-int sceHttpPrivateSslContextAddCertCheck(unsigned int context, unsigned int argument)
+int sceHttpPrivateSslContextAddCertCheck(void *context, void *argument)
 {
     VH_TRACE();
-    VITALS_LOG("private export A9A39BA1 context=%08X argument=%08X: libssl's own checks only", context, argument);
-    return context == 0 || argument == 0 ? (int)0x80435801 : 0;
+    if (context == NULL || argument == NULL)
+        return (int)0x80435801;
+    int result = vh_tls_add_cert_check(context, argument);
+    VITALS_LOG("private export A9A39BA1 context=%p argument=%p rc=%08X", context, argument, (unsigned int)result);
+    return result;
 }
 
 /* Sony's does nothing but succeed */

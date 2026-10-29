@@ -1,6 +1,7 @@
 # Builds vitals-app.vpk: the vitals app (installer and connection test), packaged with the kernel
-# plugin, vitals-http and the browser provider it installs
-# Those come from ../vitals-plugin, ../vitals-http and ../tls13-vita, which are built first
+# plugin, vitals-http, vitals-ssl and the browser provider it installs
+# Those come from ../vitals-plugin, ../vitals-http, ../vitals-ssl and ../tls13-vita, which are built
+# first
 # Everything is built in build/ at the repository root
 BUILD_DIR := $(abspath ../build)
 # 1 builds the vitals-ssl test app instead (build/vitals-app-ssltest/vitals-app.vpk, title
@@ -15,13 +16,13 @@ all: modules
 		-DVITALS_SSL_TEST=$(if $(filter 1,$(SSL_TEST)),ON,OFF)
 	cmake --build $(OUT_DIR)
 
-# The plugin, vitals-http, providers and redirect have their own Makefiles; CMake decides what to
-# rebuild. All of them are built at every debug level, which the app lets users switch between
+# The plugin, vitals-http, vitals-ssl and the providers have their own Makefiles; CMake decides what
+# to rebuild. All of them are built at every debug level, which the app lets users switch between
 modules:
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-plugin DEBUG=$(level) SSL_TEST=$(SSL_TEST) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-ssl DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../tls13-vita DEBUG=$(level) &&) true
-	$(if $(filter 1,$(SSL_TEST)),$(MAKE) -C ../vitals-ssl DEBUG=1)
 
 # Refreshes the bundled Mozilla certificates (assets/) from curl; review and commit the result
 update-certs:

@@ -1,8 +1,12 @@
 /* Host tests of the engine, through the exported API, against tests/server.py */
 #include "http_extra.h"
 #include "vh.h"
+#include "vitals_ssl.h"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <pthread.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1383,6 +1387,128 @@ static void test_uri(void)
     CHECK(strcmp(out, "/a/c") == 0);
 }
 
+/* ---- libhttp's certificate check on another module's libssl context ---- */
+
+/* As libhttp lays its argument out (VhCertCheck in tls.c) */
+typedef struct CertCheckArgument
+{
+    uint32_t flags;
+    const char *host;
+    int *result;
+    unsigned int *bits;
+    int (*callback)(unsigned int bits, void *const certificates[], int count, void *argument);
+    void *argument;
+    void *reserved[4];
+    int (*lock)(void *argument);
+    int (*unlock)(void *argument);
+} CertCheckArgument;
+
+static int g_check_calls, g_check_count, g_locks, g_unlocks;
+static unsigned int g_check_bits;
+
+static int check_callback(unsigned int bits, void *const certificates[], int count, void *argument)
+{
+    (void)certificates;
+    ++g_check_calls;
+    g_check_bits = bits;
+    g_check_count = count;
+    return *(int *)argument;
+}
+
+static int check_lock(void *argument)
+{
+    (void)argument;
+    return ++g_locks;
+}
+
+static int check_unlock(void *argument)
+{
+    (void)argument;
+    return ++g_unlocks;
+}
+
+/* A connection on a libssl context of its own, as the NetCheck dialog makes one: the BIO gives no
+ * host name, the argument does. 1 when connected */
+static int checked_connect(CertCheckArgument *argument)
+{
+    void *library = NULL;
+    CHECK_EQ(sceSslInternalGetLibrary(&library), 0);
+    void *context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    CHECK(context != NULL);
+    CHECK_EQ(sceHttpPrivateSslContextAddCertCheck(context, argument), 0);
+    void *ssl = sceSslInternalNew(context);
+    sceSslInternalCtxFree(context);
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_port = htons((unsigned short)(g_port + 1));
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    CHECK_EQ(connect(fd, (struct sockaddr *)&address, sizeof(address)), 0);
+    void *bio = sceSslInternalBioNewSocket(fd, 0);
+    sceSslInternalSetBio(ssl, bio, bio);
+    sceSslInternalSetConnectState(ssl);
+    int connected = sceSslInternalConnect(ssl) == 1;
+    sceSslInternalFree(ssl);
+    close(fd);
+    return connected;
+}
+
+static void test_cert_check(void)
+{
+    printf("libhttp's certificate check\n");
+    int result = 1, verdict = 0;
+    unsigned int bits = 99;
+    CertCheckArgument argument = {0, "127.0.0.1", &result, &bits, NULL, NULL, {NULL}, NULL, NULL};
+    CHECK_EQ(sceHttpPrivateSslContextAddCertCheck(NULL, &argument), 0x80435801);
+    CHECK_EQ(sceHttpPrivateSslContextAddCertCheck(&argument, NULL), 0x80435801);
+    /* Sony's flags when none are given: the server isn't known */
+    CHECK_EQ(checked_connect(&argument), 0);
+    CHECK_EQ(result, 0x80435806);
+    CHECK_EQ(bits, SCE_HTTPS_ERROR_SSL_UNKNOWN_CA);
+    /* Without the server check, anything goes */
+    argument.flags = SCE_HTTPS_FLAG_CN_CHECK | SCE_HTTPS_FLAG_KNOWN_CA_CHECK;
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(result, 0);
+    CHECK_EQ(bits, 0);
+    /* The app's callback decides: it sees what was found, and the certificates */
+    argument.flags = 0;
+    argument.callback = check_callback;
+    argument.argument = &verdict;
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(g_check_calls, 1);
+    CHECK_EQ(g_check_bits, SCE_HTTPS_ERROR_SSL_UNKNOWN_CA);
+    CHECK_EQ(g_check_count, 1);
+    verdict = -1;
+    CHECK_EQ(checked_connect(&argument), 0);
+    CHECK_EQ(result, 0x80435806);
+    argument.callback = NULL;
+    /* The certificates the app loaded are trusted, the server's as itself */
+    FILE *file = fopen(g_cert_path, "rb");
+    static char pem[8192];
+    size_t size = fread(pem, 1, sizeof(pem), file);
+    fclose(file);
+    SceHttpsData data = {pem, (unsigned int)size};
+    const SceHttpsData *list[] = {&data};
+    CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(result, 0);
+    CHECK_EQ(bits, 0);
+    /* Another name: the CN check, unless it's off */
+    argument.host = "localhost";
+    CHECK_EQ(checked_connect(&argument), 0);
+    CHECK_EQ(bits, SCE_HTTPS_ERROR_SSL_CN_CHECK);
+    argument.flags = SCE_HTTPS_FLAG_SERVER_VERIFY | SCE_HTTPS_FLAG_KNOWN_CA_CHECK;
+    CHECK_EQ(checked_connect(&argument), 1);
+    /* The caller's lock, taken around the check */
+    argument.flags |= 0x40000000u;
+    argument.lock = check_lock;
+    argument.unlock = check_unlock;
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(g_locks, 1);
+    CHECK_EQ(g_unlocks, 1);
+    CHECK_EQ(sceHttpsUnloadCert(), 0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 9)
@@ -1422,6 +1548,7 @@ int main(int argc, char **argv)
     test_private(template_);
     test_proxy();
     test_console_profile(template_);
+    test_cert_check();
     test_host_redirects(template_);
 
     /* Everything deleted, nothing left in the pool (the host redirect list is outside it) */

@@ -112,7 +112,7 @@ SceLibSsl:
         - sceSslInternalTimeProviderFree: 0xD4ADF069
         - sceSslInternalKeyMatches: 0xD68D8421
         - sceSslInternalD6D32A2F: 0xD6D32A2F
-        - sceSslInternalD776E2F8: 0xD776E2F8
+        - sceSslInternalPending: 0xD776E2F8
         - sceSslInternalDABB61EE: 0xDABB61EE
         - sceSslInternalDEC6DD27: 0xDEC6DD27
         - sceSslInternalConnect: 0xE5EDD91B
@@ -136,6 +136,7 @@ SceLibSsl:
       functions:
         - vitalsSslBioNew: 0x258C6C64
         - vitalsSslCertificateRequested: 0xEB8141B2
+        - vitalsSslCheckChain: 0x791117DC
         - vitalsSslCheckCertificate: 0x169DA221
         - vitalsSslCheckKey: 0xDE8174EC
         - vitalsSslCtxSetDeferredVerify: 0x00FB3554

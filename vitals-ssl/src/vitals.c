@@ -371,6 +371,44 @@ static uint32_t certificate_flags(uint32_t flags)
     return mapped;
 }
 
+/* The bundle's roots, then the store's certificates, for vitalsSslCheckChain */
+static int chain_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates)
+{
+    const VsStore *store = context;
+    int result = vs_find_trusted_issuers(NULL, child, candidates);
+    if (result != 0 || store == NULL)
+        return result;
+    return store_find(store, child, candidates);
+}
+
+static int chain_exact(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags)
+{
+    if (depth == 0 && (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) != 0 &&
+        vitals_ca_trusts_exact(chain_issuers, context, certificate))
+        *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
+    return 0;
+}
+
+/* NID 0x791117DC: the certificates can be another copy of vitals-ssl's (the libssl module's, when
+ * vitals-http checks a context the NetCheck dialog made there): they are only read */
+unsigned int vitalsSslCheckChain(void *const certificates[], int count, const char *host, void *store_handle)
+{
+    VsStore *store = is_store(store_handle) ? store_handle : NULL;
+    const mbedtls_x509_crt *leaf = certificates != NULL && count > 0 ? vs_certificate(certificates[0]) : NULL;
+    if (leaf == NULL)
+        return VITALS_CERT_INVALID;
+    /* As every connection's: SHA-1 signatures stay allowed for Sony's own servers */
+    mbedtls_x509_crt_profile profile = mbedtls_x509_crt_profile_default;
+    profile.allowed_mds |= MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA1);
+    uint32_t flags = 0;
+    int result = mbedtls_x509_crt_verify_with_ca_cb((mbedtls_x509_crt *)leaf, chain_issuers, store, &profile,
+                                                    host != NULL && host[0] != '\0' ? host : NULL, &flags,
+                                                    chain_exact, store);
+    if (result != 0 && flags == 0)
+        flags = MBEDTLS_X509_BADCERT_OTHER;
+    return (unsigned int)certificate_flags(flags);
+}
+
 /* NID 0xD35E2515 */
 unsigned int vitalsSslGetVerifyResult(void *handle)
 {

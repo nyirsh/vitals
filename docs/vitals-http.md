@@ -30,7 +30,7 @@ plugin, since games can't open `ux0:data` themselves.
 | File on the console                       | Comes from                                                        | Installed by                                                   |
 | ----------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
 | `vs0:/data/external/vitals/libhttp.suprx` | built from [vitals-http/](../vitals-http/)                        | `install_http_modules` in [install.c](../vitals-app/install.c) |
-| `vs0:/data/external/vitals/libssl.suprx`  | `app0:lssl.suprx`, see [libssl.md](libssl.md)                     | same function                                                  |
+| `vs0:/data/external/vitals/libssl.suprx`  | built from [vitals-ssl/](../vitals-ssl/), see [libssl.md](libssl.md) | same function                                                  |
 | `vs0:/data/external/cert/CA_LIST.cer`     | the certificate store: Sony's, Mozilla's and `custom-certs.pem`'s | `install_certificates`                                         |
 | `ux0:data/vitals/redirects.txt`           | the host redirect list, created once with examples                | the installer; never overwritten                               |
 | `ux0:data/vitals/useragent.txt`           | the User-Agent suffix, optional                                   | you                                                            |

@@ -21,13 +21,15 @@ else()
 endif()
 include(../version.cmake)
 
-# The kernel plugin, vitals-http and browser provider this VPK installs, built by
-# ../vitals-plugin, ../vitals-http and ../tls13-vita
+# The kernel plugin, vitals-http, vitals-ssl and browser provider this VPK installs, built by
+# ../vitals-plugin, ../vitals-http, ../vitals-ssl and ../tls13-vita
 set(VITALS_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build")
 set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-plugin${plugin_suffix}/vitals.skprx")
 set(VITALS_LIBHTTP "${VITALS_BUILD_DIR}/vitals-http/libhttp.suprx")
+# vitals-ssl, installed as the system's libssl in place of Sony's
+set(VITALS_LIBSSL "${VITALS_BUILD_DIR}/vitals-ssl/libssl.suprx")
 set(VITALS_BROWSER_PROVIDER "${VITALS_BUILD_DIR}/tls13-vita/browser/vitals.suprx")
-foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_BROWSER_PROVIDER)
+foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_LIBSSL VITALS_BROWSER_PROVIDER)
     if(NOT EXISTS "${${module}}")
         message(FATAL_ERROR "${${module}} is missing; build ../vitals-plugin, ../vitals-http and ../tls13-vita first (make does this)")
     endif()
@@ -36,7 +38,8 @@ endforeach()
 # 1 and 2), which the app switches to; they go in debug/<level>/ next to the release modules
 set(debug_entries)
 foreach(level 1 2)
-    foreach(module vitals-http-debug${level}/libhttp.suprx tls13-vita-debug${level}/browser/vitals.suprx
+    foreach(module vitals-http-debug${level}/libhttp.suprx vitals-ssl-debug${level}/libssl.suprx
+            tls13-vita-debug${level}/browser/vitals.suprx
             vitals-plugin-debug${level}${plugin_suffix}/vitals.skprx)
         if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
             message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
@@ -125,7 +128,7 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          ${VITALS_KERNEL_MODULE} vitals.skprx
          assets/compat.suprx compat.suprx
          ${VITALS_LIBHTTP} libhttp.suprx
-         assets/lssl.suprx lssl.suprx
+         ${VITALS_LIBSSL} libssl.suprx
          ${VITALS_BROWSER_PROVIDER} vitals.suprx
          ${debug_entries}
          ../README.md README.md
