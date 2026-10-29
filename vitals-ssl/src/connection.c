@@ -16,8 +16,9 @@
  *   error, which is how libhttp sees a timeout), 0 when the server closed the connection, -1 when
  *   the TLS failed
  * - SSL_get_error then says which it was, as OpenSSL's kinds
- * Certificates are checked by Mbed TLS against the CA bundle and the host name while a context's
- * verify mode is on; the verify callback a context is given isn't called yet */
+ * While a context's verify mode is on the server's certificate is checked: by the verify callback
+ * the context was given, which is how libhttp checks it (certificate.c has the objects it uses),
+ * or else by Mbed TLS against the CA bundle and the host name */
 
 #define METHOD_MAGIC 0x4D535356u
 #define CONTEXT_MAGIC 0x43535356u
@@ -37,6 +38,11 @@ static int is_context(const VsContext *context)
 static int is_ssl(const VsSsl *ssl)
 {
     return ssl != NULL && ssl->magic == SSL_MAGIC;
+}
+
+int vs_is_ssl(const void *ssl)
+{
+    return is_ssl(ssl);
 }
 
 static int is_bio(const VsBio *bio)
@@ -152,7 +158,8 @@ void sceSslInternalCtxSetVerify(void *handle, int mode)
         context->verify_mode = mode;
 }
 
-/* NID 0xAF50B945, Sony 0x81016581: SSL_CTX_set_cert_verify_callback; kept, not called yet */
+/* NID 0xAF50B945, Sony 0x81016581: SSL_CTX_set_cert_verify_callback, called in place of the
+ * check against the CA bundle as (ssl, certificates, count, argument, &reason) */
 void sceSslInternalCtxSetCertVerifyCallback(void *handle, VsVerifyCallback callback, void *argument)
 {
     VsContext *context = handle;
@@ -390,6 +397,66 @@ static int verify_certificate(void *context, mbedtls_x509_crt *certificate, int 
     return 0;
 }
 
+/* No roots for Mbed TLS when the verify callback decides: it looks them up itself */
+static int no_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates)
+{
+    (void)context, (void)child;
+    *candidates = NULL;
+    return 0;
+}
+
+/* Mbed TLS's flags for the callback's reason, which pick the alert (Sony's map is in the README) */
+static uint32_t refused_flags(int reason)
+{
+    switch (reason) {
+    case 3:
+        return MBEDTLS_X509_BADCERT_FUTURE;
+    case 4:
+        return MBEDTLS_X509_BADCERT_EXPIRED;
+    case 8:
+        return MBEDTLS_X509_BADCERT_REVOKED;
+    default:
+        return MBEDTLS_X509_BADCERT_OTHER;
+    }
+}
+
+#define MAX_CHAIN 16
+
+/* With a verify callback: Mbed TLS's own findings are dropped, and once it has the server's chain
+ * (depth 0 is called last) the callback decides, as Sony's calls it, with the certificates as the
+ * server sent them */
+static int verify_with_callback(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags)
+{
+    VsSsl *ssl = context;
+    *flags = 0;
+    if (depth > 0)
+        return 0;
+    VsCert *certs = calloc(MAX_CHAIN, sizeof(*certs));
+    void *handles[MAX_CHAIN];
+    if (certs == NULL) {
+        vs_note_out_of_memory();
+        return MBEDTLS_ERR_X509_ALLOC_FAILED;
+    }
+    int count = 0;
+    for (mbedtls_x509_crt *crt = certificate; crt != NULL && crt->raw.p != NULL && count < MAX_CHAIN; crt = crt->next) {
+        vs_cert_borrow(&certs[count], crt);
+        handles[count] = &certs[count];
+        ++count;
+    }
+    vs_certificate_lookups_reset();
+    ssl->verify_result = 0;
+    int accepted = ssl->context->verify_callback(ssl, handles, count, ssl->context->verify_argument,
+                                                 &ssl->verify_result);
+    vs_certificate_lookups_reset();
+    for (int i = 0; i < count; ++i)
+        vs_cert_return(&certs[i]);
+    free(certs);
+    VITALS_LOG("ssl %p verify callback %d reason=%d chain=%d", (void *)ssl, accepted, ssl->verify_result, count);
+    if (!accepted)
+        *flags = refused_flags(ssl->verify_result);
+    return 0;
+}
+
 /* Mbed TLS for one connection, on its first connect: TLS 1.2 to 1.3, the host name the read BIO
  * carries as SNI and for the certificate check; an IPv4 address isn't sent, as Sony's */
 static int setup(VsSsl *ssl)
@@ -409,7 +476,10 @@ static int setup(VsSsl *ssl)
     mbedtls_ssl_conf_max_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_3);
     int verify = ssl->context->verify_mode & 1;
     mbedtls_ssl_conf_authmode(&ssl->config, verify ? MBEDTLS_SSL_VERIFY_REQUIRED : MBEDTLS_SSL_VERIFY_NONE);
-    if (verify) {
+    if (verify && ssl->context->verify_callback != NULL) {
+        mbedtls_ssl_conf_ca_cb(&ssl->config, no_issuers, NULL);
+        mbedtls_ssl_conf_verify(&ssl->config, verify_with_callback, ssl);
+    } else if (verify) {
         mbedtls_ssl_conf_ca_cb(&ssl->config, vs_find_trusted_issuers, NULL);
         mbedtls_ssl_conf_verify(&ssl->config, verify_certificate, ssl);
     }
@@ -598,4 +668,35 @@ int sceSslInternalGetError(void *handle, int returned)
     default:
         return VS_KIND_SYSCALL;
     }
+}
+
+/* NID 0x24C6257F, Sony 0x81019995: an item of the connection by number: 1, 5 and 6 the Cert-C
+ * objects certificate.c's functions take (one here), 2, 3, 4 and 7 nothing */
+int sceSslInternalGetItem(void *handle, int item, const void **out)
+{
+    if (!is_ssl(handle) || out == NULL)
+        return 10017;
+    switch (item) {
+    case 1:
+    case 5:
+    case 6:
+        *out = vs_cert_library();
+        return 0;
+    case 2:
+    case 3:
+    case 4:
+    case 7:
+        *out = NULL;
+        return 0;
+    default:
+        return 10011;
+    }
+}
+
+/* NID 0xB0E4CB2F, Sony 0x8101AF8F: SSL_set_verify_result */
+void sceSslInternalSetVerifyResult(void *handle, int result)
+{
+    VsSsl *ssl = handle;
+    if (is_ssl(ssl))
+        ssl->verify_result = result;
 }

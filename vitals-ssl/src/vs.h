@@ -62,7 +62,9 @@ typedef struct VsMethod {
     int kind;
 } VsMethod;
 
-typedef int (*VsVerifyCallback)(void *store, void *argument);
+/* libhttp's certificate check (0x81014592): the server's chain, its certificate first; 1 accepts,
+ * and reason is what the connection's verify result becomes */
+typedef int (*VsVerifyCallback)(void *ssl, void *certificates[], int count, void *argument, int *reason);
 typedef int (*VsClientCertCallback)(void *ssl, void **certificate, void **key);
 typedef void (*VsInfoCallback)(const void *ssl, int where, int value);
 
@@ -110,7 +112,17 @@ typedef struct VsSsl {
      * here, as Mbed TLS would send it */
     int check_address;
     unsigned char address[4];
+    /* What the verify callback gave as its reason (SSL_get_verify_result), set by B0E4CB2F too */
+    int verify_result;
 } VsSsl;
+
+/* A certificate: the server's, which the connection keeps (borrowed), or one 29AAC768 parsed */
+typedef struct VsCert {
+    uint32_t magic;
+    mbedtls_x509_crt *crt;
+    int owned;
+    mbedtls_x509_crt own;
+} VsCert;
 
 /* core.c, under the lock: whether sceSslInit ran, and what failed last for the error translator */
 int vs_initialized(void);
@@ -121,6 +133,24 @@ int vs_take_out_of_memory(void);
 int vs_tls_random(void *context, unsigned char *output, size_t size);
 int vs_find_trusted_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates);
 int vs_trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags);
+/* The CA bundle's index, built on first use; NULL without a bundle */
+const struct VitalsCaIndex *vs_ca_index(void);
+
+/* certificate.c: certificate objects over Mbed TLS, for libhttp's verify callback and SceSsl's
+ * getters */
+const void *vs_cert_library(void);
+int vs_is_ssl(const void *ssl);
+const mbedtls_x509_crt *vs_certificate(const void *cert);
+void vs_cert_borrow(VsCert *cert, mbedtls_x509_crt *crt);
+void vs_cert_return(VsCert *cert);
+int64_t vs_certificate_time(const mbedtls_x509_crt *crt, int not_after);
+/* A name object: a copy of the Name raw holds (tag and all), freed with vs_name_free */
+void *vs_name_new(const mbedtls_x509_buf *raw);
+void vs_name_free(void *name);
+int vs_name_count(const void *name);
+const mbedtls_x509_name *vs_name_entry(const void *name, int index);
+/* Forgets which roots the CA store gave this thread, before a verify callback runs */
+void vs_certificate_lookups_reset(void);
 
 /* The platform: platform_vita.c on the console, tests/platform_posix.c on a host */
 /* The pool sceSslInit's size gives, which every allocation comes from; a negative SCE error when
@@ -139,9 +169,10 @@ int vs_platform_parse_ipv4(const char *host, unsigned char address[4]);
  * curves), waiting for it; on the caller's thread when one can't be made */
 void vs_platform_run_on_large_stack(void (*function)(void *), void *argument);
 int vs_platform_ca_path(char *path, size_t size);
+unsigned int vs_platform_thread_id(void);
 
-/* The SceSslInternal exports written so far (core.c, connection.c), with the arguments Sony's
- * libhttp passes */
+/* The SceSslInternal exports written so far (core.c, connection.c, certificate.c), with the
+ * arguments Sony's libhttp passes */
 int sceSslInternalIsInitalized(void);
 int sceSslInternalGetLibrary(void **library);
 int sceSslInternalErrorCode(int kind, int reason);
@@ -169,5 +200,44 @@ int sceSslInternalRead(void *ssl, void *buffer, int size);
 int sceSslInternalWrite(void *ssl, const void *buffer, int size);
 int sceSslInternalShutdown(void *ssl);
 int sceSslInternalGetError(void *ssl, int returned);
+int sceSslInternalGetItem(void *ssl, int item, const void **out);
+void sceSslInternalSetVerifyResult(void *ssl, int result);
+int sceSslInternalCertSubject(void *cert, int format, void **name);
+int sceSslInternalCertIssuer(void *cert, int format, void **name);
+int sceSslInternalNameFree(void *name);
+int sceSslInternalNameEqual(const void *a, const void *b);
+int sceSslInternalNameInfo(void *name, int item, void *out);
+int sceSslInternalEntryInfo(void *entry, int item, void *out);
+int sceSslInternalEntryFree(void *entry);
+int sceSslInternalOidSet(void *oid, int mode, const unsigned char *data, unsigned int length);
+int sceSslInternalOidText(const void *oid, int format, unsigned int size, char *text);
+int sceSslInternalExtensionNew(const void *library, int type, void **out);
+int sceSslInternalExtensionFree(void *extension);
+int sceSslInternalExtensionInfo(void *extension, int item, void *out);
+int sceSslInternalCertPublicKey(void *cert, int format, void **key);
+int sceSslInternalKeyFree(void *key);
+int sceSslInternalCertVerifySignature(void *cert, void *key, int *valid);
+int sceSslInternalCertFromBinary(const void *library, int flags, int format, unsigned int length,
+                                 const unsigned char *data, unsigned int *consumed, void **out);
+int sceSslInternalCertFree(void *cert);
+int sceSslInternalCertInfo(void *cert, int item, void *out);
+int sceSslInternalCertToBinary(void *cert, int format, unsigned char *buffer, unsigned int size,
+                               unsigned int *length);
+int sceSslInternalTimeProvider(const void *library, int type, void **out);
+int sceSslInternalTimeProviderFree(void *provider);
+int sceSslInternalTimeNew(const void *provider, void **out);
+int sceSslInternalTimeFree(void *time);
+int sceSslInternalTimeNow(void *now);
+int sceSslInternalTimeExport(const void *now, int format, void *value, unsigned int size);
+int sceSslInternalTimeImport(void *time, int format, const void *value, unsigned int size);
+int sceSslInternalCertNotAfter(void *cert, void *time);
+int sceSslInternalCertNotBefore(void *cert, void *time);
+int sceSslInternalTimeCompare(const void *a, const void *b, int *order);
+int sceSslInternalTimeText(const void *time, int format, char *text, unsigned int *length, unsigned int size);
+int sceSslInternalGetCertificateAuthorityByName(const void *name, char ***entries, char *buffer,
+                                                unsigned int size, unsigned int *total, int flag);
+int sceSslInternalGetCertificateAuthority(unsigned int group, unsigned int mask, char ***entries, char *buffer,
+                                          unsigned int size, unsigned int *total);
+int sceSslInternalCaRevoked(unsigned int group, unsigned int mask, const void **entries, unsigned int *count);
 
 #endif

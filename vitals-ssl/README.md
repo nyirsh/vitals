@@ -5,8 +5,9 @@ exported under libssl's own library and function NIDs ([libssl_api.yml.in](libss
 all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
 shared with vitals-http and the browser provider).
 
-Written so far: `sceSslInit`, `sceSslTerm`, `sceSslGetMemoryPoolStats` and the 27 connection
-functions Sony's libhttp uses (below), plus three that do nothing in Sony's either. Every other
+Written so far: all 11 `SceSsl` functions, the 27 connection functions Sony's libhttp uses and the
+35 certificate functions its certificate check uses (below), plus three that do nothing in Sony's
+either. Every other
 export logs its name (with `DEBUG=1` or `2`) and fails with `SCE_SSL_ERROR_INTERNAL`
 (`0x80435026`), or returns `NULL` where it returns a pointer. Nothing installs it; the app still
 installs the copy of Sony's libssl it bundles ([docs/libssl.md](../docs/libssl.md)).
@@ -23,7 +24,10 @@ make test       # host tests (needs VITASDK for <psp2/libssl.h>; skipped without
 The host tests build the library for this machine ([tests/platform_posix.c](tests/platform_posix.c)
 in place of the Vita's) and call it as Sony's libhttp does, against a local TLS server
 ([tests/server.py](tests/server.py)): connecting, reading and writing, the server's close_notify or a
-dropped socket, a receive timeout, the certificate and host name checks, and the error codes.
+dropped socket, a receive timeout, the certificate and host name checks, and the error codes; and
+the certificate functions on a CA and a server certificate it signed: names, extensions, keys and
+signatures, dates, the CA store, and a verify callback that checks the chain with them, as
+libhttp's does.
 
 ## Exports
 
@@ -36,7 +40,7 @@ what it does.
 | Library | NID | Functions | Named |
 | --- | --- | --- | --- |
 | `SceSsl` | `0xCAF5F2E9` | 11 | all, as `<psp2/libssl.h>` declares them ([src/core.c](src/core.c), [src/ssl.c](src/ssl.c)) |
-| `SceSslInternal` | `0x68D6C3FF` | 98 | 3 from the NID database: `sceSslInternalGetCertificateAuthority`, `sceSslInternalIsInitalized` (its spelling) and `sceSslInternalWrite`; the ones written here after what they do ([src/core.c](src/core.c), [src/connection.c](src/connection.c)); the others `sceSslInternal<NID>` ([src/internal.c](src/internal.c)) |
+| `SceSslInternal` | `0x68D6C3FF` | 98 | 3 from the NID database: `sceSslInternalGetCertificateAuthority`, `sceSslInternalIsInitalized` (its spelling) and `sceSslInternalWrite`; the ones written here after what they do ([src/core.c](src/core.c), [src/connection.c](src/connection.c), [src/certificate.c](src/certificate.c)); the others `sceSslInternal<NID>` ([src/internal.c](src/internal.c)) |
 
 `SceSslInternal` is the part Sony's own modules use for their TLS: Sony's libhttp alone imports 69
 of its functions. The arguments of the ones not written yet aren't known, so their stubs take none.
@@ -59,12 +63,20 @@ of its functions. The arguments of the ones not written yet aren't known, so the
   and checked against the certificate; an IPv4 address isn't sent, and is checked against the
   certificate's IP address entries.
 - **Certificates**: while a context's verify mode is on (libhttp always turns it on), the server is
-  checked by Mbed TLS against the CA bundle (`vs0:/data/external/cert/CA_LIST.cer`, indexed on the
-  first connection that needs it), with SHA-1 signatures allowed and a self-signed certificate in
-  the bundle trusted, as vitals-http does. Sony's libssl instead calls the verify callback libhttp
-  sets (`SSL_CTX_set_cert_verify_callback`), and libhttp does the whole check itself with the
-  certificate functions; that callback is kept, not called yet. So for now a failed check always
-  refuses the connection, even where libhttp's HTTPS options would accept it.
+  checked. When the context has a verify callback (`SSL_CTX_set_cert_verify_callback`, which libhttp
+  sets), it decides, as in Sony's: it's called once Mbed TLS has the server's chain, with the
+  certificates in the order the server sent them, and whatever Mbed TLS found is dropped. libhttp's
+  does the whole check itself with the certificate functions (below), so `sceHttpsDisableOption`
+  and `sceHttpsSetSslCallback` work as on Sony's. Without one, Mbed TLS checks the server against
+  the CA bundle (`vs0:/data/external/cert/CA_LIST.cer`, indexed on the first connection that needs
+  it), with SHA-1 signatures allowed and a self-signed certificate in the bundle trusted, as
+  vitals-http does.
+- **The CA store**: Sony's libssl has its roots built in, served as PEM text by number
+  (`064DFC99`) and by name (`3746501F`); here they are the CA bundle's. Where Sony's has one root
+  per name, the bundle can have several (cross-signed roots), so asking again for a name on the
+  same thread gives the next, then none: libhttp asks again when the root it got doesn't verify the
+  certificate, and with the same answer would ask forever. A version 3 certificate without
+  basicConstraints is not a CA here (RFC 5280, Mbed TLS), where libhttp would skip the check.
 - **Not yet**: the client certificate callback is kept, not called; session resumption (libhttp
   turns Sony's cache off anyway); the option masks are kept, with no effect.
 - **The handshake** runs on a thread with a 64 KiB stack, as vitals-http's does: a TLS 1.3
@@ -94,6 +106,8 @@ arguments come from the registers libhttp sets before the call.
 | `67FB1CD3` | setup | `(ctx, bytes, 8)` → 0 or a reason | adds the bytes to the context's random generator; Sony's reason 32 without any | `sceSslInternalCtxSeedRandom` |
 | `FBEB1FD7` | setup | `(ctx, 0x20001FFB or 0x22001FFB)` | `SSL_CTX_set_options`: ORs the mask in; the second mask for apps built with SDK 3.50 or later and SSL version option 3 | `sceSslInternalCtxSetOptions` |
 | `9E38815D` | setup | `(ctx, callback)` | `SSL_CTX_set_client_cert_cb`: the callback gets `(ssl, X509 **, EVP_PKEY **)` | `sceSslInternalCtxSetClientCertCallback` |
+| `260F5A85` | `sceHttpPrivateSslContextAddCertCheck` | `(ctx, 1)` | `SSL_CTX_set_verify`'s mode: 1 checks the server | `sceSslInternalCtxSetVerify` |
+| `AF50B945` | `sceHttpPrivateSslContextAddCertCheck` | `(ctx, callback, argument)` | `SSL_CTX_set_cert_verify_callback`: libhttp's `0x81014592`, which does the whole check (below) | `sceSslInternalCtxSetCertVerifyCallback` |
 | `CC7F4211` | setup | `(ctx, 44, 0, NULL)` | `SSL_CTX_ctrl`; 44 and 45 set and get the session cache mode (OpenSSL's numbers), here turning it off | `sceSslInternalCtxCtrl` |
 | `D28834E6` | setup | `(ctx)` → ssl | `SSL_new` | `sceSslInternalNew` |
 | `19B2BB58` | setup, close | `(ssl)` | `SSL_free` | `sceSslInternalFree` |
@@ -111,77 +125,106 @@ arguments come from the registers libhttp sets before the call.
 | `EC9FAF42` | close, failed setup | `(ssl)` | `SSL_shutdown` | `sceSslInternalShutdown` |
 | `461C5990` | 38 calls, after failures | `(kind, reason)` → `0x8043xxxx` | turns an internal failure into an SCE error code: kind 0 a certificate function's reason (most of 10001 to 10037 become `0x80432AF0` + reason, 10005 out of memory), kind 1 the given code unless an allocation failed | `sceSslInternalErrorCode` |
 
-### Client certificate callback (`0x81009088`): the certificate and key `sceHttpsLoadCert` loaded
+### Certificate verification (`0x81014592`): libhttp's own check of the server's chain
+
+Sony's libssl calls it from its chain check (`0x810166A7`) in place of its own verifier, as
+`int callback(SSL *ssl, X509 *certificates[], int count, void *argument, int *reason)`, the server's
+certificates as it sent them, and `reason` the connection's verify result. 1 accepts; on 0 Sony's
+refuses the connection (when the verify mode is on) with the alert for the reason: 2 → 51
+(decrypt_error), 3 → 42 (bad_certificate), 4 → 45 (certificate_expired), 8 → 44
+(certificate_revoked), 10 → 40 (handshake_failure), 11 → 80 (internal_error). The argument is the
+structure libhttp gave `sceHttpPrivateSslContextAddCertCheck`:
+
+| Offset | What |
+| --- | --- |
+| 0 | the `SCE_HTTPS_FLAG_*` bits (101 when 0: server verify, CN check, known CA check and 0x40); 0x40 looks issuers up in the CA store; 0x100 only the store's first group; 0x40000000 takes the lock at 20, 40 and 44 around it |
+| 4 | the host name the CN check compares |
+| 8 | where the SCE result goes: `0x80435806` when refused, `0x80435804` when out of memory, 0 when accepted |
+| 12 | where the `SCE_HTTPS_ERROR_SSL_*` bits go: 1 a certificate function failed, 2 an invalid certificate or chain, 4 the CN check, 8 expired, 16 not yet valid, 32 an unknown CA |
+| 16, 20 | the app's `sceHttpsSetSslCallback` and its argument, called last as `(bits, certificates, count, argument)`; a negative return refuses |
+
+For each certificate it reads the serial number, subject and issuer, compares the current time with
+the validity dates when `NOT_AFTER_CHECK` or `NOT_BEFORE_CHECK` is set, and takes the DER
+encoding. The host check (`0x81013EFA`) then runs on the first certificate when `CN_CHECK` is set:
+the subjectAltName's value, which libhttp parses itself, and only without one the subject's CN
+(the entry whose attribute is `2.5.4.3`). Then the chain is ordered: each issuer is looked for among
+the certificates and, with 0x40, in the certificates `sceHttpsLoadCert` loaded and the CA store
+(libhttp's `0x81014292`, which decodes the PEM text and parses it with `29AAC768`); a root found is
+checked against its group's refused serial numbers, its key must verify the signature below it, and
+up the chain each issuer must be a CA with room in its path length and must have made the
+signature below; MD2, MD4 and MD5 signatures are refused. Without a known root, bit 32.
+
+What each function is comes from how libhttp uses what it returns and from Sony's libssl, where
+they are RSA Cert-C's object calls (an object's info by number through its type's table). The
+objects are only ever reached through these functions, so here they are vitals-ssl's own, over
+Mbed TLS ([src/certificate.c](src/certificate.c)); only the items libhttp reads directly keep
+Sony's layout: an item is `{length, bytes}`, an entry's info `{tag, length, bytes}`.
+
+| NID | Arguments | What it is | Here |
+| --- | --- | --- | --- |
+| `24C6257F` | `(ssl, item, &out)` | an item of the connection: 1 the Cert-C context, 3, 5 and 6 other Cert-C objects, 7 another of the connection; `10017` without a connection or out, `10011` for another number | `sceSslInternalGetItem`: one Cert-C object for 1, 5 and 6, nothing for the others |
+| `B0E4CB2F` | `(ssl, result)` | `SSL_set_verify_result`; libhttp sets the reason again | `sceSslInternalSetVerifyResult` |
+| `29AAC768` | `(cert_c, 0, 1, length, der, &consumed, &certificate)` | a certificate from DER | `sceSslInternalCertFromBinary` |
+| `144FA354` | `(certificate)` | frees one | `sceSslInternalCertFree`; the server's stay the connection's |
+| `64BDF1BB` | `(certificate, item, out)` | a certificate's info: 2 the serial number (an item), `0x4003` subjectAltName and `0x4005` basicConstraints into an extension object, `0x8007` the signature's algorithm (7 and 8 refused), `0x8009` the public key, `0x800A` and `0x800B` the issuer's and subject's names; `10008` without the extension | `sceSslInternalCertInfo`; 8 for MD5; a version 3 certificate without basicConstraints gets one with cA false |
+| `08ED1B25` | `(certificate, 4, buffer, size, &length)` | the DER encoding; its length with no buffer | `sceSslInternalCertToBinary` |
+| `2074A6EB` | `(certificate, time)` | the notAfter into a time object | `sceSslInternalCertNotAfter` |
+| `2464F9D0` | `(certificate, time)` | the notBefore | `sceSslInternalCertNotBefore` |
+| `170D595D` | `(certificate, 1, &key)` | the public key, freed with `46358909` | `sceSslInternalCertPublicKey` |
+| `306E2A22` | `(certificate, key, &valid)` | whether the key made the certificate's signature | `sceSslInternalCertVerifySignature` |
+| `46358909` | `(key)` | frees a key | `sceSslInternalKeyFree` |
+| `08179EBD` | `(certificate, 1, &name)` | the subject's name, freed with `CE37B69E` | `sceSslInternalCertSubject` |
+| `81FA5DBE` | `(certificate, 1, &name)` | the issuer's | `sceSslInternalCertIssuer` |
+| `CE37B69E` | `(name)` | frees a name | `sceSslInternalNameFree` |
+| `568F0E80` | `(name, name)` → 1 when the same | compares two names | `sceSslInternalNameEqual`, as Mbed TLS compares them |
+| `91C2531C` | `(name, 10, &count)`, `(name, 11, &{index, entry})` | the number of entries, an entry, freed with `17BF2367` | `sceSslInternalNameInfo` |
+| `B5A099D2` | `(entry, 1 or 2, &{tag, length, bytes})` | an entry's attribute (the OID's bytes) or value | `sceSslInternalEntryInfo` |
+| `17BF2367` | `(entry)` | frees an entry | `sceSslInternalEntryFree` |
+| `4D80D3F7` | `(&oid, 1, bytes, length)` | points an OID object (16 bytes, libhttp's stack) at bytes | `sceSslInternalOidSet` |
+| `3DE4F3DB` | `(oid, 0, 24, text)` | the OID as dotted text | `sceSslInternalOidText` |
+| `BF99D664` | `(cert_c, -1, &extension)` | an empty extension object | `sceSslInternalExtensionNew` |
+| `93EAE08A` | `(extension, item, out)` | `0x8001` critical, `0x8002` the value (an item), for basicConstraints `0x8007` cA and `0x8008` the path length | `sceSslInternalExtensionInfo`; no path length is `INT_MAX` |
+| `F030A0DE` | `(extension)` | frees it | `sceSslInternalExtensionFree` |
+| `D3C049B9` | `(cert_c, 0, &provider)` | the context's time provider | `sceSslInternalTimeProvider` |
+| `D4ADF069` | `(provider)` | frees it | `sceSslInternalTimeProviderFree` |
+| `5E50CB55` | `(provider, &time)` | a time object, freed with `6CDB4EE8` | `sceSslInternalTimeNew` |
+| `6CDB4EE8` | `(time)` | frees it | `sceSslInternalTimeFree` |
+| `4AAF0D45` | `(&now)` | the current time (Sony's calls a hook) | `sceSslInternalTimeNow`: 8 bytes of seconds |
+| `6D2A86F0` | `(&now, 3, &value, 8)` | that time as a value of format 3 | `sceSslInternalTimeExport` |
+| `88391E03` | `(time, 3, &value, 8)` | sets a time object from one | `sceSslInternalTimeImport` |
+| `04BAED82` | `(time, time, &order)` | -1, 0 or 1 as the first is before, at or after the second | `sceSslInternalTimeCompare` |
+| `D1A82B1A` | `(time, 6, text, &length, 20)` | a time as text, for libhttp's log | `sceSslInternalTimeText`: `YYYYMMDDHHMMSSZ` |
+| `3746501F` | `(name, &entries, buffer, size, &total, flag)` → 1, or 0 | the store's root with the name, `entries[0]` its PEM text; with no buffer the size needed | `sceSslInternalGetCertificateAuthorityByName`, from the CA bundle |
+| `064DFC99` | `(group, mask, &entries, buffer, size, &total)` → count, or `0x80010086` | the store's roots by number: a group from 1 and a bit each, group 0 with mask `0xFFFFFFFF` all of them | `sceSslInternalGetCertificateAuthority`: the bundle's roots in groups of 32 |
+| `349B0E73` | `(group, mask, &entries, &count)` | the serial numbers a root refuses, as items; Sony's has ten, for one root | `sceSslInternalCaRevoked`: none |
+
+### Loading certificates and the client certificate callback
+
+`sceHttpsLoadCert` and the client certificate callback (`0x81009088`, which sends the certificate
+and key `sceHttpsLoadCert` loaded) use the ones above (`24C6257F` with 5 and 6, `29AAC768`,
+`144FA354`, `81FA5DBE`, `568F0E80`, `CE37B69E`, `46358909`) and these, not written yet:
 
 | NID | Called from | Arguments | Likely |
 | --- | --- | --- | --- |
-| `24C6257F` | callback, verification, second setup | `(ssl, 5 or 6, &out)` | reads an item of the SSL object by number |
 | `A4EA9DE0` | callback | `(ssl)` → count | how many of a list the server sent (likely acceptable CA names) |
 | `243DE290` | callback | `(ssl, index, &out)` | entry *index* of that list |
-| `29AAC768` | callback, `sceHttpsLoadCert` | 7 arguments, DER in | makes a certificate object from DER |
-| `144FA354` | callback, verification | `(certificate)` | frees a certificate object |
 | `B8E6E249` | callback | `()` → buffer | a memory BIO or buffer object |
 | `33AC7A16` | callback | `(buffer, data, length)` → written | writes to it |
 | `7D30F0A6` | callback | `(buffer, ?, &key, 6, 0x1100)` | parses a private key from it |
 | `C4D984C2` | callback | `(buffer)` | frees it |
-| `46358909` | callback, verification | `(key)` | frees a key |
 | `D68D8421` | callback | `(certificate, key)` → match | checks the key belongs to the certificate |
-| `81FA5DBE` | callback, verification | `(certificate, 1, &name)` | a name of the certificate (issuer) |
-| `568F0E80` | callback, verification | `(name, name)` → 1 when equal | compares two names |
-| `CE37B69E` | callback, host check, verification | `(name)` | frees a name |
 
-### Host name check (`0x81013EFA`): subjectAltName, then the subject's CN
-
-| NID | Called from | Arguments | Likely |
-| --- | --- | --- | --- |
-| `BF99D664` | host check, verification | `(?, -1, &object)` | creates a list object |
-| `64BDF1BB` | host check, verification | `(certificate, 0x4003, object)` | reads an extension into it (subjectAltName) |
-| `93EAE08A` | host check, verification | `(object, 0x8002, &entry)` | an entry of it by type |
-| `F030A0DE` | host check, verification | `(object)` | frees the list object |
-| `08179EBD` | host check, verification | `(certificate, 1, &name)` | a name of the certificate (subject) |
-| `91C2531C` | host check | `(name, 10 → count, 11 → entry)` | a name's attributes |
-| `B5A099D2` | host check | `(attribute, 1 → type, 2 → value, &out)` | an attribute's type or value |
-| `4D80D3F7` | host check | `(&out, 1, data, length)` | decodes an attribute type |
-| `3DE4F3DB` | host check | `(type, 0, 24, text)` | writes it as dotted text, compared with `2.5.4.3` (CN) |
-| `17BF2367` | host check | `(attribute)` | releases an attribute |
-
-### Loading certificates (`sceHttpsLoadCert`, `0x81014292`) and `sceHttpPrivateSslContextAddCertCheck`
-
-| NID | Called from | Arguments | Likely |
-| --- | --- | --- | --- |
-| `064DFC99` | load | 6 arguments | known: `sceSslInternalGetCertificateAuthority` |
-| `3746501F` | load | 6 arguments | a wrapper like the one above, around another of libssl's own functions |
-| `260F5A85` | `AddCertCheck` | `(ctx, 1)` | `SSL_CTX_set_verify`'s mode; written: `sceSslInternalCtxSetVerify` |
-| `AF50B945` | `AddCertCheck` | `(ctx, callback, argument)` | `SSL_CTX_set_cert_verify_callback`, whose callback (libhttp's `0x81014592`) does the whole certificate check; written, the callback kept and not called yet: `sceSslInternalCtxSetCertVerifyCallback` |
-
-### Certificate verification (`0x81014592`), not read yet
-
-| NID | Called from | Arguments | Likely |
-| --- | --- | --- | --- |
-| `04BAED82` | verification |  |  |
-| `08ED1B25` | verification |  |  |
-| `170D595D` | verification |  |  |
-| `2074A6EB` | verification |  |  |
-| `2464F9D0` | verification |  |  |
-| `306E2A22` | verification |  |  |
-| `349B0E73` | verification |  |  |
-| `4AAF0D45` | verification |  |  |
-| `5E50CB55` | verification |  |  |
-| `6CDB4EE8` | verification |  |  |
-| `6D2A86F0` | verification |  |  |
-| `88391E03` | verification |  |  |
-| `B0E4CB2F` | verification |  |  |
-| `D1A82B1A` | verification |  |  |
-| `D3C049B9` | verification |  |  |
-| `D4ADF069` | verification |  |  |
+`sceHttpPrivateSslContextAddCertCheck` sets the verify mode (`260F5A85`, `(ctx, 1)`) and the
+callback (`AF50B945`), both in the connection table above.
 
 ## Layout
 
 | File | Role |
 |---|---|
 | [src/core.c](src/core.c) | `sceSslInit`, `sceSslTerm`, the pool's stats, the library object, the error translator, the random generator and the CA bundle's index |
-| [src/connection.c](src/connection.c) | methods, contexts, connections, the socket BIO, connect, read, write, shutdown and `SSL_get_error` |
-| [src/ssl.c](src/ssl.c) | `SceSsl`'s certificate functions (not written yet), and the stub every unwritten export calls |
+| [src/connection.c](src/connection.c) | methods, contexts, connections, the socket BIO, connect, read, write, shutdown, `SSL_get_error`, and calling the verify callback |
+| [src/certificate.c](src/certificate.c) | the certificate objects: certificates, names and entries, extensions, keys, times and the CA store |
+| [src/ssl.c](src/ssl.c) | `SceSsl`'s certificate getters, and the stub every unwritten export calls |
 | [src/internal.c](src/internal.c) | the `SceSslInternal` exports not written yet |
 | [src/platform_vita.c](src/platform_vita.c) | module start and stop, the lock, the pool, SceNet and the handshake's thread |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |

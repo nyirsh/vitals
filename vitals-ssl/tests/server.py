@@ -1,7 +1,8 @@
 """The TLS server vitals-ssl's host tests connect to: on its port, after the handshake it sends
 the name the client asked for (SNI) as "sni=<name>\n" ("sni=-" without one), then echoes each line
 back. "quit\n" ends the connection with close_notify, and "drop\n" closes the socket without it.
-The next port accepts and never answers, for timeouts."""
+The next port accepts and never answers, for timeouts. With a second certificate and key, the port
+after that serves them the same way (a chain a CA signed)."""
 import socket
 import ssl
 import sys
@@ -61,13 +62,19 @@ def serve_silent(listener):
         kept.append(raw)
 
 
-def main():
-    port, certificate, key = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+def server_context(certificate, key):
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(certificate, key)
+    return context
+
+
+def main():
+    port, certificate, key = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+    context = server_context(certificate, key)
+    chained = server_context(sys.argv[4], sys.argv[5]) if len(sys.argv) > 5 else None
     listeners = []
-    for offset in range(2):
+    for offset in range(3 if chained else 2):
         listener = socket.socket()
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(("127.0.0.1", port + offset))
@@ -75,6 +82,8 @@ def main():
         listeners.append(listener)
     threading.Thread(target=serve_echo, args=(listeners[0], context), daemon=True).start()
     threading.Thread(target=serve_silent, args=(listeners[1],), daemon=True).start()
+    if chained:
+        threading.Thread(target=serve_echo, args=(listeners[2], chained), daemon=True).start()
     print("ready", flush=True)
     threading.Event().wait()
 

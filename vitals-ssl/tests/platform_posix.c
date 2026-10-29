@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,6 +68,11 @@ void vs_platform_heap_stats(unsigned int *capacity, unsigned int *peak, unsigned
     *capacity = g_capacity;
     *peak = 0;
     *used = 0;
+}
+
+unsigned int vs_platform_thread_id(void)
+{
+    return (unsigned int)(uintptr_t)pthread_self();
 }
 
 void vs_platform_clear_net_errno(void)

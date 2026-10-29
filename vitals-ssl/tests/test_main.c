@@ -1,6 +1,9 @@
 #include "vs.h"
 
+#include <mbedtls/x509_crt.h>
+
 #include <arpa/inet.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,14 +13,14 @@
 #include <unistd.h>
 
 /* vitals-ssl's connection functions, called as Sony's libhttp calls them, against tests/server.py:
- * test_main <port> <server certificate> <unrelated root> */
+ * test_main <port> <server certificate> <unrelated root> <CA-signed chain> <bundle with the CA> */
 
 extern char vs_test_ca_path[512];
 extern unsigned int vs_test_refused_pool;
 
 static int g_checks, g_failures;
 static int g_port;
-static const char *g_server_pem, *g_other_root;
+static const char *g_server_pem, *g_other_root, *g_chain_pem, *g_bundle;
 
 #define CHECK(condition)                                                                       \
     do {                                                                                       \
@@ -57,6 +60,12 @@ static int connect_to(int port, int receive_timeout_ms)
     }
     return fd;
 }
+
+/* 91C2531C's entry request */
+typedef struct VsEntryRequestForTests {
+    int index;
+    void *entry;
+} VsEntryRequestForTests;
 
 typedef struct Connection {
     void *context;
@@ -353,15 +362,381 @@ static void test_implicit_connect(void)
     close_connection(&connection);
 }
 
+/* ---- certificates ---- */
+
+/* The chain's PEM file, and its certificates (leaf, CA) as Mbed TLS parses it: while vitals-ssl is
+ * initialized, as Mbed TLS's RSA keys take mutexes from it */
+static unsigned char g_chain_text[16384];
+static size_t g_chain_length;
+static mbedtls_x509_crt g_chain;
+
+static void load_chain(void)
+{
+    mbedtls_x509_crt_init(&g_chain);
+    CHECK_EQ(mbedtls_x509_crt_parse(&g_chain, g_chain_text, g_chain_length + 1), 0);
+    CHECK(g_chain.next != NULL);
+}
+
+static void *parse_der(const mbedtls_x509_crt *crt)
+{
+    void *cert = NULL;
+    unsigned int consumed = 0;
+    CHECK_EQ(sceSslInternalCertFromBinary(vs_cert_library(), 0, 1, (unsigned int)crt->raw.len, crt->raw.p,
+                                          &consumed, &cert), 0);
+    CHECK_EQ(consumed, crt->raw.len);
+    return cert;
+}
+
+/* A name's first entry's attribute as dotted text and its value, as libhttp's host check reads them */
+static void first_entry(void *name, char *oid_text, char *value, size_t size)
+{
+    VsEntryRequestForTests request = {0, NULL};
+    CHECK_EQ(sceSslInternalNameInfo(name, 11, &request), 0);
+    struct { int tag; unsigned int length; const unsigned char *data; } item;
+    CHECK_EQ(sceSslInternalEntryInfo(request.entry, 1, &item), 0);
+    uint64_t oid[4]; /* 16 bytes on the Vita, more with 64-bit pointers */
+    CHECK_EQ(sceSslInternalOidSet(oid, 1, item.data, item.length), 0);
+    CHECK_EQ(sceSslInternalOidText(oid, 0, 24, oid_text), 0);
+    CHECK_EQ(sceSslInternalEntryInfo(request.entry, 2, &item), 0);
+    CHECK(item.length < size);
+    memcpy(value, item.data, item.length);
+    value[item.length] = '\0';
+    CHECK_EQ(sceSslInternalEntryFree(request.entry), 0);
+}
+
+static void test_certificate_objects(void)
+{
+    load_chain();
+    const mbedtls_x509_crt *leaf_crt = &g_chain, *ca_crt = g_chain.next;
+    void *leaf = parse_der(leaf_crt), *ca = parse_der(ca_crt), *other = NULL;
+    unsigned int consumed = 0;
+    static const unsigned char junk[] = {0x30, 0x03, 0x02, 0x01, 0x01};
+    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, sizeof(junk), junk, &consumed, &other), 10001);
+    CHECK(other == NULL);
+    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, 0, NULL, &consumed, &other), 10017);
+
+    /* Serial number and DER */
+    struct { unsigned int length; const unsigned char *data; } item = {0, NULL};
+    CHECK_EQ(sceSslInternalCertInfo(leaf, 2, &item), 0);
+    CHECK_EQ(item.length, leaf_crt->serial.len);
+    CHECK(item.data != NULL && memcmp(item.data, leaf_crt->serial.p, item.length) == 0);
+    unsigned int length = 0;
+    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, NULL, 0, &length), 0);
+    CHECK_EQ(length, leaf_crt->raw.len);
+    unsigned char *der = malloc(length);
+    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, der, length - 1, &length), 10006);
+    CHECK_EQ(sceSslInternalCertToBinary(leaf, 4, der, length, &length), 0);
+    CHECK(memcmp(der, leaf_crt->raw.p, length) == 0);
+    free(der);
+    CHECK_EQ(sceSslInternalCertInfo(leaf, 0x1234, &item), 10011);
+    CHECK_EQ(sceSslInternalCertInfo(NULL, 2, &item), 10017);
+
+    /* Names: the leaf's issuer is the CA's subject */
+    void *issuer = NULL, *subject = NULL, *ca_subject = NULL;
+    CHECK_EQ(sceSslInternalCertIssuer(leaf, 1, &issuer), 0);
+    CHECK_EQ(sceSslInternalCertSubject(leaf, 1, &subject), 0);
+    CHECK_EQ(sceSslInternalCertInfo(ca, 0x800B, &ca_subject), 0);
+    CHECK_EQ(sceSslInternalNameEqual(issuer, ca_subject), 1);
+    CHECK_EQ(sceSslInternalNameEqual(issuer, subject), 0);
+    CHECK_EQ(sceSslInternalNameEqual(issuer, NULL), 0);
+    int count = 0;
+    CHECK_EQ(sceSslInternalNameInfo(subject, 10, &count), 0);
+    CHECK_EQ(count, 1);
+    CHECK_EQ(sceSslInternalNameInfo(issuer, 10, &count), 0);
+    CHECK_EQ(count, 2);
+    char oid_text[24], value[64];
+    first_entry(subject, oid_text, value, sizeof(value));
+    CHECK(strcmp(oid_text, "2.5.4.3") == 0);
+    CHECK(strcmp(value, "chain.test") == 0);
+    first_entry(issuer, oid_text, value, sizeof(value));
+    CHECK(strcmp(oid_text, "2.5.4.10") == 0);
+    CHECK(strcmp(value, "vitals-ssl") == 0);
+    VsEntryRequestForTests request = {5, NULL};
+    CHECK_EQ(sceSslInternalNameInfo(subject, 11, &request), 10008);
+    CHECK_EQ(sceSslInternalNameInfo(subject, 12, &count), 10011);
+    uint64_t oid[4]; /* 16 bytes on the Vita, more with 64-bit pointers */
+    char small[4];
+    static const unsigned char cn[] = {0x55, 0x04, 0x03};
+    CHECK_EQ(sceSslInternalOidSet(oid, 1, cn, sizeof(cn)), 0);
+    CHECK_EQ(sceSslInternalOidText(oid, 0, sizeof(small), small), 10006);
+    CHECK_EQ(sceSslInternalNameFree(issuer), 0);
+    CHECK_EQ(sceSslInternalNameFree(subject), 0);
+    CHECK_EQ(sceSslInternalNameFree(ca_subject), 0);
+    CHECK_EQ(sceSslInternalNameFree(NULL), 10017);
+
+    /* Extensions: subjectAltName's value, as libhttp parses it; basicConstraints */
+    void *extension = NULL;
+    CHECK_EQ(sceSslInternalExtensionNew(vs_cert_library(), -1, &extension), 0);
+    CHECK_EQ(sceSslInternalCertInfo(leaf, 0x4003, extension), 0);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8002, &item), 0);
+    static const unsigned char names[] = {0x30, 0x0C, 0x82, 0x0A, 'c', 'h', 'a', 'i', 'n', '.', 't', 'e', 's', 't'};
+    CHECK_EQ(item.length, sizeof(names));
+    CHECK(item.data != NULL && memcmp(item.data, names, sizeof(names)) == 0);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8007, &count), 10011);
+    CHECK_EQ(sceSslInternalCertInfo(ca, 0x4003, extension), 10008);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8002, &item), 10008);
+    int critical = 0, is_ca = -1, path_length = 0;
+    CHECK_EQ(sceSslInternalCertInfo(ca, 0x4005, extension), 0);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8001, &critical), 0);
+    CHECK_EQ(critical, 1);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8007, &is_ca), 0);
+    CHECK_EQ(is_ca, 1);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8008, &path_length), 0);
+    CHECK_EQ(path_length, INT_MAX);
+    CHECK_EQ(sceSslInternalCertInfo(leaf, 0x4005, extension), 0);
+    CHECK_EQ(sceSslInternalExtensionInfo(extension, 0x8007, &is_ca), 0);
+    CHECK_EQ(is_ca, 0);
+    CHECK_EQ(sceSslInternalExtensionFree(extension), 0);
+    int signature = 0;
+    CHECK_EQ(sceSslInternalCertInfo(leaf, 0x8007, &signature), 0);
+    CHECK(signature != 7 && signature != 8);
+
+    /* Keys and signatures: the CA's key made the leaf's, the leaf's didn't */
+    void *ca_key = NULL, *leaf_key = NULL;
+    int valid = -1;
+    CHECK_EQ(sceSslInternalCertInfo(ca, 0x8009, &ca_key), 0);
+    CHECK_EQ(sceSslInternalCertPublicKey(leaf, 1, &leaf_key), 0);
+    CHECK_EQ(sceSslInternalCertVerifySignature(leaf, ca_key, &valid), 0);
+    CHECK_EQ(valid, 1);
+    CHECK_EQ(sceSslInternalCertVerifySignature(ca, ca_key, &valid), 0);
+    CHECK_EQ(valid, 1);
+    CHECK_EQ(sceSslInternalCertVerifySignature(leaf, leaf_key, &valid), 0);
+    CHECK_EQ(valid, 0);
+    CHECK_EQ(sceSslInternalCertVerifySignature(leaf, NULL, &valid), 10017);
+    CHECK_EQ(sceSslInternalKeyFree(ca_key), 0);
+    CHECK_EQ(sceSslInternalKeyFree(leaf_key), 0);
+
+    /* Times: now is between the leaf's dates, as libhttp's date checks compare them */
+    void *provider = NULL, *now = NULL, *date = NULL;
+    unsigned char clock[12], value8[8];
+    int order = 2;
+    CHECK_EQ(sceSslInternalTimeProvider(vs_cert_library(), 0, &provider), 0);
+    CHECK_EQ(sceSslInternalTimeNew(provider, &now), 0);
+    CHECK_EQ(sceSslInternalTimeNew(provider, &date), 0);
+    CHECK_EQ(sceSslInternalTimeNow(clock), 0);
+    CHECK_EQ(sceSslInternalTimeExport(clock, 3, value8, 7), 10006);
+    CHECK_EQ(sceSslInternalTimeExport(clock, 3, value8, 8), 0);
+    CHECK_EQ(sceSslInternalTimeImport(now, 3, value8, 8), 0);
+    CHECK_EQ(sceSslInternalCertNotAfter(leaf, date), 0);
+    CHECK_EQ(sceSslInternalTimeCompare(date, now, &order), 0);
+    CHECK_EQ(order, 1);
+    CHECK_EQ(sceSslInternalCertNotBefore(leaf, date), 0);
+    CHECK_EQ(sceSslInternalTimeCompare(date, now, &order), 0);
+    CHECK_EQ(order, (uint32_t)-1);
+    CHECK_EQ(sceSslInternalTimeCompare(date, date, &order), 0);
+    CHECK_EQ(order, 0);
+    char text[20];
+    unsigned int text_length = 0;
+    int64_t known = 951782400 + 3723; /* 2000-02-29 01:02:03 */
+    CHECK_EQ(sceSslInternalTimeImport(date, 3, &known, 8), 0);
+    CHECK_EQ(sceSslInternalTimeText(date, 6, text, &text_length, 20), 0);
+    CHECK_EQ(text_length, 15);
+    CHECK(strcmp(text, "20000229010203Z") == 0);
+    CHECK_EQ(sceSslInternalTimeText(date, 6, text, &text_length, 15), 10006);
+    CHECK_EQ(sceSslInternalTimeFree(now), 0);
+    CHECK_EQ(sceSslInternalTimeFree(date), 0);
+    CHECK_EQ(sceSslInternalTimeProviderFree(provider), 0);
+
+    /* SceSsl's getters on the same certificate */
+    const char *serial = NULL;
+    unsigned serial_length = 0;
+    CHECK_EQ(sceSslGetSerialNumber(leaf, &serial, &serial_length), 0);
+    CHECK_EQ(serial_length, leaf_crt->serial.len);
+    SceRtcTick before = {0}, after = {0};
+    CHECK_EQ(sceSslGetNotBefore(leaf, &before), 0);
+    CHECK_EQ(sceSslGetNotAfter(leaf, &after), 0);
+    /* Two days apart, in microseconds since year 1 */
+    CHECK(after.tick - before.tick == 2ull * 86400 * 1000000);
+    CHECK(before.tick > 62135596800ull * 1000000);
+    SceSslCertName *name = sceSslGetIssuerName(leaf);
+    CHECK(name != NULL);
+    CHECK_EQ(sceSslGetNameEntryCount(name), 2);
+    char attribute[8], entry_value[8];
+    unsigned value_length = 0;
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 1, attribute, sizeof(attribute), entry_value, sizeof(entry_value),
+                                    &value_length), 0);
+    CHECK(strcmp(attribute, "CN") == 0);
+    CHECK(strcmp(entry_value, "vitals-") == 0);
+    CHECK_EQ(value_length, strlen("vitals-ssl test CA"));
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 2, attribute, sizeof(attribute), entry_value, sizeof(entry_value),
+                                    &value_length), SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslFreeSslCertName(name), 0);
+    CHECK(sceSslGetSubjectName(NULL) == NULL);
+    CHECK_EQ(sceSslGetNameEntryCount(NULL), SCE_SSL_ERROR_INVALID_VALUE);
+
+    CHECK_EQ(sceSslInternalCertFree(leaf), 0);
+    CHECK_EQ(sceSslInternalCertFree(ca), 0);
+    mbedtls_x509_crt_free(&g_chain);
+}
+
+/* The CA store on a bundle of the unrelated root and the CA */
+static void test_certificate_store(void)
+{
+    CHECK_EQ(sceSslTerm(), 0);
+    snprintf(vs_test_ca_path, sizeof(vs_test_ca_path), "%s", g_bundle);
+    CHECK_EQ(sceSslInit(256 * 1024), 0);
+    load_chain();
+    void *leaf = parse_der(&g_chain), *issuer = NULL;
+    CHECK_EQ(sceSslInternalCertIssuer(leaf, 1, &issuer), 0);
+
+    /* By name: the size, then the PEM text, as libhttp's lookup (0x81014292) asks */
+    char **entries = NULL;
+    unsigned int total = 0;
+    CHECK_EQ(sceSslInternalGetCertificateAuthorityByName(issuer, NULL, NULL, 0, &total, 0), 1);
+    CHECK(total > 0);
+    char *buffer = malloc(total + 15000);
+    CHECK_EQ(sceSslInternalGetCertificateAuthorityByName(issuer, &entries, buffer, 10, &total, 0),
+             VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslInternalGetCertificateAuthorityByName(issuer, &entries, buffer, total + 15000, &total, 0), 1);
+    CHECK(entries != NULL && strncmp(entries[0], "-----BEGIN CERTIFICATE-----\n", 28) == 0);
+    mbedtls_x509_crt found;
+    mbedtls_x509_crt_init(&found);
+    CHECK_EQ(mbedtls_x509_crt_parse(&found, (const unsigned char *)entries[0], strlen(entries[0]) + 1), 0);
+    CHECK(found.raw.len == g_chain.next->raw.len &&
+          memcmp(found.raw.p, g_chain.next->raw.p, found.raw.len) == 0);
+    mbedtls_x509_crt_free(&found);
+    /* Asked again, the next root with the name: there's none, so the caller stops */
+    CHECK_EQ(sceSslInternalGetCertificateAuthorityByName(issuer, &entries, buffer, total + 15000, &total, 0), 0);
+    vs_certificate_lookups_reset();
+    CHECK_EQ(sceSslInternalGetCertificateAuthorityByName(issuer, &entries, buffer, total + 15000, &total, 0), 1);
+    vs_certificate_lookups_reset();
+    void *subject = NULL;
+    CHECK_EQ(sceSslInternalCertSubject(leaf, 1, &subject), 0);
+    CHECK_EQ(sceSslInternalGetCertificateAuthorityByName(subject, NULL, NULL, 0, &total, 0), 0);
+    CHECK_EQ(sceSslInternalNameFree(subject), 0);
+    free(buffer);
+
+    /* By number: all, the first of group 1, nothing past the bundle's two */
+    CHECK_EQ(sceSslInternalGetCertificateAuthority(0, 0xFFFFFFFFu, NULL, NULL, 0, &total), 2);
+    buffer = malloc(total);
+    CHECK_EQ(sceSslInternalGetCertificateAuthority(0, 0xFFFFFFFFu, &entries, buffer, total, &total), 2);
+    CHECK(strncmp(entries[0], "-----BEGIN CERTIFICATE-----", 27) == 0);
+    CHECK(strncmp(entries[1], "-----BEGIN CERTIFICATE-----", 27) == 0);
+    CHECK(strstr(entries[0], "-----END CERTIFICATE-----") != NULL);
+    free(buffer);
+    CHECK_EQ(sceSslInternalGetCertificateAuthority(1, 2, NULL, NULL, 0, &total), 1);
+    CHECK_EQ(sceSslInternalGetCertificateAuthority(1, 4, NULL, NULL, 0, &total), 0x80010086);
+    CHECK_EQ(sceSslInternalGetCertificateAuthority(2, 1, NULL, NULL, 0, &total), 0x80010086);
+    const void *revoked = &total;
+    unsigned int revoked_count = 9;
+    CHECK_EQ(sceSslInternalCaRevoked(5, 4, &revoked, &revoked_count), 0);
+    CHECK(revoked == NULL && revoked_count == 0);
+
+    CHECK_EQ(sceSslInternalNameFree(issuer), 0);
+    CHECK_EQ(sceSslInternalCertFree(leaf), 0);
+    mbedtls_x509_crt_free(&g_chain);
+}
+
+/* A verify callback as libhttp's does the chain part: the issuer from the CA store by name, its key
+ * over the server certificate's signature */
+static int g_callback_calls, g_callback_count, g_callback_refuse;
+
+static int check_chain(void *ssl, void *certificates[], int count, void *argument, int *reason)
+{
+    ++g_callback_calls;
+    g_callback_count = count;
+    const void *library = NULL;
+    CHECK_EQ(sceSslInternalGetItem(ssl, 1, &library), 0);
+    CHECK(library != NULL && argument == &g_callback_calls);
+    if (g_callback_refuse) {
+        *reason = 4;
+        return 0;
+    }
+    void *issuer = NULL, *found = NULL, *key = NULL;
+    char **entries = NULL;
+    unsigned int total = 0;
+    int valid = 0;
+    CHECK_EQ(sceSslInternalCertIssuer(certificates[0], 1, &issuer), 0);
+    if (sceSslInternalGetCertificateAuthorityByName(issuer, NULL, NULL, 0, &total, 0) == 1) {
+        char *buffer = malloc(total);
+        mbedtls_x509_crt pem;
+        mbedtls_x509_crt_init(&pem);
+        if (sceSslInternalGetCertificateAuthorityByName(issuer, &entries, buffer, total, &total, 0) == 1 &&
+            mbedtls_x509_crt_parse(&pem, (const unsigned char *)entries[0], strlen(entries[0]) + 1) == 0) {
+            found = parse_der(&pem);
+            CHECK_EQ(sceSslInternalCertInfo(found, 0x8009, &key), 0);
+            CHECK_EQ(sceSslInternalCertVerifySignature(certificates[0], key, &valid), 0);
+            sceSslInternalKeyFree(key);
+            sceSslInternalCertFree(found);
+        }
+        mbedtls_x509_crt_free(&pem);
+        free(buffer);
+    }
+    sceSslInternalNameFree(issuer);
+    *reason = valid ? 0 : 10;
+    return valid;
+}
+
+static Connection open_checked(const char *host)
+{
+    Connection connection = open_connection(g_port + 2, host, 1, 5000);
+    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, &g_callback_calls);
+    return connection;
+}
+
+static void test_verify_callback(void)
+{
+    char line[128];
+    /* The bundle has the CA: the callback finds it and accepts, whatever Mbed TLS would say of the
+     * name, which the callback checks or not */
+    g_callback_calls = 0;
+    Connection connection = open_checked("not-the-name.test");
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
+    CHECK_EQ(g_callback_calls, 1);
+    CHECK_EQ(g_callback_count, 2);
+    CHECK_EQ(((VsSsl *)connection.ssl)->verify_result, 0);
+    CHECK(read_line(connection.ssl, line, sizeof(line)) > 0);
+    CHECK(strcmp(line, "sni=not-the-name.test\n") == 0);
+    close_connection(&connection);
+    /* It refuses: a TLS failure, with its reason kept */
+    g_callback_refuse = 1;
+    connection = open_checked("chain.test");
+    int result = sceSslInternalConnect(connection.ssl);
+    CHECK_EQ(result, -1);
+    CHECK_EQ(sceSslInternalGetError(connection.ssl, result), VS_KIND_SSL);
+    CHECK_EQ(((VsSsl *)connection.ssl)->verify_result, 4);
+    sceSslInternalSetVerifyResult(connection.ssl, 7);
+    CHECK_EQ(((VsSsl *)connection.ssl)->verify_result, 7);
+    close_connection(&connection);
+    g_callback_refuse = 0;
+    /* A bundle without the CA: the callback finds no issuer and refuses */
+    CHECK_EQ(sceSslTerm(), 0);
+    snprintf(vs_test_ca_path, sizeof(vs_test_ca_path), "%s", g_other_root);
+    CHECK_EQ(sceSslInit(256 * 1024), 0);
+    connection = open_checked("chain.test");
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), -1);
+    CHECK_EQ(((VsSsl *)connection.ssl)->verify_result, 10);
+    close_connection(&connection);
+    /* Without the verify mode the callback isn't called */
+    g_callback_calls = 0;
+    connection = open_connection(g_port + 2, "chain.test", 0, 5000);
+    sceSslInternalCtxSetCertVerifyCallback(connection.context, check_chain, &g_callback_calls);
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
+    CHECK_EQ(g_callback_calls, 0);
+    close_connection(&connection);
+    const void *item = &item;
+    CHECK_EQ(sceSslInternalGetItem(NULL, 1, &item), 10017);
+}
+
 int main(int argc, char **argv)
 {
-    if (argc != 4) {
-        fprintf(stderr, "usage: %s <port> <server certificate> <unrelated root>\n", argv[0]);
+    if (argc != 6) {
+        fprintf(stderr, "usage: %s <port> <server certificate> <unrelated root> <chain> <bundle>\n", argv[0]);
         return 2;
     }
     g_port = atoi(argv[1]);
     g_server_pem = argv[2];
     g_other_root = argv[3];
+    g_chain_pem = argv[4];
+    g_bundle = argv[5];
+    FILE *file = fopen(g_chain_pem, "rb");
+    g_chain_length = file != NULL ? fread(g_chain_text, 1, sizeof(g_chain_text) - 1, file) : 0;
+    if (file != NULL)
+        fclose(file);
+    if (g_chain_length == 0) {
+        fprintf(stderr, "can't read %s\n", g_chain_pem);
+        return 2;
+    }
     test_init();
     test_error_codes();
     test_objects();
@@ -371,6 +746,9 @@ int main(int argc, char **argv)
     test_implicit_connect();
     test_address();
     test_verify();
+    test_certificate_objects();
+    test_certificate_store();
+    test_verify_callback();
     CHECK_EQ(sceSslTerm(), 0);
     (void)g_alerts;
     (void)g_last_alert;

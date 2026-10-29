@@ -31,85 +31,85 @@ SceLibSsl:
       nid: 0x68D6C3FF
       functions:
         - sceSslInternal00ABEBC3: 0x00ABEBC3
-        - sceSslInternal04BAED82: 0x04BAED82
+        - sceSslInternalTimeCompare: 0x04BAED82
         - sceSslInternal05F6A292: 0x05F6A292
         - sceSslInternalGetCertificateAuthority: 0x064DFC99
-        - sceSslInternal08179EBD: 0x08179EBD
-        - sceSslInternal08ED1B25: 0x08ED1B25
+        - sceSslInternalCertSubject: 0x08179EBD
+        - sceSslInternalCertToBinary: 0x08ED1B25
         - sceSslInternal09657E15: 0x09657E15
         - sceSslInternal0C693D36: 0x0C693D36
         - sceSslInternalSetOptions: 0x0DB6C206
         - sceSslInternal133ED36D: 0x133ED36D
-        - sceSslInternal144FA354: 0x144FA354
+        - sceSslInternalCertFree: 0x144FA354
         - sceSslInternalBioCtrl: 0x16D7C7CA
-        - sceSslInternal170D595D: 0x170D595D
-        - sceSslInternal17BF2367: 0x17BF2367
+        - sceSslInternalCertPublicKey: 0x170D595D
+        - sceSslInternalEntryFree: 0x17BF2367
         - sceSslInternalFree: 0x19B2BB58
-        - sceSslInternal2074A6EB: 0x2074A6EB
+        - sceSslInternalCertNotAfter: 0x2074A6EB
         - sceSslInternalGetLibrary: 0x2185BB05
         - sceSslInternal243DE290: 0x243DE290
-        - sceSslInternal2464F9D0: 0x2464F9D0
-        - sceSslInternal24C6257F: 0x24C6257F
+        - sceSslInternalCertNotBefore: 0x2464F9D0
+        - sceSslInternalGetItem: 0x24C6257F
         - sceSslInternalCtxSetVerify: 0x260F5A85
         - sceSslInternal26CBEEB6: 0x26CBEEB6
-        - sceSslInternal29AAC768: 0x29AAC768
+        - sceSslInternalCertFromBinary: 0x29AAC768
         - sceSslInternal2B90012E: 0x2B90012E
         - sceSslInternalGetError: 0x2F0FC3CD
-        - sceSslInternal306E2A22: 0x306E2A22
+        - sceSslInternalCertVerifySignature: 0x306E2A22
         - sceSslInternal33737FDC: 0x33737FDC
         - sceSslInternal33AC7A16: 0x33AC7A16
-        - sceSslInternal349B0E73: 0x349B0E73
-        - sceSslInternal3746501F: 0x3746501F
-        - sceSslInternal3DE4F3DB: 0x3DE4F3DB
+        - sceSslInternalCaRevoked: 0x349B0E73
+        - sceSslInternalGetCertificateAuthorityByName: 0x3746501F
+        - sceSslInternalOidText: 0x3DE4F3DB
         - sceSslInternal3EF42454: 0x3EF42454
         - sceSslInternal422DFE70: 0x422DFE70
         - sceSslInternalErrorCode: 0x461C5990
-        - sceSslInternal46358909: 0x46358909
+        - sceSslInternalKeyFree: 0x46358909
         - sceSslInternal4725F9E7: 0x4725F9E7
         - sceSslInternalSetBio: 0x4A1557A7
-        - sceSslInternal4AAF0D45: 0x4AAF0D45
+        - sceSslInternalTimeNow: 0x4AAF0D45
         - sceSslInternalIsInitalized: 0x4B4A2307
-        - sceSslInternal4D80D3F7: 0x4D80D3F7
+        - sceSslInternalOidSet: 0x4D80D3F7
         - sceSslInternalRead: 0x4F781BB6
-        - sceSslInternal568F0E80: 0x568F0E80
+        - sceSslInternalNameEqual: 0x568F0E80
         - sceSslInternal56FE376A: 0x56FE376A
-        - sceSslInternal5E50CB55: 0x5E50CB55
+        - sceSslInternalTimeNew: 0x5E50CB55
         - sceSslInternal6046C1F3: 0x6046C1F3
-        - sceSslInternal64BDF1BB: 0x64BDF1BB
+        - sceSslInternalCertInfo: 0x64BDF1BB
         - sceSslInternalCtxSeedRandom: 0x67FB1CD3
-        - sceSslInternal6CDB4EE8: 0x6CDB4EE8
+        - sceSslInternalTimeFree: 0x6CDB4EE8
         - sceSslInternal6D0D3B11: 0x6D0D3B11
-        - sceSslInternal6D2A86F0: 0x6D2A86F0
+        - sceSslInternalTimeExport: 0x6D2A86F0
         - sceSslInternal6F3B9809: 0x6F3B9809
         - sceSslInternal7D30F0A6: 0x7D30F0A6
-        - sceSslInternal81FA5DBE: 0x81FA5DBE
-        - sceSslInternal88391E03: 0x88391E03
-        - sceSslInternal91C2531C: 0x91C2531C
+        - sceSslInternalCertIssuer: 0x81FA5DBE
+        - sceSslInternalTimeImport: 0x88391E03
+        - sceSslInternalNameInfo: 0x91C2531C
         - sceSslInternal92560B8D: 0x92560B8D
-        - sceSslInternal93EAE08A: 0x93EAE08A
+        - sceSslInternalExtensionInfo: 0x93EAE08A
         - sceSslInternalCtxSetClientCertCallback: 0x9E38815D
         - sceSslInternalClientMethod: 0xA374CD7B
         - sceSslInternalA4EA9DE0: 0xA4EA9DE0
         - sceSslInternalClientMethod2: 0xAC1DBE40
         - sceSslInternalCtxSetCertVerifyCallback: 0xAF50B945
-        - sceSslInternalB0E4CB2F: 0xB0E4CB2F
+        - sceSslInternalSetVerifyResult: 0xB0E4CB2F
         - sceSslInternalB1745DAD: 0xB1745DAD
-        - sceSslInternalB5A099D2: 0xB5A099D2
+        - sceSslInternalEntryInfo: 0xB5A099D2
         - sceSslInternalB8E6E249: 0xB8E6E249
-        - sceSslInternalBF99D664: 0xBF99D664
+        - sceSslInternalExtensionNew: 0xBF99D664
         - sceSslInternalC0B135F0: 0xC0B135F0
         - sceSslInternalC1299FB6: 0xC1299FB6
         - sceSslInternalC4D984C2: 0xC4D984C2
         - sceSslInternalCB83EA07: 0xCB83EA07
         - sceSslInternalCBEC7D13: 0xCBEC7D13
         - sceSslInternalCtxCtrl: 0xCC7F4211
-        - sceSslInternalCE37B69E: 0xCE37B69E
+        - sceSslInternalNameFree: 0xCE37B69E
         - sceSslInternalSetConnectState: 0xCEE46B33
-        - sceSslInternalD1A82B1A: 0xD1A82B1A
+        - sceSslInternalTimeText: 0xD1A82B1A
         - sceSslInternalNew: 0xD28834E6
-        - sceSslInternalD3C049B9: 0xD3C049B9
+        - sceSslInternalTimeProvider: 0xD3C049B9
         - sceSslInternalD419451B: 0xD419451B
-        - sceSslInternalD4ADF069: 0xD4ADF069
+        - sceSslInternalTimeProviderFree: 0xD4ADF069
         - sceSslInternalD68D8421: 0xD68D8421
         - sceSslInternalD6D32A2F: 0xD6D32A2F
         - sceSslInternalD776E2F8: 0xD776E2F8
@@ -119,7 +119,7 @@ SceLibSsl:
         - sceSslInternalCtxNew: 0xE746465E
         - sceSslInternalShutdown: 0xEC9FAF42
         - sceSslInternalCtxFree: 0xEF9EBAC7
-        - sceSslInternalF030A0DE: 0xF030A0DE
+        - sceSslInternalExtensionFree: 0xF030A0DE
         - sceSslInternalSetInfoCallback: 0xF2C9B744
         - sceSslInternalWrite: 0xF39A49C6
         - sceSslInternalF4007DBE: 0xF4007DBE

@@ -127,6 +127,11 @@ void vs_platform_run_on_large_stack(void (*function)(void *), void *argument)
     function(argument);
 }
 
+unsigned int vs_platform_thread_id(void)
+{
+    return (unsigned int)sceKernelGetThreadId();
+}
+
 int vs_platform_ca_path(char *path, size_t size)
 {
     const uint32_t options[4] = {0};

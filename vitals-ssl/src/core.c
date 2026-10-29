@@ -73,6 +73,11 @@ static int ca_index_ready(void)
     return ready;
 }
 
+const VitalsCaIndex *vs_ca_index(void)
+{
+    return ca_index_ready() ? &g_ca_index : NULL;
+}
+
 int vs_find_trusted_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates)
 {
     (void)context;

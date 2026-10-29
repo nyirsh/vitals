@@ -27,6 +27,7 @@ target_link_libraries(vitals_vita_mock PUBLIC Threads::Threads)
 add_executable(vitals_ssl_tests
     ${ROOT}/src/core.c
     ${ROOT}/src/connection.c
+    ${ROOT}/src/certificate.c
     ${ROOT}/src/ssl.c
     ${ROOT}/src/internal.c
     ${TLS13_DIR}/provider/platform_shims.c

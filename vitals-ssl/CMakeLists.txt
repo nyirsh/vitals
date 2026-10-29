@@ -23,6 +23,7 @@ add_subdirectory(${TLS13_DIR}/crypto crypto)
 add_executable(vitals_libssl
     src/core.c
     src/connection.c
+    src/certificate.c
     src/ssl.c
     src/internal.c
     src/platform_vita.c
