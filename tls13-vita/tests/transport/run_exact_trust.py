@@ -26,8 +26,9 @@ def certificates(directory):
     # The server's own certificate, and another with the same name but a different key
     self_signed(directory, "server", *server)
     self_signed(directory, "lookalike", *server)
-    # One made with openssl's defaults, which is a CA and already worked before
-    self_signed(directory, "default")
+    # A CA, like the one OpenSSL 3 makes by default, which already worked before
+    # (stated explicitly: LibreSSL, macOS's /usr/bin/openssl, adds no basicConstraints by default)
+    self_signed(directory, "default", "-addext", "basicConstraints=critical,CA:TRUE")
     # A root unrelated to the server, as the rest of a real store
     openssl(directory, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
             "-keyout", "root.key", "-out", "root.pem", "-subj", "/CN=vitals test root")
