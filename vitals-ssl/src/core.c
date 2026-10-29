@@ -95,20 +95,19 @@ int vs_trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int
     return 0;
 }
 
-/* NID 0x3C733316, Sony 0x81047F09 */
-int sceSslInit(unsigned poolSize)
+/* Sets up the library: a pool of pool_size bytes as Sony's (sceSslInit), or none (0), where the
+ * caller's allocator serves (vitalsSslInitShared) */
+int vs_library_init(unsigned int pool_size)
 {
     vs_lock();
     int result = 0;
     if (g_initialized)
         result = VS_ERROR_ALREADY_INITED;
-    else if (poolSize == 0)
-        result = VS_ERROR_INVALID_VALUE;
-    else
-        result = vs_platform_heap_create(poolSize);
+    else if (pool_size > 0)
+        result = vs_platform_heap_create(pool_size);
     if (result != 0) {
         vs_unlock();
-        VITALS_LOG("init pool=%u rc=%08X", poolSize, (unsigned int)result);
+        VITALS_LOG("init pool=%u rc=%08X", pool_size, (unsigned int)result);
         return result;
     }
     if (vitals_crypto_platform_init() != 0 || psa_crypto_init() != PSA_SUCCESS)
@@ -126,15 +125,22 @@ int sceSslInit(unsigned poolSize)
     if (result != 0) {
         mbedtls_psa_crypto_free();
         vitals_crypto_platform_free();
-        vs_platform_heap_destroy();
+        if (pool_size > 0)
+            vs_platform_heap_destroy();
     } else {
         g_initialized = 1;
         g_out_of_memory = 0;
         g_ca_index_state = 0;
     }
     vs_unlock();
-    VITALS_LOG("init pool=%u rc=%08X", poolSize, (unsigned int)result);
+    VITALS_LOG("init pool=%u rc=%08X", pool_size, (unsigned int)result);
     return result;
+}
+
+/* NID 0x3C733316, Sony 0x81047F09 */
+int sceSslInit(unsigned poolSize)
+{
+    return poolSize == 0 ? VS_ERROR_INVALID_VALUE : vs_library_init(poolSize);
 }
 
 /* NID 0x03CE6E3A, Sony 0x810480AD */

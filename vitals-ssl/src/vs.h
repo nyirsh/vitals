@@ -20,6 +20,11 @@
 #define VS_ERROR_UNKNOWN_REASON ((int)0x804352FF)
 /* SceNet's EAGAIN, which a receive that timed out returns */
 #define VS_NET_ERROR_EAGAIN ((int)0x80410123)
+#define VS_NET_ERROR_EINTR ((int)0x80410104)
+
+/* The objects' first word, which tells them apart */
+#define VS_CONTEXT_MAGIC 0x43535356u
+#define VS_BIO_MAGIC 0x42535356u
 
 /* SSL_get_error's kinds, as OpenSSL numbers them */
 #define VS_KIND_NONE 0
@@ -78,6 +83,12 @@ typedef struct VsContext {
     VsVerifyCallback verify_callback;
     void *verify_argument;
     VsClientCertCallback client_cert_callback;
+    /* vitals' additions (vitals.c) */
+    int profile;
+    int deferred_verify;
+    struct VsStore *store;
+    mbedtls_x509_crt *own_certificate;
+    mbedtls_pk_context *own_key;
 } VsContext;
 
 typedef struct VsBio {
@@ -88,6 +99,10 @@ typedef struct VsBio {
     /* Sony's: the host name libhttp gives (100), which the ClientHello's SNI comes from; the
      * caller's pointer, as Sony keeps it */
     const char *host;
+    /* vitals' callback BIO (vitalsSslBioNew): the caller's transport in place of a socket */
+    int (*send)(void *, const unsigned char *, size_t);
+    int (*receive)(void *, unsigned char *, size_t);
+    void *transport;
 } VsBio;
 
 typedef struct VsSsl {
@@ -120,6 +135,8 @@ typedef struct VsSsl {
     int ca_name_count;
     /* The client certificate and key the callback gave, kept until the connection is freed */
     void *client_cert, *client_key;
+    /* The server asked for a certificate */
+    int certificate_requested;
 } VsSsl;
 
 /* A certificate: the server's, which the connection keeps (borrowed), or one 29AAC768 parsed */
@@ -139,6 +156,15 @@ int vs_take_out_of_memory(void);
 int vs_tls_random(void *context, unsigned char *output, size_t size);
 int vs_find_trusted_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates);
 int vs_trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags);
+/* Sets up the library, with a pool of size bytes or (0) the caller's allocator: 0 or an SCE error */
+int vs_library_init(unsigned int pool_size);
+
+/* vitals.c: vitals' additions to contexts */
+void vs_context_free_additions(VsContext *context);
+/* The bundle's roots, then the context's store's certificates; context is the connection */
+int vs_find_issuers_with_store(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates);
+/* Applies the context's profile to a connection's configuration */
+int vs_apply_profile(VsSsl *ssl);
 /* The CA bundle's index, built on first use; NULL without a bundle */
 const struct VitalsCaIndex *vs_ca_index(void);
 

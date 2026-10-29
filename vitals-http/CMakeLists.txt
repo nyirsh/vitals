@@ -30,6 +30,8 @@ set(VITALS_HTTP_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trus
 
 # TLS is Mbed TLS 3.6 (tls13-vita/crypto, shared with the browser provider), with tls13-vita's CA index, certificate flags and runtime
 set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
+# TLS is vitals-ssl's, built in (phase 1: not yet the libssl module it imports)
+set(VITALS_SSL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vitals-ssl)
 include(../dependencies.cmake)
 # The release version from ../VERSION, which the module header carries
 include(../version.cmake)
@@ -48,6 +50,11 @@ add_executable(vitals_libhttp
     src/redirect.c
     src/useragent.c
     src/tls.c
+    src/ssl_platform.c
+    ${VITALS_SSL_DIR}/src/core.c
+    ${VITALS_SSL_DIR}/src/connection.c
+    ${VITALS_SSL_DIR}/src/certificate.c
+    ${VITALS_SSL_DIR}/src/vitals.c
     ${TLS13_DIR}/provider/platform_shims.c
     src/platform_vita.c
     ${TLS13_DIR}/provider/ca_index.c
@@ -56,7 +63,8 @@ add_executable(vitals_libhttp
     ${TLS13_DIR}/src/host_map.c
     ${TLS13_DIR}/src/redirect_list.c
 )
-target_include_directories(vitals_libhttp PRIVATE src ${TLS13_DIR}/provider ${TLS13_DIR}/include)
+target_include_directories(vitals_libhttp PRIVATE src ${VITALS_SSL_DIR}/src ${VITALS_SSL_DIR}/include
+    ${TLS13_DIR}/provider ${TLS13_DIR}/include)
 target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-http"

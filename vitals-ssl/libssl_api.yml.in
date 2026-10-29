@@ -128,3 +128,27 @@ SceLibSsl:
         - sceSslInternalCtxSetOptions: 0xFBEB1FD7
         - sceSslInternalFEFE761C: 0xFEFE761C
         - sceSslInternalBioNewSocket: 0xFFE2ED51
+    # vitals' own additions, for vitals-http (include/vitals_ssl.h); each NID is the first word of the
+    # SHA-1 of its name, as Sony's are made
+    VitalsSsl:
+      syscall: false
+      nid: 0x6D89DA35
+      functions:
+        - vitalsSslBioNew: 0x258C6C64
+        - vitalsSslCertificateRequested: 0xEB8141B2
+        - vitalsSslCheckCertificate: 0x169DA221
+        - vitalsSslCheckKey: 0xDE8174EC
+        - vitalsSslCtxSetDeferredVerify: 0x00FB3554
+        - vitalsSslCtxSetIdentity: 0x8DCEBE98
+        - vitalsSslCtxSetProfile: 0xC356276E
+        - vitalsSslCtxSetStore: 0x4AAF69E0
+        - vitalsSslGetCertificateFlags: 0x7B93015B
+        - vitalsSslGetCiphersuite: 0x352F91AF
+        - vitalsSslGetTlsError: 0xE6EB9C2D
+        - vitalsSslGetVerifyResult: 0xD35E2515
+        - vitalsSslGetVersion: 0x184CAB4B
+        - vitalsSslInitShared: 0xEC2EA2B3
+        - vitalsSslStoreAdd: 0x5F84E0A4
+        - vitalsSslStoreNew: 0xFBCA83CB
+        - vitalsSslStoreRelease: 0x8563BB9E
+        - vitalsSslTlsErrorIsMemory: 0xE0613333

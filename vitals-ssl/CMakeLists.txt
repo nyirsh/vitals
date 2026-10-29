@@ -24,6 +24,7 @@ add_executable(vitals_libssl
     src/core.c
     src/connection.c
     src/certificate.c
+    src/vitals.c
     src/ssl.c
     src/internal.c
     src/platform_vita.c
@@ -31,7 +32,7 @@ add_executable(vitals_libssl
     ${TLS13_DIR}/provider/ca_index.c
     ${TLS13_DIR}/provider/user_runtime.c
 )
-target_include_directories(vitals_libssl PRIVATE src ${TLS13_DIR}/provider ${TLS13_DIR}/include)
+target_include_directories(vitals_libssl PRIVATE src include ${TLS13_DIR}/provider ${TLS13_DIR}/include)
 target_compile_definitions(vitals_libssl PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-ssl"
@@ -52,9 +53,9 @@ foreach(function malloc calloc realloc free memchr memcmp memcpy memmove memset 
 endforeach()
 # Nothing in the module calls its exports, so --gc-sections would drop them: each one the yml lists
 # is kept
-file(STRINGS libssl_api.yml.in export_lines REGEX "^ +- sceSsl[A-Za-z0-9]+:")
+file(STRINGS libssl_api.yml.in export_lines REGEX "^ +- (sceSsl|vitalsSsl)[A-Za-z0-9]+:")
 foreach(line ${export_lines})
-    string(REGEX REPLACE "^ +- (sceSsl[A-Za-z0-9]+):.*$" "\\1" function "${line}")
+    string(REGEX REPLACE "^ +- ((sceSsl|vitalsSsl)[A-Za-z0-9]+):.*$" "\\1" function "${line}")
     target_link_options(vitals_libssl PRIVATE "-Wl,--undefined=${function}")
 endforeach()
 target_link_libraries(vitals_libssl PRIVATE

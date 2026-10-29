@@ -28,6 +28,7 @@ add_executable(vitals_ssl_tests
     ${ROOT}/src/core.c
     ${ROOT}/src/connection.c
     ${ROOT}/src/certificate.c
+    ${ROOT}/src/vitals.c
     ${ROOT}/src/ssl.c
     ${ROOT}/src/internal.c
     ${TLS13_DIR}/provider/platform_shims.c
@@ -38,7 +39,7 @@ add_executable(vitals_ssl_tests
 target_include_directories(vitals_ssl_tests BEFORE PRIVATE ${CMAKE_BINARY_DIR}/sdk)
 # With the debug log compiled in, so its lines run too
 target_compile_definitions(vitals_ssl_tests PRIVATE VITALS_DEBUG=1 VITALS_LOG_PREFIX="vitals-ssl")
-target_include_directories(vitals_ssl_tests PRIVATE ${ROOT}/src ${TLS13_DIR}/provider ${TLS13_DIR}/include)
+target_include_directories(vitals_ssl_tests PRIVATE ${ROOT}/src ${ROOT}/include ${TLS13_DIR}/provider ${TLS13_DIR}/include)
 target_compile_options(vitals_ssl_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
     -fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(vitals_ssl_tests PRIVATE -fsanitize=address,undefined)

@@ -1,5 +1,6 @@
 #include "vs.h"
 
+#include "ca_index.h"
 #include "diagnostics.h"
 
 #include <mbedtls/error.h>
@@ -21,9 +22,9 @@
  * or else by Mbed TLS against the CA bundle and the host name */
 
 #define METHOD_MAGIC 0x4D535356u
-#define CONTEXT_MAGIC 0x43535356u
+#define CONTEXT_MAGIC VS_CONTEXT_MAGIC
 #define SSL_MAGIC 0x53535356u
-#define BIO_MAGIC 0x42535356u
+#define BIO_MAGIC VS_BIO_MAGIC
 
 /* Two client methods, as Sony's: libhttp uses the first for its connections and the second for
  * another; here both are TLS 1.2 to 1.3 */
@@ -87,6 +88,7 @@ static void context_release(VsContext *context)
     unsigned int left = --context->references;
     vs_unlock();
     if (left == 0) {
+        vs_context_free_additions(context);
         context->magic = 0;
         free(context);
     }
@@ -346,13 +348,33 @@ void sceSslInternalSetConnectState(void *handle)
 
 /* The socket BIO's send and receive, as Sony's: SceNet's errno cleared first, and what the socket
  * returned kept for the caller when it failed */
+/* A callback BIO's send or receive: what it moved, or its error as the socket's */
+static int transport_result(VsSsl *ssl, int result, int sending)
+{
+    if (result > 0 || (result == 0 && !sending))
+        return result;
+    if (result == 0) {
+        ssl->failure = VS_FAILED_SEND_ZERO;
+        return MBEDTLS_ERR_SSL_WANT_WRITE;
+    }
+    ssl->failure = sending ? VS_FAILED_SEND : VS_FAILED_RECEIVE;
+    ssl->socket_result = result;
+    return sending ? MBEDTLS_ERR_NET_SEND_FAILED : MBEDTLS_ERR_NET_RECV_FAILED;
+}
+
 static int tls_send(void *context, const unsigned char *data, size_t size)
 {
     VsSsl *ssl = context;
+    if (is_bio(ssl->wbio) && ssl->wbio->send != NULL)
+        return transport_result(ssl, ssl->wbio->send(ssl->wbio->transport, data, size), 1);
     if (!is_bio(ssl->wbio) || !ssl->wbio->has_fd)
         return MBEDTLS_ERR_NET_INVALID_CONTEXT;
-    vs_platform_clear_net_errno();
-    int result = sceNetSend(ssl->wbio->fd, data, (unsigned int)size, 0);
+    int result;
+    /* A signal is no failure: sent again, as vitals-http's transport does */
+    do {
+        vs_platform_clear_net_errno();
+        result = sceNetSend(ssl->wbio->fd, data, (unsigned int)size, 0);
+    } while (result == (int)VS_NET_ERROR_EINTR);
     if (result > 0)
         return result;
     if (result == 0) {
@@ -367,10 +389,15 @@ static int tls_send(void *context, const unsigned char *data, size_t size)
 static int tls_recv(void *context, unsigned char *data, size_t size)
 {
     VsSsl *ssl = context;
+    if (is_bio(ssl->rbio) && ssl->rbio->receive != NULL)
+        return transport_result(ssl, ssl->rbio->receive(ssl->rbio->transport, data, size), 0);
     if (!is_bio(ssl->rbio) || !ssl->rbio->has_fd)
         return MBEDTLS_ERR_NET_INVALID_CONTEXT;
-    vs_platform_clear_net_errno();
-    int result = sceNetRecv(ssl->rbio->fd, data, (unsigned int)size, 0);
+    int result;
+    do {
+        vs_platform_clear_net_errno();
+        result = sceNetRecv(ssl->rbio->fd, data, (unsigned int)size, 0);
+    } while (result == (int)VS_NET_ERROR_EINTR);
     if (result >= 0)
         return result;
     ssl->failure = VS_FAILED_RECEIVE;
@@ -395,10 +422,14 @@ static int names_address(const mbedtls_x509_crt *certificate, const unsigned cha
     return 0;
 }
 
+/* As vitals-http: a self-signed server certificate that is itself trusted (in the bundle or the
+ * context's store) counts as trusted; its other checks (host name, dates) still apply */
 static int verify_certificate(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags)
 {
     VsSsl *ssl = context;
-    (void)vs_trust_exact_self_signed(NULL, certificate, depth, flags);
+    if (depth == 0 && (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) != 0 &&
+        vitals_ca_trusts_exact(vs_find_issuers_with_store, ssl, certificate))
+        *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
     if (depth == 0 && ssl->check_address && !names_address(certificate, ssl->address))
         *flags |= MBEDTLS_X509_BADCERT_CN_MISMATCH;
     return 0;
@@ -479,6 +510,7 @@ static int certificate_request(void *context, mbedtls_ssl_context *tls, const un
 {
     VsSsl *ssl = context;
     VsClientCertCallback callback = ssl->context->client_cert_callback;
+    ssl->certificate_requested = 1;
     if (callback == NULL)
         return 0;
     int count = 0;
@@ -549,17 +581,31 @@ static int setup(VsSsl *ssl)
     mbedtls_ssl_conf_rng(&ssl->config, vs_tls_random, NULL);
     mbedtls_ssl_conf_min_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_max_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_3);
+    result = vs_apply_profile(ssl);
+    if (result != 0)
+        return result;
     int verify = ssl->context->verify_mode & 1;
-    mbedtls_ssl_conf_authmode(&ssl->config, verify ? MBEDTLS_SSL_VERIFY_REQUIRED : MBEDTLS_SSL_VERIFY_NONE);
-    if (verify && ssl->context->verify_callback != NULL) {
+    /* Deferred: the caller decides from what was found (vitalsSslGetCertificateFlags) */
+    int deferred = verify && ssl->context->deferred_verify && ssl->context->verify_callback == NULL;
+    mbedtls_ssl_conf_authmode(&ssl->config, !verify ? MBEDTLS_SSL_VERIFY_NONE
+                                            : deferred ? MBEDTLS_SSL_VERIFY_OPTIONAL
+                                                       : MBEDTLS_SSL_VERIFY_REQUIRED);
+    if (deferred) {
+        mbedtls_ssl_conf_ca_cb(&ssl->config, vs_find_issuers_with_store, ssl);
+        mbedtls_ssl_conf_verify(&ssl->config, verify_certificate, ssl);
+    } else if (verify && ssl->context->verify_callback != NULL) {
         mbedtls_ssl_conf_ca_cb(&ssl->config, no_issuers, NULL);
         mbedtls_ssl_conf_verify(&ssl->config, verify_with_callback, ssl);
     } else if (verify) {
         mbedtls_ssl_conf_ca_cb(&ssl->config, vs_find_trusted_issuers, NULL);
         mbedtls_ssl_conf_verify(&ssl->config, verify_certificate, ssl);
     }
-    if (ssl->context->client_cert_callback != NULL)
-        mbedtls_ssl_conf_cert_request_cb(&ssl->config, certificate_request, ssl);
+    mbedtls_ssl_conf_cert_request_cb(&ssl->config, certificate_request, ssl);
+    if (ssl->context->own_certificate != NULL && ssl->context->own_key != NULL) {
+        result = mbedtls_ssl_conf_own_cert(&ssl->config, ssl->context->own_certificate, ssl->context->own_key);
+        if (result != 0)
+            return result;
+    }
     result = mbedtls_ssl_setup(&ssl->tls, &ssl->config);
     if (result != 0)
         return result;

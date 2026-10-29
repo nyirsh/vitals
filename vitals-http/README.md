@@ -2,8 +2,11 @@
 
 Sony's HTTP library (`SceLibHttp`, the `sceHttp*` API) written from scratch, as a user module
 exported under libhttp's own library and function NIDs ([vitals_http_api.yml.in](vitals_http_api.yml.in)),
-all 116 of them. Its TLS is Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/), shared with the browser provider) with tls13-vita's CA bundle index, exact
-trust of self-signed certificates, certificate-problem mapping and heap runtime.
+all 116 of them. Its TLS is [vitals-ssl](../vitals-ssl/)'s, built in for now: Mbed TLS 3.6
+([tls13-vita/crypto](../tls13-vita/crypto/), shared with the browser provider) with tls13-vita's CA
+bundle index, exact trust of self-signed certificates, certificate-problem mapping and heap runtime.
+It goes through vitals-ssl's own interface, `include/vitals_ssl.h` (Sony's functions and the
+VitalsSsl additions), so it can later import the libssl module instead.
 
 The kernel plugin loads it in place of Sony's libhttp in every process, shared as Sony's is, and
 the vitals app installs it as `vs0:/data/external/vitals/libhttp.suprx`. Its whole lifetime, from the
@@ -36,11 +39,13 @@ the app gives `sceHttpInit`. An open https connection takes about 40 KiB of it.
 | [src/redirect.c](src/redirect.c) | the host redirect list, `ux0:data/vitals/redirects.txt` |
 | [src/useragent.c](src/useragent.c) | the User-Agent suffix, `ux0:data/vitals/useragent.txt` |
 | [src/private.c](src/private.c) | the 23 exports nothing names, as Sony's code does them |
-| [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, `sceHttpsLoadCert` |
+| [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, through vitals-ssl, and `sceHttpsLoadCert` |
+| [src/ssl_platform.c](src/ssl_platform.c) | vitals-ssl's platform, built in: this library's lock, heap and threads |
 | [src/platform_vita.c](src/platform_vita.c) | module start, the pool's memory, the lock, SceNet |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |
 
-From tls13-vita it uses the Mbed TLS build in `crypto/`, `provider/ca_index.c`,
+From vitals-ssl it builds `src/core.c`, `connection.c`, `certificate.c` and `vitals.c`. From
+tls13-vita it uses the Mbed TLS build in `crypto/`, `provider/ca_index.c`,
 `provider/platform_shims.c` (Mbed TLS's mutexes, entropy and time, on the kernel and the RTC),
 `provider/user_runtime.c` (the heap, and the C library the module is linked without), `src/error_map.c`, and `src/host_map.c` with
 `src/redirect_list.c` for the redirect list.
@@ -58,7 +63,8 @@ RC4-MD5 and the renegotiation SCSV, null compression, and only `server_name` and
 RC4 suites, so they are only offered, through a small patch
 ([tls13-vita/crypto/offer-unknown-ciphersuites.patch](../tls13-vita/crypto/offer-unknown-ciphersuites.patch)); every server
 seen picks AES128-SHA256, and one that picked one of them would fail the handshake. Every other
-connection gets TLS 1.2 to 1.3 with Mbed TLS's default suites.
+connection gets TLS 1.2 to 1.3 with Mbed TLS's default suites. Both are vitals-ssl's profiles
+(`vitalsSslCtxSetProfile`).
 
 ## Trust
 

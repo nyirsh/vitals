@@ -258,6 +258,26 @@ connection; otherwise it frees them and returns 0, and no certificate is sent.
 `sceHttpPrivateSslContextAddCertCheck` sets the verify mode (`260F5A85`, `(ctx, 1)`) and the
 callback (`AF50B945`), both in the connection table above.
 
+## VitalsSsl: vitals' additions
+
+vitals-http does its TLS through vitals-ssl, built into it for now, so a later step can have it
+import the libssl module as Sony's libhttp does. It uses Sony's functions and a few more, which
+the module exports as its own library, `VitalsSsl` (NID `0x6D89DA35`; each function's NID is the
+first word of the SHA-1 of its name, as Sony's are made). [include/vitals_ssl.h](include/vitals_ssl.h)
+declares both, with every object opaque:
+
+| Functions | What for |
+| --- | --- |
+| `vitalsSslInitShared` | the library without a pool of its own: its memory is the caller's (vitals-http's heap) |
+| `vitalsSslBioNew` | a BIO over the caller's transport (its timeouts, aborts and proxy tunnels) |
+| `vitalsSslCtxSetProfile` | the console's ClientHello for Sony's private HTTPS option `0x40` (PSN sign-in) |
+| `vitalsSslCtxSetDeferredVerify`, `vitalsSslGetCertificateFlags`, `vitalsSslGetVerifyResult` | the handshake goes on whatever the check finds, and the caller decides from it (its HTTPS options, the app's callback) |
+| `vitalsSslStoreNew`, `vitalsSslStoreAdd`, `vitalsSslStoreRelease`, `vitalsSslCtxSetStore` | CA certificates trusted besides the bundle (an app's `sceHttpsLoadCert` ones), also as exact self-signed certificates |
+| `vitalsSslCtxSetIdentity`, `vitalsSslCheckCertificate`, `vitalsSslCheckKey` | a client certificate sent to any server that asks, as vitals-http does |
+| `vitalsSslGetTlsError`, `vitalsSslTlsErrorIsMemory`, `vitalsSslGetVersion`, `vitalsSslGetCiphersuite`, `vitalsSslCertificateRequested` | what a connection did, for errors and logs |
+
+Built in, vitals-ssl's platform is vitals-http's ([vitals-http/src/ssl_platform.c](../vitals-http/src/ssl_platform.c)).
+
 ## Layout
 
 | File | Role |
@@ -267,6 +287,7 @@ callback (`AF50B945`), both in the connection table above.
 | [src/certificate.c](src/certificate.c) | the certificate objects: certificates, names and entries, extensions, keys, times and the CA store |
 | [src/ssl.c](src/ssl.c) | `SceSsl`'s certificate getters, and the stub every unwritten export calls |
 | [src/internal.c](src/internal.c) | the `SceSslInternal` exports not written yet |
+| [src/vitals.c](src/vitals.c), [include/vitals_ssl.h](include/vitals_ssl.h) | VitalsSsl, vitals' additions, and the header vitals' own callers include |
 | [src/platform_vita.c](src/platform_vita.c) | module start and stop, the lock, the pool, SceNet and the handshake's thread |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |
 

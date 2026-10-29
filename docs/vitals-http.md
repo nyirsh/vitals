@@ -143,12 +143,15 @@ call has returned.
 
 ## 8. TLS
 
-[tls.c](../vitals-http/src/tls.c), with Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
-the same build as the browser provider's).
+[tls.c](../vitals-http/src/tls.c), through [vitals-ssl](../vitals-ssl/), built into the module, with
+Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/), the same build as the browser provider's).
+Each connection is a vitals-ssl connection over vitals-http's own socket functions, so timeouts,
+aborts and proxies work as before; vitals-http decides on the certificate from what vitals-ssl
+found, the HTTPS options and the app's callback.
 
 **Set up once per process.** The first HTTPS connection starts the TLS heap and the random number
-generator, and builds an **index** of the certificate store: where each root is in
-`CA_LIST.cer`, not the roots themselves. The log says `tls ready roots=<count>`.
+generator, and on the first check builds an **index** of the certificate store: where each root
+is in `CA_LIST.cer`, not the roots themselves. The log says `tls ready rc=1`, then `roots=<count>`.
 
 **Two profiles:**
 
