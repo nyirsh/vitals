@@ -1,5 +1,7 @@
 /build/
 __pycache__/
 *.o
-# macOS Finder metadata, in any folder
-.DS_Store
+
+.*
+!.gitignore
+!.vscode
