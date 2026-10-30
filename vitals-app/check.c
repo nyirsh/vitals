@@ -30,146 +30,7 @@ static char notice[120];
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 static void lock(void) { sceKernelLockMutex(guard, 1, NULL); }
 static void unlock(void) { sceKernelUnlockMutex(guard, 1); }
-#if VITALS_SSL_TEST
-/* The vitals-ssl test app (make SSL_TEST=1): the plugin gives this process Sony's libhttp on
- * vitals-ssl (app0:vssl.suprx). The report says which libssl loaded, the pool before and after,
- * and what the app's SSL callback saw through the sceSslGet* getters; the callback refuses
- * whatever libhttp found wrong, as without one, so the results stay comparable */
-#define REPORT_NAME "vitalsssl"
-static char ssl_module[256];
-static SceSslMemoryPoolStats pool_before, pool_after;
-static int pool_before_rc = -1, pool_after_rc = -1;
-static unsigned callback_calls, callback_refused, callback_last_bits, callback_last_count;
-static char callback_subject[128];
-/* untrusted-root.badssl.com with badssl.com's root loaded by sceHttpsLoadCert, which must connect,
- * then again after sceHttpsUnloadCert, which must be refused */
-#define LOADED_ROOT_PATH "app0:badssl-untrusted-root.pem"
-static int loaded_load_rc = -1, loaded_unload_rc = -1;
-static CheckResult loaded_result, unloaded_result;
-/* client.badssl.com, which answers 200 with badssl.com's client certificate and 400 without:
- * loaded with sceHttpsLoadCert, then unloaded */
-#define CLIENT_CERT_PATH "app0:badssl-client.pem"
-#define CLIENT_KEY_PATH "app0:badssl-client.key"
-static int client_load_rc = -1, client_unload_rc = -1;
-static CheckResult client_result, no_client_result;
-static int ssl_callback(unsigned int verify_errors, void *const certificates[], int count, void *argument)
-{
-    (void)argument;
-    lock();
-    ++callback_calls;
-    callback_last_bits = verify_errors;
-    callback_last_count = (unsigned)count;
-    if (verify_errors != 0)
-        ++callback_refused;
-    callback_subject[0] = 0;
-    SceSslCertName *name = count > 0 ? sceSslGetSubjectName(certificates[0]) : NULL;
-    if (name != NULL)
-    {
-        int entries = sceSslGetNameEntryCount(name);
-        size_t used = 0;
-        for (int i = 0; i < entries && used + 1 < sizeof(callback_subject); ++i)
-        {
-            char attribute[24], value[64];
-            unsigned length = 0;
-            if (sceSslGetNameEntryInfo(name, i, attribute, sizeof(attribute), value, sizeof(value), &length) < 0)
-                break;
-            int n = snprintf(callback_subject + used, sizeof(callback_subject) - used, "%s%s=%s",
-                             i ? "," : "", attribute, value);
-            if (n < 0)
-                break;
-            used += (size_t)n;
-        }
-        (void)sceSslFreeSslCertName(name);
-    }
-    unlock();
-    return verify_errors != 0 ? -1 : 0;
-}
-static void find_ssl_module(void)
-{
-    SceUID ids[128];
-    SceSize count = sizeof(ids) / sizeof(ids[0]);
-    ssl_module[0] = 0;
-    if (sceKernelGetModuleList(0xff, ids, &count) < 0)
-        return;
-    for (unsigned i = 0; i < count && i < 128; ++i)
-    {
-        SceKernelModuleInfo info = {0};
-        info.size = sizeof(info);
-        if (sceKernelGetModuleInfo(ids[i], &info) == 0 && strcmp(info.module_name, "SceLibSsl") == 0)
-            snprintf(ssl_module, sizeof(ssl_module), "%s", info.path);
-    }
-}
-static int stopped(void);
-static int fetch_url(const char *url, int verify, int unverified_allowed, int status_only, char *body,
-                     size_t *length, CheckResult *r);
-static void run_loaded_root(char *body)
-{
-    static char pem[4096];
-    size_t n = 0;
-    CheckResult loaded = {0}, unloaded = {0};
-    int load_rc = -1, unload_rc = -1;
-    FILE *file = fopen(LOADED_ROOT_PATH, "rb");
-    size_t length = file != NULL ? fread(pem, 1, sizeof(pem) - 1, file) : 0;
-    if (file != NULL)
-        fclose(file);
-    pem[length] = 0;
-    if (length > 0 && !stopped())
-    {
-        /* With its NUL, which some parsers want */
-        SceHttpsData root = {pem, (unsigned)length + 1};
-        const SceHttpsData *list[1] = {&root};
-        load_rc = sceHttpsLoadCert(1, list, NULL, NULL);
-        (void)fetch_url("https://untrusted-root.badssl.com/", 1, 0, 1, body, &n, &loaded);
-        unload_rc = sceHttpsUnloadCert();
-        (void)fetch_url("https://untrusted-root.badssl.com/", 1, 0, 1, body, &n, &unloaded);
-    }
-    else
-        snprintf(loaded.message, sizeof(loaded.message), "Not tested: " LOADED_ROOT_PATH " unreadable");
-    lock();
-    loaded_load_rc = load_rc;
-    loaded_unload_rc = unload_rc;
-    loaded_result = loaded;
-    unloaded_result = unloaded;
-    unlock();
-}
-static size_t read_asset(const char *path, char *out, size_t size)
-{
-    FILE *file = fopen(path, "rb");
-    size_t length = file != NULL ? fread(out, 1, size - 1, file) : 0;
-    if (file != NULL)
-        fclose(file);
-    out[length] = 0;
-    return length;
-}
-static void run_client_certificate(char *body)
-{
-    static char certificate[4096], key[4096];
-    size_t n = 0;
-    CheckResult with = {0}, without = {0};
-    int load_rc = -1, unload_rc = -1;
-    size_t certificate_length = read_asset(CLIENT_CERT_PATH, certificate, sizeof(certificate));
-    size_t key_length = read_asset(CLIENT_KEY_PATH, key, sizeof(key));
-    if (certificate_length > 0 && key_length > 0 && !stopped())
-    {
-        SceHttpsData cert = {certificate, (unsigned)certificate_length + 1};
-        SceHttpsData private_key = {key, (unsigned)key_length + 1};
-        load_rc = sceHttpsLoadCert(0, NULL, &cert, &private_key);
-        (void)fetch_url("https://client.badssl.com/", 1, 0, 1, body, &n, &with);
-        unload_rc = sceHttpsUnloadCert();
-        (void)fetch_url("https://client.badssl.com/", 1, 0, 1, body, &n, &without);
-    }
-    else
-        snprintf(with.message, sizeof(with.message), "Not tested: " CLIENT_CERT_PATH " unreadable");
-    lock();
-    client_load_rc = load_rc;
-    client_unload_rc = unload_rc;
-    client_result = with;
-    no_client_result = without;
-    unlock();
-}
-#else
 #define REPORT_NAME "browserleaks"
-#endif
 static int stopped(void)
 {
     lock();
@@ -260,9 +121,6 @@ static int fetch_once(const char *url, int verify, int unverified_allowed, int s
     REQUIRE(sceHttpSetAutoRedirect(tmpl, SCE_HTTP_DISABLE));
     REQUIRE(sceHttpSetCookieEnabled(tmpl, SCE_HTTP_DISABLE));
     REQUIRE(sceHttpSetResponseHeaderMaxSize(tmpl, 16384));
-#if VITALS_SSL_TEST
-    REQUIRE(sceHttpsSetSslCallback(tmpl, ssl_callback, NULL));
-#endif
     REQUIRE(conn = sceHttpCreateConnectionWithURL(tmpl, url, SCE_HTTP_DISABLE));
     REQUIRE(req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_GET, url, 0));
     REQUIRE(sceHttpAddRequestHeader(req, "Accept-Encoding", "identity", SCE_HTTP_HEADER_OVERWRITE));
@@ -497,37 +355,6 @@ static int save_report(const CheckService *s)
     fprintf(f, "vitals=%s (vitals-http loaded in this process)\n",
             s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled"
                                                                    : "not enabled");
-#if VITALS_SSL_TEST
-    lock();
-    fprintf(f, "libssl=%s\npool_before=rc 0x%08X size %u peak %u current %u\n"
-               "pool_after=rc 0x%08X size %u peak %u current %u\n"
-               "ssl_callback calls=%u refused=%u last_bits=0x%02X last_certificates=%u last_subject=%s\n",
-            ssl_module[0] ? ssl_module : "(not found)", (unsigned)pool_before_rc, pool_before.poolSize,
-            pool_before.maxInuseSize, pool_before.currentInuseSize, (unsigned)pool_after_rc,
-            pool_after.poolSize, pool_after.maxInuseSize, pool_after.currentInuseSize, callback_calls,
-            callback_refused, callback_last_bits, callback_last_count, callback_subject);
-    fprintf(f, "loaded_root load=0x%08X unload=0x%08X\n"
-               "loaded_root_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
-               "result=%s (expected connected)\n"
-               "unloaded_root_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
-               "result=%s (expected refused)\n",
-            (unsigned)loaded_load_rc, (unsigned)loaded_unload_rc, loaded_result.state, loaded_result.http_code,
-            (unsigned)loaded_result.error, (unsigned)loaded_result.ssl_error, loaded_result.ssl_detail,
-            loaded_result.message, unloaded_result.state, unloaded_result.http_code,
-            (unsigned)unloaded_result.error, (unsigned)unloaded_result.ssl_error, unloaded_result.ssl_detail,
-            unloaded_result.message);
-    fprintf(f, "client_cert load=0x%08X unload=0x%08X\n"
-               "client_cert_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
-               "result=%s (expected HTTP 200)\n"
-               "no_client_cert_connect state=%d HTTP=%d error=0x%08X ssl_error=0x%08X ssl_detail=0x%08X "
-               "result=%s (expected HTTP 400)\n",
-            (unsigned)client_load_rc, (unsigned)client_unload_rc, client_result.state, client_result.http_code,
-            (unsigned)client_result.error, (unsigned)client_result.ssl_error, client_result.ssl_detail,
-            client_result.message, no_client_result.state, no_client_result.http_code,
-            (unsigned)no_client_result.error, (unsigned)no_client_result.ssl_error, no_client_result.ssl_detail,
-            no_client_result.message);
-    unlock();
-#endif
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
     {
         const CheckResult *r = i == CHECK_REPORT ? &s->connection : &s->protocols[i];
@@ -650,13 +477,6 @@ static int run_checks(SceSize argc, void *argv)
         free(h);
         return 0;
     }
-#if VITALS_SSL_TEST
-    lock();
-    callback_calls = callback_refused = callback_last_bits = callback_last_count = 0;
-    callback_subject[0] = 0;
-    pool_before_rc = sceSslGetMemoryPoolStats(&pool_before);
-    unlock();
-#endif
     /* The redirect rules are listed first, so their page fills in as they are tested */
     CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
     unsigned redirect_count = redirects != NULL ? load_redirects(redirects) : 0;
@@ -746,10 +566,6 @@ static int run_checks(SceSize argc, void *argv)
         }
         publish_badssl(i, &r);
     }
-#if VITALS_SSL_TEST
-    run_loaded_root(body);
-    run_client_certificate(body);
-#endif
     /* Each redirect is requested by its old name, as a game would: vitals' provider sends it to
      * the new host and checks the certificate against the new name, so a pass proves the whole
      * path; any final HTTP status counts, as only the server's reachability is tested */
@@ -785,11 +601,6 @@ static int run_checks(SceSize argc, void *argv)
     free(redirects);
     free(body);
     free(h);
-#if VITALS_SSL_TEST
-    lock();
-    pool_after_rc = sceSslGetMemoryPoolStats(&pool_after);
-    unlock();
-#endif
     /* The log is saved only on request (vitals_check_save_report), and only for a run that
      * wasn't cancelled */
     lock();
@@ -837,9 +648,6 @@ int vitals_check_open(void)
             goto failed;
         ssl_ready = 1;
     }
-#if VITALS_SSL_TEST
-    find_ssl_module();
-#endif
     if (!http_ready)
     {
         rc = sceHttpInit(1024 * 1024);

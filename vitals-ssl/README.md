@@ -32,32 +32,9 @@ libhttp's does.
 
 ### On a console
 
-With vitals installed, no process runs Sony's libhttp, which is what vitals-ssl is written for. The
-vitals-ssl test app gives one process exactly that:
-
-```bash
-make -C ../vitals-app SSL_TEST=1    # build/vitals-app-ssltest/vitals-app.vpk
-```
-
-It is vitals-app with its own title (`VITALSSL1`, "vitals ssl test"), carrying the kernel plugin
-built with its test route (`make -C ../vitals-plugin SSL_TEST=1`) and this library's `DEBUG=1`
-build as `vssl.suprx`. Install it next to vitals-app, run its Install, and reboot. In its process
-only, the plugin leaves Sony's libhttp alone and loads `ux0:app/VITALSSL1/vssl.suprx` in place of
-libssl; every other process is as with the release plugin, and deleting the app removes the
-route's target (the app then gets Sony's libssl, which makes the stock run to compare with).
-Running vitals-app's Install again puts the release plugin back.
-
-Its connection test is vitals-app's (BrowserLeaks TLS 1.0 to 1.3 and the badssl.com battery), on
-Sony's libhttp over vitals-ssl, so `sceHttpsEnableOption`/`DisableOption`, the verify callback and
-the certificate functions all run. Its saved report (`ux0:data/vitals/vitalsssl-*.txt`) adds which
-libssl loaded, the pool before and after the run, and what an `sceHttpsSetSslCallback` saw through
-the `sceSslGet*` getters (it refuses what libhttp found wrong, as without one). It also loads
-badssl.com's untrusted root with `sceHttpsLoadCert` (libhttp looks for issuers among the
-certificates an app loaded before the CA store), connects to `untrusted-root.badssl.com`, which
-must work, and again after `sceHttpsUnloadCert`, which must be refused. Then it loads badssl.com's
-published client certificate and key (the key decrypted) and requests `client.badssl.com`, which
-answers 200 when the certificate was sent and 400 when it wasn't, before and after unloading them.
-
+vitals-app installs it as the system's libssl, and vitals-http uses it, so vitals-app's connection
+test runs on it: BrowserLeaks TLS 1.0 to 1.3 and the badssl.com battery. `sceHttpsLoadCert`,
+loaded CA certificates and client certificates are covered by vitals-http's host tests.
 
 The NIDs are those of the libssl the app bundles ([vitals-app/assets/lssl.suprx](../vitals-app/assets/lssl.suprx)),
 read from its export table, and so is the module NID (`0xB1620F91`; the NID database's 3.60
