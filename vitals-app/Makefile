@@ -20,8 +20,8 @@ all: modules
 # to rebuild. All of them are built at every debug level, which the app lets users switch between
 modules:
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-plugin DEBUG=$(level) SSL_TEST=$(SSL_TEST) &&) true
-	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-ssl DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../tls13-vita DEBUG=$(level) &&) true
 
 # Refreshes the bundled Mozilla certificates (assets/) from curl; review and commit the result

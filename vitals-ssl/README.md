@@ -11,7 +11,7 @@ callback), `SSL_pending`, which the NetCheck dialog's own TLS adds, the 25 nothi
 worked out from Sony's code ([the rest](#the-rest-what-nothing-seen-calls)), and three that do
 nothing in Sony's either. The app installs it as the system's
 libssl, in place of the copy of Sony's it used to install ([docs/libssl.md](../docs/libssl.md)),
-and vitals-http has it built in.
+and vitals-http imports it, as Sony's libhttp imports Sony's libssl.
 
 ## Building
 
@@ -296,15 +296,15 @@ reasons), its object layouts are SSLeay's, and the rest is what it reads and wri
 
 ## VitalsSsl: vitals' additions
 
-vitals-http does its TLS through vitals-ssl, built into it for now, so a later step can have it
-import the libssl module as Sony's libhttp does. It uses Sony's functions and a few more, which
+vitals-http does its TLS through this module, as Sony's libhttp does through Sony's. It uses
+Sony's functions and a few more, which
 the module exports as its own library, `VitalsSsl` (NID `0x6D89DA35`; each function's NID is the
 first word of the SHA-1 of its name, as Sony's are made). [include/vitals_ssl.h](include/vitals_ssl.h)
 declares both, with every object opaque:
 
 | Functions | What for |
 | --- | --- |
-| `vitalsSslInitShared` | the library without a pool of its own: its memory is the caller's (vitals-http's heap) |
+| `vitalsSslInitShared` | the library without a pool of its own, its memory the caller's, for a caller that builds vitals-ssl in |
 | `vitalsSslBioNew` | a BIO over the caller's transport (its timeouts, aborts and proxy tunnels) |
 | `vitalsSslCtxSetProfile` | the console's ClientHello for Sony's private HTTPS option `0x40` (PSN sign-in) |
 | `vitalsSslCtxSetDeferredVerify`, `vitalsSslGetCertificateFlags`, `vitalsSslGetVerifyResult` | the handshake goes on whatever the check finds, and the caller decides from it (its HTTPS options, the app's callback) |
@@ -313,7 +313,9 @@ declares both, with every object opaque:
 | `vitalsSslCheckChain` | checks a chain a verify callback was given, for vitals-http's version of libhttp's certificate check (on a context the NetCheck dialog makes in the libssl module) |
 | `vitalsSslGetTlsError`, `vitalsSslTlsErrorIsMemory`, `vitalsSslGetVersion`, `vitalsSslGetCiphersuite`, `vitalsSslCertificateRequested` | what a connection did, for errors and logs |
 
-Built in, vitals-ssl's platform is vitals-http's ([vitals-http/src/ssl_platform.c](../vitals-http/src/ssl_platform.c)).
+The build also makes the import stubs (`stubs/libSceLibSsl_stub.a` and `_stub_weak.a`) vitals-http
+links. Its host tests build vitals-ssl in, with their own platform
+([vitals-http/tests/ssl_platform.c](../vitals-http/tests/ssl_platform.c)).
 
 ## Layout
 

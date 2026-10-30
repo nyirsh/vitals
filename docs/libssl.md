@@ -6,12 +6,13 @@ companion is [browser.md](browser.md); apps and games use `vitals-http`, describ
 
 In one paragraph: whenever a process loads libssl, vitals gives it [vitals-ssl](../vitals-ssl/),
 Sony's library written from scratch on Mbed TLS, under Sony's own library and function NIDs. It is
-left **shared** and never hooked. vitals' own TLS doesn't go through this module: `vitals-http`,
-which replaces Sony's libhttp in every process, has the same vitals-ssl code built in, with a heap
-of its own, so it works in processes that load libhttp without libssl (Adrenaline's bubble booter
-and the browser's WebKit process do). The libssl module is left for apps and system code that call
-`sceSsl` directly (SceStoreBrowser and NpCommerce2 call `sceSslInit`, `sceSslTerm` and its pool's
-stats).
+left **shared** and never hooked. `vitals-http`, which replaces Sony's libhttp in every process,
+does its TLS through this module as Sony's libhttp does through Sony's, in the pool the app gives
+`sceSslInit`, with vitals' additions (the `VitalsSsl` library) for what Sony's libhttp reached into
+libssl's structures for. Its import is weak, so processes that load libhttp without libssl
+(Adrenaline's bubble booter and the browser's WebKit process do) still load it, and do no https,
+as with Sony's. Apps and system code also call `sceSsl` directly (SceStoreBrowser and NpCommerce2
+call `sceSslInit`, `sceSslTerm` and its pool's stats; the NetCheck dialog does its own TLS).
 
 ## At a glance
 

@@ -3,10 +3,10 @@
 #include "diagnostics.h"
 #include "vs.h"
 
-/* vitals-ssl, built into vitals-http: its platform is vitals-http's. Its lock is vitals-http's
- * (recursive), its memory vitals-http's heap (vitalsSslInitShared, so no pool of its own), its
- * handshake thread one of vitals-http's, and its connections run over vitals-http's transport
- * (vitalsSslBioNew), so the socket functions are unused */
+/* The host tests build vitals-ssl into vitals-http, as a host can't import the libssl module:
+ * its platform is the tests' vitals-http platform. Its lock is vitals-http's (recursive), its pool
+ * only counted (the system's allocator serves), its handshake thread one of vitals-http's, and
+ * its connections run over vitals-http's transport (vitalsSslBioNew) or the tests' sockets */
 
 void vs_lock(void)
 {
@@ -21,7 +21,7 @@ void vs_unlock(void)
 int vs_platform_heap_create(unsigned int size)
 {
     (void)size;
-    return VS_ERROR_INTERNAL;
+    return 0;
 }
 
 void vs_platform_heap_destroy(void)

@@ -9,10 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* TLS 1.2 and 1.3 through vitals-ssl, built in: its connections over this library's transport,
- * the CA bundle's index and the app's own CA certificates, its exact trust of self-signed
- * certificates, and tls13-vita's mapping of certificate problems to libhttp's detail bits. Its
- * memory is the tls13-vita runtime's heap (user_runtime.c), not the app's pool.
+/* TLS 1.2 and 1.3 through vitals-ssl, the libssl module, as Sony's libhttp goes through Sony's: its
+ * connections over this library's transport, the CA bundle's index and the app's own CA
+ * certificates, its exact trust of self-signed certificates, and tls13-vita's mapping of
+ * certificate problems to libhttp's detail bits. Its memory is the pool the app gave sceSslInit;
+ * without one, as with Sony's, there is no https. (The host tests build vitals-ssl in.)
  *
  * Sony's own connections (the ones with the private HTTPS option 0x40, as the shell's PSN
  * sign-in) get the console's own ClientHello (vitals-ssl's console profile), as a capture of a
@@ -37,20 +38,31 @@ struct VhTls
 
 /* Set up on the first https connection, with the lock held: 1 once ready, negative when it failed */
 static int g_state;
-/* sceHttpsLoadCert's CA certificates, under the lock; each connection keeps the store it began with */
+/* sceHttpsLoadCert's CA certificates, as the app gave them, under the lock. As Sony's, loading them
+ * keeps them and nothing more: libssl, which may not be in the process, reads them when an https
+ * connection starts, into the store, which is made again when they change (g_store_made). Each
+ * connection keeps the store it began with */
+typedef struct VhCa
+{
+    struct VhCa *next;
+    size_t size;
+    unsigned char data[];
+} VhCa;
+static VhCa *g_cas;
+static unsigned int g_cas_changed;
 static void *g_store;
+static unsigned int g_store_made;
 /* Its client certificate and key, as the app gave them (NUL-terminated); each connection parses
  * its own copy, so an unload during a handshake frees nothing it uses */
 static unsigned char *g_client_certificate, *g_client_key;
 static size_t g_client_certificate_size, g_client_key_size;
 
-/* The heap, then vitals-ssl (Mbed TLS's platform and PSA, its random generator; it indexes the CA
- * bundle on the first check). With the lock held */
+/* The heap for what this library keeps; with the lock held */
 static int tls_ready(void)
 {
     if (g_state != 0)
         return g_state;
-    g_state = vh_platform_tls_init() == 0 && vitalsSslInitShared() == 0 ? 1 : -1;
+    g_state = vh_platform_tls_init() == 0 ? 1 : -1;
     VITALS_LOG("tls ready rc=%d", g_state);
     return g_state;
 }
@@ -148,6 +160,27 @@ void vh_tls_close(VhTls *tls)
     free(tls);
 }
 
+/* The store of the loaded CA certificates, made again when they changed; NULL when there are none
+ * or memory ran out. With the lock held and libssl set up */
+static void *current_store(void)
+{
+    if (g_store_made == g_cas_changed)
+        return g_store;
+    if (g_store != NULL)
+        vitalsSslStoreRelease(g_store);
+    g_store = NULL;
+    g_store_made = g_cas_changed;
+    if (g_cas == NULL || (g_store = vitalsSslStoreNew()) == NULL)
+        return g_store;
+    for (const VhCa *ca = g_cas; ca != NULL; ca = ca->next) {
+        int parsed = vitalsSslStoreAdd(g_store, ca->data, ca->size);
+        if (parsed != 0)
+            VITALS_LOG("loaded CA certificate of %u bytes unreadable rc=%08X: not trusted", (unsigned int)ca->size,
+                       (unsigned int)parsed);
+    }
+    return g_store;
+}
+
 /* The client certificate and key sceHttpsLoadCert gave, for servers that ask for one; 0 when there
  * are none, or the parser's error */
 static int own_identity(VhTls *tls, void *context)
@@ -162,6 +195,11 @@ static int own_identity(VhTls *tls, void *context)
     vh_unlock();
     if (tls->has_own)
         VITALS_LOG("client certificate host=%s rc=%08X", tls->host, (unsigned int)result);
+    /* One that doesn't parse is left out, as no client certificate */
+    if (result != 0 && !vitalsSslTlsErrorIsMemory(result)) {
+        tls->has_own = 0;
+        result = 0;
+    }
     return result;
 }
 
@@ -181,7 +219,7 @@ static int setup(VhTls *tls, int console)
         result = vitalsSslCtxSetProfile(context, console ? VITALS_SSL_PROFILE_CONSOLE : VITALS_SSL_PROFILE_MODERN);
     if (result == 0) {
         vh_lock();
-        result = vitalsSslCtxSetStore(context, g_store);
+        result = vitalsSslCtxSetStore(context, current_store());
         vh_unlock();
     }
     if (result == 0)
@@ -224,6 +262,13 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
     vh_lock();
     int ready = tls_ready();
     vh_unlock();
+    /* As Sony's: libssl must be the app's, set up with sceSslInit. Only https calls it: in a process
+     * without it, the import points at the libssl another process loaded (the module is shared) */
+    int ssl_state = sceSslInternalIsInitalized();
+    if (ssl_state != 0) {
+        VITALS_LOG("tls host=%s: libssl not initialized rc=%08X", open->host, (unsigned int)ssl_state);
+        return store_outcome(VITALS_OUTCOME_INTERNAL, (uint32_t)ssl_state, ssl_error, ssl_detail);
+    }
     VhTls *tls = ready > 0 ? calloc(1, sizeof(*tls)) : NULL;
     if (tls == NULL)
         return store_outcome(ready > 0 ? VITALS_OUTCOME_NO_MEMORY : VITALS_OUTCOME_INTERNAL, 0, ssl_error, ssl_detail);
@@ -372,7 +417,7 @@ static int cert_check(void *ssl, void *certificates[], int count, void *argument
         found = vitalsSslCheckChain(certificates, count,
                                     (options & VITALS_SCE_HTTPS_OPTION_CN_CHECK) != 0 && check != NULL ? check->host
                                                                                                        : NULL,
-                                    g_store);
+                                    current_store());
         vh_unlock();
     }
     unsigned int bits = vitals_map_certificate_detail(vitals_filter_certificate_flags(found, options));
@@ -418,18 +463,38 @@ static void wipe(void *data, size_t size)
         *at++ = 0;
 }
 
-/* A copy of the app's data, NUL-terminated; NULL when there is none or memory ran out */
-static unsigned char *copy_data(const SceHttpsData *data, size_t *size)
+/* A copy of size bytes, NUL-terminated for PEM; NULL when there are none or memory ran out */
+static unsigned char *copy_bytes(const void *data, size_t size)
 {
-    if (data == NULL || data->ptr == NULL || data->size == 0)
+    if (data == NULL || size == 0)
         return NULL;
-    unsigned char *copy = malloc((size_t)data->size + 1u);
+    unsigned char *copy = malloc(size + 1u);
     if (copy != NULL) {
-        memcpy(copy, data->ptr, data->size);
-        copy[data->size] = '\0';
-        *size = data->size;
+        memcpy(copy, data, size);
+        copy[size] = '\0';
     }
     return copy;
+}
+
+static VhCa *ca_new(const void *data, size_t size)
+{
+    VhCa *ca = malloc(sizeof(*ca) + size + 1u);
+    if (ca != NULL) {
+        ca->next = NULL;
+        ca->size = size;
+        memcpy(ca->data, data, size);
+        ca->data[size] = '\0';
+    }
+    return ca;
+}
+
+static void cas_free(VhCa *ca)
+{
+    while (ca != NULL) {
+        VhCa *next = ca->next;
+        free(ca);
+        ca = next;
+    }
 }
 
 static void free_client(void)
@@ -442,63 +507,56 @@ static void free_client(void)
     g_client_certificate_size = g_client_key_size = 0;
 }
 
-static void release_store(void)
+/* A store was only made with libssl in the process (by an https connection), so it is released only
+ * then */
+static void release_cas(void)
 {
-    vitalsSslStoreRelease(g_store);
+    cas_free(g_cas);
+    g_cas = NULL;
+    if (g_store != NULL)
+        vitalsSslStoreRelease(g_store);
     g_store = NULL;
+    g_store_made = ++g_cas_changed;
 }
 
-/* As Sony's: it replaces everything loaded before. The CA certificates must all parse; the client
- * certificate and key are checked here too, and refused when they don't, with the reason logged */
+/* As Sony's: it replaces everything loaded before, and keeps what it is given, which is read when an
+ * https connection starts: a CA certificate that doesn't parse then isn't trusted, and a client
+ * certificate or key that doesn't isn't sent */
 int vh_tls_load_certs(int count, const SceHttpsData **list, const SceHttpsData *cert, const SceHttpsData *key)
 {
     if (tls_ready() < 0)
         return (int)SCE_HTTP_ERROR_SSL;
-    void *store = count > 0 ? vitalsSslStoreNew() : NULL;
-    if (count > 0 && store == NULL)
-        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-    for (int i = 0; i < count; ++i) {
-        int parsed = list[i] != NULL && list[i]->ptr != NULL && list[i]->size != 0
-                         ? vitalsSslStoreAdd(store, list[i]->ptr, list[i]->size)
-                         : -1;
-        if (parsed != 0) {
-            VITALS_LOG("load cert: CA %d of %d unreadable rc=%08X", i + 1, count, (unsigned int)parsed);
-            vitalsSslStoreRelease(store);
+    for (int i = 0; i < count; ++i)
+        if (list[i] == NULL || list[i]->ptr == NULL || list[i]->size == 0)
             return (int)SCE_HTTP_ERROR_INVALID_VALUE;
-        }
-    }
+    if ((cert != NULL && (cert->ptr == NULL || cert->size == 0)) || (key != NULL && (key->ptr == NULL || key->size == 0)))
+        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
 
-    size_t certificate_size = 0, key_size = 0;
-    unsigned char *certificate = copy_data(cert, &certificate_size);
-    unsigned char *private_key = copy_data(key, &key_size);
-    int result = 0;
-    if ((cert != NULL && certificate == NULL) || (key != NULL && private_key == NULL))
-        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
-    else if (certificate != NULL || private_key != NULL) {
-        /* Parsed once now, so a bad one is told at once rather than at every handshake */
-        int certificate_rc = certificate != NULL ? vitalsSslCheckCertificate(certificate, certificate_size) : -1;
-        int key_rc = private_key != NULL ? vitalsSslCheckKey(private_key, key_size) : -1;
-        VITALS_LOG("load cert: client certificate %u bytes rc=%08X, key %u bytes rc=%08X",
-                   (unsigned int)certificate_size, (unsigned int)certificate_rc, (unsigned int)key_size,
-                   (unsigned int)key_rc);
-        if (certificate_rc != 0 || key_rc != 0)
-            result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    VhCa *cas = NULL, **last = &cas;
+    for (int i = 0; i < count; ++i) {
+        if ((*last = ca_new(list[i]->ptr, list[i]->size)) == NULL)
+            break;
+        last = &(*last)->next;
     }
-    if (result < 0) {
-        if (private_key != NULL)
-            wipe(private_key, key_size);
+    unsigned char *certificate = cert != NULL ? copy_bytes(cert->ptr, cert->size) : NULL;
+    unsigned char *private_key = key != NULL ? copy_bytes(key->ptr, key->size) : NULL;
+    if (*last != NULL || (count > 0 && cas == NULL) || (cert != NULL && certificate == NULL) ||
+        (key != NULL && private_key == NULL)) {
+        cas_free(cas);
         free(certificate);
+        if (private_key != NULL)
+            wipe(private_key, key->size);
         free(private_key);
-        vitalsSslStoreRelease(store);
-        return result;
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
     }
-    release_store();
-    g_store = store;
+    release_cas();
+    g_cas = cas;
+    ++g_cas_changed;
     free_client();
     g_client_certificate = certificate;
-    g_client_certificate_size = certificate_size;
+    g_client_certificate_size = certificate != NULL ? cert->size : 0;
     g_client_key = private_key;
-    g_client_key_size = key_size;
+    g_client_key_size = private_key != NULL ? key->size : 0;
     VITALS_LOG("loaded %d CA certificates, client certificate %s", count,
                certificate != NULL && private_key != NULL ? "yes" : "no");
     return 0;
@@ -506,39 +564,31 @@ int vh_tls_load_certs(int count, const SceHttpsData **list, const SceHttpsData *
 
 void vh_tls_unload_certs(void)
 {
-    release_store();
+    release_cas();
     free_client();
 }
 
-/* A copy of size bytes, NUL-terminated for PEM; NULL when there are none or memory ran out */
-static unsigned char *copy_bytes(const void *data, unsigned int size)
-{
-    const SceHttpsData given = {(char *)(uintptr_t)data, size};
-    size_t copied = 0;
-    return copy_data(&given, &copied);
-}
-
-/* Sony's keeps whatever it is given and fails at its use; one that doesn't parse can't be used
- * here either, so it is left out, with the reason logged */
+/* As Sony's: kept, and read when an https connection starts */
 int vh_tls_add_ca(const void *data, unsigned int size)
 {
     if (tls_ready() < 0)
         return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
     if (data == NULL || size == 0)
         return 0;
-    if (g_store == NULL && (g_store = vitalsSslStoreNew()) == NULL)
+    VhCa *ca = ca_new(data, size);
+    if (ca == NULL)
         return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-    int parsed = vitalsSslStoreAdd(g_store, data, size);
-    if (vitalsSslTlsErrorIsMemory(parsed))
-        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-    if (parsed != 0)
-        VITALS_LOG("private CA certificate of %u bytes unreadable rc=%08X: not trusted", size, (unsigned int)parsed);
+    VhCa **last = &g_cas;
+    while (*last != NULL)
+        last = &(*last)->next;
+    *last = ca;
+    ++g_cas_changed;
     return 0;
 }
 
 void vh_tls_clear_cas(void)
 {
-    release_store();
+    release_cas();
 }
 
 /* Each replaces the one before, and nothing (no data, or none of it) leaves none; the pair is used

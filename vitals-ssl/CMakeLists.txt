@@ -75,3 +75,12 @@ target_link_libraries(vitals_libssl PRIVATE
 configure_file(libssl_api.yml.in libssl_api.yml @ONLY)
 vita_create_self(libssl.suprx vitals_libssl
     CONFIG ${CMAKE_CURRENT_BINARY_DIR}/libssl_api.yml UNSAFE)
+# The stubs that import it (stubs/lib<library>_stub.a and _stub_weak.a), which vitals-http links to
+# use the libssl module as Sony's libhttp does
+add_custom_target(vitals_ssl_stubs ALL
+    COMMAND vita-elf-export user $<TARGET_FILE:vitals_libssl> ${CMAKE_CURRENT_BINARY_DIR}/libssl_api.yml
+        libssl_exports.yml
+    COMMAND vita-libs-gen libssl_exports.yml stubs
+    COMMAND make -C stubs
+    DEPENDS vitals_libssl
+)

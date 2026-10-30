@@ -16,6 +16,7 @@ extern "C" {
 #define VITALS_SSL_KIND_SSL 1
 
 /* SceSslInternal, as Sony's libhttp calls them */
+int sceSslInternalIsInitalized(void);
 int sceSslInternalGetLibrary(void **library);
 const void *sceSslInternalClientMethod(void);
 void *sceSslInternalCtxNew(const void *library, const void *method);
@@ -42,8 +43,9 @@ int sceSslInternalGetError(void *ssl, int returned);
 
 /* ---- VitalsSsl ---- */
 
-/* Sets up the library without a pool of its own: everything comes from the caller's allocator
- * (vitals-http's heap). Once per process, in place of sceSslInit; 0, or an SCE error */
+/* Sets up the library without a pool of its own: everything comes from the caller's allocator.
+ * Once per process, in place of sceSslInit, for a copy of vitals-ssl built in (the host tests);
+ * 0, or an SCE error */
 int vitalsSslInitShared(void);
 
 /* A BIO over the caller's own transport: send and receive return the bytes moved (receive 0 when

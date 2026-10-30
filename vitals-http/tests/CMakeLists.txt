@@ -39,7 +39,7 @@ add_executable(vitals_http_tests
     ${ROOT}/src/redirect.c
     ${ROOT}/src/useragent.c
     ${ROOT}/src/tls.c
-    ${ROOT}/src/ssl_platform.c
+    ssl_platform.c
     ${VITALS_SSL_DIR}/src/core.c
     ${VITALS_SSL_DIR}/src/connection.c
     ${VITALS_SSL_DIR}/src/certificate.c

@@ -3,6 +3,8 @@
 #include "vh.h"
 #include "vitals_ssl.h"
 
+#include <psp2/libssl.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -721,11 +723,18 @@ static void test_https(int template_)
     fclose(file);
     SceHttpsData data = {pem, (unsigned int)size};
     const SceHttpsData *list[] = {&data};
-    /* A key that isn't one is refused */
-    CHECK_EQ(sceHttpsLoadCert(1, list, &data, &data), SCE_HTTP_ERROR_INVALID_VALUE);
+    /* As Sony's, what is loaded is kept and read at the connection: a CA certificate that isn't one
+     * isn't trusted, and a key that isn't one isn't sent */
     SceHttpsData garbage = {"not a certificate", 17};
     const SceHttpsData *bad[] = {&garbage};
-    CHECK_EQ(sceHttpsLoadCert(1, bad, NULL, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsLoadCert(1, bad, &data, &data), 0);
+    int fresh = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(fresh, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL),
+             SCE_HTTP_ERROR_SSL);
+    sceHttpDeleteConnection(fresh);
+    SceHttpsData empty = {pem, 0};
+    const SceHttpsData *none[] = {&empty};
+    CHECK_EQ(sceHttpsLoadCert(1, none, NULL, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
     /* Self-signed and loaded by the app: trusted as itself */
     CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
     char first[32], second[32];
@@ -1524,6 +1533,8 @@ int main(int argc, char **argv)
     snprintf(g_secure_base, sizeof(g_secure_base), "https://127.0.0.1:%d", g_port + 1);
 
     CHECK_EQ(sceHttpCreateTemplate("x", SCE_HTTP_VERSION_1_1, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* As with Sony's, https needs libssl set up by the app */
+    CHECK_EQ(sceSslInit(512 * 1024), 0);
     CHECK_EQ(sceHttpInit(1024 * 1024), 0);
     CHECK_EQ(sceHttpInit(1024 * 1024), SCE_HTTP_ERROR_ALREADY_INITED);
     int template_ = sceHttpCreateTemplate("vh-test", SCE_HTTP_VERSION_1_1, 0);
@@ -1583,6 +1594,26 @@ int main(int argc, char **argv)
         CHECK_EQ(sceHttpDeleteTemplate(templates[i]), 0);
     CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
     CHECK_EQ(stats.currentInuseSize, 0);
+    CHECK_EQ(sceHttpTerm(), 0);
+
+    /* Without libssl set up there is no https, as with Sony's */
+    printf("https without sceSslInit\n");
+    CHECK_EQ(sceSslTerm(), 0);
+    CHECK_EQ(sceHttpInit(1024 * 1024), 0);
+    int plain = sceHttpCreateTemplate("vh-test", SCE_HTTP_VERSION_1_1, 0);
+    int secure = sceHttpCreateConnectionWithURL(plain, g_secure_base, 1);
+    char body[64];
+    int status, request = 0, ssl_error = 0;
+    unsigned int detail = 0;
+    CHECK_EQ(fetch(secure, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body),
+                   &request), SCE_HTTP_ERROR_SSL);
+    CHECK_EQ(sceHttpsGetSslError(request, &ssl_error, &detail), 0);
+    CHECK_EQ(ssl_error, SCE_HTTPS_ERROR_INTERNAL);
+    sceHttpDeleteRequest(request);
+    /* Plain http doesn't need it */
+    int insecure = sceHttpCreateConnectionWithURL(plain, g_base, 1);
+    CHECK_EQ(fetch(insecure, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), NULL), 11);
+    sceHttpDeleteTemplate(plain);
     CHECK_EQ(sceHttpTerm(), 0);
 
     printf("%d checks, %d failed\n", g_checks, g_failures);
