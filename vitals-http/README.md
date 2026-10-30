@@ -46,13 +46,13 @@ vitals-ssl is built first (`make` at the top does this), since this links its st
 | [src/redirect.c](src/redirect.c) | the host redirect list, `ux0:data/vitals/redirects.txt` |
 | [src/useragent.c](src/useragent.c) | the User-Agent suffix, `ux0:data/vitals/useragent.txt` |
 | [src/private.c](src/private.c) | the 23 exports nothing names, as Sony's code does them |
+| [src/md5.c](src/md5.c) | MD5 (RFC 1321), for Digest authentication |
 | [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, through the libssl module, and `sceHttpsLoadCert` |
 | [src/platform_vita.c](src/platform_vita.c) | module start, the pool's memory, the lock, SceNet |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py`, with vitals-ssl built in (its platform in `ssl_platform.c`) |
 
-From tls13-vita it uses Mbed TLS's MD5 only (for Digest authentication, from the build in
-`crypto/`), `provider/platform_shims.c`, `provider/user_runtime.c` (the heap, and the C library the
-module is linked without), `src/error_map.c`, and `src/host_map.c` with `src/redirect_list.c` for
+It links no crypto library: Digest authentication's MD5 is [src/md5.c](src/md5.c). From tls13-vita
+it uses `provider/user_runtime.c` (the heap, and the C library the module is linked without), `src/error_map.c`, and `src/host_map.c` with `src/redirect_list.c` for
 the redirect list.
 
 ## Sony's own connections

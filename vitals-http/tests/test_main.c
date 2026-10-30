@@ -1,9 +1,12 @@
 /* Host tests of the engine, through the exported API, against tests/server.py */
 #include "http_extra.h"
+#include "md5.h"
 #include "vh.h"
 #include "vitals_ssl.h"
 
 #include <psp2/libssl.h>
+
+#include <mbedtls/md5.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -1462,6 +1465,52 @@ static int checked_connect(CertCheckArgument *argument)
     return connected;
 }
 
+/* Digest authentication's MD5: RFC 1321's vectors, and Mbed TLS's digest (the test build has it,
+ * for vitals-ssl) over every length across the padding's edges, whole and a byte at a time */
+static void test_md5(void)
+{
+    static const char *const vectors[][2] = {
+        {"", "d41d8cd98f00b204e9800998ecf8427e"},
+        {"a", "0cc175b9c0f1b6a831c399e269772661"},
+        {"abc", "900150983cd24fb0d6963f7d28e17f72"},
+        {"message digest", "f96b697d7cb7938d525a2f31aaf161d0"},
+        {"abcdefghijklmnopqrstuvwxyz", "c3fcd3d76192e4007dfb496cca67e13b"},
+        {"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", "d174ab98d277d9f5a5611c2c9f419d9f"},
+        {"12345678901234567890123456789012345678901234567890123456789012345678901234567890",
+         "57edf4a22be3c955ac49da2e2107b67a"},
+    };
+    for (size_t i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
+        unsigned char digest[16];
+        char hex[33];
+        VhMd5 md5;
+        vh_md5_init(&md5);
+        vh_md5_update(&md5, vectors[i][0], strlen(vectors[i][0]));
+        vh_md5_finish(&md5, digest);
+        vh_md5_hex(digest, hex);
+        CHECK(strcmp(hex, vectors[i][1]) == 0);
+    }
+    static unsigned char data[300];
+    for (size_t i = 0; i < sizeof(data); ++i)
+        data[i] = (unsigned char)(i * 7 + 3);
+    int whole_ok = 1, split_ok = 1;
+    for (size_t size = 0; size <= sizeof(data); ++size) {
+        unsigned char expected[16], whole[16], split[16];
+        mbedtls_md5(data, size, expected);
+        VhMd5 md5;
+        vh_md5_init(&md5);
+        vh_md5_update(&md5, data, size);
+        vh_md5_finish(&md5, whole);
+        vh_md5_init(&md5);
+        for (size_t at = 0; at < size; ++at)
+            vh_md5_update(&md5, data + at, 1);
+        vh_md5_finish(&md5, split);
+        whole_ok &= memcmp(whole, expected, 16) == 0;
+        split_ok &= memcmp(split, expected, 16) == 0;
+    }
+    CHECK(whole_ok);
+    CHECK(split_ok);
+}
+
 static void test_cert_check(void)
 {
     printf("libhttp's certificate check\n");
@@ -1541,6 +1590,7 @@ int main(int argc, char **argv)
     CHECK(template_ > 0);
 
     test_uri();
+    test_md5();
     test_parse_header();
     test_record_scan();
     test_user_agent();
