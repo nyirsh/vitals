@@ -11,3 +11,4 @@
 # old.server.example        new.server.example
 # game.server.example       203.0.113.5
 # telemetry.example         block
+# block.this.too.           0.0.0.0
