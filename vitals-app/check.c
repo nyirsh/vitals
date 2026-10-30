@@ -8,6 +8,7 @@
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/libssl.h>
 #include <psp2/net/http.h>
+#include <psp2/rtc.h>
 #include <psp2/sysmodule.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +31,7 @@ static char notice[120];
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 static void lock(void) { sceKernelLockMutex(guard, 1, NULL); }
 static void unlock(void) { sceKernelUnlockMutex(guard, 1); }
-#define REPORT_NAME "browserleaks"
+#define REPORT_NAME "vitals-testresults"
 static int stopped(void)
 {
     lock();
@@ -334,9 +335,14 @@ static int detect_vitals(void)
 static int save_report(const CheckService *s)
 {
     char path[160];
-    snprintf(path, sizeof(path), REPORT_DIR "/%s-%08X-%llu.txt",
-             REPORT_NAME, (unsigned)sceKernelGetProcessId(),
-             (unsigned long long)sceKernelGetSystemTimeWide());
+    /* Named after the console's local time; without it, after the system timer */
+    SceDateTime now;
+    if (sceRtcGetCurrentClockLocalTime(&now) == 0)
+        snprintf(path, sizeof(path), REPORT_DIR "/" REPORT_NAME "-%04u-%02u-%02u_%02u-%02u-%02u.txt", now.year,
+                 now.month, now.day, now.hour, now.minute, now.second);
+    else
+        snprintf(path, sizeof(path), REPORT_DIR "/" REPORT_NAME "-%llu.txt",
+                 (unsigned long long)sceKernelGetSystemTimeWide());
     (void)sceIoMkdir(REPORT_DIR, 0777);
     FILE *f = fopen(path, "w");
     if (!f)
