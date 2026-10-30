@@ -2,12 +2,15 @@
 
 #include "ca_index.h"
 #include "diagnostics.h"
+#include "vitals_ssl.h"
 
 #include <mbedtls/error.h>
 #include <mbedtls/net_sockets.h>
 #include <mbedtls/platform_util.h>
 #include <psp2/net/net.h>
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -30,6 +33,7 @@
  * another; here both are TLS 1.2 to 1.3 */
 static const VsMethod g_client_method = {METHOD_MAGIC, 1};
 static const VsMethod g_client_method_2 = {METHOD_MAGIC, 2};
+static const VsMethod g_client_method_3 = {METHOD_MAGIC, 3};
 
 static int is_context(const VsContext *context)
 {
@@ -597,7 +601,8 @@ static int setup(VsSsl *ssl)
         mbedtls_ssl_conf_ca_cb(&ssl->config, no_issuers, NULL);
         mbedtls_ssl_conf_verify(&ssl->config, verify_with_callback, ssl);
     } else if (verify) {
-        mbedtls_ssl_conf_ca_cb(&ssl->config, vs_find_trusted_issuers, NULL);
+        /* The bundle, and the certificates 05F6A292 gave the context */
+        mbedtls_ssl_conf_ca_cb(&ssl->config, vs_find_issuers_with_store, ssl);
         mbedtls_ssl_conf_verify(&ssl->config, verify_certificate, ssl);
     }
     mbedtls_ssl_conf_cert_request_cb(&ssl->config, certificate_request, ssl);
@@ -800,7 +805,8 @@ int sceSslInternalGetError(void *handle, int returned)
 }
 
 /* NID 0x24C6257F, Sony 0x81019995: an item of the connection by number: 1, 5 and 6 the Cert-C
- * objects certificate.c's functions take (one here), 2, 3, 4 and 7 nothing */
+ * objects certificate.c's functions take (one here), 2, 3, 4 and 7 what CBEC7D13 set, NULL until it
+ * does */
 int sceSslInternalGetItem(void *handle, int item, const void **out)
 {
     if (!is_ssl(handle) || out == NULL)
@@ -815,7 +821,7 @@ int sceSslInternalGetItem(void *handle, int item, const void **out)
     case 3:
     case 4:
     case 7:
-        *out = NULL;
+        *out = ((VsSsl *)handle)->items[item];
         return 0;
     default:
         return 10011;
@@ -859,4 +865,253 @@ int sceSslInternalPending(void *handle)
     if (!is_ssl(ssl) || !ssl->handshake_done)
         return 0;
     return (int)mbedtls_ssl_get_bytes_avail(&ssl->tls);
+}
+
+/* ---- the rest of SSL-C's connection interface, which nothing seen calls ---- */
+
+/* NID 0x133ED36D, Sony 0x8100F4E9: TLSv1_client_method; Sony's speaks TLS 1.0 with it, these
+ * methods TLS 1.2 to 1.3 */
+const void *sceSslInternalClientMethodTls10(void)
+{
+    return &g_client_method_3;
+}
+
+/* NID 0x3EF42454, Sony 0x8101B07F: SSL_version, the negotiated version (0x0303, 0x0304), and
+ * TLS 1.2's before one is */
+int sceSslInternalVersion(void *handle)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl))
+        return 0;
+    return ssl->handshake_done ? (int)mbedtls_ssl_get_version_number(&ssl->tls) : 0x0303;
+}
+
+/* NID 0x6F3B9809, Sony 0x81018E5B: SSL_state, as OpenSSL numbers it: 3 (SSL_ST_OK) once
+ * connected, before that SSL_ST_BEFORE | SSL_ST_CONNECT */
+int sceSslInternalState(void *handle)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl))
+        return 0;
+    return ssl->handshake_done ? 0x03 : 0x5000;
+}
+
+/* NID 0xD6D32A2F, Sony 0x8101ACBD: SSL_want: 3 (reading) after a failed receive, 2 (writing) after
+ * a failed send, 1 (nothing) otherwise */
+int sceSslInternalWant(void *handle)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl))
+        return 1;
+    switch (ssl->failure) {
+    case VS_FAILED_RECEIVE:
+        return 3;
+    case VS_FAILED_SEND:
+    case VS_FAILED_SEND_ZERO:
+        return 2;
+    default:
+        return 1;
+    }
+}
+
+/* NID 0xB1745DAD, Sony 0x8101B087: SSL_get_quiet_shutdown; nothing exported sets it */
+int sceSslInternalGetQuietShutdown(void *handle)
+{
+    VsSsl *ssl = handle;
+    return is_ssl(ssl) ? ssl->quiet_shutdown : 0;
+}
+
+/* NID 0x0C693D36, Sony 0x8101AFA9: SSL_get_current_cipher, NULL before the handshake; it lasts as
+ * long as the connection */
+const void *sceSslInternalGetCurrentCipher(void *handle)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl) || !ssl->handshake_done)
+        return NULL;
+    ssl->cipher.id = 0x03000000u | (uint32_t)mbedtls_ssl_get_ciphersuite_id_from_ssl(&ssl->tls);
+    ssl->cipher.name = mbedtls_ssl_get_ciphersuite(&ssl->tls);
+    return &ssl->cipher;
+}
+
+/* NID 0x2B90012E, Sony 0x8101BCF7: SSL_CIPHER_get_name, "(NONE)" without one */
+const char *sceSslInternalCipherGetName(const void *cipher)
+{
+    const struct { uint32_t id; const char *name; } *chosen = cipher;
+    return chosen != NULL && chosen->name != NULL ? chosen->name : "(NONE)";
+}
+
+/* NID 0x92560B8D, Sony 0x81019AE3: SSL_connect, the connect state set first when it isn't, as the
+ * other (E5EDD91B) */
+int sceSslInternalDoConnect(void *handle)
+{
+    return sceSslInternalConnect(handle);
+}
+
+/* NID 0xCBEC7D13, Sony 0x8101A8A9: sets an item of the connection by number (1 to 12), which
+ * 24C6257F gives back; only item 7 may be NULL. 1, 5 and 6 are the Cert-C objects here, which stay */
+int sceSslInternalSetItem(void *handle, int item, const void *value)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl) || (value == NULL && item != 7))
+        return 10017;
+    if (item < 1 || item > 12)
+        return 10011;
+    ssl->items[item] = value;
+    return 0;
+}
+
+/* NID 0xF4007DBE, Sony 0x8101639D: SSL_get_client_CA_list: on a client the CA names of the server's
+ * certificate request, while the client certificate callback runs (A4EA9DE0 and 243DE290 read
+ * them); NULL otherwise */
+const void *sceSslInternalGetClientCaList(void *handle)
+{
+    VsSsl *ssl = handle;
+    return is_ssl(ssl) && ssl->ca_name_count > 0 ? (const void *)ssl->ca_names : NULL;
+}
+
+/* NID 0xCB83EA07, Sony 0x81000BCD: BIO_printf: up to 1 KiB of text, written to the BIO; what was
+ * written, 0 without a BIO, -1 when it failed */
+int sceSslInternalBioPrintf(void *handle, const char *format, ...)
+{
+    VsBio *bio = handle;
+    if (!is_bio(bio) || format == NULL)
+        return 0;
+    char text[1024];
+    va_list arguments;
+    va_start(arguments, format);
+    int length = vsnprintf(text, sizeof(text), format, arguments);
+    va_end(arguments);
+    if (length < 0)
+        return -1;
+    if ((size_t)length >= sizeof(text))
+        length = (int)sizeof(text) - 1;
+    int written = 0;
+    while (written < length) {
+        int sent = bio->send != NULL ? bio->send(bio->transport, (const unsigned char *)text + written,
+                                                 (size_t)(length - written))
+                                     : sceNetSend(bio->fd, text + written, (unsigned int)(length - written), 0);
+        if (sent <= 0)
+            return written > 0 ? written : -1;
+        written += sent;
+    }
+    return written;
+}
+
+/* ---- contexts' certificates ---- */
+
+void vs_context_free_client_cas(VsContext *context)
+{
+    for (int i = 0; i < context->client_ca_count; ++i)
+        vs_name_free(context->client_ca_names[i]);
+    free(context->client_ca_names);
+    context->client_ca_names = NULL;
+    context->client_ca_count = 0;
+}
+
+/* NID 0x00ABEBC3, Sony 0x81017843: SSL_CTX_add_client_CA: a copy of the certificate's subject, which
+ * a server would list in its certificate request; 1, or 0 */
+int sceSslInternalCtxAddClientCa(void *handle, void *cert)
+{
+    VsContext *context = handle;
+    const mbedtls_x509_crt *crt = vs_certificate(cert);
+    if (!is_context(context) || crt == NULL)
+        return 0;
+    void *name = vs_name_new(&crt->subject_raw);
+    void **grown = name != NULL ? realloc(context->client_ca_names,
+                                          (size_t)(context->client_ca_count + 1) * sizeof(*grown))
+                                : NULL;
+    if (grown == NULL) {
+        vs_name_free(name);
+        vs_note_out_of_memory();
+        return 0;
+    }
+    grown[context->client_ca_count++] = name;
+    context->client_ca_names = grown;
+    return 1;
+}
+
+/* NID 0x05F6A292, Sony 0x810164A3: adds a certificate to the context's own trusted ones, with a type
+ * (0, 1 or 2; Sony's stores 0, 1 and 9), which its connections then trust besides the bundle: 1,
+ * 0 without both, 10018 for another type */
+int sceSslInternalCtxAddTrustedCertificate(void *handle, void *cert, int type)
+{
+    VsContext *context = handle;
+    const mbedtls_x509_crt *crt = vs_certificate(cert);
+    if (!is_context(context) || crt == NULL)
+        return 0;
+    if (type < 0 || type > 2)
+        return 10018;
+    if (context->store == NULL && (context->store = vitalsSslStoreNew()) == NULL)
+        return 10005;
+    int result = vitalsSslStoreAdd(context->store, crt->raw.p, crt->raw.len);
+    if (result != 0)
+        return result == MBEDTLS_ERR_X509_ALLOC_FAILED ? 10005 : 10001;
+    return 1;
+}
+
+/* NID 0xD419451B, Sony 0x81018B9F: SSL_CTX_use_certificate: a copy of it, sent with the key
+ * SSL_CTX_use_PrivateKey gives to a server that asks; 1, or 0 */
+int sceSslInternalCtxUseCertificate(void *handle, void *cert)
+{
+    VsContext *context = handle;
+    const mbedtls_x509_crt *crt = vs_certificate(cert);
+    if (!is_context(context) || crt == NULL)
+        return 0;
+    mbedtls_x509_crt *copy = calloc(1, sizeof(*copy));
+    if (copy == NULL) {
+        vs_note_out_of_memory();
+        return 0;
+    }
+    mbedtls_x509_crt_init(copy);
+    if (mbedtls_x509_crt_parse_der(copy, crt->raw.p, crt->raw.len) != 0) {
+        mbedtls_x509_crt_free(copy);
+        free(copy);
+        return 0;
+    }
+    if (context->own_certificate != NULL) {
+        mbedtls_x509_crt_free(context->own_certificate);
+        free(context->own_certificate);
+    }
+    context->own_certificate = copy;
+    return 1;
+}
+
+/* NID 0x26CBEEB6, Sony 0x81018BFB: SSL_CTX_use_PrivateKey: a copy of the key; 1, or 0 */
+int sceSslInternalCtxUsePrivateKey(void *handle, void *key_handle)
+{
+    VsContext *context = handle;
+    mbedtls_pk_context *key = vs_key(key_handle);
+    if (!is_context(context) || key == NULL)
+        return 0;
+    unsigned char *der = malloc(4096);
+    mbedtls_pk_context *copy = calloc(1, sizeof(*copy));
+    int ok = der != NULL && copy != NULL;
+    if (ok) {
+        mbedtls_pk_init(copy);
+        /* Written from the end of the buffer */
+        int length = mbedtls_pk_write_key_der(key, der, 4096);
+        ok = length > 0 && mbedtls_pk_parse_key(copy, der + 4096 - length, (size_t)length, NULL, 0,
+                                                vs_tls_random, NULL) == 0;
+        mbedtls_platform_zeroize(der, 4096);
+    }
+    free(der);
+    if (!ok) {
+        if (copy != NULL)
+            mbedtls_pk_free(copy);
+        free(copy);
+        return 0;
+    }
+    if (context->own_key != NULL) {
+        mbedtls_pk_free(context->own_key);
+        free(context->own_key);
+    }
+    context->own_key = copy;
+    return 1;
+}
+
+/* NID 0x6046C1F3, Sony 0x81019F35: SSL_CTX_set_cipher_list: OpenSSL's rules for Sony's suites; here
+ * Mbed TLS's own suites stay, which are what the servers of now take. 1 with a list, 0 without */
+int sceSslInternalCtxSetCipherList(void *handle, const char *rules)
+{
+    return is_context(handle) && rules != NULL;
 }

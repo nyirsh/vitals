@@ -36,6 +36,7 @@
 #define R_NOT_FOUND 10008
 #define R_NOT_SUPPORTED 10011
 #define R_NULL_ARG 10017
+#define R_BAD_VALUE 10018
 
 /* What GetCertificateAuthority returns when nothing matches, as Sony's */
 #define CA_NOT_FOUND ((int)0x80010086)
@@ -1074,17 +1075,31 @@ static unsigned int lookup_next(uint32_t name, int advance)
     return next;
 }
 
-static size_t pem_size(size_t der_length)
+static size_t pem_size_labelled(size_t der_length, const char *label)
 {
     size_t base64 = 4 * ((der_length + 2) / 3);
-    return sizeof("-----BEGIN CERTIFICATE-----\n") - 1 + base64 + (base64 + 63) / 64 +
-           sizeof("-----END CERTIFICATE-----\n") - 1 + 1;
+    return 2 * (strlen(label) + sizeof("-----BEGIN -----\n") - 1) + base64 + (base64 + 63) / 64 + 1;
+}
+
+static size_t pem_size(size_t der_length)
+{
+    return pem_size_labelled(der_length, "CERTIFICATE");
 }
 
 /* PEM text of DER, NUL-terminated, into out (pem_size bytes) */
-static int write_pem(const unsigned char *der, size_t length, char *out)
+/* "<prefix><label>-----\n" into out, its length */
+static size_t sprintf_line(char *out, const char *prefix, const char *label)
 {
-    static const char begin[] = "-----BEGIN CERTIFICATE-----\n", end[] = "-----END CERTIFICATE-----\n";
+    size_t a = strlen(prefix), b = strlen(label);
+    memcpy(out, prefix, a);
+    memcpy(out + a, label, b);
+    memcpy(out + a + b, "-----\n", 6);
+    return a + b + 6;
+}
+
+/* PEM text of DER with its label, NUL-terminated, into out (pem_size_labelled bytes) */
+static int write_pem_labelled(const unsigned char *der, size_t length, const char *label, char *out)
+{
     size_t base64 = 4 * ((length + 2) / 3), written = 0;
     unsigned char *encoded = malloc(base64 + 1);
     if (encoded == NULL)
@@ -1093,17 +1108,22 @@ static int write_pem(const unsigned char *der, size_t length, char *out)
         free(encoded);
         return R_FAILED;
     }
-    memcpy(out, begin, sizeof(begin) - 1);
-    out += sizeof(begin) - 1;
+    out += sprintf_line(out, "-----BEGIN ", label);
     for (size_t i = 0; i < written; i += 64) {
         size_t line = written - i < 64 ? written - i : 64;
         memcpy(out, encoded + i, line);
         out += line;
         *out++ = '\n';
     }
-    memcpy(out, end, sizeof(end));
+    out += sprintf_line(out, "-----END ", label);
+    *out = '\0';
     free(encoded);
     return 0;
+}
+
+static int write_pem(const unsigned char *der, size_t length, char *out)
+{
+    return write_pem_labelled(der, length, "CERTIFICATE", out);
 }
 
 /* Where answers go: an array of pointers at the buffer's start, then the texts */
@@ -1265,4 +1285,150 @@ int sceSslInternalCaRevoked(unsigned int group, unsigned int mask, const void **
     *entries = NULL;
     *count = 0;
     return 0;
+}
+
+/* ---- the rest of Cert-C's interface, which nothing seen calls ---- */
+
+/* The resource list Cert-C's library contexts are made from; nothing reads it */
+static struct { uint32_t magic; } g_default_resources = {0x52435356u};
+
+/* NID 0xFB51AE89, Sony 0x8100AD43: the default resource list, for 09657E15 */
+const void *sceSslInternalDefaultResources(void)
+{
+    return &g_default_resources;
+}
+
+/* NID 0x09657E15, Sony 0x81021DD1: a Cert-C library context from a resource list, as (resources,
+ * flags, &context): here the one Cert-C object certificate.c's functions take */
+int sceSslInternalLibraryContextNew(const void *resources, int flags, const void **out)
+{
+    (void)resources, (void)flags;
+    if (out == NULL)
+        return R_NULL_ARG;
+    *out = &g_cert_library;
+    return 0;
+}
+
+/* NID 0x4725F9E7, Sony 0x81021521: frees one; Sony's counts references, this one is never freed */
+int sceSslInternalLibraryContextFree(const void *context)
+{
+    (void)context;
+    return 0;
+}
+
+void *vs_name_copy(const void *handle)
+{
+    const VsName *name = handle;
+    if (!is_name(name))
+        return NULL;
+    VsName *copy = calloc(1, sizeof(*copy));
+    if (copy == NULL)
+        return NULL;
+    copy->magic = NAME_MAGIC;
+    copy->length = name->length;
+    if (name->length > 0) {
+        copy->der = malloc(name->length);
+        unsigned char *start = copy->der;
+        if (start == NULL) {
+            free(copy);
+            return NULL;
+        }
+        memcpy(start, name->der, name->length);
+        if (mbedtls_x509_get_name(&start, copy->der + copy->length, &copy->head) != 0) {
+            vs_name_free(copy);
+            return NULL;
+        }
+    }
+    return copy;
+}
+
+/* NID 0xDABB61EE, Sony 0x8100519B: a copy of an object (through its type's table in Sony's), as
+ * (object, cert_c, &copy): certificates (freed with 144FA354) and names (with CE37B69E) */
+int sceSslInternalObjectDuplicate(void *object, const void *library, void **copy)
+{
+    if (object == NULL || copy == NULL)
+        return R_NULL_ARG;
+    *copy = NULL;
+    if (is_cert(object)) {
+        const mbedtls_x509_crt *crt = ((VsCert *)object)->crt;
+        return sceSslInternalCertFromBinary(library, 0, 1, (unsigned int)crt->raw.len, crt->raw.p, NULL, copy);
+    }
+    if (is_name(object)) {
+        *copy = vs_name_copy(object);
+        return *copy != NULL ? 0 : R_ALLOC_FAILURE;
+    }
+    return R_NOT_SUPPORTED;
+}
+
+/* NID 0xFEFE761C, Sony 0x8101F799: a key from DER (or PEM), as 29AAC768 makes a certificate:
+ * (cert_c, flags, format, length, data, &consumed, &key), freed with 46358909; a private key, or a
+ * public one */
+int sceSslInternalKeyFromBinary(const void *library, int flags, int format, unsigned int length,
+                                const unsigned char *data, unsigned int *consumed, void **out)
+{
+    (void)library, (void)flags, (void)format;
+    if (data == NULL || out == NULL)
+        return R_NULL_ARG;
+    *out = NULL;
+    VsKey *key = calloc(1, sizeof(*key));
+    unsigned char *text = malloc((size_t)length + 1);
+    if (key == NULL || text == NULL) {
+        free(key);
+        free(text);
+        return R_ALLOC_FAILURE;
+    }
+    memcpy(text, data, length);
+    text[length] = '\0';
+    key->magic = KEY_MAGIC;
+    mbedtls_pk_init(&key->pk);
+    size_t size = length + (length > 0 && data[0] == '-' ? 1 : 0);
+    int result = mbedtls_pk_parse_key(&key->pk, text, size, NULL, 0, vs_tls_random, NULL);
+    if (result != 0) {
+        mbedtls_pk_free(&key->pk);
+        mbedtls_pk_init(&key->pk);
+        result = mbedtls_pk_parse_public_key(&key->pk, text, size);
+    }
+    mbedtls_platform_zeroize(text, length);
+    free(text);
+    if (result != 0) {
+        mbedtls_pk_free(&key->pk);
+        free(key);
+        return result == MBEDTLS_ERR_PK_ALLOC_FAILED ? R_ALLOC_FAILURE : R_FAILED;
+    }
+    if (consumed != NULL)
+        *consumed = length;
+    *out = key;
+    return 0;
+}
+
+/* NID 0x6D0D3B11, Sony 0x81002DD1: writes a certificate into a buffer (B8E6E249's), as (certificate,
+ * buffer, type, format, &written): format 0x1100 PEM, its label "CERTIFICATE" for type 1 and "WTLS
+ * CERTIFICATE" for type 2; 0 and 0x100 DER */
+int sceSslInternalObjectWrite(void *cert_handle, void *buffer, int type, int format, unsigned int *written)
+{
+    VsCert *cert = cert_handle;
+    if (!is_cert(cert) || !is_buffer(buffer) || written == NULL)
+        return R_NULL_ARG;
+    *written = 0;
+    const mbedtls_x509_crt *crt = cert->crt;
+    if (format == 0 || format == 0x100) {
+        if (sceSslInternalBufferWrite(buffer, crt->raw.p, (int)crt->raw.len) < 0)
+            return R_ALLOC_FAILURE;
+        *written = (unsigned int)crt->raw.len;
+        return 0;
+    }
+    if (format != 0x1100 || (type != 1 && type != 2))
+        return R_BAD_VALUE;
+    const char *label = type == 1 ? "CERTIFICATE" : "WTLS CERTIFICATE";
+    char *text = malloc(pem_size_labelled(crt->raw.len, label));
+    if (text == NULL)
+        return R_ALLOC_FAILURE;
+    int result = write_pem_labelled(crt->raw.p, crt->raw.len, label, text);
+    size_t length = result == 0 ? strlen(text) : 0;
+    if (result == 0 && sceSslInternalBufferWrite(buffer, text, (int)length) < 0)
+        result = R_ALLOC_FAILURE;
+    free(text);
+    if (result == 0)
+        *written = (unsigned int)length;
+    return result;
 }

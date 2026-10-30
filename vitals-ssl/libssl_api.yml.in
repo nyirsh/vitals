@@ -30,16 +30,16 @@ SceLibSsl:
       syscall: false
       nid: 0x68D6C3FF
       functions:
-        - sceSslInternal00ABEBC3: 0x00ABEBC3
+        - sceSslInternalCtxAddClientCa: 0x00ABEBC3
         - sceSslInternalTimeCompare: 0x04BAED82
-        - sceSslInternal05F6A292: 0x05F6A292
+        - sceSslInternalCtxAddTrustedCertificate: 0x05F6A292
         - sceSslInternalGetCertificateAuthority: 0x064DFC99
         - sceSslInternalCertSubject: 0x08179EBD
         - sceSslInternalCertToBinary: 0x08ED1B25
-        - sceSslInternal09657E15: 0x09657E15
-        - sceSslInternal0C693D36: 0x0C693D36
+        - sceSslInternalLibraryContextNew: 0x09657E15
+        - sceSslInternalGetCurrentCipher: 0x0C693D36
         - sceSslInternalSetOptions: 0x0DB6C206
-        - sceSslInternal133ED36D: 0x133ED36D
+        - sceSslInternalClientMethodTls10: 0x133ED36D
         - sceSslInternalCertFree: 0x144FA354
         - sceSslInternalBioCtrl: 0x16D7C7CA
         - sceSslInternalCertPublicKey: 0x170D595D
@@ -51,9 +51,9 @@ SceLibSsl:
         - sceSslInternalCertNotBefore: 0x2464F9D0
         - sceSslInternalGetItem: 0x24C6257F
         - sceSslInternalCtxSetVerify: 0x260F5A85
-        - sceSslInternal26CBEEB6: 0x26CBEEB6
+        - sceSslInternalCtxUsePrivateKey: 0x26CBEEB6
         - sceSslInternalCertFromBinary: 0x29AAC768
-        - sceSslInternal2B90012E: 0x2B90012E
+        - sceSslInternalCipherGetName: 0x2B90012E
         - sceSslInternalGetError: 0x2F0FC3CD
         - sceSslInternalCertVerifySignature: 0x306E2A22
         - sceSslInternal33737FDC: 0x33737FDC
@@ -61,11 +61,11 @@ SceLibSsl:
         - sceSslInternalCaRevoked: 0x349B0E73
         - sceSslInternalGetCertificateAuthorityByName: 0x3746501F
         - sceSslInternalOidText: 0x3DE4F3DB
-        - sceSslInternal3EF42454: 0x3EF42454
-        - sceSslInternal422DFE70: 0x422DFE70
+        - sceSslInternalVersion: 0x3EF42454
+        - sceSslInternalErrRemoveState: 0x422DFE70
         - sceSslInternalErrorCode: 0x461C5990
         - sceSslInternalKeyFree: 0x46358909
-        - sceSslInternal4725F9E7: 0x4725F9E7
+        - sceSslInternalLibraryContextFree: 0x4725F9E7
         - sceSslInternalSetBio: 0x4A1557A7
         - sceSslInternalTimeNow: 0x4AAF0D45
         - sceSslInternalIsInitalized: 0x4B4A2307
@@ -74,18 +74,18 @@ SceLibSsl:
         - sceSslInternalNameEqual: 0x568F0E80
         - sceSslInternal56FE376A: 0x56FE376A
         - sceSslInternalTimeNew: 0x5E50CB55
-        - sceSslInternal6046C1F3: 0x6046C1F3
+        - sceSslInternalCtxSetCipherList: 0x6046C1F3
         - sceSslInternalCertInfo: 0x64BDF1BB
         - sceSslInternalCtxSeedRandom: 0x67FB1CD3
         - sceSslInternalTimeFree: 0x6CDB4EE8
-        - sceSslInternal6D0D3B11: 0x6D0D3B11
+        - sceSslInternalObjectWrite: 0x6D0D3B11
         - sceSslInternalTimeExport: 0x6D2A86F0
-        - sceSslInternal6F3B9809: 0x6F3B9809
+        - sceSslInternalState: 0x6F3B9809
         - sceSslInternalKeyFromBuffer: 0x7D30F0A6
         - sceSslInternalCertIssuer: 0x81FA5DBE
         - sceSslInternalTimeImport: 0x88391E03
         - sceSslInternalNameInfo: 0x91C2531C
-        - sceSslInternal92560B8D: 0x92560B8D
+        - sceSslInternalDoConnect: 0x92560B8D
         - sceSslInternalExtensionInfo: 0x93EAE08A
         - sceSslInternalCtxSetClientCertCallback: 0x9E38815D
         - sceSslInternalClientMethod: 0xA374CD7B
@@ -93,28 +93,28 @@ SceLibSsl:
         - sceSslInternalClientMethod2: 0xAC1DBE40
         - sceSslInternalCtxSetCertVerifyCallback: 0xAF50B945
         - sceSslInternalSetVerifyResult: 0xB0E4CB2F
-        - sceSslInternalB1745DAD: 0xB1745DAD
+        - sceSslInternalGetQuietShutdown: 0xB1745DAD
         - sceSslInternalEntryInfo: 0xB5A099D2
         - sceSslInternalBufferNew: 0xB8E6E249
         - sceSslInternalExtensionNew: 0xBF99D664
         - sceSslInternalC0B135F0: 0xC0B135F0
-        - sceSslInternalC1299FB6: 0xC1299FB6
+        - sceSslInternalSetMemoryFunctions: 0xC1299FB6
         - sceSslInternalBufferFree: 0xC4D984C2
-        - sceSslInternalCB83EA07: 0xCB83EA07
-        - sceSslInternalCBEC7D13: 0xCBEC7D13
+        - sceSslInternalBioPrintf: 0xCB83EA07
+        - sceSslInternalSetItem: 0xCBEC7D13
         - sceSslInternalCtxCtrl: 0xCC7F4211
         - sceSslInternalNameFree: 0xCE37B69E
         - sceSslInternalSetConnectState: 0xCEE46B33
         - sceSslInternalTimeText: 0xD1A82B1A
         - sceSslInternalNew: 0xD28834E6
         - sceSslInternalTimeProvider: 0xD3C049B9
-        - sceSslInternalD419451B: 0xD419451B
+        - sceSslInternalCtxUseCertificate: 0xD419451B
         - sceSslInternalTimeProviderFree: 0xD4ADF069
         - sceSslInternalKeyMatches: 0xD68D8421
-        - sceSslInternalD6D32A2F: 0xD6D32A2F
+        - sceSslInternalWant: 0xD6D32A2F
         - sceSslInternalPending: 0xD776E2F8
-        - sceSslInternalDABB61EE: 0xDABB61EE
-        - sceSslInternalDEC6DD27: 0xDEC6DD27
+        - sceSslInternalObjectDuplicate: 0xDABB61EE
+        - sceSslInternalLibraryInit: 0xDEC6DD27
         - sceSslInternalConnect: 0xE5EDD91B
         - sceSslInternalCtxNew: 0xE746465E
         - sceSslInternalShutdown: 0xEC9FAF42
@@ -122,11 +122,11 @@ SceLibSsl:
         - sceSslInternalExtensionFree: 0xF030A0DE
         - sceSslInternalSetInfoCallback: 0xF2C9B744
         - sceSslInternalWrite: 0xF39A49C6
-        - sceSslInternalF4007DBE: 0xF4007DBE
+        - sceSslInternalGetClientCaList: 0xF4007DBE
         - sceSslInternalSetCallback: 0xF71DB06F
-        - sceSslInternalFB51AE89: 0xFB51AE89
+        - sceSslInternalDefaultResources: 0xFB51AE89
         - sceSslInternalCtxSetOptions: 0xFBEB1FD7
-        - sceSslInternalFEFE761C: 0xFEFE761C
+        - sceSslInternalKeyFromBinary: 0xFEFE761C
         - sceSslInternalBioNewSocket: 0xFFE2ED51
     # vitals' own additions, for vitals-http (include/vitals_ssl.h); each NID is the first word of the
     # SHA-1 of its name, as Sony's are made

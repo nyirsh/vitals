@@ -5,12 +5,11 @@ exported under libssl's own library and function NIDs ([libssl_api.yml.in](libss
 all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
 shared with vitals-http and the browser provider).
 
-Written so far: all 11 `SceSsl` functions, the 69 `SceSslInternal` functions Sony's libhttp
-uses (below: connections, its certificate check and its client certificate callback) and
-`SSL_pending`, which the NetCheck dialog's own TLS adds, plus three that do nothing in Sony's
-either. Every other
-export logs its name (with `DEBUG=1` or `2`) and fails with `SCE_SSL_ERROR_INTERNAL`
-(`0x80435026`), or returns `NULL` where it returns a pointer. The app installs it as the system's
+Every export is written: all 11 `SceSsl` functions and all 98 `SceSslInternal` ones. That is the
+69 Sony's libhttp uses (below: connections, its certificate check and its client certificate
+callback), `SSL_pending`, which the NetCheck dialog's own TLS adds, the 25 nothing seen calls,
+worked out from Sony's code ([the rest](#the-rest-what-nothing-seen-calls)), and three that do
+nothing in Sony's either. The app installs it as the system's
 libssl, in place of the copy of Sony's it used to install ([docs/libssl.md](../docs/libssl.md)),
 and vitals-http has it built in.
 
@@ -69,10 +68,10 @@ what it does.
 | Library | NID | Functions | Named |
 | --- | --- | --- | --- |
 | `SceSsl` | `0xCAF5F2E9` | 11 | all, as `<psp2/libssl.h>` declares them ([src/core.c](src/core.c), [src/ssl.c](src/ssl.c)) |
-| `SceSslInternal` | `0x68D6C3FF` | 98 | 3 from the NID database: `sceSslInternalGetCertificateAuthority`, `sceSslInternalIsInitalized` (its spelling) and `sceSslInternalWrite`; the ones written here after what they do ([src/core.c](src/core.c), [src/connection.c](src/connection.c), [src/certificate.c](src/certificate.c)); the others `sceSslInternal<NID>` ([src/internal.c](src/internal.c)) |
+| `SceSslInternal` | `0x68D6C3FF` | 98 | 3 from the NID database: `sceSslInternalGetCertificateAuthority`, `sceSslInternalIsInitalized` (its spelling) and `sceSslInternalWrite`; the others after what they do ([src/core.c](src/core.c), [src/connection.c](src/connection.c), [src/certificate.c](src/certificate.c)), but for the three that do nothing, `sceSslInternal<NID>` ([src/internal.c](src/internal.c)) |
 
 `SceSslInternal` is the part Sony's own modules use for their TLS: Sony's libhttp alone imports 69
-of its functions. The arguments of the ones not written yet aren't known, so their stubs take none.
+of its functions, and the NetCheck dialog one more.
 
 ## How the written part behaves
 
@@ -261,6 +260,40 @@ connection; otherwise it frees them and returns 0, and no certificate is sent.
 `sceHttpPrivateSslContextAddCertCheck` sets the verify mode (`260F5A85`, `(ctx, 1)`) and the
 callback (`AF50B945`), both in the connection table above.
 
+### The rest: what nothing seen calls
+
+Nothing on the console was seen calling these, so what they do comes from Sony's code alone: the
+error codes each one reports are OpenSSL's (`SSL_new` reports 186, `SSL_F_SSL_NEW`, with OpenSSL's
+reasons), its object layouts are SSLeay's, and the rest is what it reads and writes.
+
+| NID | Arguments | What it is | Here |
+| --- | --- | --- | --- |
+| `3EF42454` | `(ssl)` | `SSL_version` (`ssl[0]`) | `sceSslInternalVersion`: the negotiated `0x0303` or `0x0304`, TLS 1.2's before |
+| `6F3B9809` | `(ssl)` | `SSL_state` (`ssl[48]`) | `sceSslInternalState`: 3 (`SSL_ST_OK`) once connected, `0x5000` before |
+| `D6D32A2F` | `(ssl)` | `SSL_want` (`ssl[24]`) | `sceSslInternalWant`: 3 after a failed receive, 2 after a failed send, 1 otherwise |
+| `B1745DAD` | `(ssl)` | `SSL_get_quiet_shutdown` (`ssl[44]`), which nothing exported sets | `sceSslInternalGetQuietShutdown`: 0 |
+| `0C693D36` | `(ssl)` | `SSL_get_current_cipher`, NULL before the handshake | `sceSslInternalGetCurrentCipher` |
+| `2B90012E` | `(cipher)` | `SSL_CIPHER_get_name`, `"(NONE)"` without one | `sceSslInternalCipherGetName`: Mbed TLS's name of the suite |
+| `92560B8D` | `(ssl)` | `SSL_connect` through the method (slot 20), the connect state set first | `sceSslInternalDoConnect` |
+| `CBEC7D13` | `(ssl, item 1 to 12, value)` | sets an item `24C6257F` reads; only item 7 may be NULL | `sceSslInternalSetItem`: kept, and given back for 2, 3, 4 and 7 |
+| `F4007DBE` | `(ssl)` | `SSL_get_client_CA_list`: on a client the server's CA names | `sceSslInternalGetClientCaList`: while the client certificate callback runs, NULL otherwise |
+| `CB83EA07` | `(bio, format, ...)` | `BIO_printf` (error library 32, BIO), up to 1 KiB | `sceSslInternalBioPrintf` |
+| `133ED36D` | `()` | `TLSv1_client_method` (Sony's TLS 1.0 table; `A374CD7B` is its TLS 1.2 one, `AC1DBE40` its SSLv3 one) | `sceSslInternalClientMethodTls10`: TLS 1.2 to 1.3, as the others here |
+| `D419451B` | `(ctx, certificate)` | `SSL_CTX_use_certificate` (171) | `sceSslInternalCtxUseCertificate`: a copy, sent with the key to a server that asks |
+| `26CBEEB6` | `(ctx, key)` | `SSL_CTX_use_PrivateKey` (174) | `sceSslInternalCtxUsePrivateKey`: a copy |
+| `05F6A292` | `(ctx, certificate, type 0 to 2)` | adds a certificate to the context's own trusted ones (234); 10018 for another type | `sceSslInternalCtxAddTrustedCertificate`: trusted besides the bundle, also without a verify callback |
+| `00ABEBC3` | `(ctx, certificate)` | `SSL_CTX_add_client_CA`: the subject's name, which a server sends | `sceSslInternalCtxAddClientCa`: kept |
+| `6046C1F3` | `(ctx, rules)` | `SSL_CTX_set_cipher_list`, OpenSSL's rules for Sony's suites | `sceSslInternalCtxSetCipherList`: 1, Mbed TLS's suites kept |
+| `FB51AE89` | `()` | Cert-C's default resource list | `sceSslInternalDefaultResources` |
+| `09657E15` | `(resources, flags, &context)` | a Cert-C library context from it | `sceSslInternalLibraryContextNew`: the one Cert-C object here |
+| `4725F9E7` | `(context)` | frees it (counted) | `sceSslInternalLibraryContextFree` |
+| `DABB61EE` | `(object, cert_c, &copy)` | an object's copy, through its type's table | `sceSslInternalObjectDuplicate`: certificates and names |
+| `FEFE761C` | `(cert_c, flags, format, length, data, &consumed, &key)` | a key from binary, as `29AAC768` makes a certificate | `sceSslInternalKeyFromBinary`: a private or public key, DER or PEM |
+| `6D0D3B11` | `(object, buffer, type, format, ...)` | writes an object as text: `CERTIFICATE` or `WTLS CERTIFICATE` for format `0x1100` | `sceSslInternalObjectWrite`: certificates, PEM or DER, with `&written` last (Likely) |
+| `DEC6DD27` | `()` | `SSL_library_init`: its parts' set-ups | `sceSslInternalLibraryInit`: 1 |
+| `422DFE70` | `(thread)` | `ERR_remove_state` | `sceSslInternalErrRemoveState`: no queue per thread here |
+| `C1299FB6` | `(allocate, reallocate, free)` | the allocator, all three or none | `sceSslInternalSetMemoryFunctions`: kept unused, as memory is the pool |
+
 ## VitalsSsl: vitals' additions
 
 vitals-http does its TLS through vitals-ssl, built into it for now, so a later step can have it
@@ -290,7 +323,7 @@ Built in, vitals-ssl's platform is vitals-http's ([vitals-http/src/ssl_platform.
 | [src/connection.c](src/connection.c) | methods, contexts, connections, the socket BIO, connect, read, write, shutdown, `SSL_get_error`, and calling the verify callback |
 | [src/certificate.c](src/certificate.c) | the certificate objects: certificates, names and entries, extensions, keys, times and the CA store |
 | [src/ssl.c](src/ssl.c) | `SceSsl`'s certificate getters, and the stub every unwritten export calls |
-| [src/internal.c](src/internal.c) | the `SceSslInternal` exports not written yet |
+| [src/internal.c](src/internal.c) | the three `SceSslInternal` exports that do nothing in Sony's either |
 | [src/vitals.c](src/vitals.c), [include/vitals_ssl.h](include/vitals_ssl.h) | VitalsSsl, vitals' additions, and the header vitals' own callers include |
 | [src/platform_vita.c](src/platform_vita.c) | module start and stop, the lock, the pool, SceNet and the handshake's thread |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |

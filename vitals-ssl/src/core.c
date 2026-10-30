@@ -225,3 +225,27 @@ int sceSslInternalErrorCode(int kind, int reason)
         return vs_take_out_of_memory() ? VS_ERROR_OUT_OF_MEMORY : reason;
     return VS_ERROR_INVALID_VALUE;
 }
+
+/* ---- the rest of the library's own calls, which nothing seen calls ---- */
+
+/* NID 0xDEC6DD27, Sony 0x8100AD4D: SSL_library_init, which Sony's runs through its parts' set-ups;
+ * sceSslInit does it here. 1 */
+int sceSslInternalLibraryInit(void)
+{
+    return 1;
+}
+
+/* NID 0x422DFE70, Sony 0x810481FD: ERR_remove_state: a thread's error queue gone; this library
+ * keeps no queue per thread */
+void sceSslInternalErrRemoveState(unsigned long thread)
+{
+    (void)thread;
+}
+
+/* NID 0xC1299FB6, Sony 0x8102A13B: the allocator Sony's uses, its three functions given at once
+ * (none changes it without all three); here everything comes from sceSslInit's pool, so they are
+ * kept unused */
+void sceSslInternalSetMemoryFunctions(void *allocate, void *reallocate, void *release)
+{
+    (void)allocate, (void)reallocate, (void)release;
+}

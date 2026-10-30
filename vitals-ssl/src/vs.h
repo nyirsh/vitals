@@ -89,6 +89,9 @@ typedef struct VsContext {
     struct VsStore *store;
     mbedtls_x509_crt *own_certificate;
     mbedtls_pk_context *own_key;
+    /* SSL_CTX_add_client_CA's names, which only a server would send */
+    void **client_ca_names;
+    int client_ca_count;
 } VsContext;
 
 typedef struct VsBio {
@@ -137,6 +140,14 @@ typedef struct VsSsl {
     void *client_cert, *client_key;
     /* The server asked for a certificate */
     int certificate_requested;
+    /* SSL_get_current_cipher's: OpenSSL's id (0x03000000 and the suite's number) and its name */
+    struct {
+        uint32_t id;
+        const char *name;
+    } cipher;
+    int quiet_shutdown;
+    /* The items CBEC7D13 sets, which 24C6257F gives back */
+    const void *items[13];
 } VsSsl;
 
 /* A certificate: the server's, which the connection keeps (borrowed), or one 29AAC768 parsed */
@@ -234,6 +245,35 @@ int sceSslInternalWrite(void *ssl, const void *buffer, int size);
 int sceSslInternalShutdown(void *ssl);
 int sceSslInternalGetError(void *ssl, int returned);
 int sceSslInternalPending(void *ssl);
+const void *sceSslInternalClientMethodTls10(void);
+int sceSslInternalVersion(void *ssl);
+int sceSslInternalState(void *ssl);
+int sceSslInternalWant(void *ssl);
+int sceSslInternalGetQuietShutdown(void *ssl);
+const void *sceSslInternalGetCurrentCipher(void *ssl);
+const char *sceSslInternalCipherGetName(const void *cipher);
+int sceSslInternalDoConnect(void *ssl);
+int sceSslInternalSetItem(void *ssl, int item, const void *value);
+const void *sceSslInternalGetClientCaList(void *ssl);
+int sceSslInternalBioPrintf(void *bio, const char *format, ...);
+int sceSslInternalCtxAddClientCa(void *context, void *cert);
+int sceSslInternalCtxAddTrustedCertificate(void *context, void *cert, int type);
+int sceSslInternalCtxUseCertificate(void *context, void *cert);
+int sceSslInternalCtxUsePrivateKey(void *context, void *key);
+int sceSslInternalCtxSetCipherList(void *context, const char *rules);
+const void *sceSslInternalDefaultResources(void);
+int sceSslInternalLibraryContextNew(const void *resources, int flags, const void **out);
+int sceSslInternalLibraryContextFree(const void *context);
+int sceSslInternalObjectDuplicate(void *object, const void *library, void **copy);
+int sceSslInternalKeyFromBinary(const void *library, int flags, int format, unsigned int length,
+                                const unsigned char *data, unsigned int *consumed, void **out);
+int sceSslInternalObjectWrite(void *cert, void *buffer, int type, int format, unsigned int *written);
+int sceSslInternalLibraryInit(void);
+void sceSslInternalErrRemoveState(unsigned long thread);
+void sceSslInternalSetMemoryFunctions(void *allocate, void *reallocate, void *release);
+void vs_context_free_client_cas(VsContext *context);
+/* certificate.c: a copy of a name object */
+void *vs_name_copy(const void *name);
 int sceSslInternalGetItem(void *ssl, int item, const void **out);
 void sceSslInternalSetVerifyResult(void *ssl, int result);
 int sceSslInternalCertSubject(void *cert, int format, void **name);

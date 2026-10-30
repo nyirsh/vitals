@@ -302,6 +302,7 @@ int vitalsSslCheckKey(const void *data, size_t size)
 void vs_context_free_additions(VsContext *context)
 {
     free_identity(context);
+    vs_context_free_client_cas(context);
     if (context->store != NULL)
         store_release(context->store);
     context->store = NULL;

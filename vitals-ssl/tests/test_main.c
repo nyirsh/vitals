@@ -877,6 +877,141 @@ static void test_client_certificate(void)
     sceSslInternalCertFree(cert);
 }
 
+/* ---- the rest: exports nothing seen calls ---- */
+
+static void test_remaining(void)
+{
+    char line[128];
+    /* A connection's state, version, cipher and want */
+    Connection connection = open_connection(g_port, "vitals-ssl.test", 0, 5000);
+    CHECK_EQ(sceSslInternalState(connection.ssl), 0x5000);
+    CHECK_EQ(sceSslInternalVersion(connection.ssl), 0x0303);
+    CHECK(sceSslInternalGetCurrentCipher(connection.ssl) == NULL);
+    CHECK_EQ(sceSslInternalDoConnect(connection.ssl), 1);
+    CHECK_EQ(sceSslInternalState(connection.ssl), 3);
+    int version = sceSslInternalVersion(connection.ssl);
+    CHECK(version == 0x0303 || version == 0x0304);
+    const void *cipher = sceSslInternalGetCurrentCipher(connection.ssl);
+    CHECK(cipher != NULL);
+    const char *cipher_name = sceSslInternalCipherGetName(cipher);
+    CHECK(cipher_name != NULL && strncmp(cipher_name, "TLS", 3) == 0);
+    CHECK(strcmp(sceSslInternalCipherGetName(NULL), "(NONE)") == 0);
+    CHECK_EQ(sceSslInternalWant(connection.ssl), 1);
+    CHECK_EQ(sceSslInternalGetQuietShutdown(connection.ssl), 0);
+    CHECK(sceSslInternalGetClientCaList(connection.ssl) == NULL);
+    /* Items set and read back */
+    static int marker;
+    const void *item = NULL;
+    CHECK_EQ(sceSslInternalSetItem(connection.ssl, 3, &marker), 0);
+    CHECK_EQ(sceSslInternalGetItem(connection.ssl, 3, &item), 0);
+    CHECK(item == &marker);
+    CHECK_EQ(sceSslInternalSetItem(connection.ssl, 3, NULL), 10017);
+    CHECK_EQ(sceSslInternalSetItem(connection.ssl, 7, NULL), 0);
+    CHECK_EQ(sceSslInternalSetItem(connection.ssl, 13, &marker), 10011);
+    CHECK(read_line(connection.ssl, line, sizeof(line)) > 0);
+    close_connection(&connection);
+    /* BIO_printf, on a plain socket BIO */
+    int fd = connect_to(g_port + 1, 0);
+    void *bio = sceSslInternalBioNewSocket(fd, 0);
+    CHECK_EQ(sceSslInternalBioPrintf(bio, "%s %d\n", "printed", 42), 11);
+    CHECK_EQ(sceSslInternalBioPrintf(NULL, "x"), 0);
+    void *library = NULL;
+    CHECK_EQ(sceSslInternalGetLibrary(&library), 0);
+    void *context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    void *ssl = sceSslInternalNew(context);
+    sceSslInternalSetBio(ssl, bio, bio);
+    sceSslInternalFree(ssl);
+    sceSslInternalCtxFree(context);
+    close(fd);
+
+    /* A context's own trusted certificate: the chain's CA, with a bundle that hasn't it */
+    CHECK_EQ(sceSslTerm(), 0);
+    snprintf(vs_test_ca_path, sizeof(vs_test_ca_path), "%s", g_other_root);
+    CHECK_EQ(sceSslInit(256 * 1024), 0);
+    load_chain();
+    void *ca = parse_der(g_chain.next), *leaf = parse_der(&g_chain);
+    connection = open_connection(g_port + 2, "chain.test", 1, 5000);
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), -1);
+    close_connection(&connection);
+    connection = open_connection(g_port + 2, "chain.test", 1, 5000);
+    CHECK_EQ(sceSslInternalCtxAddTrustedCertificate(connection.context, ca, 0), 1);
+    CHECK_EQ(sceSslInternalCtxAddTrustedCertificate(connection.context, ca, 3), 10018);
+    CHECK_EQ(sceSslInternalCtxAddTrustedCertificate(connection.context, NULL, 0), 0);
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
+    close_connection(&connection);
+
+    /* A context's own certificate and key, sent to a server that asks without a callback */
+    size_t length = 0;
+    char *text = read_text(g_client_pem, &length);
+    void *client = NULL, *client_key = NULL;
+    unsigned int consumed = 0;
+    CHECK_EQ(sceSslInternalCertFromBinary(library, 0, 1, (unsigned int)length, (unsigned char *)text, &consumed,
+                                          &client), 0);
+    free(text);
+    text = read_text(g_client_key, &length);
+    CHECK_EQ(sceSslInternalKeyFromBinary(library, 0, 1, (unsigned int)length, (unsigned char *)text, &consumed,
+                                         &client_key), 0);
+    CHECK_EQ(consumed, length);
+    free(text);
+    void *junk = NULL;
+    CHECK_EQ(sceSslInternalKeyFromBinary(library, 0, 1, 4, (const unsigned char *)"junk", NULL, &junk), 10001);
+    char page[128];
+    connection = open_connection(g_port + 3, "vitals-ssl.test", 0, 5000);
+    CHECK_EQ(sceSslInternalCtxUseCertificate(connection.context, client), 1);
+    CHECK_EQ(sceSslInternalCtxUsePrivateKey(connection.context, client_key), 1);
+    CHECK_EQ(sceSslInternalCtxUseCertificate(NULL, client), 0);
+    CHECK_EQ(sceSslInternalCtxAddClientCa(connection.context, ca), 1);
+    CHECK_EQ(sceSslInternalCtxSetCipherList(connection.context, "HIGH:!aNULL"), 1);
+    CHECK_EQ(sceSslInternalCtxSetCipherList(connection.context, NULL), 0);
+    CHECK_EQ(sceSslInternalConnect(connection.ssl), 1);
+    CHECK_EQ(sceSslInternalWrite(connection.ssl, "GET / HTTP/1.0\r\n\r\n", 18), 18);
+    int got = sceSslInternalRead(connection.ssl, page, sizeof(page) - 1);
+    CHECK(got > 0 && strncmp(page, "HTTP/1.0 200", 12) == 0);
+    close_connection(&connection);
+    sceSslInternalKeyFree(client_key);
+
+    /* Copies and writing a certificate out */
+    void *copy = NULL, *name = NULL, *name_copy = NULL;
+    CHECK_EQ(sceSslInternalObjectDuplicate(leaf, library, &copy), 0);
+    CHECK(copy != NULL && copy != leaf);
+    CHECK_EQ(sceSslInternalCertSubject(leaf, 1, &name), 0);
+    CHECK_EQ(sceSslInternalObjectDuplicate(name, library, &name_copy), 0);
+    CHECK_EQ(sceSslInternalNameEqual(name, name_copy), 1);
+    CHECK_EQ(sceSslInternalObjectDuplicate(&marker, library, &junk), 10011);
+    void *buffer = sceSslInternalBufferNew();
+    unsigned int written = 0;
+    CHECK_EQ(sceSslInternalObjectWrite(copy, buffer, 1, 0x1100, &written), 0);
+    CHECK(written > 0);
+    CHECK_EQ(sceSslInternalObjectWrite(copy, buffer, 3, 0x1100, &written), 10018);
+    sceSslInternalBufferFree(buffer);
+    buffer = sceSslInternalBufferNew();
+    CHECK_EQ(sceSslInternalObjectWrite(copy, buffer, 1, 0, &written), 0);
+    CHECK_EQ(written, g_chain.raw.len);
+    sceSslInternalBufferFree(buffer);
+    sceSslInternalNameFree(name);
+    sceSslInternalNameFree(name_copy);
+    sceSslInternalCertFree(copy);
+    sceSslInternalCertFree(client);
+    sceSslInternalCertFree(leaf);
+    sceSslInternalCertFree(ca);
+    mbedtls_x509_crt_free(&g_chain);
+
+    /* The library's own */
+    const void *resources = sceSslInternalDefaultResources(), *cert_c = NULL;
+    CHECK(resources != NULL);
+    CHECK_EQ(sceSslInternalLibraryContextNew(resources, 0, &cert_c), 0);
+    CHECK(cert_c == vs_cert_library());
+    CHECK_EQ(sceSslInternalLibraryContextNew(resources, 0, NULL), 10017);
+    CHECK_EQ(sceSslInternalLibraryContextFree(cert_c), 0);
+    CHECK_EQ(sceSslInternalLibraryInit(), 1);
+    sceSslInternalErrRemoveState(0);
+    sceSslInternalSetMemoryFunctions(NULL, NULL, NULL);
+    CHECK(sceSslInternalClientMethodTls10() != NULL);
+    void *tls10 = sceSslInternalCtxNew(library, sceSslInternalClientMethodTls10());
+    CHECK(tls10 != NULL);
+    sceSslInternalCtxFree(tls10);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 10) {
@@ -914,6 +1049,7 @@ int main(int argc, char **argv)
     test_certificate_store();
     test_verify_callback();
     test_client_certificate();
+    test_remaining();
     CHECK_EQ(sceSslTerm(), 0);
     (void)g_alerts;
     (void)g_last_alert;
