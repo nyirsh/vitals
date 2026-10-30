@@ -63,7 +63,8 @@ target_link_libraries(vitals_libssl PRIVATE
     mbedx509
     mbedcrypto
     gcc
-    SceAppMgr_stub
+    # Weak: the browser engine's process has no path conversion, and gives the bundle's path itself
+    SceAppMgr_stub_weak
     SceLibKernel_stub
     SceKernelThreadMgr_stub
     SceSysmem_stub

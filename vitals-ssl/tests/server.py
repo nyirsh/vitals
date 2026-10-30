@@ -1,5 +1,6 @@
 """The TLS server vitals-ssl's host tests connect to: on its port, after the handshake it sends
-the name the client asked for (SNI) as "sni=<name>\n" ("sni=-" without one), then echoes each line
+the name the client asked for (SNI) as "sni=<name>\n" ("sni=-" without one), and the ALPN name
+picked as "alpn=<name>\n" when the client offered any, then echoes each line
 back. "quit\n" ends the connection with close_notify, and "drop\n" closes the socket without it.
 The next port accepts and never answers, for timeouts. With a second certificate and key, the port
 after that serves them the same way (a chain a CA signed)."""
@@ -28,6 +29,8 @@ def echo(raw, context):
         return
     try:
         connection.sendall(("sni=%s\n" % (getattr(connection, "vs_name", None) or "-")).encode())
+        if connection.selected_alpn_protocol() is not None:
+            connection.sendall(("alpn=%s\n" % connection.selected_alpn_protocol()).encode())
         pending = b""
         while True:
             data = connection.recv(4096)
@@ -66,6 +69,7 @@ def server_context(certificate, key):
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(certificate, key)
+    context.set_alpn_protocols(["h2", "http/1.1"])
     return context
 
 

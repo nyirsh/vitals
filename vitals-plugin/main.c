@@ -36,7 +36,7 @@ enum
 static const char *const g_replacement_modules[MODULE_COUNT] = {
     "vs0:/data/external/vitals/ScePsp2Compat.suprx",
     "vs0:/data/external/vitals/libhttp.suprx",
-    "vs0:/data/external/vitals/libssl.suprx",
+    VITALS_LIBSSL_PATH,
 };
 
 static uint8_t g_replace[MODULE_COUNT];
@@ -80,6 +80,7 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     }
     else if (g_replace_iap && path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx"))
     {
+        ksceDebugPrintf("vitals: libssl load pid=0x%X flags=0x%08X\n", target_pid, flags);
         module = MODULE_LIBSSL;
         path = g_replacement_modules[module];
     }
@@ -110,6 +111,26 @@ static int start_for_pid_patched(SceUID pid, SceUID module, SceSize size,
     int res = TAI_CONTINUE(int, g_start_hook_ref, pid, module, size, data, flags, options, status);
     (void)vitals_post_start_complete(target_pid, module, res);
     return res;
+}
+
+/* The flags the system's own loads of libhttp and libssl into an app come with (sceSysmodule's):
+ * shared, as Sony's libraries are */
+#define VITALS_SYSTEM_MODULE_LOAD_FLAGS UINT32_C(0x08008001)
+
+/* libssl for the browser engine's process, loaded as the system loads it for an app: through the
+ * path swap above, and shared, since the shared libhttp there imports from it and a private module
+ * can't export to a shared one. Loaded and started through the module manager's own functions,
+ * which these hooks already call (ksceKernelStartModuleForPid's import isn't the same on every
+ * firmware). Its module ID, or the loader's error; *started and *status are the start's */
+SceUID vitals_kernel_load_system_libssl(SceUID pid, int *started, int *status)
+{
+    int four = 4;
+    *started = -1;
+    *status = SCE_KERNEL_START_FAILED;
+    SceUID modid = load_for_pid_patched(pid, "vs0:sys/external/libssl.suprx", VITALS_SYSTEM_MODULE_LOAD_FLAGS, &four);
+    if (modid > 0)
+        *started = start_for_pid_patched(pid, modid, 0, NULL, 0, NULL, status);
+    return modid;
 }
 
 /* The Vita loader enters through _start; macOS, where only the host tests build, has no aliases */

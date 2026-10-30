@@ -22,7 +22,8 @@ endif()
 include("${CMAKE_CURRENT_LIST_DIR}/../dependencies.cmake")
 # The release version from ../VERSION, which the providers carry in their module headers
 include("${CMAKE_CURRENT_LIST_DIR}/../version.cmake")
-if(VITALS_BUILD_VITA_PROVIDER OR VITALS_BUILD_TRANSPORT_TESTS)
+# The browser provider's TLS is the libssl module's; only the host tests build Mbed TLS here
+if(VITALS_BUILD_TRANSPORT_TESTS)
     vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
 endif()
 
@@ -106,7 +107,7 @@ if(VITALS_BUILD_HOST_TESTS)
     add_subdirectory(tests/runtime)
 endif()
 
-if(VITALS_BUILD_VITA_PROVIDER OR VITALS_BUILD_TRANSPORT_TESTS)
+if(VITALS_BUILD_TRANSPORT_TESTS)
     add_subdirectory(crypto)
 endif()
 

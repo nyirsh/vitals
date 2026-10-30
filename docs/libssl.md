@@ -11,8 +11,11 @@ does its TLS through this module as Sony's libhttp does through Sony's, in the p
 `sceSslInit`, with vitals' additions (the `VitalsSsl` library) for what Sony's libhttp reached into
 libssl's structures for. Its import is weak, so processes that load libhttp without libssl
 (Adrenaline's bubble booter and the browser's WebKit process do) still load it, and do no https,
-as with Sony's. Apps and system code also call `sceSsl` directly (SceStoreBrowser and NpCommerce2
-call `sceSslInit`, `sceSslTerm` and its pool's stats; the NetCheck dialog does its own TLS).
+as with Sony's. The browser's engine never loads libssl: the kernel plugin loads it into that
+process, as the system loads it for an app, before the browser provider, whose TLS it does
+([browser.md](browser.md)). Apps and system
+code also call `sceSsl` directly (SceStoreBrowser and NpCommerce2 call `sceSslInit`, `sceSslTerm`
+and its pool's stats; the NetCheck dialog does its own TLS).
 
 ## At a glance
 

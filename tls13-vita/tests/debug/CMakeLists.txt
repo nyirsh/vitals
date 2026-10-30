@@ -2,11 +2,12 @@
 # 1 and 2), against stand-ins declared as in VitaSDK; a broken or mismatched log line fails the
 # test build. Only compiled, never run
 set(debug_sources
-    ../../provider/ca_file.c ../../provider/ca_index.c ../../provider/platform_shims.c
+    ../../provider/ca_index.c ../../provider/platform_shims.c
     ../../browser/backend.c ../../browser/config.c ../../browser/module.c ../../browser/webkit_callback.c)
 foreach(level 1 2)
     add_library(vitals_debug_${level}_build OBJECT ${debug_sources})
-    target_include_directories(vitals_debug_${level}_build PRIVATE ../../provider ../../browser)
+    target_include_directories(vitals_debug_${level}_build PRIVATE ../../provider ../../browser
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../vitals-ssl/include)
     target_link_libraries(vitals_debug_${level}_build PRIVATE vitals_core mbedtls vitals_vita_mock)
     target_compile_definitions(vitals_debug_${level}_build PRIVATE VITALS_DEBUG=${level}
         VITALS_LOG_PREFIX="vitals_test" VITALS_HTTP_HEAP_BYTES=131072u

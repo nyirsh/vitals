@@ -238,6 +238,50 @@ int vitalsSslCtxSetStore(void *handle, void *store_handle)
     return 0;
 }
 
+/* NID 0xE61C471E: whether the bundle is trusted besides the store (it is, unless 0) */
+int vitalsSslCtxSetTrustBundle(void *handle, int trusted)
+{
+    VsContext *context = context_of(handle);
+    if (context == NULL)
+        return VS_ERROR_INVALID_VALUE;
+    context->no_bundle = trusted == 0;
+    return 0;
+}
+
+/* NID 0xABB1825C: the suites the modern profile offers, IANA numbers ending with 0 (at most 16);
+ * NULL or an empty list puts Mbed TLS's defaults back */
+int vitalsSslCtxSetCiphersuites(void *handle, const int *suites)
+{
+    VsContext *context = context_of(handle);
+    if (context == NULL)
+        return VS_ERROR_INVALID_VALUE;
+    size_t count = 0;
+    while (suites != NULL && suites[count] != 0)
+        if (++count >= sizeof(context->suites) / sizeof(context->suites[0]))
+            return VS_ERROR_INVALID_VALUE;
+    memset(context->suites, 0, sizeof(context->suites));
+    if (count > 0)
+        memcpy(context->suites, suites, count * sizeof(*suites));
+    return 0;
+}
+
+/* NID 0xA882893F: the ALPN names offered, a NULL-terminated list (at most 4) the caller keeps as
+ * long as the context; NULL offers none */
+int vitalsSslCtxSetAlpn(void *handle, const char *const *protocols)
+{
+    VsContext *context = context_of(handle);
+    if (context == NULL)
+        return VS_ERROR_INVALID_VALUE;
+    size_t count = 0;
+    while (protocols != NULL && protocols[count] != NULL)
+        if (++count >= sizeof(context->alpn) / sizeof(context->alpn[0]))
+            return VS_ERROR_INVALID_VALUE;
+    memset(context->alpn, 0, sizeof(context->alpn));
+    for (size_t i = 0; i < count; ++i)
+        context->alpn[i] = protocols[i];
+    return 0;
+}
+
 static void free_identity(VsContext *context)
 {
     if (context->own_certificate != NULL) {
@@ -340,7 +384,7 @@ static int store_find(const VsStore *store, const mbedtls_x509_crt *child, mbedt
 int vs_find_issuers_with_store(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates)
 {
     VsSsl *ssl = context;
-    int result = vs_find_trusted_issuers(NULL, child, candidates);
+    int result = ssl != NULL && ssl->context->no_bundle ? 0 : vs_find_trusted_issuers(NULL, child, candidates);
     if (result != 0 || ssl == NULL || ssl->context->store == NULL)
         return result;
     return store_find(ssl->context->store, child, candidates);

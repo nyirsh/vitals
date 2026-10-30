@@ -357,6 +357,10 @@ static int transport_result(VsSsl *ssl, int result, int sending)
 {
     if (result > 0 || (result == 0 && !sending))
         return result;
+    if (result == VITALS_SSL_WOULD_BLOCK) {
+        ssl->failure = sending ? VS_FAILED_WANT_WRITE : VS_FAILED_WANT_READ;
+        return sending ? MBEDTLS_ERR_SSL_WANT_WRITE : MBEDTLS_ERR_SSL_WANT_READ;
+    }
     if (result == 0) {
         ssl->failure = VS_FAILED_SEND_ZERO;
         return MBEDTLS_ERR_SSL_WANT_WRITE;
@@ -588,6 +592,27 @@ static int setup(VsSsl *ssl)
     result = vs_apply_profile(ssl);
     if (result != 0)
         return result;
+    if (ssl->context->profile == VITALS_SSL_PROFILE_MODERN && ssl->context->suites[0] != 0) {
+        /* Only the versions the suites given are for (TLS 1.3's are 0x13xx) */
+        int tls13 = 0, tls12 = 0;
+        for (const int *suite = ssl->context->suites; *suite != 0; ++suite) {
+            if ((*suite >> 8) == 0x13)
+                tls13 = 1;
+            else
+                tls12 = 1;
+        }
+        if (!tls13)
+            mbedtls_ssl_conf_max_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_2);
+        if (!tls12)
+            mbedtls_ssl_conf_min_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_3);
+        mbedtls_ssl_conf_ciphersuites(&ssl->config, ssl->context->suites);
+    }
+    if (ssl->context->alpn[0] != NULL) {
+        /* Mbed TLS takes the list without const; it only reads it */
+        result = mbedtls_ssl_conf_alpn_protocols(&ssl->config, (const char **)ssl->context->alpn);
+        if (result != 0)
+            return result;
+    }
     int verify = ssl->context->verify_mode & 1;
     /* Deferred: the caller decides from what was found (vitalsSslGetCertificateFlags) */
     int deferred = verify && ssl->context->deferred_verify && ssl->context->verify_callback == NULL;
@@ -649,6 +674,13 @@ static int failed(VsSsl *ssl, int result)
         return ssl->socket_result;
     if (ssl->failure == VS_FAILED_SEND_ZERO && result == MBEDTLS_ERR_SSL_WANT_WRITE)
         return 0;
+    /* Waiting on the callback BIO; TLS can also ask for more with nothing tried yet */
+    if (result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE) {
+        if (ssl->failure == VS_FAILED_NOTHING)
+            ssl->failure = result == MBEDTLS_ERR_SSL_WANT_READ ? VS_FAILED_WANT_READ : VS_FAILED_WANT_WRITE;
+        if (ssl->failure == VS_FAILED_WANT_READ || ssl->failure == VS_FAILED_WANT_WRITE)
+            return -1;
+    }
     if (result == MBEDTLS_ERR_SSL_CONN_EOF) {
         ssl->failure = VS_FAILED_EOF;
         return 0;
@@ -703,6 +735,45 @@ static int connect_now(VsSsl *ssl)
     VITALS_LOG("ssl %p connected %s %s", (void *)ssl, mbedtls_ssl_get_version(&ssl->tls),
                mbedtls_ssl_get_ciphersuite(&ssl->tls));
     return 1;
+}
+
+/* NID 0x434710F6: one pass of the handshake on the caller's own stack, for a transport that doesn't
+ * block (vitals' callback BIO giving VITALS_SSL_WOULD_BLOCK): 1 once connected, else -1, and
+ * SSL_get_error says whether it waits to read (2) or write (3) or failed */
+int vitalsSslHandshake(void *handle)
+{
+    VsSsl *ssl = handle;
+    if (!is_ssl(ssl))
+        return -1;
+    ssl->connecting = 1;
+    if (ssl->handshake_done)
+        return 1;
+    ssl->failure = VS_FAILED_NOTHING;
+    if (!vs_initialized()) {
+        ssl->failure = VS_FAILED_TLS;
+        return -1;
+    }
+    int result = setup(ssl);
+    if (result == 0)
+        result = mbedtls_ssl_handshake(&ssl->tls);
+    if (result != 0) {
+        int returned = failed(ssl, result);
+        if (ssl->failure == VS_FAILED_TLS)
+            VITALS_LOG("ssl %p handshake failed %d flags=%08X", (void *)ssl, result,
+                       (unsigned int)mbedtls_ssl_get_verify_result(&ssl->tls));
+        return returned;
+    }
+    ssl->handshake_done = 1;
+    VITALS_LOG("ssl %p connected %s %s", (void *)ssl, mbedtls_ssl_get_version(&ssl->tls),
+               mbedtls_ssl_get_ciphersuite(&ssl->tls));
+    return 1;
+}
+
+/* NID 0x69C630B4: whether TLS holds data not yet read, a record not yet decrypted included */
+int vitalsSslCheckPending(void *handle)
+{
+    VsSsl *ssl = handle;
+    return is_ssl(ssl) && ssl->handshake_done && mbedtls_ssl_check_pending(&ssl->tls);
 }
 
 /* NID 0xE5EDD91B, Sony 0x8101ADCF: SSL_connect; 1 once connected */
@@ -796,7 +867,10 @@ int sceSslInternalGetError(void *handle, int returned)
     case VS_FAILED_RECEIVE:
         return returned < 0 ? VS_KIND_WANT_READ : VS_KIND_SYSCALL;
     case VS_FAILED_SEND_ZERO:
+    case VS_FAILED_WANT_WRITE:
         return VS_KIND_WANT_WRITE;
+    case VS_FAILED_WANT_READ:
+        return VS_KIND_WANT_READ;
     case VS_FAILED_CLOSED:
         return returned == 0 ? VS_KIND_ZERO_RETURN : VS_KIND_SYSCALL;
     default:
@@ -905,9 +979,11 @@ int sceSslInternalWant(void *handle)
         return 1;
     switch (ssl->failure) {
     case VS_FAILED_RECEIVE:
+    case VS_FAILED_WANT_READ:
         return 3;
     case VS_FAILED_SEND:
     case VS_FAILED_SEND_ZERO:
+    case VS_FAILED_WANT_WRITE:
         return 2;
     default:
         return 1;

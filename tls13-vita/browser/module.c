@@ -15,6 +15,10 @@
 enum { BROWSER_HOOK_CLOSE, BROWSER_HOOK_PENDING, BROWSER_HOOK_CHECK, BROWSER_HOOK_CONNECT, BROWSER_HOOK_COUNT };
 static tai_hook_ref_t hook_refs[BROWSER_HOOK_COUNT];
 static int hook_ids[BROWSER_HOOK_COUNT];
+/* Writable and initialized, so the module has a data segment with content: vita-elf-create can't
+ * lay out an empty one, which this module would have now that its TLS is the libssl module's (the
+ * link keeps it) */
+char vitals_browser_module_data[] = "vitals browser provider";
 static uint32_t starting;
 static char ca_path[256];
 

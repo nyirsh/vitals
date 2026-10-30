@@ -5,12 +5,21 @@
 static int target_name_result, provider_name_result = NAME_NOT_FOUND;
 static int target_name_uid = 188, provider_name_uid = 199;
 static int wrong_target_name, wrong_provider_name, missing_target_nul, missing_provider_nul;
-static unsigned int name_target_calls, name_provider_calls;
+static unsigned int name_target_calls, name_provider_calls, name_ssl_calls;
+static int ssl_name_result = NAME_NOT_FOUND;
 
 int taiGetModuleInfoForKernel(SceUID pid, const char *name, tai_module_info_t *info) {
     assert(pid == 99 && !locked && info->size == sizeof(*info));
     require_query_workspace(info, sizeof(*info));
     assert(info->modid == 0 && info->name[sizeof(info->name) - 1] == 0);
+    /* libssl, loaded before the provider when it isn't there */
+    if (strcmp(name, "SceLibSsl") == 0) {
+        ++name_ssl_calls;
+        if (ssl_name_result != 0) return ssl_name_result;
+        info->modid = 166;
+        strcpy(info->name, name);
+        return 0;
+    }
     /* The browser engine, then the provider */
     int target = strcmp(name, "ScePsp2Compat") == 0;
     assert(target || strcmp(name, "vitals") == 0);

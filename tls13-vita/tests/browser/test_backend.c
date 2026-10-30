@@ -19,6 +19,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+/* vitals-ssl's host platform reads the bundle from here */
+extern char vs_test_ca_path[512];
+int sceSslTerm(void);
+
 static uint64_t deadline;
 static unsigned int waits, writes_waited, reads_waited;
 static const void *accepted_callback, *accepted_userdata;
@@ -94,6 +98,7 @@ int main(int argc, char **argv) {
     assert(argc == 5);
     scenario = argv[3];
     mock_ca_file = argv[1];
+    snprintf(vs_test_ca_path, sizeof(vs_test_ca_path), "%s", argv[1]);
     arena = mmap((void *)(uintptr_t)0x24000000, 65536, PROT_READ | PROT_WRITE,
         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
     assert(arena != MAP_FAILED && (uintptr_t)arena <= UINT32_MAX);
@@ -133,8 +138,8 @@ int main(int argc, char **argv) {
 #ifdef VITALS_BROWSER_MEMORY_TEST
     if (memory_case) {
         memory_after_init = vitals_memory_tracker_snapshot();
+        /* The TLS is libssl's, set up on the first connection: nothing is kept before it */
         assert(!memory_after_init.overflow);
-        assert(memory_after_init.current_bytes > 0 && memory_after_init.live_allocations > 0);
     }
 #endif
     vitals_browser_enable(1);
@@ -340,6 +345,8 @@ cleanup:
     assert(vitals_browser_destroy() == 0);
 #ifdef VITALS_BROWSER_MEMORY_TEST
     if (memory_case) {
+        /* libssl outlives the provider in a process; ended here, everything is given back */
+        assert(sceSslTerm() == 0);
         memory_after_destroy = vitals_memory_tracker_snapshot();
         assert(!memory_after_destroy.overflow);
         assert(memory_after_destroy.current_bytes == 0);

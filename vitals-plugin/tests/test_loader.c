@@ -15,6 +15,8 @@ static const uint8_t compat_hash[32] = {
 static int browser_file = 1, corrupt_browser;
 static int read_once[2], locked, mutex_live, loads, unloads;
 static int load_error, start_error, reenter, close_error;
+/* The libssl load before the provider's */
+static int ssl_loads, ssl_unloads, ssl_load_error, ssl_start_error;
 static int target_info_error, target_user_id = 188;
 static int target_wrong_name;
 static unsigned int target_queries;
@@ -298,8 +300,21 @@ SceUID ksceKernelLoadStartModuleForPid(SceUID pid, const char *path, SceSize siz
     *status = start_error ? SCE_KERNEL_START_FAILED : SCE_KERNEL_START_SUCCESS;
     return 777;
 }
+/* libssl, as the system loads it (main.c), then started */
+SceUID vitals_kernel_load_system_libssl(SceUID pid, int *started, int *status) {
+    assert(pid == 99 && !locked);
+    ++ssl_loads;
+    if (ssl_load_error) return -457;
+    *started = 0;
+    *status = ssl_start_error ? SCE_KERNEL_START_FAILED : SCE_KERNEL_START_SUCCESS;
+    return 555;
+}
 int ksceKernelUnloadModuleForPid(SceUID pid, SceUID id, int flags, const void *options) {
-    assert(pid == 99 && id == 777 && flags == 0 && options == NULL && !locked);
+    assert(pid == 99 && (id == 777 || id == 555) && flags == 0 && options == NULL && !locked);
+    if (id == 555) {
+        ++ssl_unloads;
+        return 0;
+    }
     ++unloads;
     return 0;
 }
@@ -311,6 +326,7 @@ static void reset(void) {
     assert(!query_live && query_allocations == query_frees);
     stream_blocks = 1;
     loads = unloads = 0;
+    ssl_loads = ssl_unloads = ssl_load_error = ssl_start_error = 0;
     load_error = start_error = reenter = corrupt_browser = close_error = 0;
     target_info_error = 0;
     target_wrong_name = 0;

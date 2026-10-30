@@ -2,8 +2,9 @@
 
 Sony's SSL library (`SceLibSsl`, the `sceSsl` API) being written from scratch, as a user module
 exported under libssl's own library and function NIDs ([libssl_api.yml.in](libssl_api.yml.in)),
-all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
-shared with vitals-http and the browser provider).
+all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/)),
+the only copy of it on the console: vitals-http and the browser provider do their TLS through
+this module.
 
 Every export is written: all 11 `SceSsl` functions and all 98 `SceSslInternal` ones. That is the
 69 Sony's libhttp uses (below: connections, its certificate check and its client certificate
@@ -11,7 +12,8 @@ callback), `SSL_pending`, which the NetCheck dialog's own TLS adds, the 25 nothi
 worked out from Sony's code ([the rest](#the-rest-what-nothing-seen-calls)), and three that do
 nothing in Sony's either. The app installs it as the system's
 libssl, in place of the copy of Sony's it used to install ([docs/libssl.md](../docs/libssl.md)),
-and vitals-http imports it, as Sony's libhttp imports Sony's libssl.
+vitals-http imports it, as Sony's libhttp imports Sony's libssl, and the browser provider does its
+TLS on it, in the browser engine's process, where the kernel plugin loads it.
 
 ## Building
 
@@ -273,8 +275,9 @@ reasons), its object layouts are SSLeay's, and the rest is what it reads and wri
 
 ## VitalsSsl: vitals' additions
 
-vitals-http does its TLS through this module, as Sony's libhttp does through Sony's. It uses
-Sony's functions and a few more, which
+vitals-http does its TLS through this module, as Sony's libhttp does through Sony's, and so does
+the browser provider ([tls13-vita/browser](../tls13-vita/browser/)). They use Sony's functions and a
+few more, which
 the module exports as its own library, `VitalsSsl` (NID `0x6D89DA35`; each function's NID is the
 first word of the SHA-1 of its name, as Sony's are made). [include/vitals_ssl.h](include/vitals_ssl.h)
 declares both, with every object opaque:
@@ -282,7 +285,10 @@ declares both, with every object opaque:
 | Functions | What for |
 | --- | --- |
 | `vitalsSslInitShared` | the library without a pool of its own, its memory the caller's, for a caller that builds vitals-ssl in |
-| `vitalsSslBioNew` | a BIO over the caller's transport (its timeouts, aborts and proxy tunnels) |
+| `vitalsSslBioNew` | a BIO over the caller's transport (its timeouts, aborts and proxy tunnels); a transport that doesn't block answers `VITALS_SSL_WOULD_BLOCK`, and `SSL_get_error` then says to wait to read or write |
+| `vitalsSslHandshake`, `vitalsSslCheckPending` | one pass of the handshake on the caller's own stack, for such a transport (the browser's curl socket), and whether a record is waiting to be decrypted |
+| `vitalsSslCtxSetCiphersuites`, `vitalsSslCtxSetAlpn` | the suites offered (only the TLS versions they are for) and the ALPN names, as the browser's curl asks |
+| `vitalsSslCtxSetTrustBundle` | only the store trusted, not the bundle: a page's own CA file |
 | `vitalsSslCtxSetProfile` | the console's ClientHello for Sony's private HTTPS option `0x40` (PSN sign-in) |
 | `vitalsSslCtxSetDeferredVerify`, `vitalsSslGetCertificateFlags`, `vitalsSslGetVerifyResult` | the handshake goes on whatever the check finds, and the caller decides from it (its HTTPS options, the app's callback) |
 | `vitalsSslStoreNew`, `vitalsSslStoreAdd`, `vitalsSslStoreRelease`, `vitalsSslCtxSetStore` | CA certificates trusted besides the bundle (an app's `sceHttpsLoadCert` ones), also as exact self-signed certificates |

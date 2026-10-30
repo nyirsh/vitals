@@ -5,7 +5,7 @@
 Modern TLS (1.2 and 1.3) for the PS Vita browser, apps and games that use Sony's `sceHttp` APIs.  
 It started as a derivation of `tls_fixer` by [devnoname120](https://github.com/devnoname120), it grew enough to become its own full project. ([more info](#why-a-separate-project))
 
-The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals gives apps and games rewrites of Sony's HTTP and SSL libraries, the SSL one on [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), gives the browser Mbed TLS in place of its own TLS, and installs an up-to-date certificate store. Apps keep calling the same HTTP functions, so they work unchanged.
+The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals gives apps and games rewrites of Sony's HTTP and SSL libraries, the SSL one on [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), gives the browser that same SSL library in place of its own TLS, and installs an up-to-date certificate store. Apps keep calling the same HTTP functions, so they work unchanged.
 
 > [!TIP]
 > **If it's not broken, don't fix it**
@@ -48,7 +48,7 @@ Before installing, the app removes the plugins known to conflict with vitals. Un
 
 ## What it covers
 
-- **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl)
+- **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl), on `vitals-ssl`, which the kernel plugin loads into the browser's process
 - **Apps, games and the shell:** `vitals-http`, Sony's HTTP library written from scratch, with its TLS from `vitals-ssl` (Sony's SSL library rewritten on `Mbed TLS` 3.6), replaces `SceLibHttp` in every process that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
 - **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. The starter [host redirects](#host-redirects) list sends the old host to the new one, and `vitals-http` applies it in the shell and in every app, as [reAuth](https://github.com/psv-plugins-archive/reAuth) did
 
@@ -204,7 +204,7 @@ Every build includes all three levels; choose one on the console from the app's 
 ### Updating `Mbed TLS` or `curl`
 
 Both are pinned in [dependencies.cmake](dependencies.cmake). Change the version and the SHA-256 together, where the SHA-256 is that of the new release archive (`sha256sum` of the downloaded file).  
-The next build downloads and verifies it. `vitals-ssl` and the browser provider share one `Mbed TLS` build ([tls13-vita/crypto](tls13-vita/crypto/)) and accept any 3.6 release, whose patch must still apply. They can't move to 4.x: it dropped the RSA key exchange PSN sign-in needs.
+The next build downloads and verifies it. `vitals-ssl`, which does the TLS of apps, games and the browser, builds it ([tls13-vita/crypto](tls13-vita/crypto/)) and accepts any 3.6 release, whose patch must still apply. It can't move to 4.x: it dropped the RSA key exchange PSN sign-in needs.
 
 ### Updating the bundled certificates
 

@@ -60,6 +60,10 @@ typedef enum VsFailure {
     VS_FAILED_EOF,     /* the server closed the socket */
     VS_FAILED_CLOSED,  /* the server's close_notify */
     VS_FAILED_TLS,     /* the TLS itself: a bad message, an alert, a refused certificate */
+    /* vitals' callback BIO had nothing to give or no room (VITALS_SSL_WOULD_BLOCK), or TLS is
+     * waiting on it */
+    VS_FAILED_WANT_READ,
+    VS_FAILED_WANT_WRITE,
 } VsFailure;
 
 typedef struct VsMethod {
@@ -87,6 +91,12 @@ typedef struct VsContext {
     int profile;
     int deferred_verify;
     struct VsStore *store;
+    /* Only the store is trusted, not the bundle (vitalsSslCtxSetTrustBundle) */
+    int no_bundle;
+    /* The suites offered (IANA numbers, 0-terminated) and the ALPN names, when the caller set them;
+     * the names are the caller's, kept as long as the context */
+    int suites[17];
+    const char *alpn[5];
     mbedtls_x509_crt *own_certificate;
     mbedtls_pk_context *own_key;
     /* SSL_CTX_add_client_CA's names, which only a server would send */

@@ -139,6 +139,9 @@ SceLibSsl:
         - vitalsSslCheckChain: 0x791117DC
         - vitalsSslCheckCertificate: 0x169DA221
         - vitalsSslCheckKey: 0xDE8174EC
+        - vitalsSslCheckPending: 0x69C630B4
+        - vitalsSslCtxSetAlpn: 0xA882893F
+        - vitalsSslCtxSetCiphersuites: 0xABB1825C
         - vitalsSslCtxSetDeferredVerify: 0x00FB3554
         - vitalsSslCtxSetIdentity: 0x8DCEBE98
         - vitalsSslCtxSetProfile: 0xC356276E
@@ -148,8 +151,11 @@ SceLibSsl:
         - vitalsSslGetTlsError: 0xE6EB9C2D
         - vitalsSslGetVerifyResult: 0xD35E2515
         - vitalsSslGetVersion: 0x184CAB4B
+        - vitalsSslHandshake: 0x434710F6
+        - vitalsSslSetBundlePath: 0x65D6DCBE
         - vitalsSslInitShared: 0xEC2EA2B3
         - vitalsSslStoreAdd: 0x5F84E0A4
         - vitalsSslStoreNew: 0xFBCA83CB
         - vitalsSslStoreRelease: 0x8563BB9E
         - vitalsSslTlsErrorIsMemory: 0xE0613333
+        - vitalsSslCtxSetTrustBundle: 0xE61C471E

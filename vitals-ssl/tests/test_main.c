@@ -1,13 +1,18 @@
 #include "vs.h"
+#include "vitals/error_map.h"
+#include "vitals_ssl.h"
 
 #include <mbedtls/x509_crt.h>
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -283,6 +288,206 @@ static void test_echo(void)
     CHECK_EQ(sceSslInternalGetError(connection.ssl, result), VS_KIND_ZERO_RETURN);
     CHECK_EQ(sceSslInternalShutdown(connection.ssl), 1);
     close_connection(&connection);
+}
+
+/* The browser provider's way: vitalsSslHandshake, reads and writes over vitals' callback BIO on a
+ * socket that doesn't block, waiting as SSL_get_error says */
+typedef struct Transport {
+    int fd;
+    int sends, receives, would_block;
+} Transport;
+
+static int nonblocking_send(void *context, const unsigned char *data, size_t size)
+{
+    Transport *transport = context;
+    ++transport->sends;
+    ssize_t sent = send(transport->fd, data, size, 0);
+    if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        ++transport->would_block;
+        return VITALS_SSL_WOULD_BLOCK;
+    }
+    return sent < 0 ? -1 : (int)sent;
+}
+
+static int nonblocking_receive(void *context, unsigned char *data, size_t size)
+{
+    Transport *transport = context;
+    ++transport->receives;
+    ssize_t received = recv(transport->fd, data, size, 0);
+    if (received < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        ++transport->would_block;
+        return VITALS_SSL_WOULD_BLOCK;
+    }
+    return received < 0 ? -1 : (int)received;
+}
+
+/* Runs call until it succeeds or fails for good: its result */
+static int wait_for(int fd, void *ssl, int (*call)(void *, void *, int), void *buffer, int size)
+{
+    for (int round = 0; round < 1000; ++round) {
+        int result = call(ssl, buffer, size);
+        if (result > 0)
+            return result;
+        int kind = sceSslInternalGetError(ssl, result);
+        if (kind != VITALS_SSL_KIND_WANT_READ && kind != VITALS_SSL_KIND_WANT_WRITE)
+            return result;
+        struct pollfd wait = {fd, (short)(kind == VITALS_SSL_KIND_WANT_READ ? POLLIN : POLLOUT), 0};
+        (void)poll(&wait, 1, 5000);
+    }
+    return -1;
+}
+
+static int handshake_call(void *ssl, void *buffer, int size)
+{
+    (void)buffer, (void)size;
+    return vitalsSslHandshake(ssl);
+}
+
+static int read_call(void *ssl, void *buffer, int size)
+{
+    return sceSslInternalRead(ssl, buffer, size);
+}
+
+static int write_call(void *ssl, void *buffer, int size)
+{
+    return sceSslInternalWrite(ssl, buffer, size);
+}
+
+static int read_line_nonblocking(Transport *transport, void *ssl, char *line, int size)
+{
+    int length = 0;
+    while (length < size - 1) {
+        int result = wait_for(transport->fd, ssl, read_call, line + length, 1);
+        if (result <= 0)
+            return result;
+        if (line[length++] == '\n')
+            break;
+    }
+    line[length] = '\0';
+    return length;
+}
+
+typedef struct Browser {
+    void *context, *ssl;
+    Transport transport;
+} Browser;
+
+/* In place: the BIO keeps a pointer to the transport */
+static void open_nonblocking(Browser *opened, const int *suites, const char *const *alpn, void *store, int bundle)
+{
+    Browser browser_ = {0};
+    *opened = browser_;
+    Browser *b = opened;
+    void *library = NULL;
+    CHECK_EQ(sceSslInternalGetLibrary(&library), 0);
+    b->context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    sceSslInternalCtxSetVerify(b->context, 1);
+    CHECK_EQ(vitalsSslCtxSetDeferredVerify(b->context, 1), 0);
+    CHECK_EQ(vitalsSslCtxSetCiphersuites(b->context, suites), 0);
+    CHECK_EQ(vitalsSslCtxSetAlpn(b->context, alpn), 0);
+    CHECK_EQ(vitalsSslCtxSetStore(b->context, store), 0);
+    CHECK_EQ(vitalsSslCtxSetTrustBundle(b->context, bundle), 0);
+    b->ssl = sceSslInternalNew(b->context);
+    sceSslInternalCtxFree(b->context);
+    b->transport.fd = connect_to(g_port, 0);
+    CHECK_EQ(fcntl(b->transport.fd, F_SETFL, fcntl(b->transport.fd, F_GETFL) | O_NONBLOCK), 0);
+    void *bio = vitalsSslBioNew(nonblocking_send, nonblocking_receive, &b->transport);
+    CHECK_EQ(sceSslInternalBioCtrl(bio, VS_BIO_CTRL_SET_HOST, 0, (void *)"vitals-ssl.test"), 1);
+    sceSslInternalSetBio(b->ssl, bio, bio);
+    sceSslInternalSetConnectState(b->ssl);
+}
+
+static void close_nonblocking(Browser *browser)
+{
+    (void)sceSslInternalShutdown(browser->ssl);
+    sceSslInternalFree(browser->ssl);
+    CHECK_EQ(close(browser->transport.fd), 0);
+}
+
+static void test_nonblocking(void)
+{
+    char line[128];
+    /* The bundle doesn't have the server; the store does */
+    CHECK_EQ(sceSslTerm(), 0);
+    snprintf(vs_test_ca_path, sizeof(vs_test_ca_path), "%s", g_other_root);
+    CHECK_EQ(sceSslInit(256 * 1024), 0);
+    void *store = vitalsSslStoreNew();
+    FILE *file = fopen(g_server_pem, "rb");
+    static char pem[8192];
+    size_t size = file != NULL ? fread(pem, 1, sizeof(pem), file) : 0;
+    if (file != NULL)
+        fclose(file);
+    CHECK_EQ(vitalsSslStoreAdd(store, pem, size), 0);
+
+    /* TLS 1.3 with the one suite given, ALPN, the store only */
+    static const int tls13_only[] = {0x1302, 0};
+    static const char *const alpn[] = {"http/1.1", NULL};
+    Browser browser;
+    open_nonblocking(&browser, tls13_only, alpn, store, 0);
+    CHECK_EQ(wait_for(browser.transport.fd, browser.ssl, handshake_call, NULL, 0), 1);
+    CHECK(browser.transport.would_block > 0);
+    CHECK_EQ(vitalsSslGetCertificateFlags(browser.ssl), 0);
+    CHECK(strcmp(vitalsSslGetVersion(browser.ssl), "TLSv1.3") == 0);
+    CHECK(strstr(vitalsSslGetCiphersuite(browser.ssl), "AES-256-GCM") != NULL);
+    /* Done: a second call is 1 at once */
+    CHECK_EQ(vitalsSslHandshake(browser.ssl), 1);
+    CHECK(read_line_nonblocking(&browser.transport, browser.ssl, line, sizeof(line)) > 0);
+    CHECK(strcmp(line, "sni=vitals-ssl.test\n") == 0);
+    CHECK(read_line_nonblocking(&browser.transport, browser.ssl, line, sizeof(line)) > 0);
+    CHECK(strcmp(line, "alpn=http/1.1\n") == 0);
+    /* Nothing to read yet: wait to read, nothing pending */
+    int result = sceSslInternalRead(browser.ssl, line, sizeof(line));
+    CHECK_EQ(result, -1);
+    CHECK_EQ(sceSslInternalGetError(browser.ssl, result), VITALS_SSL_KIND_WANT_READ);
+    CHECK_EQ(sceSslInternalWant(browser.ssl), 3);
+    CHECK_EQ(vitalsSslCheckPending(browser.ssl), 0);
+    CHECK_EQ(wait_for(browser.transport.fd, browser.ssl, write_call, "pending\n", 8), 8);
+    CHECK_EQ(wait_for(browser.transport.fd, browser.ssl, read_call, line, 1), 1);
+    /* The rest of the record is there */
+    CHECK_EQ(vitalsSslCheckPending(browser.ssl), 1);
+    CHECK(read_line_nonblocking(&browser.transport, browser.ssl, line + 1, sizeof(line) - 1) > 0);
+    CHECK(strcmp(line, "pending\n") == 0);
+    CHECK_EQ(wait_for(browser.transport.fd, browser.ssl, write_call, "quit\n", 5), 5);
+    CHECK(read_line_nonblocking(&browser.transport, browser.ssl, line, sizeof(line)) > 0);
+    CHECK(strcmp(line, "bye\n") == 0);
+    result = wait_for(browser.transport.fd, browser.ssl, read_call, line, sizeof(line));
+    CHECK_EQ(result, 0);
+    CHECK_EQ(sceSslInternalGetError(browser.ssl, result), VITALS_SSL_KIND_ZERO_RETURN);
+    close_nonblocking(&browser);
+
+    /* TLS 1.2 with the one suite given; with neither the store nor the bundle trusting the server,
+     * the handshake still ends (deferred), with an unknown CA */
+    static const int tls12_only[] = {0xC02F, 0xC02B, 0};
+    open_nonblocking(&browser, tls12_only, NULL, NULL, 0);
+    CHECK_EQ(wait_for(browser.transport.fd, browser.ssl, handshake_call, NULL, 0), 1);
+    CHECK(strcmp(vitalsSslGetVersion(browser.ssl), "TLSv1.2") == 0);
+    CHECK(strstr(vitalsSslGetCiphersuite(browser.ssl), "AES-128-GCM") != NULL);
+    CHECK_EQ(vitalsSslGetCertificateFlags(browser.ssl), VITALS_CERT_UNKNOWN_CA);
+    /* No ALPN offered: the server's first line only */
+    CHECK(read_line_nonblocking(&browser.transport, browser.ssl, line, sizeof(line)) > 0);
+    CHECK(strcmp(line, "sni=vitals-ssl.test\n") == 0);
+    close_nonblocking(&browser);
+
+    /* The store with the bundle (the default): trusted too */
+    open_nonblocking(&browser, NULL, NULL, store, 1);
+    CHECK_EQ(wait_for(browser.transport.fd, browser.ssl, handshake_call, NULL, 0), 1);
+    CHECK_EQ(vitalsSslGetCertificateFlags(browser.ssl), 0);
+    close_nonblocking(&browser);
+
+    /* Bad lists are refused */
+    void *library = NULL;
+    CHECK_EQ(sceSslInternalGetLibrary(&library), 0);
+    void *context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    static const int too_many[18] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 0};
+    static const char *const too_many_names[] = {"a", "b", "c", "d", "e", NULL};
+    CHECK_EQ(vitalsSslCtxSetCiphersuites(context, too_many), VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsSslCtxSetAlpn(context, too_many_names), VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsSslCtxSetCiphersuites(NULL, NULL), VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsSslCtxSetTrustBundle(NULL, 1), VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsSslHandshake(NULL), -1);
+    CHECK_EQ(vitalsSslCheckPending(NULL), 0);
+    sceSslInternalCtxFree(context);
+    vitalsSslStoreRelease(store);
 }
 
 /* The server closes the socket without close_notify: 0, and a system error (5) */
@@ -1050,6 +1255,7 @@ int main(int argc, char **argv)
     test_verify_callback();
     test_client_certificate();
     test_remaining();
+    test_nonblocking();
     CHECK_EQ(sceSslTerm(), 0);
     (void)g_alerts;
     (void)g_last_alert;

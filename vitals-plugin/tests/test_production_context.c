@@ -7,6 +7,34 @@ static void clean_context(void) {
     assert(!locked);
 }
 
+/* libssl is loaded into the process before the provider, unless it is there; without it there is
+ * no provider */
+static void test_libssl_first(void) {
+    reset();
+    assert(vitals_kernel_loader_init() == 0);
+    provider_name_result = NAME_NOT_FOUND;
+    ssl_name_result = NAME_NOT_FOUND;
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) == 0);
+    assert(ssl_loads == 1 && loads == 1);
+    clean_context();
+    ssl_name_result = 0;
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) == 0);
+    assert(ssl_loads == 1 && loads == 2);
+    ssl_name_result = NAME_NOT_FOUND;
+    ssl_load_error = 1;
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) == -457);
+    ssl_load_error = 0;
+    ssl_start_error = 1;
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) < 0 && ssl_unloads == 1);
+    ssl_start_error = 0;
+    ssl_name_result = -42;
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) < 0);
+    ssl_name_result = NAME_NOT_FOUND;
+    assert(loads == 2 && ssl_loads == 3);
+    clean_context();
+    reset();
+}
+
 int main(void) {
     reset();
     assert(vitals_kernel_loader_init() == 0);
@@ -44,6 +72,7 @@ int main(void) {
     test_query_workspace_failures();
     test_workspace_failures();
     test_loader_failure_paths();
+    test_libssl_first();
     puts("browser provider: native stack, narrow lookup, duplicate/failure gates PASS");
     return 0;
 }

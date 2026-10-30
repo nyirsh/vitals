@@ -13,10 +13,34 @@ target_link_libraries(vitals_browser_config_tests PRIVATE vitals_core)
 target_compile_options(vitals_browser_config_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME vitals_browser_config COMMAND vitals_browser_config_tests)
 
-add_executable(vitals_browser_backend_tests test_backend.c ../../browser/backend.c
-    ../../browser/config.c ../../provider/ca_file.c ../../provider/ca_index.c ../../provider/platform_shims.c)
+# The backend's TLS is vitals-ssl, built in here with its host platform; it needs VitaSDK's
+# <psp2/libssl.h>, as vitals-ssl's own tests do
+if(NOT DEFINED ENV{VITASDK})
+    message(STATUS "VITASDK is not set: the browser backend tests are left out")
+else()
+set(VITALS_SSL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../vitals-ssl)
+file(COPY $ENV{VITASDK}/arm-vita-eabi/include/psp2/libssl.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/sdk/psp2)
+file(COPY $ENV{VITASDK}/arm-vita-eabi/include/vitasdk/build_utils.h DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/sdk/vitasdk)
+add_library(vitals_ssl_host STATIC
+    ${VITALS_SSL_ROOT}/src/core.c
+    ${VITALS_SSL_ROOT}/src/connection.c
+    ${VITALS_SSL_ROOT}/src/certificate.c
+    ${VITALS_SSL_ROOT}/src/vitals.c
+    ${VITALS_SSL_ROOT}/src/ssl.c
+    ${VITALS_SSL_ROOT}/src/internal.c
+    ${VITALS_SSL_ROOT}/tests/platform_posix.c
+    ../../provider/platform_shims.c
+    ../../provider/ca_index.c)
+target_include_directories(vitals_ssl_host BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sdk)
+target_include_directories(vitals_ssl_host PRIVATE ${VITALS_SSL_ROOT}/src ../../provider
+    PUBLIC ${VITALS_SSL_ROOT}/include)
+target_compile_definitions(vitals_ssl_host PRIVATE VITALS_DEBUG=0 VITALS_LOG_PREFIX="vitals-ssl")
+target_compile_options(vitals_ssl_host PRIVATE -std=gnu11 -fno-pie)
+target_link_libraries(vitals_ssl_host PUBLIC vitals_core mbedtls mbedx509 mbedcrypto vitals_vita_mock)
+
+add_executable(vitals_browser_backend_tests test_backend.c ../../browser/backend.c ../../browser/config.c)
 target_include_directories(vitals_browser_backend_tests PRIVATE ../../browser ../../provider)
-target_link_libraries(vitals_browser_backend_tests PRIVATE vitals_core mbedtls vitals_vita_mock)
+target_link_libraries(vitals_browser_backend_tests PRIVATE vitals_ssl_host)
 target_compile_options(vitals_browser_backend_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG -fno-pie)
 target_link_options(vitals_browser_backend_tests PRIVATE -no-pie)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -25,9 +49,9 @@ add_test(NAME vitals_browser_loopback COMMAND "${Python3_EXECUTABLE}"
 set_tests_properties(vitals_browser_loopback PROPERTIES TIMEOUT 120)
 
 add_executable(vitals_browser_memory_tests test_backend.c memory_tracker.c ../../browser/backend.c
-    ../../browser/config.c ../../provider/ca_file.c ../../provider/ca_index.c ../../provider/platform_shims.c)
+    ../../browser/config.c)
 target_include_directories(vitals_browser_memory_tests PRIVATE ../../browser ../../provider)
-target_link_libraries(vitals_browser_memory_tests PRIVATE vitals_core mbedtls vitals_vita_mock)
+target_link_libraries(vitals_browser_memory_tests PRIVATE vitals_ssl_host)
 target_compile_definitions(vitals_browser_memory_tests PRIVATE
     VITALS_BROWSER_MEMORY_TEST=1)
 target_compile_options(vitals_browser_memory_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG -fno-pie)
@@ -38,15 +62,15 @@ add_test(NAME vitals_browser_memory COMMAND "${Python3_EXECUTABLE}"
     --scenario memory-full-ca)
 set_tests_properties(vitals_browser_memory PROPERTIES TIMEOUT 120)
 
-add_executable(vitals_browser_lazy_ca_tests test_lazy_ca.c ../../browser/backend.c
-    ../../browser/config.c ../../provider/ca_file.c ../../provider/ca_index.c ../../provider/platform_shims.c)
+add_executable(vitals_browser_lazy_ca_tests test_lazy_ca.c ../../browser/backend.c ../../browser/config.c)
 target_include_directories(vitals_browser_lazy_ca_tests PRIVATE ../../browser ../../provider)
-target_link_libraries(vitals_browser_lazy_ca_tests PRIVATE vitals_core mbedtls vitals_vita_mock)
+target_link_libraries(vitals_browser_lazy_ca_tests PRIVATE vitals_ssl_host)
 target_compile_options(vitals_browser_lazy_ca_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG -fno-pie)
-target_link_options(vitals_browser_lazy_ca_tests PRIVATE -no-pie -Wl,--wrap=vitals_ca_index_build)
+target_link_options(vitals_browser_lazy_ca_tests PRIVATE -no-pie -Wl,--wrap=sceIoOpen)
 foreach(scenario IN ITEMS init legacy failure)
     add_test(NAME vitals_browser_lazy_ca_${scenario} COMMAND vitals_browser_lazy_ca_tests ${scenario})
 endforeach()
+endif()
 
 add_executable(vitals_browser_module_tests test_module.c ../../browser/module.c
     ../../browser/webkit_callback.c)

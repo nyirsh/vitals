@@ -108,7 +108,9 @@ static int thread_entry(SceSize size, void *data)
     (void)size;
     const VsThreadStart *start = data;
     start->function(start->argument);
-    return sceKernelExitThread(0);
+    /* Returning ends it: sceKernelExitThread's library isn't in every process (the browser
+     * engine's has none) */
+    return 0;
 }
 
 void vs_platform_run_on_large_stack(void (*function)(void *), void *argument)

@@ -1,7 +1,7 @@
 #ifndef VITALS_SSL_PUBLIC_H
 #define VITALS_SSL_PUBLIC_H
 
-/* vitals-ssl for its own callers (vitals-http): the Sony functions they use, as Sony's libhttp
+/* vitals-ssl for its own callers (vitals-http, the browser provider): the Sony functions they use, as Sony's libhttp
  * calls them, and vitals' additions, the VitalsSsl library. Every object is opaque, so a caller
  * needs neither vitals-ssl's nor Mbed TLS's headers */
 
@@ -14,6 +14,10 @@ extern "C" {
 /* SSL_get_error's kinds */
 #define VITALS_SSL_KIND_NONE 0
 #define VITALS_SSL_KIND_SSL 1
+
+/* SceSsl's set-up, as an app calls it: the pool every connection's memory comes from */
+int sceSslInit(unsigned int poolSize);
+int sceSslTerm(void);
 
 /* SceSslInternal, as Sony's libhttp calls them */
 int sceSslInternalIsInitalized(void);
@@ -37,6 +41,8 @@ int sceSslInternalRead(void *ssl, void *buffer, int size);
 int sceSslInternalWrite(void *ssl, const void *buffer, int size);
 int sceSslInternalShutdown(void *ssl);
 int sceSslInternalGetError(void *ssl, int returned);
+/* SSL_pending: what TLS has already decrypted and not given out */
+int sceSslInternalPending(void *ssl);
 
 /* BIO_ctrl's command that gives the host name (SNI, and the name checked) */
 #define VITALS_SSL_BIO_SET_HOST 100
@@ -53,6 +59,27 @@ int vitalsSslInitShared(void);
 typedef int (*VitalsSslSend)(void *context, const unsigned char *data, size_t size);
 typedef int (*VitalsSslReceive)(void *context, unsigned char *data, size_t size);
 void *vitalsSslBioNew(VitalsSslSend send, VitalsSslReceive receive, void *context);
+/* What send or receive returns when the transport has nothing to give or no room yet: the call
+ * then returns -1, and SSL_get_error says to wait to read or write */
+#define VITALS_SSL_WOULD_BLOCK (-2)
+/* SSL_get_error's kinds for it */
+#define VITALS_SSL_KIND_WANT_READ 2
+#define VITALS_SSL_KIND_WANT_WRITE 3
+#define VITALS_SSL_KIND_ZERO_RETURN 6
+/* One pass of the handshake, on the caller's stack, for such a transport: 1 once connected, else -1
+ * (SSL_get_error: wait, or failed) */
+int vitalsSslHandshake(void *ssl);
+/* Whether TLS holds data not yet read, a record not yet decrypted included */
+int vitalsSslCheckPending(void *ssl);
+/* The suites offered (IANA numbers ending with 0, at most 16; NULL for Mbed TLS's defaults), and
+ * the ALPN names (NULL-terminated, at most 4, kept by the caller as long as the context) */
+int vitalsSslCtxSetCiphersuites(void *context, const int *suites);
+int vitalsSslCtxSetAlpn(void *context, const char *const *protocols);
+/* The bundle's path as this process names it, where vitals-ssl's own lookup can't serve (the
+ * browser engine's process): 0, or an SCE error */
+int vitalsSslSetBundlePath(const char *path);
+/* Whether the bundle is trusted besides the store (1, the default), or only the store (0) */
+int vitalsSslCtxSetTrustBundle(void *context, int trusted);
 
 /* The ClientHello a context's connections send */
 #define VITALS_SSL_PROFILE_MODERN 0
