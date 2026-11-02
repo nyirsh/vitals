@@ -1,11 +1,13 @@
 # Pinned third-party sources, downloaded into build/deps on first use
 # To update one, change its version and SHA-256 together; the SHA-256 is that of the release
-# archive named below (for example `sha256sum mbedtls-3.6.7.tar.bz2`)
+# archive named below (for example `sha256sum mbedtls-4.2.0.tar.bz2`)
 
-# Mbed TLS 3.6 LTS, used by vitals-http and the browser provider (tls13-vita/crypto): unlike 4.x it
-# still has the RSA key exchange the console's own TLS offers, which PSN sign-in's CDN expects
-set(VITALS_MBEDTLS_VERSION "3.6.7")
-set(VITALS_MBEDTLS_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
+# Mbed TLS 4.2 (with TF-PSA-Crypto), the TLS of vitals-ssl, which vitals-http and the browser
+# provider use: patched back to the client side of TLS 1.2's RSA key exchange, which 4.0 removed and
+# the console's own TLS offers, as some of Sony's servers (PSN sign-in, the store) still expect
+# (tls13-vita/crypto/rsa-client.patch)
+set(VITALS_MBEDTLS_VERSION "4.2.0")
+set(VITALS_MBEDTLS_SHA256 "2bed9d713b4668f76553b097e72b8aa30bc8f112a940d7ae228d524bbde6ffea")
 set(VITALS_MBEDTLS_URL
     "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${VITALS_MBEDTLS_VERSION}/mbedtls-${VITALS_MBEDTLS_VERSION}.tar.bz2")
 

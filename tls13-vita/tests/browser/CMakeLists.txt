@@ -36,7 +36,7 @@ target_include_directories(vitals_ssl_host PRIVATE ${VITALS_SSL_ROOT}/src ../../
     PUBLIC ${VITALS_SSL_ROOT}/include)
 target_compile_definitions(vitals_ssl_host PRIVATE VITALS_DEBUG=0 VITALS_LOG_PREFIX="vitals-ssl")
 target_compile_options(vitals_ssl_host PRIVATE -std=gnu11 -fno-pie)
-target_link_libraries(vitals_ssl_host PUBLIC vitals_core mbedtls mbedx509 mbedcrypto vitals_vita_mock)
+target_link_libraries(vitals_ssl_host PUBLIC vitals_core mbedtls mbedx509 tfpsacrypto vitals_vita_mock)
 
 add_executable(vitals_browser_backend_tests test_backend.c ../../browser/backend.c ../../browser/config.c)
 target_include_directories(vitals_browser_backend_tests PRIVATE ../../browser ../../provider)

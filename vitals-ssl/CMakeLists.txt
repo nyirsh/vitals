@@ -11,8 +11,8 @@ endif()
 # The bundle the vitals app installs, which servers are checked against
 set(VITALS_SSL_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trusted CA bundle (PEM)")
 
-# TLS is Mbed TLS 3.6 (tls13-vita/crypto, shared with vitals-http and the browser provider), with
-# tls13-vita's CA index and runtime
+# TLS is Mbed TLS 4.2 with TF-PSA-Crypto (tls13-vita/crypto), with tls13-vita's CA index and
+# runtime
 set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
 include(../dependencies.cmake)
 # The release version from ../VERSION, which the module header carries
@@ -61,7 +61,7 @@ endforeach()
 target_link_libraries(vitals_libssl PRIVATE
     mbedtls
     mbedx509
-    mbedcrypto
+    tfpsacrypto
     gcc
     # Weak: the browser engine's process has no path conversion, and gives the bundle's path itself
     SceAppMgr_stub_weak

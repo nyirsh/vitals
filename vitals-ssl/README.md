@@ -2,7 +2,7 @@
 
 Sony's SSL library (`SceLibSsl`, the `sceSsl` API) being written from scratch, as a user module
 exported under libssl's own library and function NIDs ([libssl_api.yml.in](libssl_api.yml.in)),
-all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/)),
+all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 4.2 ([tls13-vita/crypto](../tls13-vita/crypto/)),
 the only copy of it on the console: vitals-http and the browser provider do their TLS through
 this module.
 

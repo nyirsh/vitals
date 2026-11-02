@@ -586,7 +586,6 @@ static int setup(VsSsl *ssl)
     ssl->profile = mbedtls_x509_crt_profile_default;
     ssl->profile.allowed_mds |= MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA1);
     mbedtls_ssl_conf_cert_profile(&ssl->config, &ssl->profile);
-    mbedtls_ssl_conf_rng(&ssl->config, vs_tls_random, NULL);
     mbedtls_ssl_conf_min_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_max_tls_version(&ssl->config, MBEDTLS_SSL_VERSION_TLS1_3);
     result = vs_apply_profile(ssl);
@@ -806,8 +805,10 @@ int sceSslInternalRead(void *handle, void *buffer, int size)
             return result;
         if (result == 0)
             result = MBEDTLS_ERR_SSL_CONN_EOF;
-        /* TLS 1.3's session tickets, read on the way to the data */
-        if (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET)
+        /* TLS 1.3's session tickets, read on the way to the data, which Mbed TLS 4 reports: first as
+         * a want-read with the transport untouched (it only took the message in), then as a ticket */
+        if (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET ||
+            (result == MBEDTLS_ERR_SSL_WANT_READ && ssl->failure == VS_FAILED_NOTHING))
             continue;
         return failed(ssl, result);
     }
@@ -829,6 +830,9 @@ int sceSslInternalWrite(void *handle, const void *buffer, int size)
         ssl->failure = VS_FAILED_NOTHING;
         int result = mbedtls_ssl_write(&ssl->tls, (const unsigned char *)buffer + written,
                                        (size_t)(size - written));
+        /* A TLS 1.3 session ticket read on the way, which Mbed TLS 4 reports */
+        if (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET)
+            continue;
         if (result <= 0)
             return written > 0 ? written : failed(ssl, result == 0 ? MBEDTLS_ERR_SSL_WANT_WRITE : result);
         written += result;
@@ -1166,8 +1170,7 @@ int sceSslInternalCtxUsePrivateKey(void *handle, void *key_handle)
         mbedtls_pk_init(copy);
         /* Written from the end of the buffer */
         int length = mbedtls_pk_write_key_der(key, der, 4096);
-        ok = length > 0 && mbedtls_pk_parse_key(copy, der + 4096 - length, (size_t)length, NULL, 0,
-                                                vs_tls_random, NULL) == 0;
+        ok = length > 0 && mbedtls_pk_parse_key(copy, der + 4096 - length, (size_t)length, NULL, 0) == 0;
         mbedtls_platform_zeroize(der, 4096);
     }
     free(der);

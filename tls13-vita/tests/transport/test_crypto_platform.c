@@ -11,11 +11,9 @@
 #include <string.h>
 #include <time.h>
 
-/* platform_shims.c's entropy source, which Mbed TLS declares privately */
-int mbedtls_hardware_poll(void *data, unsigned char *output, size_t length, size_t *produced);
-
 static mbedtls_threading_mutex_t mutex;
-static int counter;
+static mbedtls_threading_condition_variable_t condition;
+static int counter, predicate;
 
 static void *count_worker(void *unused) {
     (void)unused;
@@ -27,22 +25,32 @@ static void *count_worker(void *unused) {
     return NULL;
 }
 
+static void *signal_worker(void *unused) {
+    (void)unused;
+    assert(mbedtls_mutex_lock(&mutex) == 0);
+    predicate = 1;
+    assert(mbedtls_condition_variable_signal(&condition) == 0);
+    assert(mbedtls_mutex_unlock(&mutex) == 0);
+    return NULL;
+}
+
 int main(void) {
     unsigned char random[200];
-    size_t produced = 999;
+    size_t bits = 999;
     int64_t seconds = INT64_C(1709164800);
     struct tm date;
-    pthread_t workers[2];
+    pthread_t workers[2], signaller;
 
     /* The kernel's random numbers, 64 bytes a call at most; a failure leaves nothing behind */
-    assert(mbedtls_hardware_poll(NULL, random, sizeof(random), &produced) == 0);
-    assert(produced == sizeof(random));
+    assert(mbedtls_platform_get_entropy(PSA_DRIVER_GET_ENTROPY_FLAGS_NONE, &bits, random, sizeof(random)) == 0);
+    assert(bits == sizeof(random) * 8);
     assert(mock_entropy_calls == 4 && mock_entropy_max_request == 64);
     mock_entropy_calls = 0;
     mock_entropy_fail_after = 1;
     memset(random, 0xab, sizeof(random));
-    assert(mbedtls_hardware_poll(NULL, random, sizeof(random), &produced) != 0);
-    assert(produced == 0);
+    assert(mbedtls_platform_get_entropy(PSA_DRIVER_GET_ENTROPY_FLAGS_NONE, &bits, random, sizeof(random)) ==
+           PSA_ERROR_INSUFFICIENT_ENTROPY);
+    assert(bits == 0);
     for (size_t i = 0; i < sizeof(random); ++i) assert(random[i] == 0);
     mock_entropy_fail_after = -1;
 
@@ -63,9 +71,19 @@ int main(void) {
     for (int i = 0; i < 2; ++i) assert(pthread_create(&workers[i], NULL, count_worker, NULL) == 0);
     for (int i = 0; i < 2; ++i) assert(pthread_join(workers[i], NULL) == 0);
     assert(counter == 2000);
+
+    /* A condition variable, made on its first wait: a signal before that wakes nobody */
+    assert(mbedtls_condition_variable_init(&condition) == 0);
+    assert(mbedtls_condition_variable_signal(&condition) == 0);
+    assert(mbedtls_mutex_lock(&mutex) == 0);
+    assert(pthread_create(&signaller, NULL, signal_worker, NULL) == 0);
+    while (!predicate) assert(mbedtls_condition_variable_wait(&condition, &mutex) == 0);
+    assert(mbedtls_mutex_unlock(&mutex) == 0);
+    assert(pthread_join(signaller, NULL) == 0);
+    mbedtls_condition_variable_free(&condition);
     mbedtls_mutex_free(&mutex);
     mbedtls_psa_crypto_free();
     vitals_crypto_platform_free();
-    puts("crypto platform: entropy bounds/failure, PSA, UTC, mutexes PASS");
+    puts("crypto platform: entropy bounds/failure, PSA, UTC, mutexes, conditions PASS");
     return 0;
 }

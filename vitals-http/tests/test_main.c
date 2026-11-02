@@ -6,7 +6,7 @@
 
 #include <psp2/libssl.h>
 
-#include <mbedtls/md5.h>
+#include <psa/crypto.h>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -1503,7 +1503,9 @@ static void test_md5(void)
     int whole_ok = 1, split_ok = 1;
     for (size_t size = 0; size <= sizeof(data); ++size) {
         unsigned char expected[16], whole[16], split[16];
-        mbedtls_md5(data, size, expected);
+        size_t expected_length = 0;
+        /* TF-PSA-Crypto's MD5, set up by sceSslInit */
+        CHECK_EQ(psa_hash_compute(PSA_ALG_MD5, data, size, expected, sizeof(expected), &expected_length), PSA_SUCCESS);
         VhMd5 md5;
         vh_md5_init(&md5);
         vh_md5_update(&md5, data, size);

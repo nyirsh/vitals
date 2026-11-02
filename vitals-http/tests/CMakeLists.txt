@@ -61,7 +61,7 @@ target_include_directories(vitals_http_tests PRIVATE ${ROOT}/src ${VITALS_SSL_DI
 target_compile_options(vitals_http_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
     -fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(vitals_http_tests PRIVATE -fsanitize=address,undefined)
-target_link_libraries(vitals_http_tests PRIVATE mbedtls mbedx509 mbedcrypto vitals_vita_mock ZLIB::ZLIB
+target_link_libraries(vitals_http_tests PRIVATE mbedtls mbedx509 tfpsacrypto vitals_vita_mock ZLIB::ZLIB
     Threads::Threads)
 
 add_test(NAME vitals_http

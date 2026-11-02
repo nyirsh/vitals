@@ -4,8 +4,6 @@
 #include "crypto_platform.h"
 #include "diagnostics.h"
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
 #include <mbedtls/platform_util.h>
 #include <psa/crypto.h>
 
@@ -13,13 +11,11 @@
 
 /* sceSslInit and sceSslTerm, the memory pool, the library object and the error translator. As
  * Sony's: everything comes from the pool the app gives sceSslInit, and an app's connections share
- * one random generator and the CA bundle's index */
+ * TF-PSA-Crypto's random generator and the CA bundle's index */
 
 static int g_initialized;
 /* What 2185BB05 hands out and SSL_CTX_new takes; nothing reads it */
 static struct { uint32_t magic; } g_library = {0x4C425356u};
-static mbedtls_entropy_context g_entropy;
-static mbedtls_ctr_drbg_context g_random;
 /* Built on the first connection that verifies, from the pool too */
 static VitalsCaIndex g_ca_index;
 static int g_ca_index_state;
@@ -48,12 +44,6 @@ int vs_take_out_of_memory(void)
     g_out_of_memory = 0;
     vs_unlock();
     return out_of_memory;
-}
-
-int vs_tls_random(void *context, unsigned char *output, size_t size)
-{
-    (void)context;
-    return mbedtls_ctr_drbg_random(&g_random, output, size);
 }
 
 /* The bundle's path as the process names it, when the caller gave one (vitalsSslSetBundlePath) */
@@ -131,18 +121,10 @@ int vs_library_init(unsigned int pool_size)
         VITALS_LOG("init pool=%u rc=%08X", pool_size, (unsigned int)result);
         return result;
     }
-    if (vitals_crypto_platform_init() != 0 || psa_crypto_init() != PSA_SUCCESS)
-        result = VS_ERROR_INTERNAL;
-    if (result == 0) {
-        mbedtls_entropy_init(&g_entropy);
-        mbedtls_ctr_drbg_init(&g_random);
-        if (mbedtls_ctr_drbg_seed(&g_random, mbedtls_entropy_func, &g_entropy,
-                                  (const unsigned char *)"vitals-ssl", 10) != 0) {
-            mbedtls_ctr_drbg_free(&g_random);
-            mbedtls_entropy_free(&g_entropy);
-            result = VS_ERROR_OUT_OF_MEMORY;
-        }
-    }
+    /* PSA's init also seeds its random generator from the kernel's */
+    psa_status_t status = vitals_crypto_platform_init() != 0 ? PSA_ERROR_BAD_STATE : psa_crypto_init();
+    if (status != PSA_SUCCESS)
+        result = status == PSA_ERROR_INSUFFICIENT_MEMORY ? VS_ERROR_OUT_OF_MEMORY : VS_ERROR_INTERNAL;
     if (result != 0) {
         mbedtls_psa_crypto_free();
         vitals_crypto_platform_free();
@@ -175,8 +157,6 @@ int sceSslTerm(void)
     if (g_ca_index_state > 0)
         vitals_ca_index_free(&g_ca_index);
     g_ca_index_state = 0;
-    mbedtls_ctr_drbg_free(&g_random);
-    mbedtls_entropy_free(&g_entropy);
     mbedtls_psa_crypto_free();
     vitals_crypto_platform_free();
     vs_platform_heap_destroy();

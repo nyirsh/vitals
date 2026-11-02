@@ -9,6 +9,8 @@
 #include <mbedtls/oid.h>
 #include <mbedtls/platform.h>
 #include <mbedtls/platform_util.h>
+#include <mbedtls/psa_util.h>
+#include <psa/crypto.h>
 #include <psp2/io/fcntl.h>
 
 #include <limits.h>
@@ -411,7 +413,7 @@ int sceSslInternalOidText(const void *handle, int format, unsigned int size, cha
         return R_NOT_FOUND;
     mbedtls_asn1_buf buffer = {MBEDTLS_ASN1_OID, oid->length, (unsigned char *)oid->data};
     int written = mbedtls_oid_get_numeric_string(text, size, &buffer);
-    if (written == MBEDTLS_ERR_OID_BUF_TOO_SMALL)
+    if (written == PSA_ERROR_BUFFER_TOO_SMALL)
         return R_BUFFER_TOO_SMALL;
     return written < 0 ? R_FAILED : 0;
 }
@@ -603,14 +605,15 @@ int sceSslInternalCertVerifySignature(void *handle, void *key_handle, int *valid
     if (!is_cert(cert) || !is_key(key) || valid == NULL)
         return R_NULL_ARG;
     const mbedtls_x509_crt *crt = cert->crt;
-    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(crt->MBEDTLS_PRIVATE(sig_md));
     unsigned char hash[MBEDTLS_MD_MAX_SIZE];
+    size_t hash_length;
     *valid = 0;
-    if (md == NULL || mbedtls_md(md, crt->tbs.p, crt->tbs.len, hash) != 0)
+    /* As Mbed TLS checks a chain: the signed part's hash, then the key's verification of it */
+    if (psa_hash_compute(mbedtls_md_psa_alg_from_type(crt->MBEDTLS_PRIVATE(sig_md)), crt->tbs.p, crt->tbs.len,
+                         hash, sizeof(hash), &hash_length) != PSA_SUCCESS)
         return 0;
-    *valid = mbedtls_pk_verify_ext(crt->MBEDTLS_PRIVATE(sig_pk), crt->MBEDTLS_PRIVATE(sig_opts), &key->pk,
-                                   crt->MBEDTLS_PRIVATE(sig_md), hash, mbedtls_md_get_size(md),
-                                   crt->MBEDTLS_PRIVATE(sig).p, crt->MBEDTLS_PRIVATE(sig).len) == 0;
+    *valid = mbedtls_pk_verify_ext(crt->MBEDTLS_PRIVATE(sig_pk), &key->pk, crt->MBEDTLS_PRIVATE(sig_md), hash,
+                                   hash_length, crt->MBEDTLS_PRIVATE(sig).p, crt->MBEDTLS_PRIVATE(sig).len) == 0;
     return 0;
 }
 
@@ -696,7 +699,7 @@ int sceSslInternalKeyFromBuffer(void *handle, const void *library, void **out, i
     mbedtls_pk_init(&key->pk);
     /* With its NUL for PEM */
     size_t length = buffer->length + (buffer->data[0] == '-' ? 1 : 0);
-    int result = mbedtls_pk_parse_key(&key->pk, buffer->data, length, NULL, 0, vs_tls_random, NULL);
+    int result = mbedtls_pk_parse_key(&key->pk, buffer->data, length, NULL, 0);
     if (result != 0) {
         mbedtls_pk_free(&key->pk);
         free(key);
@@ -713,7 +716,7 @@ int sceSslInternalKeyMatches(void *cert_handle, void *key_handle)
     VsKey *key = key_handle;
     if (!is_cert(cert) || !is_key(key))
         return 0;
-    return mbedtls_pk_check_pair(&cert->crt->pk, &key->pk, vs_tls_random, NULL) == 0;
+    return mbedtls_pk_check_pair(&cert->crt->pk, &key->pk) == 0;
 }
 
 mbedtls_pk_context *vs_key(void *handle)
@@ -1382,7 +1385,7 @@ int sceSslInternalKeyFromBinary(const void *library, int flags, int format, unsi
     key->magic = KEY_MAGIC;
     mbedtls_pk_init(&key->pk);
     size_t size = length + (length > 0 && data[0] == '-' ? 1 : 0);
-    int result = mbedtls_pk_parse_key(&key->pk, text, size, NULL, 0, vs_tls_random, NULL);
+    int result = mbedtls_pk_parse_key(&key->pk, text, size, NULL, 0);
     if (result != 0) {
         mbedtls_pk_free(&key->pk);
         mbedtls_pk_init(&key->pk);

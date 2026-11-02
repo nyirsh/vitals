@@ -43,7 +43,7 @@ target_include_directories(vitals_ssl_tests PRIVATE ${ROOT}/src ${ROOT}/include 
 target_compile_options(vitals_ssl_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
     -fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(vitals_ssl_tests PRIVATE -fsanitize=address,undefined)
-target_link_libraries(vitals_ssl_tests PRIVATE mbedtls mbedx509 mbedcrypto vitals_vita_mock Threads::Threads)
+target_link_libraries(vitals_ssl_tests PRIVATE mbedtls mbedx509 tfpsacrypto vitals_vita_mock Threads::Threads)
 
 add_test(NAME vitals_ssl
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_tests.py $<TARGET_FILE:vitals_ssl_tests>)

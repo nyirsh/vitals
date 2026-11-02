@@ -4,9 +4,16 @@ These notices cover the third-party software and data in vitals. The app's VPK i
 
 ## Mbed TLS
 
-`libssl.suprx` (vitals-ssl) statically links `libmbedtls.a`, `libmbedx509.a` and `libmbedcrypto.a`, built from the official Mbed TLS 3.6 LTS source release (currently 3.6.7), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. vitals modifies three of its files with [tls13-vita/crypto/offer-unknown-ciphersuites.patch](tls13-vita/crypto/offer-unknown-ciphersuites.patch), so that a ClientHello can list cipher suites Mbed TLS doesn't implement, and five with [tls13-vita/crypto/certificate-request-callback.patch](tls13-vita/crypto/certificate-request-callback.patch), so that a client can pick its certificate from a server's certificate request (each change is marked in the code), and adds configuration headers and a Vita platform adapter. This distribution selects the Apache License 2.0 offered by the project; the license text is `licenses/Mbed-TLS-LICENSE.txt`.
+`libssl.suprx` (vitals-ssl) statically links `libmbedtls.a`, `libmbedx509.a` and `libtfpsacrypto.a`, built from the official Mbed TLS 4.2 source release (currently 4.2.0, which bundles TF-PSA-Crypto), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. vitals modifies it with four patches in [tls13-vita/crypto](tls13-vita/crypto/):
 
-The Mbed TLS source release also bundles optional third-party code (Project Everest/HACL\* Curve25519 and p256-m). vitals' configuration does not enable any of it, so none of that code is in the modules.
+- [rsa-client.patch](tls13-vita/crypto/rsa-client.patch) puts back the client side of TLS 1.2's RSA key exchange and its four AES-CBC suites, which Mbed TLS removed in 4.0 and some of Sony's servers still use. It comes from devnoname120's [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) (v0.2.2, `tls13/crypto/patches/rsa-client-4.2.patch`), trimmed
+- [offer-unknown-ciphersuites.patch](tls13-vita/crypto/offer-unknown-ciphersuites.patch) lets a ClientHello list cipher suites Mbed TLS doesn't implement
+- [certificate-request-callback.patch](tls13-vita/crypto/certificate-request-callback.patch) lets a client pick its certificate from a server's certificate request
+- [pkcs8-rsa-public-key.patch](tls13-vita/crypto/pkcs8-rsa-public-key.patch) gives an RSA private key read from PKCS#8 its public half, as the other key formats have, so it can be matched to its certificate
+
+Each change is marked in the code. vitals also adds configuration headers and a Vita platform adapter. This distribution selects the Apache License 2.0 offered by both projects; the license texts are `licenses/Mbed-TLS-LICENSE.txt` and `licenses/TF-PSA-Crypto-LICENSE.txt`.
+
+The Mbed TLS source release also bundles optional third-party code (Project Everest/HACL\* Curve25519, p256-m and the mldsa-native ML-DSA implementation). vitals' configuration does not enable any of it, so none of that code is in the modules.
 
 Mbed TLS is an independent work; no endorsement by its authors is implied.
 

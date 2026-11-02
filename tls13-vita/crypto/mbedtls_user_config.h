@@ -1,34 +1,21 @@
 #ifndef VITALS_MBEDTLS_USER_CONFIG_H
 #define VITALS_MBEDTLS_USER_CONFIG_H
 
-/* Mbed TLS 3.6 for vitals-http and the browser provider: a TLS 1.2 and 1.3 client on the Vita's
- * own primitives (../provider/platform_shims.c), verifying against CAs loaded on demand
- * (../provider/ca_index.c) */
-
-#include <stdint.h>
+/* Mbed TLS 4.2's TLS and X.509 options, for vitals-ssl: a TLS 1.2 and 1.3 client verifying against
+ * CAs loaded on demand (../provider/ca_index.c); the crypto options are in psa_user_config.h */
 
 #define MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK
 
-#define MBEDTLS_THREADING_C
-#define MBEDTLS_THREADING_ALT
-#define MBEDTLS_NO_PLATFORM_ENTROPY
-#define MBEDTLS_ENTROPY_HARDWARE_ALT
-#define MBEDTLS_PLATFORM_MS_TIME_ALT
-#define MBEDTLS_PLATFORM_GMTIME_R_ALT
-#define MBEDTLS_PLATFORM_TIME_TYPE_MACRO int64_t
-#define MBEDTLS_PLATFORM_TIME_MACRO vitals_crypto_time
+/* TLS 1.2's RSA key exchange, client side, which rsa-client.patch puts back */
+#define MBEDTLS_KEY_EXCHANGE_RSA_ENABLED
 
-/* To fit vitals-http's 128 KiB heap: a connection's outgoing records are 4 KiB at most (incoming
- * ones stay at 16 KiB, as a server may send them that size) */
+/* To keep each connection small in the app's libssl pool: its outgoing records are 4 KiB at most
+ * (incoming ones stay at 16 KiB, as a server may send them that size) */
 #define MBEDTLS_SSL_OUT_CONTENT_LEN 4096
 
-/* No files, sockets, clocks or servers of its own */
-#undef MBEDTLS_FS_IO
+/* No sockets, clocks or servers of its own (the RSA key exchange patch is client-only) */
 #undef MBEDTLS_NET_C
 #undef MBEDTLS_TIMING_C
-#undef MBEDTLS_PSA_ITS_FILE_C
-#undef MBEDTLS_PSA_CRYPTO_STORAGE_C
-#undef MBEDTLS_SELF_TEST
 #undef MBEDTLS_DEBUG_C
 #undef MBEDTLS_SSL_SRV_C
 #undef MBEDTLS_SSL_CACHE_C
@@ -48,13 +35,5 @@
 #undef MBEDTLS_X509_CSR_WRITE_C
 #undef MBEDTLS_X509_CSR_PARSE_C
 #undef MBEDTLS_X509_CRL_PARSE_C
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-int64_t vitals_crypto_time(int64_t *output);
-#ifdef __cplusplus
-}
-#endif
 
 #endif

@@ -3,7 +3,7 @@
 Sony's HTTP library (`SceLibHttp`, the `sceHttp*` API) written from scratch, as a user module
 exported under libhttp's own library and function NIDs ([vitals_http_api.yml.in](vitals_http_api.yml.in)),
 all 116 of them. Its TLS is the libssl module's, [vitals-ssl](../vitals-ssl/), imported as Sony's
-libhttp imports Sony's libssl: Mbed TLS 3.6 lives there, not here. It calls Sony's functions and
+libhttp imports Sony's libssl: Mbed TLS 4.2 lives there, not here. It calls Sony's functions and
 the VitalsSsl additions, declared in vitals-ssl's `include/vitals_ssl.h`, through the stub
 vitals-ssl's build makes, linked weak: a process that loads libhttp without libssl (Adrenaline's
 bubble booter, the browser's WebKit process) still loads it and does no https, as with Sony's.
@@ -59,7 +59,8 @@ the redirect list.
 
 The shell's PSN sign-in goes through a CDN that refuses TLS handshakes that don't look like the
 console's. Sony's TLS is RSA BSAFE SSL-C 2.8.1, which offers only static-RSA and DHE suites;
-Mbed TLS 4 has neither, which is why vitals-ssl is on 3.6. Connections with Sony's private HTTPS
+Mbed TLS 4 has neither, so vitals-ssl's copy is patched back to static RSA, client side
+(`tls13-vita/crypto/rsa-client.patch`). Connections with Sony's private HTTPS
 option `0x40` (`sceHttpsEnableOptionPrivate`, which only Sony's code sets) send the console's own
 ClientHello, as a capture of a working sign-in shows it, byte for byte but for the random bytes:
 TLS 1.2, no session ID, AES256-SHA256, AES128-SHA256, AES256-SHA, AES128-SHA, 3DES-SHA, RC4-SHA,

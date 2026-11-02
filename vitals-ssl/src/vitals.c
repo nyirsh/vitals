@@ -103,8 +103,7 @@ static int parse_key(mbedtls_pk_context *key, const void *data, size_t size)
     unsigned char *copy = copy_terminated(data, size);
     if (copy == NULL)
         return MBEDTLS_ERR_PK_ALLOC_FAILED;
-    int result = mbedtls_pk_parse_key(key, copy, has_pem_marker(copy, size) ? size + 1u : size, NULL, 0,
-                                      vs_tls_random, NULL);
+    int result = mbedtls_pk_parse_key(key, copy, has_pem_marker(copy, size) ? size + 1u : size, NULL, 0);
     mbedtls_platform_zeroize(copy, size);
     free(copy);
     return result;

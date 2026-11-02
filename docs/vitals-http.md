@@ -144,7 +144,7 @@ call has returned.
 ## 8. TLS
 
 [tls.c](../vitals-http/src/tls.c), through the libssl module, [vitals-ssl](../vitals-ssl/) (Mbed TLS
-3.6), imported as Sony's libhttp imports Sony's libssl, with a weak stub: a process that loads
+4.2), imported as Sony's libhttp imports Sony's libssl, with a weak stub: a process that loads
 libhttp without libssl still loads it. Its memory is the pool the app gives `sceSslInit`; a process
 that hasn't called it gets `SCE_HTTP_ERROR_SSL` with `SCE_HTTPS_ERROR_INTERNAL`, and the log says
 `libssl not initialized`, as with Sony's.

@@ -173,8 +173,8 @@ int vs_initialized(void);
 int vs_is_library(const void *library);
 void vs_note_out_of_memory(void);
 int vs_take_out_of_memory(void);
-/* The random numbers and trusted roots every connection uses (once sceSslInit made them) */
-int vs_tls_random(void *context, unsigned char *output, size_t size);
+/* The trusted roots every connection uses (once sceSslInit made them); random numbers are
+ * TF-PSA-Crypto's own, seeded by psa_crypto_init */
 int vs_find_trusted_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates);
 int vs_trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags);
 /* Sets up the library, with a pool of size bytes or (0) the caller's allocator: 0 or an SCE error */

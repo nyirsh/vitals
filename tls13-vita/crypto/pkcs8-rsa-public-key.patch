@@ -1,0 +1,19 @@
+vitals-ssl: an RSA private key in PKCS#8 ("BEGIN PRIVATE KEY") gets its public half when parsed, as
+PKCS#1 and EC keys already do in Mbed TLS 4.2 (TF-PSA-Crypto 1.x): without it mbedtls_pk_check_pair()
+can't match the key to its certificate (sceSslInternalKeyMatches). Applied to the Mbed TLS 4.2
+release by crypto/apply_patch.cmake
+
+--- a/tf-psa-crypto/extras/pkparse.c
++++ b/tf-psa-crypto/extras/pkparse.c
+@@ -796,7 +796,10 @@
+ 
+ #if defined(PSA_WANT_KEY_TYPE_RSA_PUBLIC_KEY)
+     if (pk_alg == MBEDTLS_PK_RSA) {
+-        if ((ret = mbedtls_pk_rsa_set_key(pk, p, len)) != 0) {
++        /* vitals: the public half too, as the other RSA formats and EC keys have it, which
++         * mbedtls_pk_check_pair() compares */
++        if ((ret = mbedtls_pk_rsa_set_key(pk, p, len)) != 0 ||
++            (ret = mbedtls_pk_set_pubkey_from_prv(pk)) != 0) {
+             mbedtls_pk_free(pk);
+             return ret;
+         }
