@@ -65,6 +65,16 @@ of its functions, and the NetCheck dialog one more.
   its pointers), then what Sony's gives when its lookup fails: `SCE_SSL_ERROR_INVALID_FORMAT` for
   the serial number, the entry count and an entry past the last, `SCE_SSL_ERROR_INTERNAL` for the
   dates and for freeing a name.
+- **The internal functions' edges**, as Sony's (checked against its code): its SSL side is OpenSSL
+  0.9.8's, which mostly doesn't check its arguments, so the edges are OpenSSL's: `SSL_shutdown` is
+  1 without a connection and -1 before the handshake (unless option `0x40000`), a read after the
+  server's close_notify ends at once with 0 (`SSL_get_error` 6) and a write after this side's
+  fails as TLS; the memory buffer is OpenSSL's memory BIO (`BIO_write` 0 without a buffer, -1
+  without data; `BIO_free` 1, or 0 without one), and freeing no key is 0. Its Cert-C side checks
+  them, with `R_NULL_ARG` (10017): the Cert-C context for certificates and keys from bytes and
+  for the time provider, the provider for a time object, the resource list for a library context.
+  An OID object copies its bytes in mode 0, points at them in 1 and 2, and refuses other modes
+  (10018).
 - **Returns**: connect, read and write return what the socket returned when it failed (a negative
   SceNet error: a receive timeout is `0x80410123`, which libhttp checks for), 0 when the server
   closed the connection, and -1 when the TLS failed. `SSL_get_error` then says which, as Sony's: 1
@@ -253,7 +263,7 @@ reasons), its object layouts are SSLeay's, and the rest is what it reads and wri
 
 | NID | Arguments | What it is | Here |
 | --- | --- | --- | --- |
-| `3EF42454` | `(ssl)` | `SSL_version` (`ssl[0]`) | `sceSslInternalVersion`: the negotiated `0x0303` or `0x0304`, TLS 1.2's before |
+| `3EF42454` | `(ssl)` | `SSL_version` (`ssl[0]`) | `sceSslInternalVersion`: the negotiated `0x0303` or `0x0304`; before, its method's (`0x0303`, `0x0300`, `0x0301`), as Sony's |
 | `6F3B9809` | `(ssl)` | `SSL_state` (`ssl[48]`) | `sceSslInternalState`: 3 (`SSL_ST_OK`) once connected, `0x5000` before |
 | `D6D32A2F` | `(ssl)` | `SSL_want` (`ssl[24]`) | `sceSslInternalWant`: 3 after a failed receive, 2 after a failed send, 1 otherwise |
 | `B1745DAD` | `(ssl)` | `SSL_get_quiet_shutdown` (`ssl[44]`), which nothing exported sets | `sceSslInternalGetQuietShutdown`: 0 |

@@ -252,6 +252,24 @@ static void test_objects(void)
     context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
     ssl = sceSslInternalNew(context);
     sceSslInternalSetBio(ssl, bio, bio);
+    /* As Sony's SSL_shutdown: 1 for no connection, -1 before the handshake unless option 0x40000
+     * lets it through (then 0: the server's close_notify hasn't come) */
+    CHECK_EQ(sceSslInternalShutdown(NULL), 1);
+    /* Before a handshake, as Sony's: the state is "before, connecting" and the version the method's */
+    CHECK_EQ(sceSslInternalState(ssl), 0x5000);
+    CHECK_EQ(sceSslInternalVersion(ssl), 0x0303);
+    const void *const methods[] = {sceSslInternalClientMethod2(), sceSslInternalClientMethodTls10()};
+    const int versions[] = {0x0300, 0x0301};
+    for (unsigned i = 0; i < 2; ++i) {
+        void *other_context = sceSslInternalCtxNew(library, methods[i]);
+        void *other = sceSslInternalNew(other_context);
+        CHECK_EQ(sceSslInternalVersion(other), versions[i]);
+        sceSslInternalFree(other);
+        sceSslInternalCtxFree(other_context);
+    }
+    CHECK_EQ(sceSslInternalShutdown(ssl), (uint32_t)-1);
+    sceSslInternalSetOptions(ssl, 0x40000);
+    CHECK_EQ(sceSslInternalShutdown(ssl), 0);
     sceSslInternalFree(ssl);
     sceSslInternalCtxFree(context);
 }
@@ -299,7 +317,13 @@ static void test_echo(void)
     int result = sceSslInternalRead(connection.ssl, line, sizeof(line));
     CHECK_EQ(result, 0);
     CHECK_EQ(sceSslInternalGetError(connection.ssl, result), VS_KIND_ZERO_RETURN);
+    /* As Sony's: after the close_notify, reads end at once, still as a clean close */
+    CHECK_EQ(sceSslInternalRead(connection.ssl, line, sizeof(line)), 0);
+    CHECK_EQ(sceSslInternalGetError(connection.ssl, 0), VS_KIND_ZERO_RETURN);
     CHECK_EQ(sceSslInternalShutdown(connection.ssl), 1);
+    /* and once this side has sent its own, writing is a TLS failure */
+    CHECK_EQ(sceSslInternalWrite(connection.ssl, "x", 1), (uint32_t)-1);
+    CHECK_EQ(sceSslInternalGetError(connection.ssl, -1), VS_KIND_SSL);
     close_connection(&connection);
 }
 
@@ -647,9 +671,12 @@ static void test_certificate_objects(void)
     void *leaf = parse_der(leaf_crt), *ca = parse_der(ca_crt), *other = NULL;
     unsigned int consumed = 0;
     static const unsigned char junk[] = {0x30, 0x03, 0x02, 0x01, 0x01};
-    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, sizeof(junk), junk, &consumed, &other), 10001);
+    CHECK_EQ(sceSslInternalCertFromBinary(vs_cert_library(), 0, 1, sizeof(junk), junk, &consumed, &other), 10001);
     CHECK(other == NULL);
-    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, 0, NULL, &consumed, &other), 10017);
+    CHECK_EQ(sceSslInternalCertFromBinary(vs_cert_library(), 0, 1, 0, NULL, &consumed, &other), 10017);
+    /* As Sony's, the Cert-C context is required, here and for keys */
+    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, sizeof(junk), junk, &consumed, &other), 10017);
+    CHECK_EQ(sceSslInternalKeyFromBinary(NULL, 0, 1, sizeof(junk), junk, &consumed, &other), 10017);
 
     /* Serial number and DER */
     struct { unsigned int length; const unsigned char *data; } item = {0, NULL};
@@ -746,7 +773,9 @@ static void test_certificate_objects(void)
     void *provider = NULL, *now = NULL, *date = NULL;
     unsigned char clock[12], value8[8];
     int order = 2;
+    CHECK_EQ(sceSslInternalTimeProvider(NULL, 0, &provider), 10017);
     CHECK_EQ(sceSslInternalTimeProvider(vs_cert_library(), 0, &provider), 0);
+    CHECK_EQ(sceSslInternalTimeNew(NULL, &now), 10017);
     CHECK_EQ(sceSslInternalTimeNew(provider, &now), 0);
     CHECK_EQ(sceSslInternalTimeNew(provider, &date), 0);
     CHECK_EQ(sceSslInternalTimeNow(clock), 0);
@@ -1030,7 +1059,7 @@ static int offer_certificate(void *ssl, void **certificate, void **key)
     CHECK_EQ(sceSslInternalBufferWrite(buffer, text, 10), 10);
     CHECK_EQ(sceSslInternalBufferWrite(buffer, text + 10, (int)length - 10), length - 10);
     CHECK_EQ(sceSslInternalKeyFromBuffer(buffer, library, &private_key, 6, 0x1100), 0);
-    CHECK_EQ(sceSslInternalBufferFree(buffer), 0);
+    CHECK_EQ(sceSslInternalBufferFree(buffer), 1);
     free(text);
     CHECK_EQ(sceSslInternalKeyMatches(cert, private_key), 1);
     CHECK_EQ(sceSslInternalCertIssuer(cert, 1, &issuer), 0);
@@ -1108,19 +1137,24 @@ static void test_client_certificate(void)
     free(text);
     text = read_text(g_client_pem, &length);
     unsigned int consumed = 0;
-    CHECK_EQ(sceSslInternalCertFromBinary(NULL, 0, 1, (unsigned int)length, (unsigned char *)text, &consumed, &cert),
-             0);
+    CHECK_EQ(sceSslInternalCertFromBinary(vs_cert_library(), 0, 1, (unsigned int)length, (unsigned char *)text,
+                                          &consumed, &cert), 0);
     free(text);
     CHECK_EQ(sceSslInternalKeyMatches(cert, key), 0);
+    /* As Sony's BIO_write: no data is -1 even for no bytes, no buffer is 0 */
     CHECK_EQ(sceSslInternalBufferWrite(buffer, NULL, 4), (uint32_t)-1);
-    CHECK_EQ(sceSslInternalBufferFree(buffer), 0);
+    CHECK_EQ(sceSslInternalBufferWrite(buffer, NULL, 0), (uint32_t)-1);
+    CHECK_EQ(sceSslInternalBufferWrite(NULL, "x", 1), 0);
+    CHECK_EQ(sceSslInternalBufferFree(buffer), 1);
     buffer = sceSslInternalBufferNew();
     CHECK_EQ(sceSslInternalBufferWrite(buffer, "junk", 4), 4);
     void *bad = NULL;
     CHECK_EQ(sceSslInternalKeyFromBuffer(buffer, NULL, &bad, 6, 0x1100), 10001);
     CHECK(bad == NULL);
-    CHECK_EQ(sceSslInternalBufferFree(buffer), 0);
-    CHECK_EQ(sceSslInternalBufferFree(NULL), 10017);
+    CHECK_EQ(sceSslInternalBufferFree(buffer), 1);
+    /* As Sony's: freeing nothing is 0 for buffers and keys alike */
+    CHECK_EQ(sceSslInternalBufferFree(NULL), 0);
+    CHECK_EQ(sceSslInternalKeyFree(NULL), 0);
     sceSslInternalKeyFree(key);
     sceSslInternalCertFree(cert);
 }
@@ -1250,6 +1284,22 @@ static void test_remaining(void)
     CHECK_EQ(sceSslInternalLibraryContextNew(resources, 0, &cert_c), 0);
     CHECK(cert_c == vs_cert_library());
     CHECK_EQ(sceSslInternalLibraryContextNew(resources, 0, NULL), 10017);
+    CHECK_EQ(sceSslInternalLibraryContextNew(NULL, 0, &cert_c), 10017);
+
+    /* An OID object's modes, as Sony's: 0 copies, 1 and 2 point; no data empties it; others 10018 */
+    uint64_t oid[4] = {0};
+    unsigned char cn[] = {0x55, 0x04, 0x03};
+    char oid_text[24];
+    CHECK_EQ(sceSslInternalOidSet(oid, 0, cn, sizeof(cn)), 0);
+    cn[2] = 0x06;
+    CHECK_EQ(sceSslInternalOidText(oid, 0, sizeof(oid_text), oid_text), 0);
+    CHECK(strcmp(oid_text, "2.5.4.3") == 0);
+    CHECK_EQ(sceSslInternalOidSet(oid, 2, cn, sizeof(cn)), 0);
+    CHECK_EQ(sceSslInternalOidText(oid, 0, sizeof(oid_text), oid_text), 0);
+    CHECK(strcmp(oid_text, "2.5.4.6") == 0);
+    CHECK_EQ(sceSslInternalOidSet(oid, 3, cn, sizeof(cn)), 10018);
+    CHECK_EQ(sceSslInternalOidSet(oid, 3, NULL, 0), 0);
+    CHECK_EQ(sceSslInternalOidText(oid, 0, sizeof(oid_text), oid_text), 10008);
     CHECK_EQ(sceSslInternalLibraryContextFree(cert_c), 0);
     CHECK_EQ(sceSslInternalLibraryInit(), 1);
     sceSslInternalErrRemoveState(0);

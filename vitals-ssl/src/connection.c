@@ -28,9 +28,11 @@
 #define CONTEXT_MAGIC VS_CONTEXT_MAGIC
 #define SSL_MAGIC 0x53535356u
 #define BIO_MAGIC VS_BIO_MAGIC
+/* The option that lets SSL_shutdown run before the handshake is done (OpenSSL 0.9.8 Sony's) */
+#define VS_OPTION_SHUTDOWN_IN_HANDSHAKE 0x40000u
 
-/* Two client methods, as Sony's: libhttp uses the first for its connections and the second for
- * another; here both are TLS 1.2 to 1.3 */
+/* Three client methods, as Sony's: libhttp uses the first for its connections and the second for
+ * another; here all are TLS 1.2 to 1.3, and only SSL_version before a handshake tells them apart */
 static const VsMethod g_client_method = {METHOD_MAGIC, 1};
 static const VsMethod g_client_method_2 = {METHOD_MAGIC, 2};
 static const VsMethod g_client_method_3 = {METHOD_MAGIC, 3};
@@ -796,6 +798,11 @@ int sceSslInternalRead(void *handle, void *buffer, int size)
         if (connected <= 0)
             return connected;
     }
+    /* As Sony's: once the server's close_notify has come, a read ends at once */
+    if (ssl->close_notify) {
+        ssl->failure = VS_FAILED_CLOSED;
+        return 0;
+    }
     if (size == 0)
         return 0;
     for (;;) {
@@ -825,6 +832,12 @@ int sceSslInternalWrite(void *handle, const void *buffer, int size)
         if (connected <= 0)
             return connected;
     }
+    /* As Sony's: after this side's close_notify, writing is a TLS failure (protocol is shut down) */
+    if (ssl->close_sent) {
+        ssl->failure = VS_FAILED_TLS;
+        ssl->tls_result = MBEDTLS_ERR_SSL_BAD_INPUT_DATA;
+        return -1;
+    }
     int written = 0;
     while (written < size) {
         ssl->failure = VS_FAILED_NOTHING;
@@ -841,11 +854,14 @@ int sceSslInternalWrite(void *handle, const void *buffer, int size)
 }
 
 /* NID 0xEC9FAF42, Sony 0x81019B81: SSL_shutdown; sends close_notify once, and is 1 when the
- * server's has arrived too */
+ * server's has arrived too. As Sony's (OpenSSL 0.9.8's): 1 for no connection, and -1 while the
+ * handshake isn't done, unless option 0x40000 is set */
 int sceSslInternalShutdown(void *handle)
 {
     VsSsl *ssl = handle;
-    if (!is_ssl(ssl))
+    if (ssl == NULL)
+        return 1;
+    if (!is_ssl(ssl) || (!ssl->handshake_done && (ssl->options & VS_OPTION_SHUTDOWN_IN_HANDSHAKE) == 0))
         return -1;
     if (ssl->handshake_done && !ssl->close_sent) {
         ssl->close_sent = 1;
@@ -954,14 +970,18 @@ const void *sceSslInternalClientMethodTls10(void)
     return &g_client_method_3;
 }
 
-/* NID 0x3EF42454, Sony 0x8101B07F: SSL_version, the negotiated version (0x0303, 0x0304), and
- * TLS 1.2's before one is */
+/* NID 0x3EF42454, Sony 0x8101B07F: SSL_version, the negotiated version (0x0303, 0x0304), and before
+ * a handshake its method's, as Sony's (SSL_clear copies it from the method's template): 0x0303 for
+ * the client method, 0x0300 for the second, 0x0301 for the TLS 1.0 one */
 int sceSslInternalVersion(void *handle)
 {
     VsSsl *ssl = handle;
     if (!is_ssl(ssl))
         return 0;
-    return ssl->handshake_done ? (int)mbedtls_ssl_get_version_number(&ssl->tls) : 0x0303;
+    if (ssl->handshake_done)
+        return (int)mbedtls_ssl_get_version_number(&ssl->tls);
+    const VsMethod *method = ssl->context->method;
+    return method == &g_client_method_2 ? 0x0300 : method == &g_client_method_3 ? 0x0301 : 0x0303;
 }
 
 /* NID 0x6F3B9809, Sony 0x81018E5B: SSL_state, as OpenSSL numbers it: 3 (SSL_ST_OK) once

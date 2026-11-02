@@ -387,18 +387,33 @@ int sceSslInternalEntryFree(void *handle)
     return 0;
 }
 
-/* NID 0x4D80D3F7, Sony 0x810090D3: points an OID object at bytes (libhttp's mode 1; mode 0, a
- * copy in Sony's, is a reference here too, as nothing frees the object) */
+/* NID 0x4D80D3F7, Sony 0x810090D3: sets an OID object's bytes, as Sony's: no data empties it, and
+ * mode 0 copies them (the object then owns its copy, flag 2), 1 points at them (libhttp's), 2
+ * points at them and takes them over; any other mode is 10018. As with Sony's, nothing exported
+ * frees what it owns */
 int sceSslInternalOidSet(void *handle, int mode, const unsigned char *data, unsigned int length)
 {
     VsOid *oid = handle;
-    (void)mode;
     if (oid == NULL)
         return R_NULL_ARG;
-    oid->reserved = 0;
-    oid->data = length > 0 ? data : NULL;
-    oid->length = data != NULL ? length : 0;
-    oid->flags = 0;
+    if (data == NULL) {
+        oid->data = NULL;
+        oid->length = 0;
+        oid->flags &= ~2u;
+        return 0;
+    }
+    if (mode == 0) {
+        unsigned char *copy = malloc(length > 0 ? length : 1);
+        if (copy == NULL)
+            return R_ALLOC_FAILURE;
+        memcpy(copy, data, length);
+        data = copy;
+    } else if (mode != 1 && mode != 2) {
+        return 10018;
+    }
+    oid->data = data;
+    oid->length = length;
+    oid->flags = mode == 1 ? oid->flags & ~2u : oid->flags | 2u;
     return 0;
 }
 
@@ -585,12 +600,12 @@ int sceSslInternalCertPublicKey(void *cert, int format, void **key)
     return public_key_of(cert, key);
 }
 
-/* NID 0x46358909, Sony 0x8101FB59: frees a key */
+/* NID 0x46358909, Sony 0x8101FB59: frees a key; 0, for none too, as Sony's */
 int sceSslInternalKeyFree(void *handle)
 {
     VsKey *key = handle;
     if (!is_key(key))
-        return R_NULL_ARG;
+        return 0;
     mbedtls_pk_free(&key->pk);
     key->magic = 0;
     free(key);
@@ -643,11 +658,14 @@ void *sceSslInternalBufferNew(void)
     return buffer;
 }
 
-/* NID 0x33AC7A16, Sony 0x81000A9D: appends bytes; how many, or a negative failure */
+/* NID 0x33AC7A16, Sony 0x81000A9D: appends bytes; how many, or a negative failure. As Sony's
+ * (BIO_write on a memory BIO): 0 for no buffer, -1 for no data, whatever the length */
 int sceSslInternalBufferWrite(void *handle, const void *data, int length)
 {
     VsBuffer *buffer = handle;
-    if (!is_buffer(buffer) || length < 0 || (data == NULL && length > 0))
+    if (buffer == NULL)
+        return 0;
+    if (!is_buffer(buffer) || data == NULL || length < 0)
         return -1;
     size_t wanted = buffer->length + (size_t)length + 1;
     if (wanted > buffer->capacity) {
@@ -667,18 +685,18 @@ int sceSslInternalBufferWrite(void *handle, const void *data, int length)
     return length;
 }
 
-/* NID 0xC4D984C2, Sony 0x8100109F: frees it */
+/* NID 0xC4D984C2, Sony 0x8100109F: frees it; as Sony's (BIO_free), 1 once freed, 0 for none */
 int sceSslInternalBufferFree(void *handle)
 {
     VsBuffer *buffer = handle;
     if (!is_buffer(buffer))
-        return R_NULL_ARG;
+        return 0;
     if (buffer->data != NULL)
         mbedtls_platform_zeroize(buffer->data, buffer->capacity);
     free(buffer->data);
     buffer->magic = 0;
     free(buffer);
-    return 0;
+    return 1;
 }
 
 /* NID 0x7D30F0A6, Sony 0x8101F9B1: a private key from the buffer's bytes (PEM or DER), as (buffer,
@@ -727,12 +745,13 @@ mbedtls_pk_context *vs_key(void *handle)
 
 /* Certificates */
 
-/* NID 0x29AAC768, Sony 0x810050D5: a certificate from DER, freed with 144FA354 */
+/* NID 0x29AAC768, Sony 0x810050D5: a certificate from DER, freed with 144FA354; as Sony's, the
+ * Cert-C context is required too */
 int sceSslInternalCertFromBinary(const void *library, int flags, int format, unsigned int length,
                                  const unsigned char *data, unsigned int *consumed, void **out)
 {
-    (void)library, (void)flags, (void)format;
-    if (data == NULL || out == NULL)
+    (void)flags, (void)format;
+    if (library == NULL || data == NULL || out == NULL)
         return R_NULL_ARG;
     *out = NULL;
     VsCert *cert = calloc(1, sizeof(*cert));
@@ -767,7 +786,7 @@ int sceSslInternalCertFromBinary(const void *library, int flags, int format, uns
     return 0;
 }
 
-/* NID 0x144FA354, Sony 0x81004FD1: frees a certificate 29AAC768 made; the server's, which the
+/* NID 0x144FA354, Sony 0x81004F29: frees a certificate 29AAC768 made; the server's, which the
  * verify callback is given, stay the connection's */
 int sceSslInternalCertFree(void *handle)
 {
@@ -866,11 +885,12 @@ static int is_time(const VsTime *time)
     return time != NULL && time->magic == TIME_MAGIC;
 }
 
-/* NID 0xD3C049B9, Sony 0x81028CFB: the time provider of the Cert-C context */
+/* NID 0xD3C049B9, Sony 0x81028CFB: the time provider of the Cert-C context, which is required, as
+ * with Sony's */
 int sceSslInternalTimeProvider(const void *library, int type, void **out)
 {
-    (void)library, (void)type;
-    if (out == NULL)
+    (void)type;
+    if (library == NULL || out == NULL)
         return R_NULL_ARG;
     *out = &g_time_provider;
     return 0;
@@ -882,11 +902,10 @@ int sceSslInternalTimeProviderFree(void *provider)
     return provider == &g_time_provider ? 0 : R_NULL_ARG;
 }
 
-/* NID 0x5E50CB55, Sony 0x81028D87: a time object, freed with 6CDB4EE8 */
+/* NID 0x5E50CB55, Sony 0x81028D87: a time object, freed with 6CDB4EE8; as Sony's, from a provider */
 int sceSslInternalTimeNew(const void *provider, void **out)
 {
-    (void)provider;
-    if (out == NULL)
+    if (provider == NULL || out == NULL)
         return R_NULL_ARG;
     VsTime *time = calloc(1, sizeof(*time));
     *out = time;
@@ -1305,8 +1324,9 @@ const void *sceSslInternalDefaultResources(void)
  * flags, &context): here the one Cert-C object certificate.c's functions take */
 int sceSslInternalLibraryContextNew(const void *resources, int flags, const void **out)
 {
-    (void)resources, (void)flags;
-    if (out == NULL)
+    (void)flags;
+    /* As Sony's, the resource list is required */
+    if (resources == NULL || out == NULL)
         return R_NULL_ARG;
     *out = &g_cert_library;
     return 0;
@@ -1369,8 +1389,9 @@ int sceSslInternalObjectDuplicate(void *object, const void *library, void **copy
 int sceSslInternalKeyFromBinary(const void *library, int flags, int format, unsigned int length,
                                 const unsigned char *data, unsigned int *consumed, void **out)
 {
-    (void)library, (void)flags, (void)format;
-    if (data == NULL || out == NULL)
+    (void)flags, (void)format;
+    /* As Sony's, the Cert-C context is required too */
+    if (library == NULL || data == NULL || out == NULL)
         return R_NULL_ARG;
     *out = NULL;
     VsKey *key = calloc(1, sizeof(*key));
