@@ -283,10 +283,11 @@ int sceHttpGetMemoryPoolStats(SceHttpMemoryPoolStats *currentStat)
 #if VITALS_DEBUG >= 2
     static unsigned int reported_used = UINT32_MAX, reported_peak;
 #endif
-    if (currentStat == NULL)
-        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    /* As Sony's: before sceHttpInit that comes first, then the pointer */
     vh_lock();
     int result = vh_initialized();
+    if (result == 0 && currentStat == NULL)
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
     if (result == 0) {
         currentStat->poolSize = g_pool_size;
         currentStat->maxInuseSize = g_pool_peak;
@@ -672,12 +673,28 @@ int sceHttpRemoveRequestHeader(int id, const char *name)
 
 /* ---- HTTPS options, for the whole library ---- */
 
+/* The HTTPS options an app may set (SCE_HTTPS_FLAG_*), and the ones only Sony's code sets with
+ * the private setters, as 0x40 (the console's own handshake); Sony's refuses any other bit with
+ * SCE_HTTP_ERROR_INVALID_VALUE, once initialized and before looking at the object.
+ * Not reproduced: Sony's disable setters also refuse turning off the server, name or known-CA
+ * check (0x25) for an app built with SDK 2.10 or later, unless a system setting allows it */
+#define VH_HTTPS_PUBLIC_FLAGS 0x3Fu
+#define VH_HTTPS_PRIVATE_FLAGS 0x1FFu
+
+static int check_https_flags(unsigned int flags, unsigned int allowed)
+{
+    int result = vh_initialized();
+    if (result == 0 && (flags & ~allowed) != 0)
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    return result;
+}
+
 int sceHttpsEnableOption(unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https enable option flags=%08X", sslFlags);
     vh_lock();
-    int result = vh_initialized();
+    int result = check_https_flags(sslFlags, VH_HTTPS_PUBLIC_FLAGS);
     if (result == 0)
         g_https_options |= sslFlags;
     vh_unlock();
@@ -689,7 +706,7 @@ int sceHttpsDisableOption(unsigned int sslFlags)
     VH_TRACE();
     VITALS_LOG("https disable option flags=%08X", sslFlags);
     vh_lock();
-    int result = vh_initialized();
+    int result = check_https_flags(sslFlags, VH_HTTPS_PUBLIC_FLAGS);
     if (result == 0)
         g_https_options &= ~sslFlags;
     vh_unlock();
@@ -698,32 +715,49 @@ int sceHttpsDisableOption(unsigned int sslFlags)
 
 /* ---- HTTPS options, for one template, connection or request ---- */
 
+/* One object's options: the flags checked first, then the object */
+static int set_https_options(int id, unsigned int flags, unsigned int allowed, int enable)
+{
+    vh_lock();
+    int result = check_https_flags(flags, allowed);
+    VhSettings *settings = result == 0 ? settings_of(id, &result) : NULL;
+    if (settings != NULL && enable) {
+        settings->https_enabled |= flags;
+        settings->https_disabled &= ~flags;
+    } else if (settings != NULL) {
+        settings->https_disabled |= flags;
+        settings->https_enabled &= ~flags;
+    }
+    vh_unlock();
+    return result;
+}
+
 int sceHttpsEnableOption2(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https enable option2 id=%d flags=%08X", id, sslFlags);
-    VH_SET(id, settings->https_enabled |= sslFlags; settings->https_disabled &= ~sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PUBLIC_FLAGS, 1);
 }
 
 int sceHttpsDisableOption2(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https disable option2 id=%d flags=%08X", id, sslFlags);
-    VH_SET(id, settings->https_disabled |= sslFlags; settings->https_enabled &= ~sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PUBLIC_FLAGS, 0);
 }
 
 int sceHttpsEnableOptionPrivate(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https enable option private id=%d flags=%08X", id, sslFlags);
-    return sceHttpsEnableOption2(id, sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PRIVATE_FLAGS, 1);
 }
 
 int sceHttpsDisableOptionPrivate(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https disable option private id=%d flags=%08X", id, sslFlags);
-    return sceHttpsDisableOption2(id, sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PRIVATE_FLAGS, 0);
 }
 
 int sceHttpsLoadCert(int caCertNum, const SceHttpsData **caList, const SceHttpsData *cert, const SceHttpsData *privKey)

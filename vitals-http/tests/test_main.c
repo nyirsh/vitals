@@ -1511,6 +1511,38 @@ static void test_md5(void)
     CHECK(split_ok);
 }
 
+/* The HTTPS options as Sony's checks them: an app's bits (0x3F) with the public setters, up to
+ * 0x1FF with the private ones Sony's code uses, any other bit refused before the object is looked
+ * at; and the pool's stats, which need a place to go */
+static void test_option_checks(int template_)
+{
+    SceHttpMemoryPoolStats stats;
+    CHECK_EQ(sceHttpGetMemoryPoolStats(NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
+
+    CHECK_EQ(sceHttpsEnableOption(0x40), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOption(0x80000000u), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOption(SCE_HTTPS_FLAG_KNOWN_CA_CHECK), 0);
+    CHECK_EQ(sceHttpsEnableOption(SCE_HTTPS_FLAG_KNOWN_CA_CHECK), 0);
+
+    int connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK(connection > 0);
+    CHECK_EQ(sceHttpsEnableOption2(connection, 0x40), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOption2(connection, 0x100), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOption2(connection, 0x3F), 0);
+    CHECK_EQ(sceHttpsDisableOption2(connection, SCE_HTTPS_FLAG_CLIENT_VERIFY), 0);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(connection, 0x200), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOptionPrivate(connection, 0x400), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(connection, 0x40), 0);
+    CHECK_EQ(sceHttpsDisableOptionPrivate(connection, 0x1FF), 0);
+    /* The bits come first, the object after */
+    CHECK_EQ(sceHttpsEnableOption2(12345, 0x40), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOption2(12345, SCE_HTTPS_FLAG_SERVER_VERIFY), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x200), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x40), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpDeleteConnection(connection), 0);
+}
+
 static void test_cert_check(void)
 {
     printf("libhttp's certificate check\n");
@@ -1582,6 +1614,11 @@ int main(int argc, char **argv)
     snprintf(g_secure_base, sizeof(g_secure_base), "https://127.0.0.1:%d", g_port + 1);
 
     CHECK_EQ(sceHttpCreateTemplate("x", SCE_HTTP_VERSION_1_1, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* As Sony's: before sceHttpInit that is the error, whatever the arguments */
+    CHECK_EQ(sceHttpGetMemoryPoolStats(NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsEnableOption(0x40), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsEnableOption2(12345, 0x40), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x200), SCE_HTTP_ERROR_BEFORE_INIT);
     /* As with Sony's, https needs libssl set up by the app */
     CHECK_EQ(sceSslInit(512 * 1024), 0);
     CHECK_EQ(sceHttpInit(1024 * 1024), 0);
@@ -1591,6 +1628,7 @@ int main(int argc, char **argv)
 
     test_uri();
     test_md5();
+    test_option_checks(template_);
     test_parse_header();
     test_record_scan();
     test_user_agent();
