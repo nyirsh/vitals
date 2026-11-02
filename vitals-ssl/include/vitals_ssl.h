@@ -127,6 +127,9 @@ int vitalsSslTlsErrorIsMemory(int error);
 const char *vitalsSslGetVersion(void *ssl);
 const char *vitalsSslGetCiphersuite(void *ssl);
 int vitalsSslCertificateRequested(void *ssl);
+/* The server's certificates (DER) as it sent them, its own first: 0, or an SCE error past the last;
+ * the bytes stay the connection's */
+int vitalsSslGetPeerCertificate(void *ssl, int index, const unsigned char **der, size_t *size);
 
 #ifdef __cplusplus
 }

@@ -497,6 +497,23 @@ const char *vitalsSslGetCiphersuite(void *handle)
     return suite != NULL ? suite : "-";
 }
 
+/* NID 0xC4BD3D69: the server's certificates as it sent them, the server's own first: 0 with *der and *size
+ * set (vitals-ssl's, until the connection is freed), or VS_ERROR_INVALID_VALUE past the last */
+int vitalsSslGetPeerCertificate(void *handle, int index, const unsigned char **der, size_t *size)
+{
+    VsSsl *ssl = ssl_of(handle);
+    if (ssl == NULL || !ssl->ready || index < 0 || der == NULL || size == NULL)
+        return VS_ERROR_INVALID_VALUE;
+    const mbedtls_x509_crt *certificate = mbedtls_ssl_get_peer_cert(&ssl->tls);
+    while (certificate != NULL && certificate->raw.p != NULL && index-- > 0)
+        certificate = certificate->next;
+    if (certificate == NULL || certificate->raw.p == NULL)
+        return VS_ERROR_INVALID_VALUE;
+    *der = certificate->raw.p;
+    *size = certificate->raw.len;
+    return 0;
+}
+
 /* NID 0xEB8141B2 */
 int vitalsSslCertificateRequested(void *handle)
 {

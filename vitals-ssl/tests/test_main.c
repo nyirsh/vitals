@@ -463,6 +463,14 @@ static void test_nonblocking(void)
     CHECK(strcmp(vitalsSslGetVersion(browser.ssl), "TLSv1.2") == 0);
     CHECK(strstr(vitalsSslGetCiphersuite(browser.ssl), "AES-128-GCM") != NULL);
     CHECK_EQ(vitalsSslGetCertificateFlags(browser.ssl), VITALS_CERT_UNKNOWN_CA);
+    /* The server's certificate, as it sent it */
+    const unsigned char *der = NULL;
+    size_t der_size = 0;
+    CHECK_EQ(vitalsSslGetPeerCertificate(browser.ssl, 0, &der, &der_size), 0);
+    CHECK(der != NULL && der_size > 100 && der[0] == 0x30);
+    CHECK_EQ(vitalsSslGetPeerCertificate(browser.ssl, 1, &der, &der_size), VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsSslGetPeerCertificate(browser.ssl, -1, &der, &der_size), VS_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsSslGetPeerCertificate(NULL, 0, &der, &der_size), VS_ERROR_INVALID_VALUE);
     /* No ALPN offered: the server's first line only */
     CHECK(read_line_nonblocking(&browser.transport, browser.ssl, line, sizeof(line)) > 0);
     CHECK(strcmp(line, "sni=vitals-ssl.test\n") == 0);

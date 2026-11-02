@@ -12,6 +12,13 @@ typedef struct VitalsBrowserOps {
     VitalsBrowserContextCallbackValidator is_default_ctx_callback;
     const char *default_ciphers;
     const char *default_ca_path;
+    /* The engine's own d2i_X509 and X509_free, for the certificates a refused connection reports
+     * to WebKit (NULL: nothing is reported) */
+    void *(*d2i_x509)(void **certificate, const unsigned char **der, long size);
+    void (*x509_free)(void *certificate);
+    /* What the record is allocated with: the engine's C library, which frees it with the request */
+    void *(*record_calloc)(size_t count, size_t size);
+    void (*record_free)(void *memory);
 } VitalsBrowserOps;
 
 typedef int (*VitalsBrowserRecv)(void *connection, int index, void *data,

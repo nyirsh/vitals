@@ -53,6 +53,8 @@ typedef struct BrowserConnection {
     uint8_t verify_peer;
     uint8_t verify_host;
     uint8_t custom_ca_requested;
+    /* WebKit's request, where a refused certificate is reported (VitalsBrowserOptions) */
+    void *ssl_info;
     uint8_t notifying_close;
     uint8_t lookahead_valid;
     unsigned char lookahead;
@@ -74,6 +76,9 @@ static struct {
     SceUID rejected_mutex;
     uint64_t rejected_hosts[BROWSER_REJECTED_HOSTS];
     int rejected_codes[BROWSER_REJECTED_HOSTS];
+    /* The refusal was reported to WebKit, which then asks the user: a retry with verification off
+     * only follows the user's yes */
+    uint8_t rejected_asked[BROWSER_REJECTED_HOSTS];
     unsigned int rejected_next;
     int default_ca_error;
     uint32_t enabled;
@@ -207,7 +212,7 @@ static uint64_t host_hash(const char *hostname) {
     return hash;
 }
 
-static void remember_rejected(const char *hostname, int code) {
+static void remember_rejected(const char *hostname, int code, int asked) {
     uint64_t hash = host_hash(hostname);
     size_t slot;
     if (sceKernelLockMutex(browser.rejected_mutex, 1, NULL) < 0) return;
@@ -220,17 +225,21 @@ static void remember_rejected(const char *hostname, int code) {
     }
     browser.rejected_hosts[slot] = hash;
     browser.rejected_codes[slot] = code;
+    browser.rejected_asked[slot] = (uint8_t)(asked != 0);
     (void)sceKernelUnlockMutex(browser.rejected_mutex, 1);
 }
 
-/* The error the host's certificate got here, or 0 */
-static int rejected_code(const char *hostname) {
+/* The error the host's certificate got here, or 0; *asked whether WebKit was told, so asked the user */
+static int rejected_code(const char *hostname, int *asked) {
     uint64_t hash = host_hash(hostname);
     int code = 0;
+    *asked = 0;
     if (sceKernelLockMutex(browser.rejected_mutex, 1, NULL) < 0) return VITALS_CURLE_SSL_CONNECT_ERROR;
     for (size_t slot = 0; slot < BROWSER_REJECTED_HOSTS && code == 0; ++slot) {
-        if (browser.rejected_codes[slot] != 0 && browser.rejected_hosts[slot] == hash)
+        if (browser.rejected_codes[slot] != 0 && browser.rejected_hosts[slot] == hash) {
             code = browser.rejected_codes[slot];
+            *asked = browser.rejected_asked[slot];
+        }
     }
     (void)sceKernelUnlockMutex(browser.rejected_mutex, 1);
     return code;
@@ -397,6 +406,7 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
     BrowserConnection *connection;
     size_t native_ssl = ssl_offset(index);
     const char *unverified_host;
+    int asked = 0;
     int result;
 
     *handled = 0;
@@ -426,13 +436,17 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
         goto unlock;
     }
     unverified_host = vitals_browser_unverified_host(native);
-    if (unverified_host != NULL && (result = rejected_code(unverified_host)) != 0) {
+    if (unverified_host != NULL && (result = rejected_code(unverified_host, &asked)) != 0 && !asked) {
         VITALS_LOG("browser refused unverified retry: code=%d", result);
         *handled = 1;
         goto unlock;
     }
-    result = vitals_browser_read_options(native, (unsigned int)index, browser.ops.default_ciphers,
-        browser.ops.is_default_ctx_callback, &options);
+    /* The user said yes to WebKit's question: this connection, without verification, stays here */
+    if (asked) VITALS_LOG("browser unverified retry the user allowed");
+    result = asked ? vitals_browser_read_unverified_options(native, (unsigned int)index,
+                         browser.ops.default_ciphers, browser.ops.is_default_ctx_callback, &options)
+                   : vitals_browser_read_options(native, (unsigned int)index, browser.ops.default_ciphers,
+                         browser.ops.is_default_ctx_callback, &options);
     if (result == VITALS_BROWSER_CONFIG_LEGACY) {
         VITALS_LOG("browser connection uses legacy TLS: unsupported custom configuration");
         result = 0;
@@ -463,6 +477,7 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
     connection->socket = options.socket;
     connection->verify_peer = options.verify_peer;
     connection->verify_host = options.verify_host;
+    connection->ssl_info = options.ssl_info;
     connection->custom_ca_requested = options.ca_file != NULL;
     memcpy(connection->hostname, options.hostname, strlen(options.hostname) + 1);
     if (options.ca_file != NULL) memcpy(connection->ca_file, options.ca_file, strlen(options.ca_file) + 1);
@@ -525,6 +540,73 @@ static int verify_connection(BrowserConnection *connection, void *easy) {
     if (connection->verify_peer && chain_flags != 0) return VITALS_CURLE_SSL_CACERT;
     if (connection->verify_host && (flags & VITALS_CERT_HOSTNAME)) {
         return VITALS_CURLE_PEER_FAILED_VERIFICATION;
+    }
+    return 0;
+}
+
+/* A refused certificate reported to WebKit as the engine's own TLS reports it (ScePsp2Compat's
+ * certificate check): a chain record of the server's certificates, in the engine's OpenSSL, and the
+ * OpenSSL verify error. WebKit then asks the user, and frees the record with the request. The
+ * record is the engine's layout, of 32-bit words: valid flag at +4, the list's head and tail at +8
+ * and +12, how many at +16; each node an entry and the next node; each entry the certificate and two
+ * words the engine fills itself. 1 when it was reported */
+static void *word_pointer(uint32_t word) {
+    return (void *)(uintptr_t)word;
+}
+
+static uint32_t pointer_word(const void *pointer) {
+    return (uint32_t)(uintptr_t)pointer;
+}
+
+static int report_to_webkit(BrowserConnection *connection, uint32_t code) {
+    unsigned char *info = connection->ssl_info;
+    uint32_t *record, *head = NULL, *tail = NULL;
+    int count = 0;
+    if (info == NULL || browser.ops.d2i_x509 == NULL || browser.ops.x509_free == NULL ||
+        browser.ops.record_calloc == NULL || browser.ops.record_free == NULL) return 0;
+    if (vitals_read_u32(info, VITALS_WEBKIT_SSL_FAILED_CHAIN_OFFSET) != 0) return 1;
+    /* The record lists the chain from its top down, the server's certificate last, as the engine
+     * pops it off OpenSSL's: built here from the server's own order, each one in front */
+    for (int i = 0;; ++i) {
+        const unsigned char *der;
+        size_t size;
+        void *certificate;
+        uint32_t *entry, *node;
+        if (vitalsSslGetPeerCertificate(connection->ssl, i, &der, &size) != 0) break;
+        certificate = browser.ops.d2i_x509(NULL, &der, (long)size);
+        entry = certificate != NULL ? browser.ops.record_calloc(3, sizeof(*entry)) : NULL;
+        node = entry != NULL ? browser.ops.record_calloc(2, sizeof(*node)) : NULL;
+        if (node == NULL) {
+            if (entry != NULL) browser.ops.record_free(entry);
+            if (certificate != NULL) browser.ops.x509_free(certificate);
+            goto failed;
+        }
+        entry[0] = pointer_word(certificate);
+        node[0] = pointer_word(entry);
+        node[1] = pointer_word(head);
+        if (head == NULL) tail = node;
+        head = node;
+        ++count;
+    }
+    record = count > 0 ? browser.ops.record_calloc(5, sizeof(*record)) : NULL;
+    if (record == NULL) goto failed;
+    /* No OpenSSL stack: the record's own list holds the certificates */
+    ((uint8_t *)record)[4] = 1;
+    record[2] = pointer_word(head);
+    record[3] = pointer_word(tail);
+    record[4] = (uint32_t)count;
+    vitals_write_u32(info, VITALS_WEBKIT_SSL_FAILED_CHAIN_OFFSET, pointer_word(record));
+    vitals_write_u32(info, VITALS_WEBKIT_SSL_ERROR_OFFSET,
+        info[VITALS_WEBKIT_SSL_REPORT_ERROR_OFFSET] != 0 ? code : 100u);
+    VITALS_LOG("browser certificate reported: certificates=%d error=%u", count, (unsigned int)code);
+    return 1;
+failed:
+    while (head != NULL) {
+        uint32_t *next = word_pointer(head[1]), *entry = word_pointer(head[0]);
+        browser.ops.x509_free(word_pointer(entry[0]));
+        browser.ops.record_free(entry);
+        browser.ops.record_free(head);
+        head = next;
     }
     return 0;
 }
@@ -616,7 +698,8 @@ int vitals_browser_connect(void *native, int index, unsigned char nonblocking,
 failed:
     VITALS_LOG("browser connect rejected: socket=%d code=%d", connection->socket, result);
     if (result == VITALS_CURLE_SSL_CACERT || result == VITALS_CURLE_PEER_FAILED_VERIFICATION)
-        remember_rejected(connection->hostname, result);
+        remember_rejected(connection->hostname, result, report_to_webkit(connection,
+            vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET)));
     connection->state = BROWSER_FAILED;
     connection->error = result;
 finished:

@@ -81,10 +81,10 @@ const char *vitals_browser_unverified_host(const void *connection) {
     return length == 0 || length == SIZE_MAX ? NULL : hostname;
 }
 
-int vitals_browser_read_options(const void *connection, unsigned int socket_index,
+static int read_options(const void *connection, unsigned int socket_index,
     const char *browser_default_ciphers,
     VitalsBrowserContextCallbackValidator callback_validator,
-    VitalsBrowserOptions *options) {
+    VitalsBrowserOptions *options, int allow_unverified) {
     static const size_t unsupported_material[] = {816, 820, 824, 828, 896, 920, 924};
     const uint8_t *easy;
     const char *ciphers;
@@ -111,14 +111,15 @@ int vitals_browser_read_options(const void *connection, unsigned int socket_inde
     ctx_userdata = (const void *)(uintptr_t)vitals_read_u32(easy, VITALS_CURL_CTX_CALLBACK_DATA_OFFSET);
     if (ctx_callback != NULL) {
         uint32_t policy = (ctx_userdata == NULL ? 1u : 0u) |
-            (callback_validator == NULL ? 2u : 0u) | (!verify_peer ? 4u : 0u) |
-            (!verify_host ? 8u : 0u) | (ca_file != NULL ? 16u : 0u);
+            (callback_validator == NULL ? 2u : 0u) | (!verify_peer && !allow_unverified ? 4u : 0u) |
+            (!verify_host && !allow_unverified ? 8u : 0u) | (ca_file != NULL ? 16u : 0u);
         /* Which of the callback's conditions failed, to tell a retry with verification off apart */
         VITALS_LOG("browser ctx callback: policy=0x%X peer=%u host=%u cafile=%u",
             (unsigned int)policy, verify_peer, verify_host, ca_file != NULL ? 1u : 0u);
         if (policy != 0 || !callback_validator(ctx_callback, ctx_userdata)) {
             return legacy_configuration(VITALS_CURL_CTX_CALLBACK_OFFSET, 1);
         }
+        options->ssl_info = (void *)(uintptr_t)ctx_userdata;
     } else if (ctx_userdata != NULL) {
         return legacy_configuration(VITALS_CURL_CTX_CALLBACK_DATA_OFFSET, 1);
     }
@@ -144,4 +145,18 @@ int vitals_browser_read_options(const void *connection, unsigned int socket_inde
     int result = cipher_mask(ciphers, browser_default_ciphers, &options->tls12_suites);
     return result == VITALS_BROWSER_CONFIG_LEGACY
         ? legacy_configuration(VITALS_CURL_CIPHERS_OFFSET, 1) : result;
+}
+
+int vitals_browser_read_options(const void *connection, unsigned int socket_index,
+    const char *browser_default_ciphers,
+    VitalsBrowserContextCallbackValidator callback_validator,
+    VitalsBrowserOptions *options) {
+    return read_options(connection, socket_index, browser_default_ciphers, callback_validator, options, 0);
+}
+
+int vitals_browser_read_unverified_options(const void *connection, unsigned int socket_index,
+    const char *browser_default_ciphers,
+    VitalsBrowserContextCallbackValidator callback_validator,
+    VitalsBrowserOptions *options) {
+    return read_options(connection, socket_index, browser_default_ciphers, callback_validator, options, 1);
 }
