@@ -21,11 +21,18 @@ int ssl_not_implemented(const char *function)
 /* SceRtcTick: microseconds since 0001-01-01 */
 #define TICKS_TO_1970 62135596800ull
 
+/* As Sony's, each of these answers SCE_SSL_ERROR_BEFORE_INIT first, then INVALID_VALUE for a NULL
+ * argument; an object that isn't one gets the error Sony's gives when its lookup fails */
+
 static int get_time(SceSslCert *sslCert, SceRtcTick *tick, int not_after)
 {
-    const mbedtls_x509_crt *crt = vs_certificate(sslCert);
-    if (crt == NULL || tick == NULL)
+    if (!vs_initialized())
+        return VS_ERROR_BEFORE_INIT;
+    if (sslCert == NULL || tick == NULL)
         return VS_ERROR_INVALID_VALUE;
+    const mbedtls_x509_crt *crt = vs_certificate(sslCert);
+    if (crt == NULL)
+        return VS_ERROR_INTERNAL;
     int64_t seconds = vs_certificate_time(crt, not_after);
     tick->tick = ((uint64_t)(seconds + (int64_t)TICKS_TO_1970)) * 1000000ull;
     return 0;
@@ -34,9 +41,13 @@ static int get_time(SceSslCert *sslCert, SceRtcTick *tick, int not_after)
 /* NID 0x901C5C15, Sony 0x810494F1: the serial number's bytes, as long as the certificate */
 int sceSslGetSerialNumber(SceSslCert *sslCert, const char **sboData, unsigned *sboLen)
 {
-    const mbedtls_x509_crt *crt = vs_certificate(sslCert);
-    if (crt == NULL || sboData == NULL || sboLen == NULL)
+    if (!vs_initialized())
+        return VS_ERROR_BEFORE_INIT;
+    if (sboData == NULL || sboLen == NULL || sslCert == NULL)
         return VS_ERROR_INVALID_VALUE;
+    const mbedtls_x509_crt *crt = vs_certificate(sslCert);
+    if (crt == NULL)
+        return VS_ERROR_INVALID_FORMAT;
     *sboData = (const char *)crt->serial.p;
     *sboLen = (unsigned)crt->serial.len;
     return 0;
@@ -57,8 +68,12 @@ int sceSslGetNotAfter(SceSslCert *sslCert, SceRtcTick *limit)
 /* NID 0x95E14CA6, Sony 0x81049895 */
 int sceSslGetNameEntryCount(SceSslCertName *certName)
 {
+    if (!vs_initialized())
+        return VS_ERROR_BEFORE_INIT;
+    if (certName == NULL)
+        return VS_ERROR_INVALID_VALUE;
     int count = vs_name_count(certName);
-    return count >= 0 ? count : VS_ERROR_INVALID_VALUE;
+    return count >= 0 ? count : VS_ERROR_INVALID_FORMAT;
 }
 
 /* The attribute names Sony's gives: SSLeay's long names, from the object table its libssl carries
@@ -101,15 +116,20 @@ static const char *attribute_name(const mbedtls_x509_buf *oid)
 
 /* NID 0x2A857867, Sony 0x810498F1: an entry's attribute ("commonName", as Sony's names it, or the
  * OID as dotted text for one it has no name for) and value, each cut to fit; valueLen is the whole
- * value's length. The value is NUL-terminated here, where Sony's isn't */
+ * value's length. As Sony's, every pointer is required and an entry past the last is
+ * SCE_SSL_ERROR_INVALID_FORMAT. The value is NUL-terminated here, where Sony's isn't */
 int sceSslGetNameEntryInfo(SceSslCertName *certName, int entryNum, char *oidname,
                            unsigned maxOidnameLen, char *value, unsigned maxValueLen,
                            unsigned *valueLen)
 {
+    if (!vs_initialized())
+        return VS_ERROR_BEFORE_INIT;
+    if (oidname == NULL || certName == NULL || valueLen == NULL || value == NULL)
+        return VS_ERROR_INVALID_VALUE;
     const mbedtls_x509_name *entry = vs_name_entry(certName, entryNum);
     if (entry == NULL)
-        return VS_ERROR_INVALID_VALUE;
-    if (oidname != NULL && maxOidnameLen > 0) {
+        return VS_ERROR_INVALID_FORMAT;
+    if (maxOidnameLen > 0) {
         const char *name = attribute_name(&entry->oid);
         if (name != NULL) {
             size_t length = strlen(name);
@@ -120,18 +140,20 @@ int sceSslGetNameEntryInfo(SceSslCertName *certName, int entryNum, char *oidname
             oidname[0] = '\0';
         }
     }
-    if (value != NULL && maxValueLen > 0) {
+    if (maxValueLen > 0) {
         size_t length = entry->val.len < maxValueLen - 1 ? entry->val.len : maxValueLen - 1;
         memcpy(value, entry->val.p, length);
         value[length] = '\0';
     }
-    if (valueLen != NULL)
-        *valueLen = (unsigned)entry->val.len;
+    *valueLen = (unsigned)entry->val.len;
     return 0;
 }
 
+/* NULL before sceSslInit, as for anything else that fails */
 static SceSslCertName *get_name(SceSslCert *sslCert, int subject)
 {
+    if (!vs_initialized())
+        return NULL;
     const mbedtls_x509_crt *crt = vs_certificate(sslCert);
     if (crt == NULL)
         return NULL;
@@ -156,8 +178,12 @@ SceSslCertName *sceSslGetIssuerName(SceSslCert *sslCert)
 /* NID 0xC73687E4, Sony 0x81049601 */
 int sceSslFreeSslCertName(SceSslCertName *certName)
 {
-    if (vs_name_count(certName) < 0)
+    if (!vs_initialized())
+        return VS_ERROR_BEFORE_INIT;
+    if (certName == NULL)
         return VS_ERROR_INVALID_VALUE;
+    if (vs_name_count(certName) < 0)
+        return VS_ERROR_INTERNAL;
     vs_name_free(certName);
     return 0;
 }

@@ -16,6 +16,7 @@
 #define VS_ERROR_ALREADY_INITED ((int)0x80435020)
 #define VS_ERROR_OUT_OF_MEMORY ((int)0x80435022)
 #define VS_ERROR_INTERNAL ((int)0x80435026)
+#define VS_ERROR_INVALID_FORMAT ((int)0x80435108)
 #define VS_ERROR_INVALID_VALUE ((int)0x804351FE)
 #define VS_ERROR_UNKNOWN_REASON ((int)0x804352FF)
 /* SceNet's EAGAIN, which a receive that timed out returns */

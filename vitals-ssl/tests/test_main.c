@@ -154,12 +154,25 @@ static void test_init(void)
     CHECK_EQ(sceSslInternalIsInitalized(), VS_ERROR_BEFORE_INIT);
     CHECK_EQ(sceSslInternalGetLibrary(&library), VS_ERROR_BEFORE_INIT);
     CHECK_EQ(sceSslGetMemoryPoolStats(&stats), VS_ERROR_BEFORE_INIT);
+    /* As Sony's: before sceSslInit, every SceSsl function says so before it looks at its arguments
+     * (the name getters, which return a pointer, give NULL) */
+    CHECK_EQ(sceSslGetMemoryPoolStats(NULL), VS_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceSslGetSerialNumber(NULL, NULL, NULL), VS_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceSslGetNotBefore(NULL, NULL), VS_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceSslGetNotAfter(NULL, NULL), VS_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceSslGetNameEntryCount(NULL), VS_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceSslGetNameEntryInfo(NULL, 0, NULL, 0, NULL, 0, NULL), VS_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceSslFreeSslCertName(NULL), VS_ERROR_BEFORE_INIT);
+    CHECK(sceSslGetSubjectName(NULL) == NULL);
+    CHECK(sceSslGetIssuerName(NULL) == NULL);
     CHECK_EQ(sceSslInit(0), VS_ERROR_INVALID_VALUE);
     vs_test_refused_pool = 12345;
     CHECK_EQ(sceSslInit(12345), 0x80022001);
     CHECK_EQ(sceSslInternalIsInitalized(), VS_ERROR_BEFORE_INIT);
     CHECK_EQ(sceSslInit(256 * 1024), 0);
     CHECK_EQ(sceSslInit(256 * 1024), VS_ERROR_ALREADY_INITED);
+    /* A second init is refused before its size is looked at */
+    CHECK_EQ(sceSslInit(0), VS_ERROR_ALREADY_INITED);
     CHECK_EQ(sceSslInternalIsInitalized(), 0);
     CHECK_EQ(sceSslGetMemoryPoolStats(NULL), VS_ERROR_INVALID_VALUE);
     stats.reserved = 77;
@@ -780,20 +793,42 @@ static void test_certificate_objects(void)
     char attribute[24], entry_value[8], small_attribute[7];
     unsigned value_length = 0;
     /* Sony's names, SSLeay's long ones */
-    CHECK_EQ(sceSslGetNameEntryInfo(name, 0, attribute, sizeof(attribute), NULL, 0, &value_length), 0);
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 0, attribute, sizeof(attribute), entry_value, 0, &value_length), 0);
     CHECK(strcmp(attribute, "organizationName") == 0);
-    CHECK_EQ(sceSslGetNameEntryInfo(name, 1, small_attribute, sizeof(small_attribute), NULL, 0, NULL), 0);
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 1, small_attribute, sizeof(small_attribute), entry_value, 0,
+                                    &value_length), 0);
     CHECK(strcmp(small_attribute, "common") == 0);
     CHECK_EQ(sceSslGetNameEntryInfo(name, 1, attribute, sizeof(attribute), entry_value, sizeof(entry_value),
                                     &value_length), 0);
     CHECK(strcmp(attribute, "commonName") == 0);
     CHECK(strcmp(entry_value, "vitals-") == 0);
     CHECK_EQ(value_length, strlen("vitals-ssl test CA"));
+    /* As Sony's: past the last entry, or not a name at all, is INVALID_FORMAT; every pointer is
+     * required, and checked before the entry */
     CHECK_EQ(sceSslGetNameEntryInfo(name, 2, attribute, sizeof(attribute), entry_value, sizeof(entry_value),
-                                    &value_length), SCE_SSL_ERROR_INVALID_VALUE);
+                                    &value_length), SCE_SSL_ERROR_INVALID_FORMAT);
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 9, attribute, sizeof(attribute), NULL, 0, &value_length),
+             SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 0, attribute, sizeof(attribute), entry_value, 0, NULL),
+             SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslGetNameEntryInfo(name, 0, NULL, 0, entry_value, 0, &value_length), SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslGetNameEntryInfo((SceSslCertName *)leaf, 0, attribute, sizeof(attribute), entry_value, 0,
+                                    &value_length), SCE_SSL_ERROR_INVALID_FORMAT);
+    CHECK_EQ(sceSslGetNameEntryCount((SceSslCertName *)leaf), SCE_SSL_ERROR_INVALID_FORMAT);
     CHECK_EQ(sceSslFreeSslCertName(name), 0);
     CHECK(sceSslGetSubjectName(NULL) == NULL);
     CHECK_EQ(sceSslGetNameEntryCount(NULL), SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslFreeSslCertName(NULL), SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslFreeSslCertName((SceSslCertName *)leaf), SCE_SSL_ERROR_INTERNAL);
+    /* The serial: its outputs first, then the certificate; something that isn't one is INVALID_FORMAT */
+    CHECK_EQ(sceSslGetSerialNumber(leaf, NULL, &serial_length), SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslGetSerialNumber(NULL, &serial, &serial_length), SCE_SSL_ERROR_INVALID_VALUE);
+    static uint64_t not_a_certificate[16];
+    CHECK_EQ(sceSslGetSerialNumber((SceSslCert *)not_a_certificate, &serial, &serial_length),
+             SCE_SSL_ERROR_INVALID_FORMAT);
+    CHECK_EQ(sceSslGetNotAfter((SceSslCert *)not_a_certificate, &after), SCE_SSL_ERROR_INTERNAL);
+    CHECK_EQ(sceSslGetNotBefore(leaf, NULL), SCE_SSL_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceSslGetNotAfter(NULL, &after), SCE_SSL_ERROR_INVALID_VALUE);
 
     CHECK_EQ(sceSslInternalCertFree(leaf), 0);
     CHECK_EQ(sceSslInternalCertFree(ca), 0);

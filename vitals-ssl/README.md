@@ -58,7 +58,13 @@ of its functions, and the NetCheck dialog one more.
   given (`SceLibsslGlobalHeap`), Mbed TLS's allocations included; `sceSslGetMemoryPoolStats`
   reports its size, peak and current use. A size the kernel refuses (not a multiple of 4 KiB, or
   more than the process has) fails with the kernel's error; 0 is `SCE_SSL_ERROR_INVALID_VALUE`, a
-  second `sceSslInit` `SCE_SSL_ERROR_ALREADY_INITED`.
+  second `sceSslInit` `SCE_SSL_ERROR_ALREADY_INITED` (whatever its size, checked first as Sony's).
+- **Errors of the `SceSsl` functions**, in Sony's order: `SCE_SSL_ERROR_BEFORE_INIT` before
+  `sceSslInit` (`sceSslGetSubjectName`/`IssuerName` return NULL), then
+  `SCE_SSL_ERROR_INVALID_VALUE` for a NULL argument (`sceSslGetNameEntryInfo` needs all four of
+  its pointers), then what Sony's gives when its lookup fails: `SCE_SSL_ERROR_INVALID_FORMAT` for
+  the serial number, the entry count and an entry past the last, `SCE_SSL_ERROR_INTERNAL` for the
+  dates and for freeing a name.
 - **Returns**: connect, read and write return what the socket returned when it failed (a negative
   SceNet error: a receive timeout is `0x80410123`, which libhttp checks for), 0 when the server
   closed the connection, and -1 when the TLS failed. `SSL_get_error` then says which, as Sony's: 1
@@ -304,7 +310,7 @@ links. Its host tests build vitals-ssl in, with their own platform
 
 | File | Role |
 |---|---|
-| [src/core.c](src/core.c) | `sceSslInit`, `sceSslTerm`, the pool's stats, the library object, the error translator, the random generator and the CA bundle's index |
+| [src/core.c](src/core.c) | `sceSslInit`, `sceSslTerm`, the pool's stats, the library object, the error translator and the CA bundle's index (random numbers are TF-PSA-Crypto's) |
 | [src/connection.c](src/connection.c) | methods, contexts, connections, the socket BIO, connect, read, write, shutdown, `SSL_get_error`, and calling the verify callback |
 | [src/certificate.c](src/certificate.c) | the certificate objects: certificates, names and entries, extensions, keys, times and the CA store |
 | [src/ssl.c](src/ssl.c) | `SceSsl`'s certificate getters, and the stub every unwritten export calls |

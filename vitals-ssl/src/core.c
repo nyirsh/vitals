@@ -140,9 +140,11 @@ int vs_library_init(unsigned int pool_size)
     return result;
 }
 
-/* NID 0x3C733316, Sony 0x81047F09 */
+/* NID 0x3C733316, Sony 0x81047F09: as Sony's, a second init is refused before the size is looked at */
 int sceSslInit(unsigned poolSize)
 {
+    if (vs_initialized())
+        return VS_ERROR_ALREADY_INITED;
     return poolSize == 0 ? VS_ERROR_INVALID_VALUE : vs_library_init(poolSize);
 }
 
