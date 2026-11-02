@@ -211,9 +211,17 @@ static void test_bodies(int template_)
     int request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/chunked"), 0);
     unsigned long long content_length;
     sceHttpSendRequest(request, NULL, 0);
-    CHECK_EQ(sceHttpGetResponseContentLength(request, &content_length), SCE_HTTP_ERROR_NO_CONTENT_LENGTH);
+    /* As Sony's: a chunked body is its own case */
+    CHECK_EQ(sceHttpGetResponseContentLength(request, &content_length), SCE_HTTP_ERROR_CHUNK_ENC);
     CHECK_EQ(read_all(request, body, sizeof(body), 1), length);
     sceHttpDeleteRequest(request);
+    /* A body that runs until the server closes has no length */
+    int closing = sceHttpCreateConnectionWithURL(template_, g_base, 0);
+    request = sceHttpCreateRequestWithURL(closing, SCE_HTTP_METHOD_GET, url(g_base, "/close"), 0);
+    CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
+    CHECK_EQ(sceHttpGetResponseContentLength(request, &content_length), SCE_HTTP_ERROR_NO_CONTENT_LENGTH);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteConnection(closing);
 
     /* A Content-Length body arriving in pieces comes whole from one read, as Sound Shapes needs */
     request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/split"), 0);
@@ -1619,6 +1627,30 @@ int main(int argc, char **argv)
     CHECK_EQ(sceHttpsEnableOption(0x40), SCE_HTTP_ERROR_BEFORE_INIT);
     CHECK_EQ(sceHttpsEnableOption2(12345, 0x40), SCE_HTTP_ERROR_BEFORE_INIT);
     CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x200), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* Every export Sony's checks it in: initialization before the arguments */
+    CHECK_EQ(sceHttpCreateTemplate(NULL, 99, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateConnectionWithURL(1, NULL, 1), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateRequestWithURL(1, 999, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateRequest2(1, NULL, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpDeleteTemplate(12345), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSendRequest(12345, NULL, 5), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpReadData(12345, NULL, 5), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpGetStatusCode(12345, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpGetResponseContentLength(12345, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpAddRequestHeader(12345, NULL, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetAutoRedirect(12345, 7), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpGetAutoRedirect(12345, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetNonblock(12345, 7), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpWaitRequest(NULL, NULL, -1, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateEpoll(NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpAddCookie(NULL, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetCookieTotalMaxSize(0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetDefaultAcceptEncodingGZIPEnabled(7), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsLoadCert(-1, NULL, NULL, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsGetSslError(12345, NULL, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsGetCaList(NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* The URI functions need no initialization */
+    CHECK_EQ(sceHttpUriSweepPath(NULL, NULL, 0), SCE_HTTP_ERROR_INVALID_VALUE);
     /* As with Sony's, https needs libssl set up by the app */
     CHECK_EQ(sceSslInit(512 * 1024), 0);
     CHECK_EQ(sceHttpInit(1024 * 1024), 0);

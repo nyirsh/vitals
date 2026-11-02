@@ -195,9 +195,18 @@ int sceSslGetMemoryPoolStats(SceSslMemoryPoolStats *currentStat)
         result = VS_ERROR_BEFORE_INIT;
     else if (currentStat == NULL)
         result = VS_ERROR_INVALID_VALUE;
-    else
+    else {
         vs_platform_heap_stats(&currentStat->poolSize, &currentStat->maxInuseSize,
                                &currentStat->currentInuseSize);
+#if VITALS_DEBUG >= 2
+        /* Apps poll this: only changes are logged */
+        static unsigned int reported_used = UINT32_MAX;
+        if (currentStat->currentInuseSize != reported_used)
+            VITALS_VERBOSE("pool stats size=%u used=%u peak=%u", currentStat->poolSize,
+                           currentStat->currentInuseSize, currentStat->maxInuseSize);
+        reported_used = currentStat->currentInuseSize;
+#endif
+    }
     vs_unlock();
     return result;
 }

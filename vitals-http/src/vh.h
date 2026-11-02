@@ -225,7 +225,19 @@ typedef struct VhObject
 
 /* 0 once sceHttpInit succeeded, SCE_HTTP_ERROR_BEFORE_INIT before */
 int vh_initialized(void);
+/* As Sony's: every export but the URI and parsing ones answers SCE_HTTP_ERROR_BEFORE_INIT before it
+ * looks at its arguments (then the arguments, then the object) */
+#define VH_REQUIRE_INIT()                                                                          \
+    do {                                                                                           \
+        vh_lock();                                                                                 \
+        int ready_ = vh_initialized();                                                             \
+        vh_unlock();                                                                               \
+        if (ready_ != 0)                                                                           \
+            return ready_;                                                                         \
+    } while (0)
 void vh_lock(void);
+/* The pool's size and use, without the export's logging */
+void vh_pool_stats(unsigned int *size, unsigned int *used, unsigned int *peak);
 void vh_unlock(void);
 /* The object with that ID and kind (VH_FREE: any kind), with the lock held; NULL when there is
  * none, or the app deleted it */

@@ -96,11 +96,10 @@ static void dump_connections(void)
 
 static void dump_pool(void)
 {
-    SceHttpMemoryPoolStats stats;
-    memset(&stats, 0, sizeof(stats));
-    (void)sceHttpGetMemoryPoolStats(&stats);
+    unsigned int size, used, peak;
+    vh_pool_stats(&size, &used, &peak);
     log_line(" current      max");
-    log_line("%8x %8x", stats.currentInuseSize, stats.maxInuseSize);
+    log_line("%8x %8x", used, peak);
 }
 
 /* Sony's does nothing here either */
@@ -295,6 +294,7 @@ int sceHttpPrivateGetSocketOption(int id, int *value)
 int sceHttpPrivateSetProxy(int id, int mode, int version, const char *host, unsigned short port)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (host == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     int result;
