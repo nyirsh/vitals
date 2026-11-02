@@ -19,9 +19,44 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+/* vitals-ssl's host platform reads the bundle from here */
+extern char vs_test_ca_path[512];
+int sceSslTerm(void);
+
 static uint64_t deadline;
 static unsigned int waits, writes_waited, reads_waited;
 static const void *accepted_callback, *accepted_userdata;
+
+/* The record WebKit gets holds 32-bit pointers, as on the Vita: its memory, and the engine's
+ * certificates, come from the low arena */
+static unsigned char *record_arena;
+static size_t record_used;
+static unsigned int record_frees;
+static void *arena_calloc(size_t count, size_t size) {
+    void *memory = record_arena + record_used;
+    assert(record_arena != NULL && count * size <= 8192 - record_used);
+    record_used += (count * size + 7u) & ~(size_t)7u;
+    memset(memory, 0, count * size);
+    return memory;
+}
+static void arena_free(void *memory) {
+    assert(memory != NULL);
+    ++record_frees;
+}
+/* The engine's d2i_X509 and X509_free: each certificate its DER size */
+static unsigned int certificates_made, certificates_freed;
+static void *fake_d2i_x509(void **certificate, const unsigned char **der, long size) {
+    long *made = arena_calloc(1, sizeof(*made));
+    assert(certificate == NULL && der != NULL && *der != NULL && size > 100 && (*der)[0] == 0x30);
+    *made = size;
+    *der += size;
+    ++certificates_made;
+    return made;
+}
+static void fake_x509_free(void *certificate) {
+    assert(certificate != NULL);
+    ++certificates_freed;
+}
 
 static int validate_default_callback(const void *callback, const void *userdata) {
     return callback == accepted_callback && userdata == accepted_userdata;
@@ -70,7 +105,11 @@ int main(int argc, char **argv) {
         .socket_wait = socket_wait,
         .is_default_ctx_callback = validate_default_callback,
         .default_ciphers = "known browser default",
-        .default_ca_path = NULL
+        .default_ca_path = NULL,
+        .d2i_x509 = fake_d2i_x509,
+        .x509_free = fake_x509_free,
+        .record_calloc = arena_calloc,
+        .record_free = arena_free
     };
     const char query[] = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
     unsigned char *arena, *connection, *easy;
@@ -94,11 +133,13 @@ int main(int argc, char **argv) {
     assert(argc == 5);
     scenario = argv[3];
     mock_ca_file = argv[1];
+    snprintf(vs_test_ca_path, sizeof(vs_test_ca_path), "%s", argv[1]);
     arena = mmap((void *)(uintptr_t)0x24000000, 65536, PROT_READ | PROT_WRITE,
         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
     assert(arena != MAP_FAILED && (uintptr_t)arena <= UINT32_MAX);
     connection = arena;
     easy = arena + 4096;
+    record_arena = arena + 20480;
     hostname = (char *)arena + 49152;
     strcpy(hostname, "localhost");
     if (strcmp(scenario, "wrong-host") == 0 || strcmp(scenario, "host-disabled") == 0 ||
@@ -125,6 +166,8 @@ int main(int argc, char **argv) {
             (uint32_t)(uintptr_t)accepted_callback);
         vitals_write_u32(easy, VITALS_CURL_CTX_CALLBACK_DATA_OFFSET,
             (uint32_t)(uintptr_t)accepted_userdata);
+        /* WebKit's request asks for the verify error itself */
+        easy[3072 + VITALS_WEBKIT_SSL_REPORT_ERROR_OFFSET] = 1;
     }
 #ifdef VITALS_BROWSER_MEMORY_TEST
     if (memory_case) vitals_memory_tracker_reset();
@@ -133,8 +176,8 @@ int main(int argc, char **argv) {
 #ifdef VITALS_BROWSER_MEMORY_TEST
     if (memory_case) {
         memory_after_init = vitals_memory_tracker_snapshot();
+        /* The TLS is libssl's, set up on the first connection: nothing is kept before it */
         assert(!memory_after_init.overflow);
-        assert(memory_after_init.current_bytes > 0 && memory_after_init.live_allocations > 0);
     }
 #endif
     vitals_browser_enable(1);
@@ -222,6 +265,33 @@ int main(int argc, char **argv) {
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 20);
         if (strcmp(scenario, "sha1-expired") == 0)
             assert(vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET) == 10);
+        if (strncmp(scenario, "default-callback-", sizeof("default-callback-") - 1) == 0) {
+            /* Reported to WebKit as the engine's TLS reports it: a chain record of the server's
+             * certificate, and the verify error, so the browser asks the user */
+            unsigned char *request = easy + 3072;
+            const uint32_t *record = (const uint32_t *)(uintptr_t)vitals_read_u32(request,
+                VITALS_WEBKIT_SSL_FAILED_CHAIN_OFFSET);
+            const uint32_t *node, *entry;
+            assert(record != NULL && ((const uint8_t *)record)[4] == 1 && record[0] == 0 && record[4] == 1);
+            node = (const uint32_t *)(uintptr_t)record[2];
+            assert(node != NULL && record[3] == record[2] && node[1] == 0);
+            entry = (const uint32_t *)(uintptr_t)node[0];
+            assert(entry != NULL && entry[0] != 0 && entry[1] == 0 && entry[2] == 0);
+            assert(certificates_made == 1 && certificates_freed == 0);
+            assert(vitals_read_u32(request, VITALS_WEBKIT_SSL_ERROR_OFFSET) ==
+                vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET));
+            /* The retry WebKit makes once the user says yes, verification off, stays here */
+            assert(vitals_browser_close(connection, index, &handled) == 0 && handled);
+            easy[VITALS_CURL_VERIFY_PEER_OFFSET] = 0;
+            easy[VITALS_CURL_VERIFY_HOST_OFFSET] = 0;
+            done = 99;
+            result = vitals_browser_connect(connection, index, 1, &done, &handled);
+            assert(handled && result != VITALS_CURLE_SSL_CACERT &&
+                result != VITALS_CURLE_PEER_FAILED_VERIFICATION);
+            /* WebKit frees the record with its request; nothing was freed before */
+            assert(record_frees == 0);
+            goto shutdown;
+        }
         if (strcmp(scenario, "wrong-host") == 0 || strcmp(scenario, "expired") == 0) {
             /* The browser's own retry, with verification off, gets the same error and never
              * reaches Sony's TLS; other hosts still can */
@@ -340,6 +410,8 @@ cleanup:
     assert(vitals_browser_destroy() == 0);
 #ifdef VITALS_BROWSER_MEMORY_TEST
     if (memory_case) {
+        /* libssl outlives the provider in a process; ended here, everything is given back */
+        assert(sceSslTerm() == 0);
         memory_after_destroy = vitals_memory_tracker_snapshot();
         assert(!memory_after_destroy.overflow);
         assert(memory_after_destroy.current_bytes == 0);

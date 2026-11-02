@@ -5,7 +5,7 @@
 Modern TLS (1.2 and 1.3) for the PS Vita browser, apps and games that use Sony's `sceHttp` APIs.  
 It started as a derivation of `tls_fixer` by [devnoname120](https://github.com/devnoname120), it grew enough to become its own full project. ([more info](#why-a-separate-project))
 
-The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals gives apps and games a rewrite of Sony's HTTP library on [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), gives the browser Mbed TLS in place of its own TLS, and installs an up-to-date certificate store. Apps keep calling the same HTTP functions, so they work unchanged.
+The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals gives apps and games rewrites of Sony's HTTP and SSL libraries, the SSL one on [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), gives the browser that same SSL library in place of its own TLS, and installs an up-to-date certificate store. Apps keep calling the same HTTP functions, so they work unchanged.
 
 > [!TIP]
 > **If it's not broken, don't fix it**
@@ -48,16 +48,16 @@ Before installing, the app removes the plugins known to conflict with vitals. Un
 
 ## What it covers
 
-- **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl)
-- **Apps, games and the shell:** `vitals-http`, Sony's HTTP library written from scratch on `Mbed TLS` 3.6, replaces `SceLibHttp` in every process that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
+- **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl), on `vitals-ssl`, which the kernel plugin loads into the browser's process
+- **Apps, games and the shell:** `vitals-http`, Sony's HTTP library written from scratch, with its TLS from `vitals-ssl` (Sony's SSL library rewritten on `Mbed TLS` 4.2), replaces `SceLibHttp` in every process that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
 - **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. The starter [host redirects](#host-redirects) list sends the old host to the new one, and `vitals-http` applies it in the shell and in every app, as [reAuth](https://github.com/psv-plugins-archive/reAuth) did
 
 TLS 1.0 and 1.1 are deliberately disabled.
 
 ## What's new compared to tls_fixer
 
-- **Sony's HTTP library, rewritten.** `tls_fixer` kept Sony's libhttp, giving each app a private copy of it and of libssl, and injected a provider into it to swap the TLS underneath. `vitals` replaces the whole library with `vitals-http`, written from scratch on `Mbed TLS` 3.6, under the same functions and NIDs, so apps and games work unchanged. It's loaded shared, as Sony's is, in every process, the system shell and the PlayStation Store included, with nothing injected or hooked. How it works is in [docs/vitals-http.md](docs/vitals-http.md)
-- **Much less heap memory taken.** `tls_fixer` reserved a fixed 2 MiB heap inside every app that uses sceHttp, which is a lot on a console where games have little memory to spare. vitals reserves 128 KiB, and only once a process makes its first HTTPS connection: apps and system processes that never use HTTPS reserve nothing. That alone fixes most of the out-of-memory crashes.
+- **Sony's HTTP library, rewritten.** `tls_fixer` kept Sony's libhttp, giving each app a private copy of it and of libssl, and injected a provider into it to swap the TLS underneath. `vitals` replaces the whole library with `vitals-http`, written from scratch, and libssl with `vitals-ssl`, written from scratch on `Mbed TLS` 4.2, under the same functions and NIDs, so apps and games work unchanged. It's loaded shared, as Sony's is, in every process, the system shell and the PlayStation Store included, with nothing injected or hooked. How it works is in [docs/vitals-http.md](docs/vitals-http.md)
+- **Much less heap memory taken.** `tls_fixer` reserved a fixed 2 MiB heap inside every app that uses sceHttp, which is a lot on a console where games have little memory to spare. vitals-http reserves 64 KiB, and only once a process makes its first HTTPS connection; the TLS itself is in the pool the app gives libssl, as with Sony's: apps and system processes that never use HTTPS reserve nothing. That alone fixes most of the out-of-memory crashes.
 - **Certificates are looked up on demand.** `tls_fixer` parsed the whole certificate store into memory when each app started. `vitals` only builds a small index at start-up and reads a root certificate from the file when a handshake actually needs it. Apps and the browser start faster, and the parsed store no longer takes memory.
 - **Games with their own certificates work.** When an app loaded its own CA certificates, `tls_fixer` sent all of that app's new connections back to Sony's old TLS stack, which fails against current servers. `vitals` keeps its modern TLS and trusts the app's certificates in addition to the system store. This is what lets games redirected to community servers, such as Sound Shapes, sign in via https instead of http.
 - **A simpler kernel plugin**, modeled on `iTLS-Enso` module redirection, with the experimental, diagnostic and multi-firmware code removed. It targets firmware 3.60 and 3.65 only.
@@ -144,8 +144,9 @@ A request that times out is tried again, up to 3 times in all, since slow server
 | Folder               | Contents                                                                                                                                                                         |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `vitals-plugin/`     | the kernel plugin (`vitals.skprx`) that redirects Sony's modules and injects the browser provider                                                                                |
-| `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with `tls13-vita`'s TLS                                                                                              |
-| `tls13-vita/`        | the browser's TLS provider and the code it shares with `vitals-http` and the kernel plugin                                                                                       |
+| `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with its TLS from `vitals-ssl`                                                                                       |
+| `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`): installed as the system's libssl, which vitals-http imports                                                             |
+| `tls13-vita/`        | the browser's TLS provider, the Mbed TLS build, and the code it shares with `vitals-ssl`, `vitals-http` and the kernel plugin                                                    |
 | `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                                                                                                   |
 | `docs/`              | how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals |
 | `licenses/`          | full license texts of the third-party software in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)                                                                               |
@@ -189,7 +190,7 @@ Available build options:
 
 | Option         | Default                  | Effect                                                                                                                                                                                       |
 | -------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TLS_HEAP_KIB` | `128`                    | memory (KiB) `vitals-http` reserves for TLS, in a process's first https use                                                                                                                  |
+| `TLS_HEAP_KIB` | `64`                     | memory (KiB) `vitals-http` keeps for TLS state, in a process's first https use                                                                                                                |
 | `USER_AGENT`   | `libhttp/3.74 (PS Vita)` | what `vitals-http` puts after each app's own User-Agent, unless `useragent.txt` gives another; up to 127 printable ASCII characters, without quotes, backslashes, backticks, `#`, `$` or `;` |
 
 Debug output levels, for `vitals-http` and the browser provider (lines start with `vitals-http:` for apps and games, `vitals_browser:` for the browser):
@@ -203,7 +204,7 @@ Every build includes all three levels; choose one on the console from the app's 
 ### Updating `Mbed TLS` or `curl`
 
 Both are pinned in [dependencies.cmake](dependencies.cmake). Change the version and the SHA-256 together, where the SHA-256 is that of the new release archive (`sha256sum` of the downloaded file).  
-The next build downloads and verifies it. `vitals-http` and the browser provider share one `Mbed TLS` build ([tls13-vita/crypto](tls13-vita/crypto/)) and accept any 3.6 release, whose patch must still apply. They can't move to 4.x: it dropped the RSA key exchange PSN sign-in needs.
+The next build downloads and verifies it. `vitals-ssl`, which does the TLS of apps, games and the browser, builds it ([tls13-vita/crypto](tls13-vita/crypto/)) with four patches, which must still apply to the new release; one of them puts back the client side of TLS 1.2's RSA key exchange, which Mbed TLS 4 removed and PSN sign-in needs, so check a new release against it with care.
 
 ### Updating the bundled certificates
 
@@ -226,6 +227,7 @@ This runs every component's host tests (`make -C <folder> test` runs one compone
 - `vitals-plugin/tests/`: the kernel plugin's routing, injection and module checks, against mocks of the Vita kernel, and the build check that keeps floating-point instructions out of it
 - `tls13-vita/tests/`: the browser provider's real TLS handshakes over loopback, certificate checks, memory use, the host redirect list's parser, the Makefile's settings, and a build with debug output on, so every log line compiles
 - `vitals-http/tests/`: the HTTP library against a local HTTP and HTTPS server: requests, keep-alive, bodies, redirects, cookies, Basic and Digest auth, HTTPS (including client certificates and the console's TLS profile), non-blocking calls, host redirects and the User-Agent
+- `vitals-ssl/tests/`: the SSL library's connection and certificate functions, called as Sony's libhttp calls them, against a local TLS server: reading and writing, close_notify and dropped sockets, timeouts, certificate and host name checks, the error codes, and a verify callback that checks a CA's chain through the certificate functions and the CA store
 - `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
 
 The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them). A few certificate tests are skipped unless `pkg-config` and the libcurl and OpenSSL development files are installed: `pkg-config libcurl4-openssl-dev libssl-dev` on Debian/Ubuntu, `brew install pkgconf curl openssl` on macOS (the tests find Homebrew's copies themselves). The OpenSSL must be the one libcurl itself uses, as the code under test shares OpenSSL objects with curl.
@@ -246,7 +248,7 @@ Each normal build also checks that the kernel plugin contains no floating-point 
 
 ## Credits
 
-**`vitals` started from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, and the idea is his:** giving the Vita modern TLS by running `Mbed TLS` where Sony's old TLS stack used to be. vitals has since become a project of its own: Sony's HTTP library is now rewritten from scratch as `vitals-http` instead of having its TLS swapped, and the DNS rules, host redirects and User-Agent are new. What `vitals` still carries from `tls_fixer` is the browser's TLS provider, the kernel plugin's injection, the certificate merging/updating and the original connection test applet.
+**`vitals` started from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, and the idea is his:** giving the Vita modern TLS by running `Mbed TLS` where Sony's old TLS stack used to be. vitals has since become a project of its own: Sony's HTTP library is now rewritten from scratch as `vitals-http` instead of having its TLS swapped, and the DNS rules, host redirects and User-Agent are new. What `vitals` still carries from `tls_fixer` is the browser's TLS provider, the kernel plugin's injection, the certificate merging/updating, the original connection test applet and the patch that puts TLS 1.2's RSA key exchange back into Mbed TLS 4 (`tls13-vita/crypto/rsa-client.patch`).
 
 **Thanks to SKGleba for the [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso) plugin!** His work updating the Vita's certificates is the foundation of `vitals`, along with his original installer and module-redirection code. Existing author notices are preserved in the source.
 

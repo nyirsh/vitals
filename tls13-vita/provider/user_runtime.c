@@ -21,16 +21,19 @@ static uint32_t g_outstanding;
 
 /* Initialize before publishing hooks; release only after all users have gone */
 int vitals_user_runtime_init(void) {
+    return vitals_user_runtime_init_size("vitals HTTP heap", VITALS_HTTP_HEAP_BYTES);
+}
+
+int vitals_user_runtime_init_size(const char *name, unsigned int size) {
     void *base = NULL;
     if (g_heap != NULL || g_heap_block >= 0 || g_heap_mutex >= 0) return -1;
-    g_heap_block = sceKernelAllocMemBlock("vitals HTTP heap",
-        SCE_KERNEL_MEMBLOCK_TYPE_USER_RW, VITALS_HTTP_HEAP_BYTES, NULL);
+    g_heap_block = sceKernelAllocMemBlock(name, SCE_KERNEL_MEMBLOCK_TYPE_USER_RW, size, NULL);
     if (g_heap_block < 0) return g_heap_block;
     int result = sceKernelGetMemBlockBase(g_heap_block, &base);
     if (result < 0 || base == NULL) goto failed;
-    g_heap_mutex = sceKernelCreateMutex("vitals HTTP heap", 0, 0, NULL);
+    g_heap_mutex = sceKernelCreateMutex(name, 0, 0, NULL);
     if (g_heap_mutex < 0) { result = g_heap_mutex; goto failed; }
-    g_heap = sceClibMspaceCreate(base, VITALS_HTTP_HEAP_BYTES);
+    g_heap = sceClibMspaceCreate(base, size);
     if (g_heap == NULL) { result = -1; goto failed; }
     g_outstanding = 0;
     return 0;

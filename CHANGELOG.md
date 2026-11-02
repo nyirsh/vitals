@@ -1,12 +1,18 @@
 # Changelog
 
+## 2.0
+
+- Sony's SSL library has been replaced by vitals own full rewrite, on top of that
+- Vitals's HTTP library now uses the SSL library just like any other Vita's module would do and it has been stripped of MBed TLS entirely
+- Updated MBed TLS to version 4.2.0 thanks to devnoname120's patches
+
 ## 1.6
 
 - Added support for http proxies
 
 ## 1.5
 
-- Sony's HTTP library is replaced by vitals own full rewrite in every app, game and the system itself
+- Sony's HTTP library has been replaced by vitals own full rewrite
 - Redirected hosts get a higher timeout, in case community servers are slow to answer
 - Added DNS resolution redirection
 - Added the ability to change User-Agent

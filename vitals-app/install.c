@@ -918,7 +918,7 @@ static int install_http_modules(int requested_state)
         }
         if (result >= 0)
         {
-            result = replace_file("app0:lssl.suprx", new_modules[MODULE_LIBSSL]);
+            result = replace_file("app0:libssl.suprx", new_modules[MODULE_LIBSSL]);
         }
         /* A starter host redirect list; an existing one is the user's and is never replaced */
         if (result >= 0 && !path_exists(redirect_list))
@@ -1099,12 +1099,14 @@ static int same_contents(const char *first_path, const char *second_path)
 enum
 {
     DEBUG_LIBHTTP,
+    DEBUG_LIBSSL,
     DEBUG_BROWSER_PROVIDER,
     DEBUG_PLUGIN,
     DEBUG_MODULE_COUNT
 };
 static const char *const debug_files[DEBUG_MODULE_COUNT] = {
     [DEBUG_LIBHTTP] = "libhttp.suprx",
+    [DEBUG_LIBSSL] = "libssl.suprx",
     [DEBUG_BROWSER_PROVIDER] = "vitals.suprx",
     [DEBUG_PLUGIN] = "vitals.skprx",
 };
@@ -1165,6 +1167,11 @@ int vitals_install_set_debug_level(int level, VitalsInstallNote note)
         printf("Installing the %s modules... \n", level == 0 ? "release" : "debug");
         debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
         result = replace_file(source, new_modules[MODULE_LIBHTTP]);
+    }
+    if (result >= 0)
+    {
+        debug_source(level, DEBUG_LIBSSL, source, sizeof(source));
+        result = replace_file(source, new_modules[MODULE_LIBSSL]);
     }
     /* The browser provider has two copies, like a full install leaves */
     if (result >= 0)

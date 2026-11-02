@@ -8,9 +8,9 @@ set(VITALS_DEBUG 0 CACHE STRING "Debug output on the console: 0, 1 or 2")
 if(NOT VITALS_DEBUG MATCHES "^[012]$")
     message(FATAL_ERROR "VITALS_DEBUG must be 0, 1 or 2")
 endif()
-# TLS's heap, apart from the pool the app gives sceHttpInit: about 40 KiB per open https
-# connection, plus a certificate chain while it is checked
-set(VITALS_HTTP_TLS_HEAP_KIB 128 CACHE STRING "TLS heap in KiB (one memory block per process)")
+# The heap for what TLS keeps here (a connection's state, the app's loaded certificates); the
+# connections themselves are in libssl's pool
+set(VITALS_HTTP_TLS_HEAP_KIB 64 CACHE STRING "TLS heap in KiB (one memory block per process)")
 if(NOT VITALS_HTTP_TLS_HEAP_KIB MATCHES "^[0-9]+$" OR VITALS_HTTP_TLS_HEAP_KIB LESS 64
    OR VITALS_HTTP_TLS_HEAP_KIB GREATER 4096)
     message(FATAL_ERROR "VITALS_HTTP_TLS_HEAP_KIB must be 64..4096")
@@ -28,13 +28,13 @@ endif()
 # The bundle the vitals app installs, which the HTTP provider trusts too
 set(VITALS_HTTP_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trusted CA bundle (PEM)")
 
-# TLS is Mbed TLS 3.6 (tls13-vita/crypto, shared with the browser provider), with tls13-vita's CA index, certificate flags and runtime
+# From tls13-vita: the heap and C library runtime, the error and certificate mapping, the redirect list
 set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
-include(../dependencies.cmake)
+# TLS is vitals-ssl's: the libssl module, imported as Sony's libhttp imports Sony's (its stub, which
+# ../vitals-ssl's build makes), so a connection's memory is the pool the app gives sceSslInit
+set(VITALS_SSL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vitals-ssl)
 # The release version from ../VERSION, which the module header carries
 include(../version.cmake)
-vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
-add_subdirectory(${TLS13_DIR}/crypto crypto)
 
 add_executable(vitals_libhttp
     src/core.c
@@ -48,15 +48,15 @@ add_executable(vitals_libhttp
     src/redirect.c
     src/useragent.c
     src/tls.c
-    ${TLS13_DIR}/provider/platform_shims.c
+    src/md5.c
     src/platform_vita.c
-    ${TLS13_DIR}/provider/ca_index.c
     ${TLS13_DIR}/provider/user_runtime.c
     ${TLS13_DIR}/src/error_map.c
     ${TLS13_DIR}/src/host_map.c
     ${TLS13_DIR}/src/redirect_list.c
 )
-target_include_directories(vitals_libhttp PRIVATE src ${TLS13_DIR}/provider ${TLS13_DIR}/include)
+target_include_directories(vitals_libhttp PRIVATE src ${VITALS_SSL_DIR}/include ${TLS13_DIR}/provider
+    ${TLS13_DIR}/include)
 target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-http"
@@ -89,11 +89,14 @@ set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-plugin/stubs/libvitals_ker
 if(NOT EXISTS "${VITALS_KERNEL_STUB}")
     message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-plugin first (make does this)")
 endif()
+# Weak: a process that loads libhttp without libssl does no https, and still loads this one
+set(VITALS_SSL_STUB "${CMAKE_BINARY_DIR}/../vitals-ssl/stubs/libSceLibSsl_stub_weak.a")
+if(NOT EXISTS "${VITALS_SSL_STUB}")
+    message(FATAL_ERROR "${VITALS_SSL_STUB} is missing; build ../vitals-ssl first (make does this)")
+endif()
 target_link_libraries(vitals_libhttp PRIVATE
     ${VITALS_KERNEL_STUB}
-    mbedtls
-    mbedx509
-    mbedcrypto
+    ${VITALS_SSL_STUB}
     z
     gcc
     SceAppMgr_stub

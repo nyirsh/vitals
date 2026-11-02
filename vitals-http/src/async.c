@@ -82,6 +82,7 @@ void vh_epoll_clear(void)
 int sceHttpCreateEpoll(SceHttpEpollHandle *eh)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (eh == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -171,6 +172,7 @@ int sceHttpUnsetEpoll(int id)
 int sceHttpGetEpoll(int id, SceHttpEpollHandle *eh, void **userArg)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result;
     if (eh == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
@@ -201,6 +203,7 @@ int sceHttpSetEpollId(int id, int epollId)
 int sceHttpGetEpollId(int id, int *epollId)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result;
     if (epollId == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
@@ -275,6 +278,7 @@ static int wait_request(SceHttpEpollHandle eh, SceHttpNBEvent *nbev, int maxeven
 int sceHttpWaitRequest(SceHttpEpollHandle eh, SceHttpNBEvent *nbev, int maxevents, int timeout)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return wait_request(eh, nbev, maxevents, timeout);
 }
 
@@ -282,6 +286,7 @@ int sceHttpWaitRequest(SceHttpEpollHandle eh, SceHttpNBEvent *nbev, int maxevent
 int sceHttpWaitRequestCB(SceHttpEpollHandle eh, SceHttpNBEvent *nbev, int maxevents, int timeout)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return wait_request(eh, nbev, maxevents, timeout);
 }
 

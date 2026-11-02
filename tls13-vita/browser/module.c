@@ -10,11 +10,16 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum { BROWSER_HOOK_CLOSE, BROWSER_HOOK_PENDING, BROWSER_HOOK_CHECK, BROWSER_HOOK_CONNECT, BROWSER_HOOK_COUNT };
 static tai_hook_ref_t hook_refs[BROWSER_HOOK_COUNT];
 static int hook_ids[BROWSER_HOOK_COUNT];
+/* Writable and initialized, so the module has a data segment with content: vita-elf-create can't
+ * lay out an empty one, which this module would have now that its TLS is the libssl module's (the
+ * link keeps it) */
+char vitals_browser_module_data[] = "vitals browser provider";
 static uint32_t starting;
 static char ca_path[256];
 
@@ -137,6 +142,12 @@ int module_start(SceSize size, const void *data) {
     ops.is_default_ctx_callback = vitals_webkit_is_default_ctx_callback;
     ops.default_ciphers = VITALS_BROWSER_DEFAULT_CIPHERS;
     ops.default_ca_path = ca_path;
+    /* The engine's own OpenSSL, for the certificates a refused connection reports to WebKit (the
+     * kernel checked the module's hash, so these are where they should be) */
+    ops.d2i_x509 = (void *(*)(void **, const unsigned char **, long))(text + VITALS_BROWSER_D2I_X509_OFFSET + 1);
+    ops.x509_free = (void (*)(void *))(text + VITALS_BROWSER_X509_FREE_OFFSET + 1);
+    ops.record_calloc = calloc;
+    ops.record_free = free;
     result = vitals_browser_init(&ops);
     if (result != 0) {
         VITALS_LOG("browser TLS initialization failed: 0x%08X", result);

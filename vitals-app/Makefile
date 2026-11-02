@@ -1,6 +1,7 @@
 # Builds vitals-app.vpk: the vitals app (installer and connection test), packaged with the kernel
-# plugin, vitals-http and the browser provider it installs
-# Those come from ../vitals-plugin, ../vitals-http and ../tls13-vita, which are built first
+# plugin, vitals-http, vitals-ssl and the browser provider it installs
+# Those come from ../vitals-plugin, ../vitals-http, ../vitals-ssl and ../tls13-vita, which are built
+# first
 # Everything is built in build/ at the repository root
 BUILD_DIR := $(abspath ../build)
 OUT_DIR = $(BUILD_DIR)/vitals-app
@@ -10,10 +11,11 @@ all: modules
 	cmake -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=$(VITA_TOOLCHAIN) -DCMAKE_BUILD_TYPE=Release
 	cmake --build $(OUT_DIR)
 
-# The plugin, vitals-http, providers and redirect have their own Makefiles; CMake decides what to
-# rebuild. All of them are built at every debug level, which the app lets users switch between
+# The plugin, vitals-http, vitals-ssl and the providers have their own Makefiles; CMake decides what
+# to rebuild. All of them are built at every debug level, which the app lets users switch between
 modules:
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-plugin DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-ssl DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../tls13-vita DEBUG=$(level) &&) true
 
@@ -33,6 +35,6 @@ test:
 	python3 -m unittest discover -s tests -p 'test_*.py'
 
 clean:
-	rm -rf $(OUT_DIR) $(TEST_DIR)
+	rm -rf $(BUILD_DIR)/vitals-app $(TEST_DIR)
 
 .PHONY: all clean modules update-certs test

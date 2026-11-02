@@ -1,73 +1,35 @@
 #include "vh.h"
 
-#include "ca_index.h"
-#include "crypto_platform.h"
 #include "diagnostics.h"
 #include "user_runtime.h"
 #include "vitals/error_map.h"
-
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/net_sockets.h>
-#include <mbedtls/pk.h>
-#include <mbedtls/platform.h>
-#include <mbedtls/platform_util.h>
-#include <mbedtls/ssl.h>
-#include <mbedtls/x509.h>
-#include <mbedtls/x509_crt.h>
-#include <psa/crypto.h>
+#include "vitals_ssl.h"
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* TLS 1.2 and 1.3 with Mbed TLS 3.6 and tls13-vita's CA bundle index, its exact trust of
- * self-signed certificates, and its mapping of certificate problems to libhttp's detail bits.
- * Mbed TLS's memory is the tls13-vita runtime's heap (user_runtime.c), not the app's pool.
+/* TLS 1.2 and 1.3 through vitals-ssl, the libssl module, as Sony's libhttp goes through Sony's: its
+ * connections over this library's transport, the CA bundle's index and the app's own CA
+ * certificates, its exact trust of self-signed certificates, and tls13-vita's mapping of
+ * certificate problems to libhttp's detail bits. Its memory is the pool the app gave sceSslInit;
+ * without one, as with Sony's, there is no https. (The host tests build vitals-ssl in.)
  *
  * Sony's own connections (the ones with the private HTTPS option 0x40, as the shell's PSN
- * sign-in) get the console's own ClientHello, as a capture of a working sign-in shows it: TLS 1.2,
- * no session ID, the suites below, null compression, and only server_name and
- * signature_algorithms. The CDN in front of PSN sign-in refuses handshakes that don't look like a
- * console's */
+ * sign-in) get the console's own ClientHello (vitals-ssl's console profile), as a capture of a
+ * working sign-in shows it. The CDN in front of PSN sign-in refuses handshakes that don't look
+ * like a console's */
 
-/* The console's suites in its order. 3DES and RC4 are only offered (the patched Mbed TLS lists
- * suites it doesn't have); every server seen picks AES128-SHA256. Mbed TLS adds the renegotiation
- * SCSV after them, as the console does */
-static const int g_console_suites[] = {
-    MBEDTLS_TLS_RSA_WITH_AES_256_CBC_SHA256,
-    MBEDTLS_TLS_RSA_WITH_AES_128_CBC_SHA256,
-    MBEDTLS_TLS_RSA_WITH_AES_256_CBC_SHA,
-    MBEDTLS_TLS_RSA_WITH_AES_128_CBC_SHA,
-    0x000A, /* TLS_RSA_WITH_3DES_EDE_CBC_SHA */
-    0x0005, /* TLS_RSA_WITH_RC4_128_SHA */
-    0x0004, /* TLS_RSA_WITH_RC4_128_MD5 */
-    0,
-};
-
-/* Its signature algorithms, in its order: RSA PKCS#1 with SHA-256, SHA-512, SHA-384, SHA-1 */
-static const uint16_t g_console_signatures[] = {
-    MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA256,
-    MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA512,
-    MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA384,
-    MBEDTLS_TLS1_3_SIG_RSA_PKCS1_SHA1,
-    MBEDTLS_TLS1_3_SIG_NONE,
-};
-
-/* How many post-handshake records (TLS 1.3 session tickets) a read goes through */
-#define VH_TICKET_BUDGET 16u
+/* An app's size can't be larger than the TLS functions take at once */
+#define VH_TLS_CHUNK 0x40000000u
 
 struct VhTls
 {
-    mbedtls_ssl_context ssl;
-    mbedtls_ssl_config config;
-    mbedtls_x509_crt_profile profile;
+    void *ssl;
     VhTransport *transport;
-    /* The transport's last error, which Mbed TLS only sees as a failed send or receive */
+    /* The transport's last error, which vitals-ssl only sees as a failed send or receive */
     int io_error;
-    /* The client certificate and key it presents, its own parsed copies */
-    mbedtls_x509_crt own_certificate;
-    mbedtls_pk_context own_key;
+    /* A client certificate and key were given to the connection */
     int has_own;
     /* The server's handshake records, for the debug log */
     VhRecordScan scan;
@@ -76,134 +38,42 @@ struct VhTls
 
 /* Set up on the first https connection, with the lock held: 1 once ready, negative when it failed */
 static int g_state;
-static VitalsCaIndex g_ca_index;
-static int g_ca_index_ready;
-/* sceHttpsLoadCert's CA certificates, under the lock; handshakes copy the ones they need */
-static mbedtls_x509_crt *g_loaded;
+/* sceHttpsLoadCert's CA certificates, as the app gave them, under the lock. As Sony's, loading them
+ * keeps them and nothing more: libssl, which may not be in the process, reads them when an https
+ * connection starts, into the store, which is made again when they change (g_store_made). Each
+ * connection keeps the store it began with */
+typedef struct VhCa
+{
+    struct VhCa *next;
+    size_t size;
+    unsigned char data[];
+} VhCa;
+static VhCa *g_cas;
+static unsigned int g_cas_changed;
+static void *g_store;
+static unsigned int g_store_made;
 /* Its client certificate and key, as the app gave them (NUL-terminated); each connection parses
  * its own copy, so an unload during a handshake frees nothing it uses */
 static unsigned char *g_client_certificate, *g_client_key;
 static size_t g_client_certificate_size, g_client_key_size;
-/* The random numbers of every handshake */
-static mbedtls_entropy_context g_entropy;
-static mbedtls_ctr_drbg_context g_random;
 
-/* Mbed TLS's platform and PSA, then the index of the CA bundle; a missing bundle leaves only the
- * app's certificates trusted. With the lock held */
+/* The heap for what this library keeps; with the lock held */
 static int tls_ready(void)
 {
-    char path[VITALS_CA_INDEX_PATH_SIZE];
     if (g_state != 0)
         return g_state;
-    if (vh_platform_tls_init() != 0 || vitals_crypto_platform_init() != 0 || psa_crypto_init() != PSA_SUCCESS) {
-        g_state = -1;
-        return g_state;
-    }
-    mbedtls_entropy_init(&g_entropy);
-    mbedtls_ctr_drbg_init(&g_random);
-    if (mbedtls_ctr_drbg_seed(&g_random, mbedtls_entropy_func, &g_entropy, (const unsigned char *)"vitals-http", 11) != 0) {
-        mbedtls_ctr_drbg_free(&g_random);
-        mbedtls_entropy_free(&g_entropy);
-        g_state = -1;
-        return g_state;
-    }
-    if (vh_platform_ca_path(path, sizeof(path)) == 0)
-        g_ca_index_ready = vitals_ca_index_build(&g_ca_index, path) == 0;
-    VITALS_LOG("tls ready roots=%u", g_ca_index_ready ? (unsigned int)g_ca_index.count : 0u);
-    g_state = 1;
+    g_state = vh_platform_tls_init() == 0 ? 1 : -1;
+    VITALS_LOG("tls ready rc=%d", g_state);
     return g_state;
 }
 
-static void free_chain(mbedtls_x509_crt *chain)
-{
-    if (chain != NULL) {
-        mbedtls_x509_crt_free(chain);
-        mbedtls_free(chain);
-    }
-}
-
-/* Adds the loaded CA certificates that issued child to *candidates, as copies Mbed TLS frees */
-static int loaded_ca_find(const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates)
-{
-    int result = 0;
-    vh_lock();
-    for (const mbedtls_x509_crt *ca = g_loaded; ca != NULL && ca->raw.p != NULL; ca = ca->next) {
-        if (ca->subject_raw.len != child->issuer_raw.len ||
-            memcmp(ca->subject_raw.p, child->issuer_raw.p, ca->subject_raw.len) != 0)
-            continue;
-        if (*candidates == NULL) {
-            *candidates = mbedtls_calloc(1, sizeof(**candidates));
-            if (*candidates == NULL) {
-                result = MBEDTLS_ERR_X509_ALLOC_FAILED;
-                break;
-            }
-            mbedtls_x509_crt_init(*candidates);
-        }
-        (void)mbedtls_x509_crt_parse_der(*candidates, ca->raw.p, ca->raw.len);
-    }
-    vh_unlock();
-    if (*candidates != NULL && (*candidates)->raw.p == NULL) {
-        free_chain(*candidates);
-        *candidates = NULL;
-    }
-    return result;
-}
-
-/* The bundle's roots, then the app's CA certificates */
-static int find_trusted_issuers(void *context, const mbedtls_x509_crt *child, mbedtls_x509_crt **candidates)
-{
-    (void)context;
-    *candidates = NULL;
-    int result = g_ca_index_ready ? vitals_ca_index_find(&g_ca_index, child, candidates) : 0;
-    if (result != 0)
-        return result;
-    return loaded_ca_find(child, candidates);
-}
-
-/* A self-signed server certificate that is itself trusted counts as trusted; its other checks
- * (host name, dates) still apply */
-static int trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int depth, uint32_t *flags)
-{
-    if (depth == 0 && (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) != 0 &&
-        vitals_ca_trusts_exact(find_trusted_issuers, context, certificate))
-        *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
-    return 0;
-}
-
-/* Mbed TLS's verification flags as tls13-vita's certificate flags (VITALS_CERT_*) */
-static uint32_t certificate_flags(uint32_t flags)
-{
-    const uint32_t invalid = MBEDTLS_X509_BADCERT_REVOKED | MBEDTLS_X509_BADCRL_EXPIRED |
-                             MBEDTLS_X509_BADCERT_MISSING | MBEDTLS_X509_BADCERT_SKIP_VERIFY |
-                             MBEDTLS_X509_BADCERT_OTHER | MBEDTLS_X509_BADCRL_FUTURE |
-                             MBEDTLS_X509_BADCERT_KEY_USAGE | MBEDTLS_X509_BADCERT_EXT_KEY_USAGE |
-                             MBEDTLS_X509_BADCERT_NS_CERT_TYPE | MBEDTLS_X509_BADCERT_BAD_MD |
-                             MBEDTLS_X509_BADCERT_BAD_PK | MBEDTLS_X509_BADCERT_BAD_KEY |
-                             MBEDTLS_X509_BADCRL_BAD_MD | MBEDTLS_X509_BADCRL_BAD_PK | MBEDTLS_X509_BADCRL_BAD_KEY;
-    uint32_t mapped = 0;
-    if (flags & invalid)
-        mapped |= VITALS_CERT_INVALID;
-    if (flags & MBEDTLS_X509_BADCERT_CN_MISMATCH)
-        mapped |= VITALS_CERT_HOSTNAME;
-    if (flags & MBEDTLS_X509_BADCERT_EXPIRED)
-        mapped |= VITALS_CERT_EXPIRED;
-    if (flags & MBEDTLS_X509_BADCERT_FUTURE)
-        mapped |= VITALS_CERT_FUTURE;
-    if (flags & (MBEDTLS_X509_BADCERT_NOT_TRUSTED | MBEDTLS_X509_BADCRL_NOT_TRUSTED))
-        mapped |= VITALS_CERT_UNKNOWN_CA;
-    if (flags != 0 && mapped == 0)
-        mapped = VITALS_CERT_INTERNAL;
-    return mapped;
-}
-
+/* The transport's bytes, or its error as it is, which connect, read and write give back */
 static int bio_send(void *context, const unsigned char *data, size_t size)
 {
     VhTls *tls = context;
     int sent = vh_transport_raw_send(tls->transport, data, size);
-    if (sent < 0) {
+    if (sent < 0)
         tls->io_error = sent;
-        return sent == (int)SCE_HTTP_ERROR_TIMEOUT ? MBEDTLS_ERR_SSL_TIMEOUT : MBEDTLS_ERR_NET_SEND_FAILED;
-    }
     return sent;
 }
 
@@ -213,7 +83,7 @@ static int bio_recv(void *context, unsigned char *data, size_t size)
     int received = vh_transport_raw_recv(tls->transport, data, size);
     if (received < 0) {
         tls->io_error = received;
-        return received == (int)SCE_HTTP_ERROR_TIMEOUT ? MBEDTLS_ERR_SSL_TIMEOUT : MBEDTLS_ERR_NET_RECV_FAILED;
+        return received;
     }
     vh_record_scan(&tls->scan, data, (size_t)received);
     return received;
@@ -285,129 +155,104 @@ void vh_tls_close(VhTls *tls)
 {
     if (tls == NULL)
         return;
-    mbedtls_ssl_free(&tls->ssl);
-    mbedtls_ssl_config_free(&tls->config);
-    if (tls->has_own) {
-        mbedtls_x509_crt_free(&tls->own_certificate);
-        mbedtls_pk_free(&tls->own_key);
-    }
-    mbedtls_platform_zeroize(tls, sizeof(*tls));
+    sceSslInternalFree(tls->ssl);
+    memset(tls, 0, sizeof(*tls));
     free(tls);
 }
 
-static int parse_certificate_data(mbedtls_x509_crt *chain, const unsigned char *data, size_t size);
-static int parse_key_data(mbedtls_pk_context *key, const unsigned char *data, size_t size);
+/* The store of the loaded CA certificates, made again when they changed; NULL when there are none
+ * or memory ran out. With the lock held and libssl set up */
+static void *current_store(void)
+{
+    if (g_store_made == g_cas_changed)
+        return g_store;
+    if (g_store != NULL)
+        vitalsSslStoreRelease(g_store);
+    g_store = NULL;
+    g_store_made = g_cas_changed;
+    if (g_cas == NULL || (g_store = vitalsSslStoreNew()) == NULL)
+        return g_store;
+    for (const VhCa *ca = g_cas; ca != NULL; ca = ca->next) {
+        int parsed = vitalsSslStoreAdd(g_store, ca->data, ca->size);
+        if (parsed != 0)
+            VITALS_LOG("loaded CA certificate of %u bytes unreadable rc=%08X: not trusted", (unsigned int)ca->size,
+                       (unsigned int)parsed);
+    }
+    return g_store;
+}
 
-/* The client certificate and key sceHttpsLoadCert gave, for servers that ask for one */
-static int own_identity(VhTls *tls)
+/* The client certificate and key sceHttpsLoadCert gave, for servers that ask for one; 0 when there
+ * are none, or the parser's error */
+static int own_identity(VhTls *tls, void *context)
 {
     int result = 0;
     vh_lock();
     if (g_client_certificate != NULL && g_client_key != NULL) {
-        mbedtls_x509_crt_init(&tls->own_certificate);
-        mbedtls_pk_init(&tls->own_key);
         tls->has_own = 1;
-        result = parse_certificate_data(&tls->own_certificate, g_client_certificate, g_client_certificate_size);
-        if (result == 0)
-            result = parse_key_data(&tls->own_key, g_client_key, g_client_key_size);
+        result = vitalsSslCtxSetIdentity(context, g_client_certificate, g_client_certificate_size, g_client_key,
+                                         g_client_key_size);
     }
     vh_unlock();
-    if (tls->has_own && result == 0)
-        result = mbedtls_ssl_conf_own_cert(&tls->config, &tls->own_certificate, &tls->own_key);
     if (tls->has_own)
         VITALS_LOG("client certificate host=%s rc=%08X", tls->host, (unsigned int)result);
+    /* One that doesn't parse is left out, as no client certificate */
+    if (result != 0 && !vitalsSslTlsErrorIsMemory(result)) {
+        tls->has_own = 0;
+        result = 0;
+    }
     return result;
 }
 
+/* A connection of vitals-ssl over the transport, verified, but decided after the handshake from the
+ * HTTPS options and the app's callback: 0, or the parser's or SSL's error (-1 for memory) */
 static int setup(VhTls *tls, int console)
 {
-    mbedtls_ssl_init(&tls->ssl);
-    mbedtls_ssl_config_init(&tls->config);
-    int result = mbedtls_ssl_config_defaults(&tls->config, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM,
-                                             MBEDTLS_SSL_PRESET_DEFAULT);
+    void *library = NULL;
+    if (sceSslInternalGetLibrary(&library) != 0)
+        return -1;
+    void *context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    if (context == NULL)
+        return -1;
+    sceSslInternalCtxSetVerify(context, 1);
+    int result = vitalsSslCtxSetDeferredVerify(context, 1);
+    if (result == 0)
+        result = vitalsSslCtxSetProfile(context, console ? VITALS_SSL_PROFILE_CONSOLE : VITALS_SSL_PROFILE_MODERN);
+    if (result == 0) {
+        vh_lock();
+        result = vitalsSslCtxSetStore(context, current_store());
+        vh_unlock();
+    }
+    if (result == 0)
+        result = own_identity(tls, context);
+    if (result == 0) {
+        tls->ssl = sceSslInternalNew(context);
+        if (tls->ssl == NULL)
+            result = -1;
+    }
+    /* The connection keeps the context */
+    sceSslInternalCtxFree(context);
     if (result != 0)
         return result;
-    /* As the HTTP provider: SHA-1 signatures stay allowed for Sony's own servers */
-    tls->profile = mbedtls_x509_crt_profile_default;
-    tls->profile.allowed_mds |= MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA1);
-    mbedtls_ssl_conf_cert_profile(&tls->config, &tls->profile);
-    mbedtls_ssl_conf_rng(&tls->config, mbedtls_ctr_drbg_random, &g_random);
-    mbedtls_ssl_conf_min_tls_version(&tls->config, MBEDTLS_SSL_VERSION_TLS1_2);
-    if (console) {
-        mbedtls_ssl_conf_max_tls_version(&tls->config, MBEDTLS_SSL_VERSION_TLS1_2);
-        mbedtls_ssl_conf_ciphersuites(&tls->config, g_console_suites);
-        mbedtls_ssl_conf_offer_unknown_ciphersuites(&tls->config, 1);
-        mbedtls_ssl_conf_sig_algs(&tls->config, g_console_signatures);
-        mbedtls_ssl_conf_extended_master_secret(&tls->config, MBEDTLS_SSL_EXTENDED_MS_DISABLED);
-        mbedtls_ssl_conf_encrypt_then_mac(&tls->config, MBEDTLS_SSL_ETM_DISABLED);
-        mbedtls_ssl_conf_session_tickets(&tls->config, MBEDTLS_SSL_SESSION_TICKETS_DISABLED);
-    } else
-        mbedtls_ssl_conf_max_tls_version(&tls->config, MBEDTLS_SSL_VERSION_TLS1_3);
-    /* Verified, but decided after the handshake, from the HTTPS options and the app's callback */
-    mbedtls_ssl_conf_authmode(&tls->config, MBEDTLS_SSL_VERIFY_OPTIONAL);
-    mbedtls_ssl_conf_ca_cb(&tls->config, find_trusted_issuers, NULL);
-    mbedtls_ssl_conf_verify(&tls->config, trust_exact_self_signed, NULL);
-    result = own_identity(tls);
-    if (result != 0)
-        return result;
-    result = mbedtls_ssl_setup(&tls->ssl, &tls->config);
-    if (result == 0)
-        result = mbedtls_ssl_set_hostname(&tls->ssl, tls->host);
-    if (result == 0)
-        mbedtls_ssl_set_bio(&tls->ssl, tls, bio_send, bio_recv, NULL);
-    return result;
+    void *bio = vitalsSslBioNew(bio_send, bio_recv, tls);
+    if (bio == NULL)
+        return -1;
+    (void)sceSslInternalBioCtrl(bio, VITALS_SSL_BIO_SET_HOST, 0, tls->host);
+    sceSslInternalSetBio(tls->ssl, bio, bio);
+    sceSslInternalSetConnectState(tls->ssl);
+    return 0;
 }
 
 #if VITALS_DEBUG >= 1
-/* For the debug log: in TLS 1.3 the request is encrypted, so it can't be seen */
+/* For the debug log: in TLS 1.3 the request is encrypted, so only vitals-ssl sees it */
 static const char *client_certificate_asked(VhTls *tls)
 {
-    if (tls->scan.certificate_request)
+    if (tls->scan.certificate_request || vitalsSslCertificateRequested(tls->ssl))
         return "yes";
-    if (mbedtls_ssl_get_version_number(&tls->ssl) == MBEDTLS_SSL_VERSION_TLS1_2 && tls->scan.done)
+    if (strcmp(vitalsSslGetVersion(tls->ssl), "TLSv1.2") == 0 && tls->scan.done)
         return "no";
     return "unknown";
 }
 #endif
-
-/* The handshake runs on a thread of its own, with a known stack: an app may call from a thread
- * whose stack is too small for one (TLS 1.3 with elliptic curves, in a game's network thread) */
-typedef struct VhHandshake
-{
-    VhTls *tls;
-    int result;
-    int done;
-} VhHandshake;
-
-static void handshake_thread(void *argument)
-{
-    VhHandshake *handshake = argument;
-    int result = mbedtls_ssl_handshake(&handshake->tls->ssl);
-    /* The caller's frame holds handshake: once done is seen, it may be gone */
-    vh_lock();
-    handshake->result = result;
-    handshake->done = 1;
-    vh_platform_notify();
-    vh_unlock();
-}
-
-static int run_handshake(VhTls *tls)
-{
-    VhHandshake handshake = {tls, 0, 0};
-    if (vh_platform_thread(handshake_thread, &handshake) < 0) {
-        VITALS_LOG("handshake thread not started host=%s: on the caller's", tls->host);
-        return mbedtls_ssl_handshake(&tls->ssl);
-    }
-    for (;;) {
-        unsigned int generation = vh_platform_generation();
-        vh_lock();
-        int done = handshake.done;
-        vh_unlock();
-        if (done)
-            return handshake.result;
-        vh_platform_wait(generation, -1);
-    }
-}
 
 int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail)
 {
@@ -417,6 +262,13 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
     vh_lock();
     int ready = tls_ready();
     vh_unlock();
+    /* As Sony's: libssl must be the app's, set up with sceSslInit. Only https calls it: in a process
+     * without it, the import points at the libssl another process loaded (the module is shared) */
+    int ssl_state = sceSslInternalIsInitalized();
+    if (ssl_state != 0) {
+        VITALS_LOG("tls host=%s: libssl not initialized rc=%08X", open->host, (unsigned int)ssl_state);
+        return store_outcome(VITALS_OUTCOME_INTERNAL, (uint32_t)ssl_state, ssl_error, ssl_detail);
+    }
     VhTls *tls = ready > 0 ? calloc(1, sizeof(*tls)) : NULL;
     if (tls == NULL)
         return store_outcome(ready > 0 ? VITALS_OUTCOME_NO_MEMORY : VITALS_OUTCOME_INTERNAL, 0, ssl_error, ssl_detail);
@@ -434,22 +286,28 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
     if (result != 0) {
         VITALS_LOG("tls setup failed host=%s tls=%08X", tls->host, (unsigned int)result);
         vh_tls_close(tls);
-        return store_outcome(result == MBEDTLS_ERR_SSL_ALLOC_FAILED ? VITALS_OUTCOME_NO_MEMORY : VITALS_OUTCOME_INTERNAL,
+        return store_outcome(result == -1 || vitalsSslTlsErrorIsMemory(result) ? VITALS_OUTCOME_NO_MEMORY
+                                                                               : VITALS_OUTCOME_INTERNAL,
                              (uint32_t)result, ssl_error, ssl_detail);
     }
     VITALS_VERBOSE("handshake start %s profile=%s", tls->host, console ? "console" : "modern");
-    result = run_handshake(tls);
-    uint32_t verify = mbedtls_ssl_get_verify_result(&tls->ssl);
-    if (result != 0) {
+    int connected = sceSslInternalConnect(tls->ssl);
+    /* For the log */
+    uint32_t verify = vitalsSslGetVerifyResult(tls->ssl);
+    (void)verify;
+    if (connected != 1) {
+        int error = vitalsSslGetTlsError(tls->ssl);
+        uint32_t found = vitalsSslGetCertificateFlags(tls->ssl);
         VITALS_LOG("handshake failed host=%s client_cert_asked=%s", tls->host, client_certificate_asked(tls));
-        VITALS_LOG("handshake failed host=%s tls=%08X io=%08X verify=%08X", tls->host, (unsigned int)result,
+        VITALS_LOG("handshake failed host=%s tls=%08X io=%08X verify=%08X", tls->host, (unsigned int)error,
                    (unsigned int)tls->io_error, (unsigned int)verify);
-        if (result == MBEDTLS_ERR_X509_CERT_VERIFY_FAILED || (verify != UINT32_MAX && verify != 0))
-            result = store_outcome(VITALS_OUTCOME_CERTIFICATE,
-                                   vitals_filter_certificate_flags(certificate_flags(verify), open->https_options),
+        if (found != 0)
+            result = store_outcome(VITALS_OUTCOME_CERTIFICATE, vitals_filter_certificate_flags(found, open->https_options),
                                    ssl_error, ssl_detail);
+        else if (vitalsSslTlsErrorIsMemory(error))
+            result = store_outcome(VITALS_OUTCOME_NO_MEMORY, (uint32_t)error, ssl_error, ssl_detail);
         else
-            result = store_outcome(tls->io_error != 0 ? VITALS_OUTCOME_IO : VITALS_OUTCOME_HANDSHAKE, (uint32_t)result,
+            result = store_outcome(tls->io_error != 0 ? VITALS_OUTCOME_IO : VITALS_OUTCOME_HANDSHAKE, (uint32_t)error,
                                    ssl_error, ssl_detail);
         if (tls->io_error != 0 || vh_transport_aborted(transport))
             result = tls_error(tls);
@@ -459,7 +317,7 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
     }
 
     /* Only the checks the options ask for; the app's callback can accept the rest */
-    uint32_t flags = vitals_filter_certificate_flags(certificate_flags(verify), open->https_options);
+    uint32_t flags = vitals_filter_certificate_flags(vitalsSslGetCertificateFlags(tls->ssl), open->https_options);
     uint32_t detail = vitals_map_certificate_detail(flags);
     if (detail != 0) {
         /* As with the HTTP provider, the callback gets the problems and no certificates */
@@ -474,7 +332,7 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
         }
     }
     VITALS_LOG("handshake ok host=%s %s %s profile=%s options=%03X callback=%d client_cert_asked=%s sent=%d",
-               tls->host, mbedtls_ssl_get_version(&tls->ssl), mbedtls_ssl_get_ciphersuite(&tls->ssl),
+               tls->host, vitalsSslGetVersion(tls->ssl), vitalsSslGetCiphersuite(tls->ssl),
                console ? "console" : "modern", (unsigned int)open->https_options, open->ssl_callback != NULL,
                client_certificate_asked(tls), tls->has_own);
     /* The heap's peak, when it has grown */
@@ -487,7 +345,8 @@ int vh_tls_send(VhTls *tls, const void *data, size_t size)
 {
     const unsigned char *at = data;
     while (size > 0) {
-        int sent = mbedtls_ssl_write(&tls->ssl, at, size);
+        int chunk = (int)(size > VH_TLS_CHUNK ? VH_TLS_CHUNK : size);
+        int sent = sceSslInternalWrite(tls->ssl, at, chunk);
         if (sent <= 0)
             return tls_error(tls);
         at += sent;
@@ -498,135 +357,206 @@ int vh_tls_send(VhTls *tls, const void *data, size_t size)
 
 int vh_tls_recv(VhTls *tls, void *data, size_t size)
 {
-    unsigned int budget = VH_TICKET_BUDGET;
-    int received;
-    do {
-        tls->io_error = 0;
-        received = mbedtls_ssl_read(&tls->ssl, data, size);
-        if (received <= 0)
-            VITALS_VERBOSE("tls read host=%s rc=%08X io=%08X", tls->host, (unsigned int)received,
-                           (unsigned int)tls->io_error);
-        /* A post-handshake record is consumed without data: read on */
-    } while ((received == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET ||
-              (received == MBEDTLS_ERR_SSL_WANT_READ && tls->io_error == 0)) &&
-             --budget != 0);
+    tls->io_error = 0;
+    /* TLS 1.3's session tickets are read through on the way to the data */
+    int received = sceSslInternalRead(tls->ssl, data, (int)(size > VH_TLS_CHUNK ? VH_TLS_CHUNK : size));
     if (received > 0)
         return received;
     /* close_notify, or a server that closes without it, both end the response */
-    if (received == 0 || received == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || received == MBEDTLS_ERR_SSL_CONN_EOF)
+    if (received == 0)
         return 0;
+    VITALS_VERBOSE("tls read host=%s rc=%08X io=%08X", tls->host, (unsigned int)received, (unsigned int)tls->io_error);
     return tls_error(tls);
+}
+
+/* ---- libhttp's certificate check, on a libssl context another module made ---- */
+
+/* The argument libhttp's check takes (sceHttpPrivateSslContextAddCertCheck's), in Sony's layout:
+ * on the Vita flags at 0, the host name at 4, where the SCE result and the SCE_HTTPS_ERROR_SSL_*
+ * bits go at 8 and 12, the app's callback and its argument at 16 and 20, and a lock its caller
+ * gives at 40 and 44 */
+typedef struct VhCertCheck
+{
+    uint32_t flags;
+    const char *host;
+    int *result;
+    unsigned int *bits;
+    int (*callback)(unsigned int bits, void *const certificates[], int count, void *argument);
+    void *argument;
+    void *reserved[4];
+    int (*lock)(void *argument);
+    int (*unlock)(void *argument);
+} VhCertCheck;
+
+/* Sony's flags when the caller gives none: server verify, CN check, known CA, and its CA lookup */
+#define VH_CERT_CHECK_DEFAULT 0x65u
+/* The caller's lock is taken around the check */
+#define VH_CERT_CHECK_LOCKED 0x40000000u
+/* The SCE result of a refused certificate */
+#define VH_CERT_CHECK_REFUSED ((int)0x80435806)
+/* The reason a refusal gives libssl, which picks the alert (handshake_failure) */
+#define VH_CERT_CHECK_REASON 10
+
+/* As Sony's libhttp's (0x81014592), called by libssl for the server's chain: the checks the flags
+ * ask for, on the bundle and the certificates the app loaded, then the app's callback, which
+ * decides when there is one (it accepts what was found unless it returns a negative), as with this
+ * library's own connections */
+static int cert_check(void *ssl, void *certificates[], int count, void *argument, int *reason)
+{
+    VhCertCheck *check = argument;
+    uint32_t options = check != NULL && check->flags != 0 ? check->flags : VH_CERT_CHECK_DEFAULT;
+    int locked = check != NULL && (check->flags & VH_CERT_CHECK_LOCKED) != 0 && check->lock != NULL &&
+                 check->unlock != NULL;
+    (void)ssl;
+    if (locked)
+        (void)check->lock(check->argument);
+    uint32_t found = 0;
+    if ((options & VITALS_SCE_HTTPS_OPTION_SERVER_VERIFY) != 0) {
+        /* The store stays while it is read */
+        vh_lock();
+        found = vitalsSslCheckChain(certificates, count,
+                                    (options & VITALS_SCE_HTTPS_OPTION_CN_CHECK) != 0 && check != NULL ? check->host
+                                                                                                       : NULL,
+                                    current_store());
+        vh_unlock();
+    }
+    unsigned int bits = vitals_map_certificate_detail(vitals_filter_certificate_flags(found, options));
+    if (locked)
+        (void)check->unlock(check->argument);
+    int accepted = bits == 0;
+    if (check != NULL && check->callback != NULL)
+        accepted = check->callback(bits, certificates, count, check->argument) >= 0;
+    if (check != NULL && check->result != NULL)
+        *check->result = accepted ? 0 : VH_CERT_CHECK_REFUSED;
+    if (check != NULL && check->bits != NULL)
+        *check->bits = bits;
+    *reason = accepted ? 0 : VH_CERT_CHECK_REASON;
+    VITALS_LOG("cert check host=%s options=%08X found=%02X bits=%02X callback=%d accepted=%d",
+               check != NULL && check->host != NULL ? check->host : "-", (unsigned int)options, (unsigned int)found, bits,
+               check != NULL && check->callback != NULL, accepted);
+    return accepted;
+}
+
+/* As Sony's: the verify mode on, and the check above in place of the bundle's; always 0. The context is
+ * the libssl module's, another copy of vitals-ssl, of the same version (the two are installed
+ * together), so its context is the same structure as this copy's */
+int vh_tls_add_cert_check(void *context, void *argument)
+{
+    vh_lock();
+    int ready = tls_ready();
+    vh_unlock();
+    /* Sony's succeeds whatever happens; without TLS here the check still reads the bundle */
+    if (ready < 0)
+        VITALS_LOG("cert check installed without tls");
+    sceSslInternalCtxSetVerify(context, 1);
+    sceSslInternalCtxSetCertVerifyCallback(context, cert_check, argument);
+    return 0;
 }
 
 /* ---- sceHttpsLoadCert ---- */
 
-static int has_pem_marker(const unsigned char *data, size_t size)
+/* Wipes a secret before it is freed: through a volatile pointer, which the compiler can't drop */
+static void wipe(void *data, size_t size)
 {
-    static const char marker[] = "-----BEGIN";
-    for (size_t i = 0; i + sizeof(marker) - 1u <= size; ++i)
-        if (memcmp(data + i, marker, sizeof(marker) - 1u) == 0)
-            return 1;
-    return 0;
+    volatile unsigned char *at = data;
+    while (size-- > 0)
+        *at++ = 0;
 }
 
-/* data is followed by a NUL that size leaves out, which PEM parsing needs */
-static int parse_certificate_data(mbedtls_x509_crt *chain, const unsigned char *data, size_t size)
+/* A copy of size bytes, NUL-terminated for PEM; NULL when there are none or memory ran out */
+static unsigned char *copy_bytes(const void *data, size_t size)
 {
-    if (has_pem_marker(data, size))
-        return mbedtls_x509_crt_parse(chain, data, size + 1u);
-    return mbedtls_x509_crt_parse_der(chain, data, size);
-}
-
-static int parse_key_data(mbedtls_pk_context *key, const unsigned char *data, size_t size)
-{
-    return mbedtls_pk_parse_key(key, data, has_pem_marker(data, size) ? size + 1u : size, NULL, 0,
-                                mbedtls_ctr_drbg_random, &g_random);
-}
-
-/* A copy of the app's data, NUL-terminated; NULL when there is none or memory ran out */
-static unsigned char *copy_data(const SceHttpsData *data, size_t *size)
-{
-    if (data == NULL || data->ptr == NULL || data->size == 0)
+    if (data == NULL || size == 0)
         return NULL;
-    unsigned char *copy = malloc((size_t)data->size + 1u);
+    unsigned char *copy = malloc(size + 1u);
     if (copy != NULL) {
-        memcpy(copy, data->ptr, data->size);
-        copy[data->size] = '\0';
-        *size = data->size;
+        memcpy(copy, data, size);
+        copy[size] = '\0';
     }
     return copy;
+}
+
+static VhCa *ca_new(const void *data, size_t size)
+{
+    VhCa *ca = malloc(sizeof(*ca) + size + 1u);
+    if (ca != NULL) {
+        ca->next = NULL;
+        ca->size = size;
+        memcpy(ca->data, data, size);
+        ca->data[size] = '\0';
+    }
+    return ca;
+}
+
+static void cas_free(VhCa *ca)
+{
+    while (ca != NULL) {
+        VhCa *next = ca->next;
+        free(ca);
+        ca = next;
+    }
 }
 
 static void free_client(void)
 {
     if (g_client_key != NULL)
-        mbedtls_platform_zeroize(g_client_key, g_client_key_size);
+        wipe(g_client_key, g_client_key_size);
     free(g_client_certificate);
     free(g_client_key);
     g_client_certificate = g_client_key = NULL;
     g_client_certificate_size = g_client_key_size = 0;
 }
 
-/* As Sony's: it replaces everything loaded before. The CA certificates must all parse; the client
- * certificate and key are checked here too, and refused when they don't, with the reason logged */
+/* A store was only made with libssl in the process (by an https connection), so it is released only
+ * then */
+static void release_cas(void)
+{
+    cas_free(g_cas);
+    g_cas = NULL;
+    if (g_store != NULL)
+        vitalsSslStoreRelease(g_store);
+    g_store = NULL;
+    g_store_made = ++g_cas_changed;
+}
+
+/* As Sony's: it replaces everything loaded before, and keeps what it is given, which is read when an
+ * https connection starts: a CA certificate that doesn't parse then isn't trusted, and a client
+ * certificate or key that doesn't isn't sent */
 int vh_tls_load_certs(int count, const SceHttpsData **list, const SceHttpsData *cert, const SceHttpsData *key)
 {
     if (tls_ready() < 0)
         return (int)SCE_HTTP_ERROR_SSL;
-    mbedtls_x509_crt *chain = count > 0 ? mbedtls_calloc(1, sizeof(*chain)) : NULL;
-    if (count > 0 && chain == NULL)
-        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-    if (chain != NULL)
-        mbedtls_x509_crt_init(chain);
-    for (int i = 0; i < count; ++i) {
-        size_t size = 0;
-        unsigned char *data = copy_data(list[i], &size);
-        int parsed = data != NULL ? parse_certificate_data(chain, data, size) : -1;
-        free(data);
-        if (parsed != 0) {
-            VITALS_LOG("load cert: CA %d of %d unreadable rc=%08X", i + 1, count, (unsigned int)parsed);
-            free_chain(chain);
+    for (int i = 0; i < count; ++i)
+        if (list[i] == NULL || list[i]->ptr == NULL || list[i]->size == 0)
             return (int)SCE_HTTP_ERROR_INVALID_VALUE;
-        }
-    }
+    if ((cert != NULL && (cert->ptr == NULL || cert->size == 0)) || (key != NULL && (key->ptr == NULL || key->size == 0)))
+        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
 
-    size_t certificate_size = 0, key_size = 0;
-    unsigned char *certificate = copy_data(cert, &certificate_size);
-    unsigned char *private_key = copy_data(key, &key_size);
-    int result = 0;
-    if ((cert != NULL && certificate == NULL) || (key != NULL && private_key == NULL))
-        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
-    else if (certificate != NULL || private_key != NULL) {
-        /* Parsed once now, so a bad one is told at once rather than at every handshake */
-        mbedtls_x509_crt check_certificate;
-        mbedtls_pk_context check_key;
-        mbedtls_x509_crt_init(&check_certificate);
-        mbedtls_pk_init(&check_key);
-        int certificate_rc = certificate != NULL ? parse_certificate_data(&check_certificate, certificate, certificate_size) : -1;
-        int key_rc = private_key != NULL ? parse_key_data(&check_key, private_key, key_size) : -1;
-        VITALS_LOG("load cert: client certificate %u bytes rc=%08X, key %u bytes rc=%08X",
-                   (unsigned int)certificate_size, (unsigned int)certificate_rc, (unsigned int)key_size,
-                   (unsigned int)key_rc);
-        mbedtls_x509_crt_free(&check_certificate);
-        mbedtls_pk_free(&check_key);
-        if (certificate_rc != 0 || key_rc != 0)
-            result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    VhCa *cas = NULL, **last = &cas;
+    for (int i = 0; i < count; ++i) {
+        if ((*last = ca_new(list[i]->ptr, list[i]->size)) == NULL)
+            break;
+        last = &(*last)->next;
     }
-    if (result < 0) {
-        if (private_key != NULL)
-            mbedtls_platform_zeroize(private_key, key_size);
+    unsigned char *certificate = cert != NULL ? copy_bytes(cert->ptr, cert->size) : NULL;
+    unsigned char *private_key = key != NULL ? copy_bytes(key->ptr, key->size) : NULL;
+    if (*last != NULL || (count > 0 && cas == NULL) || (cert != NULL && certificate == NULL) ||
+        (key != NULL && private_key == NULL)) {
+        cas_free(cas);
         free(certificate);
+        if (private_key != NULL)
+            wipe(private_key, key->size);
         free(private_key);
-        free_chain(chain);
-        return result;
+        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
     }
-    free_chain(g_loaded);
-    g_loaded = chain;
+    release_cas();
+    g_cas = cas;
+    ++g_cas_changed;
     free_client();
     g_client_certificate = certificate;
-    g_client_certificate_size = certificate_size;
+    g_client_certificate_size = certificate != NULL ? cert->size : 0;
     g_client_key = private_key;
-    g_client_key_size = key_size;
+    g_client_key_size = private_key != NULL ? key->size : 0;
     VITALS_LOG("loaded %d CA certificates, client certificate %s", count,
                certificate != NULL && private_key != NULL ? "yes" : "no");
     return 0;
@@ -634,51 +564,31 @@ int vh_tls_load_certs(int count, const SceHttpsData **list, const SceHttpsData *
 
 void vh_tls_unload_certs(void)
 {
-    free_chain(g_loaded);
-    g_loaded = NULL;
+    release_cas();
     free_client();
 }
 
-/* A copy of size bytes, NUL-terminated for PEM; NULL when there are none or memory ran out */
-static unsigned char *copy_bytes(const void *data, unsigned int size)
-{
-    const SceHttpsData given = {(char *)(uintptr_t)data, size};
-    size_t copied = 0;
-    return copy_data(&given, &copied);
-}
-
-/* Sony's keeps whatever it is given and fails at its use; one that doesn't parse can't be used
- * here either, so it is left out, with the reason logged */
+/* As Sony's: kept, and read when an https connection starts */
 int vh_tls_add_ca(const void *data, unsigned int size)
 {
     if (tls_ready() < 0)
         return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
     if (data == NULL || size == 0)
         return 0;
-    unsigned char *copy = copy_bytes(data, size);
-    if (copy == NULL)
+    VhCa *ca = ca_new(data, size);
+    if (ca == NULL)
         return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-    if (g_loaded == NULL) {
-        g_loaded = mbedtls_calloc(1, sizeof(*g_loaded));
-        if (g_loaded == NULL) {
-            free(copy);
-            return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-        }
-        mbedtls_x509_crt_init(g_loaded);
-    }
-    int parsed = parse_certificate_data(g_loaded, copy, size);
-    free(copy);
-    if (parsed == MBEDTLS_ERR_X509_ALLOC_FAILED)
-        return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
-    if (parsed != 0)
-        VITALS_LOG("private CA certificate of %u bytes unreadable rc=%08X: not trusted", size, (unsigned int)parsed);
+    VhCa **last = &g_cas;
+    while (*last != NULL)
+        last = &(*last)->next;
+    *last = ca;
+    ++g_cas_changed;
     return 0;
 }
 
 void vh_tls_clear_cas(void)
 {
-    free_chain(g_loaded);
-    g_loaded = NULL;
+    release_cas();
 }
 
 /* Each replaces the one before, and nothing (no data, or none of it) leaves none; the pair is used
@@ -691,7 +601,7 @@ static int set_client_part(unsigned char **slot, size_t *slot_size, const void *
     if (data != NULL && size != 0 && (copy = copy_bytes(data, size)) == NULL)
         return (int)SCE_HTTP_ERROR_OUT_OF_MEMORY;
     if (secret && *slot != NULL)
-        mbedtls_platform_zeroize(*slot, *slot_size);
+        wipe(*slot, *slot_size);
     free(*slot);
     *slot = copy;
     *slot_size = copy != NULL ? size : 0;

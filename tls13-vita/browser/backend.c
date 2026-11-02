@@ -1,33 +1,36 @@
 #include "backend.h"
-#include "ca_file.h"
-#include "ca_index.h"
-#include "crypto_platform.h"
 #include "diagnostics.h"
+#include "vitals/error_map.h"
 #include "vitals/registry.h"
 #include "vitals/sony_abi.h"
+#include "vitals_ssl.h"
 
+#include <psp2/io/fcntl.h>
 #include <psp2/kernel/threadmgr/mutex.h>
 #include <psp2/net/net.h>
 #include <psp2common/net.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/net_sockets.h>
-#include <mbedtls/platform_util.h>
-#include <mbedtls/ssl.h>
-#include <psa/crypto.h>
-#include <psa/crypto_extra.h>
 
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if MBEDTLS_VERSION_MAJOR != 3
-#error "The browser provider's configuration targets Mbed TLS 3.6 (tls13-vita/crypto)"
-#endif
+/* The browser's TLS is the libssl module's (vitals-ssl), which the kernel plugin loads into the
+ * browser engine's process before this provider: each connection a vitals-ssl one over curl's
+ * socket, stepped without blocking as curl drives it */
 
 #define BROWSER_IO_CHUNK 1500
 #define BROWSER_POLL_SLICE_MS 50
 #define BROWSER_REJECTED_HOSTS 32
+/* libssl's pool in the browser engine's process, set up on its first https connection: every
+ * connection's memory comes from it */
+#ifndef VITALS_BROWSER_SSL_POOL_BYTES
+#define VITALS_BROWSER_SSL_POOL_BYTES (1024u * 1024u)
+#endif
+#ifndef VITALS_DEFAULT_CA_PATH
+#define VITALS_DEFAULT_CA_PATH "vs0:/data/external/cert/CA_LIST.cer"
+#endif
+/* A page's own CA file, read whole */
+#define BROWSER_CA_FILE_MAX (512u * 1024u)
 
 enum BrowserState { BROWSER_INITIALIZING, BROWSER_HANDSHAKING, BROWSER_ACTIVE,
     BROWSER_EOF, BROWSER_FAILED };
@@ -50,14 +53,12 @@ typedef struct BrowserConnection {
     uint8_t verify_peer;
     uint8_t verify_host;
     uint8_t custom_ca_requested;
-    uint8_t custom_ca_initialized;
+    /* WebKit's request, where a refused certificate is reported (VitalsBrowserOptions) */
+    void *ssl_info;
     uint8_t notifying_close;
     uint8_t lookahead_valid;
     unsigned char lookahead;
-    mbedtls_ssl_context ssl;
-    mbedtls_ssl_config config;
-    mbedtls_x509_crt_profile certificate_profile;
-    mbedtls_x509_crt custom_ca;
+    void *ssl;
     int ciphers[8];
     char hostname[1024];
     char ca_file[1024];
@@ -75,19 +76,21 @@ static struct {
     SceUID rejected_mutex;
     uint64_t rejected_hosts[BROWSER_REJECTED_HOSTS];
     int rejected_codes[BROWSER_REJECTED_HOSTS];
+    /* The refusal was reported to WebKit, which then asks the user: a retry with verification off
+     * only follows the user's yes */
+    uint8_t rejected_asked[BROWSER_REJECTED_HOSTS];
     unsigned int rejected_next;
-    /* The default store is not kept parsed: only an index of it, and each handshake parses the
-     * roots it needs from the file (as the HTTP provider does) */
-    VitalsCaIndex ca_index;
-    /* The handshakes' random numbers, from the kernel's (platform_shims.c) */
-    mbedtls_entropy_context entropy;
-    mbedtls_ctr_drbg_context random;
     int default_ca_error;
     uint32_t enabled;
     enum DefaultCaState default_ca_state;
     uint8_t initialized;
-    uint8_t crypto_initialized;
 } browser;
+
+/* Clears memory through a volatile pointer, which the compiler can't drop */
+static void wipe(void *data, size_t size) {
+    volatile unsigned char *at = data;
+    while (size-- > 0) *at++ = 0;
+}
 
 static uintptr_t connection_key(const void *native, int index) {
     return (uintptr_t)native + (uintptr_t)(unsigned int)index;
@@ -111,26 +114,41 @@ static void free_connection(void *unused, void *payload) {
     BrowserConnection *connection = payload;
     (void)unused;
     if (connection == NULL) return;
-    mbedtls_ssl_free(&connection->ssl);
-    mbedtls_ssl_config_free(&connection->config);
-    if (connection->custom_ca_initialized) mbedtls_x509_crt_free(&connection->custom_ca);
+    if (connection->ssl != NULL) sceSslInternalFree(connection->ssl);
     if (connection->mutex >= 0) (void)sceKernelDeleteMutex(connection->mutex);
-    mbedtls_platform_zeroize(connection, sizeof(*connection));
+    wipe(connection, sizeof(*connection));
     free(connection);
 }
 
+/* libssl reads the bundle itself; without one, the browser keeps its own TLS, as when the bundle
+ * couldn't be read before */
 static int ensure_default_ca(void) {
-    int result;
+    int fd;
     if (browser.default_ca_state == DEFAULT_CA_READY) return 0;
     if (browser.default_ca_state == DEFAULT_CA_FAILED) return browser.default_ca_error;
-    result = vitals_ca_index_build(&browser.ca_index,
-        browser.ops.default_ca_path != NULL ? browser.ops.default_ca_path : VITALS_DEFAULT_CA_PATH);
-    if (result == 0) {
+    fd = sceIoOpen(browser.ops.default_ca_path != NULL ? browser.ops.default_ca_path : VITALS_DEFAULT_CA_PATH,
+        SCE_O_RDONLY, 0);
+    if (fd >= 0) {
+        (void)sceIoClose(fd);
         browser.default_ca_state = DEFAULT_CA_READY;
         return 0;
     }
-    browser.default_ca_error = result;
+    browser.default_ca_error = fd;
     browser.default_ca_state = DEFAULT_CA_FAILED;
+    return fd;
+}
+
+/* libssl set up in this process, with its pool, unless something already did: 0 or its error */
+static int ensure_library(void) {
+    int result = sceSslInternalIsInitalized();
+    if (result == 0) return 0;
+    /* libssl can't work the bundle's path out in this process: it is the one the engine's module
+     * path gives */
+    result = vitalsSslSetBundlePath(browser.ops.default_ca_path != NULL ? browser.ops.default_ca_path
+                                                                       : VITALS_DEFAULT_CA_PATH);
+    if (result != 0) return result;
+    result = sceSslInit(VITALS_BROWSER_SSL_POOL_BYTES);
+    VITALS_LOG("browser libssl pool=%u rc=0x%08X", VITALS_BROWSER_SSL_POOL_BYTES, (unsigned int)result);
     return result;
 }
 
@@ -145,17 +163,6 @@ int vitals_browser_init(const VitalsBrowserOps *ops) {
     browser.attach_mutex = -1;
     browser.rejected_mutex = -1;
     browser.ops = *ops;
-    result = vitals_crypto_platform_init();
-    if (result != 0) return result;
-    browser.crypto_initialized = 1;
-    /* Initialized first, so a failure below can free them */
-    mbedtls_entropy_init(&browser.entropy);
-    mbedtls_ctr_drbg_init(&browser.random);
-    result = (int)psa_crypto_init();
-    if (result != PSA_SUCCESS) goto failed;
-    result = mbedtls_ctr_drbg_seed(&browser.random, mbedtls_entropy_func, &browser.entropy,
-        (const unsigned char *)"vitals browser", 14);
-    if (result != 0) goto failed;
     browser.registry_mutex = sceKernelCreateMutex("vitals browser registry", 0, 0, NULL);
     browser.attach_mutex = sceKernelCreateMutex("vitals browser attach", 0, 0, NULL);
     browser.rejected_mutex = sceKernelCreateMutex("vitals browser rejected", 0, 0, NULL);
@@ -172,11 +179,6 @@ failed:
     if (browser.rejected_mutex >= 0) (void)sceKernelDeleteMutex(browser.rejected_mutex);
     if (browser.attach_mutex >= 0) (void)sceKernelDeleteMutex(browser.attach_mutex);
     if (browser.registry_mutex >= 0) (void)sceKernelDeleteMutex(browser.registry_mutex);
-    vitals_ca_index_free(&browser.ca_index);
-    mbedtls_ctr_drbg_free(&browser.random);
-    mbedtls_entropy_free(&browser.entropy);
-    mbedtls_psa_crypto_free();
-    vitals_crypto_platform_free();
     memset(&browser, 0, sizeof(browser));
     return result;
 }
@@ -193,11 +195,6 @@ int vitals_browser_destroy(void) {
     vitals_browser_enable(0);
     result = vitals_registry_destroy(&browser.registry);
     if (result != VITALS_REGISTRY_OK) return result;
-    vitals_ca_index_free(&browser.ca_index);
-    mbedtls_ctr_drbg_free(&browser.random);
-    mbedtls_entropy_free(&browser.entropy);
-    mbedtls_psa_crypto_free();
-    vitals_crypto_platform_free();
     (void)sceKernelDeleteMutex(browser.rejected_mutex);
     (void)sceKernelDeleteMutex(browser.attach_mutex);
     (void)sceKernelDeleteMutex(browser.registry_mutex);
@@ -215,7 +212,7 @@ static uint64_t host_hash(const char *hostname) {
     return hash;
 }
 
-static void remember_rejected(const char *hostname, int code) {
+static void remember_rejected(const char *hostname, int code, int asked) {
     uint64_t hash = host_hash(hostname);
     size_t slot;
     if (sceKernelLockMutex(browser.rejected_mutex, 1, NULL) < 0) return;
@@ -228,17 +225,21 @@ static void remember_rejected(const char *hostname, int code) {
     }
     browser.rejected_hosts[slot] = hash;
     browser.rejected_codes[slot] = code;
+    browser.rejected_asked[slot] = (uint8_t)(asked != 0);
     (void)sceKernelUnlockMutex(browser.rejected_mutex, 1);
 }
 
-/* The error the host's certificate got here, or 0 */
-static int rejected_code(const char *hostname) {
+/* The error the host's certificate got here, or 0; *asked whether WebKit was told, so asked the user */
+static int rejected_code(const char *hostname, int *asked) {
     uint64_t hash = host_hash(hostname);
     int code = 0;
+    *asked = 0;
     if (sceKernelLockMutex(browser.rejected_mutex, 1, NULL) < 0) return VITALS_CURLE_SSL_CONNECT_ERROR;
     for (size_t slot = 0; slot < BROWSER_REJECTED_HOSTS && code == 0; ++slot) {
-        if (browser.rejected_codes[slot] != 0 && browser.rejected_hosts[slot] == hash)
+        if (browser.rejected_codes[slot] != 0 && browser.rejected_hosts[slot] == hash) {
             code = browser.rejected_codes[slot];
+            *asked = browser.rejected_asked[slot];
+        }
     }
     (void)sceKernelUnlockMutex(browser.rejected_mutex, 1);
     return code;
@@ -248,110 +249,124 @@ size_t vitals_browser_connection_count(void) {
     return browser.initialized ? vitals_registry_count(&browser.registry) : 0;
 }
 
-/* Called by Mbed TLS for each certificate it checked: a self-signed server certificate that is
- * itself in the store counts as trusted; its other checks (host name, dates, signature strength)
- * still apply */
-static int trust_exact_self_signed(void *context, mbedtls_x509_crt *certificate, int depth,
-    uint32_t *flags) {
-    if (depth == 0 && (*flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) != 0 &&
-        vitals_ca_trusts_exact(vitals_ca_index_find, context, certificate)) {
-        *flags &= ~(uint32_t)MBEDTLS_X509_BADCERT_NOT_TRUSTED;
-    }
-    return 0;
-}
-
-static int bio_result(BrowserConnection *connection, int result, int sending) {
+/* curl's socket doesn't block: nothing to give or no room is VITALS_SSL_WOULD_BLOCK, and libssl's
+ * call then says to wait; anything else is the connection's failure, kept for the log */
+static int bio_result(BrowserConnection *connection, int result) {
     if (result >= 0) return result;
+    if ((uint32_t)result == (uint32_t)SCE_NET_ERROR_EAGAIN || (uint32_t)result == (uint32_t)SCE_NET_ERROR_EINTR)
+        return VITALS_SSL_WOULD_BLOCK;
     connection->net_error = result;
-    switch ((uint32_t)result) {
-        case (uint32_t)SCE_NET_ERROR_EAGAIN:
-        case (uint32_t)SCE_NET_ERROR_EINTR:
-            return sending ? MBEDTLS_ERR_SSL_WANT_WRITE : MBEDTLS_ERR_SSL_WANT_READ;
-        case (uint32_t)SCE_NET_ERROR_ETIMEDOUT:
-            return MBEDTLS_ERR_SSL_TIMEOUT;
-        case (uint32_t)SCE_NET_ERROR_ECONNRESET:
-            return MBEDTLS_ERR_NET_CONN_RESET;
-        default:
-            return sending ? MBEDTLS_ERR_NET_SEND_FAILED : MBEDTLS_ERR_NET_RECV_FAILED;
-    }
+    return result;
 }
 
 static int browser_send(void *context, const unsigned char *data, size_t size) {
     BrowserConnection *connection = context;
     int result;
-    if (__atomic_load_n(&connection->closing, __ATOMIC_ACQUIRE) && !connection->notifying_close) {
-        return MBEDTLS_ERR_NET_SEND_FAILED;
-    }
-    if (size > INT_MAX) return MBEDTLS_ERR_NET_SEND_FAILED;
+    if (__atomic_load_n(&connection->closing, __ATOMIC_ACQUIRE) && !connection->notifying_close)
+        return (int)SCE_NET_ERROR_ECONNABORTED;
+    if (size > INT_MAX) return (int)SCE_NET_ERROR_EINVAL;
     result = sceNetSend(connection->socket, data, (unsigned int)size, SCE_NET_MSG_DONTWAIT);
-    if (result == 0 && size != 0) return MBEDTLS_ERR_NET_SEND_FAILED;
-    return bio_result(connection, result, 1);
+    if (result == 0 && size != 0) return (int)SCE_NET_ERROR_EPIPE;
+    return bio_result(connection, result);
 }
 
 static int browser_recv(void *context, unsigned char *data, size_t size) {
     BrowserConnection *connection = context;
     int result;
-    if (__atomic_load_n(&connection->closing, __ATOMIC_ACQUIRE)) return MBEDTLS_ERR_NET_RECV_FAILED;
-    if (size > INT_MAX) return MBEDTLS_ERR_NET_RECV_FAILED;
+    if (__atomic_load_n(&connection->closing, __ATOMIC_ACQUIRE)) return (int)SCE_NET_ERROR_ECONNABORTED;
+    if (size > INT_MAX) return (int)SCE_NET_ERROR_EINVAL;
     result = sceNetRecv(connection->socket, data, (unsigned int)size, SCE_NET_MSG_DONTWAIT);
-    return bio_result(connection, result, 0);
+    return bio_result(connection, result);
 }
 
+/* A page's own CA file, whole, into a store: the store, or NULL when it can't be read or has no
+ * certificate */
+static void *load_ca_file(const char *path) {
+    void *store = NULL;
+    unsigned char *data = NULL;
+    int fd = sceIoOpen(path, SCE_O_RDONLY, 0);
+    int64_t size;
+    if (fd < 0) return NULL;
+    size = sceIoLseek(fd, 0, SCE_SEEK_END);
+    if (size <= 0 || size > BROWSER_CA_FILE_MAX || sceIoLseek(fd, 0, SCE_SEEK_SET) != 0) goto done;
+    data = malloc((size_t)size + 1u);
+    if (data == NULL) goto done;
+    for (int64_t read = 0; read < size;) {
+        int got = sceIoRead(fd, data + read, (unsigned int)(size - read));
+        if (got <= 0) goto done;
+        read += got;
+    }
+    data[size] = '\0';
+    store = vitalsSslStoreNew();
+    if (store != NULL && vitalsSslStoreAdd(store, data, (size_t)size) != 0) {
+        vitalsSslStoreRelease(store);
+        store = NULL;
+    }
+done:
+    free(data);
+    (void)sceIoClose(fd);
+    return store;
+}
+
+/* IANA numbers of the suites offered: TLS 1.3's, then the TLS 1.2 ones the page's list allows */
+#define SUITE_TLS1_3_AES_128_GCM_SHA256 0x1301
+#define SUITE_TLS1_3_AES_256_GCM_SHA384 0x1302
+#define SUITE_TLS1_3_CHACHA20_POLY1305_SHA256 0x1303
+
 static int initialize_connection(BrowserConnection *connection, uint32_t cipher_mask) {
-    /* Mbed TLS 3.6 takes the list without const; it only reads it */
-    static const char *alpn[] = {"http/1.1", NULL};
+    static const char *const alpn[] = {"http/1.1", NULL};
     static const int tls12[] = {
-        MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-        MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-        MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-        MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        0xC02F, /* ECDHE-RSA-AES128-GCM-SHA256 */
+        0xC030, /* ECDHE-RSA-AES256-GCM-SHA384 */
+        0xC02B, /* ECDHE-ECDSA-AES128-GCM-SHA256 */
+        0xC02C  /* ECDHE-ECDSA-AES256-GCM-SHA384 */
     };
+    void *library = NULL, *context, *bio, *store = NULL;
     size_t count = 0;
     int result;
 
-    connection->ciphers[count++] = MBEDTLS_TLS1_3_AES_128_GCM_SHA256;
-    connection->ciphers[count++] = MBEDTLS_TLS1_3_AES_256_GCM_SHA384;
-    connection->ciphers[count++] = MBEDTLS_TLS1_3_CHACHA20_POLY1305_SHA256;
+    connection->ciphers[count++] = SUITE_TLS1_3_AES_128_GCM_SHA256;
+    connection->ciphers[count++] = SUITE_TLS1_3_AES_256_GCM_SHA384;
+    connection->ciphers[count++] = SUITE_TLS1_3_CHACHA20_POLY1305_SHA256;
     for (size_t i = 0; i < sizeof(tls12)/sizeof(tls12[0]); ++i) {
         if (cipher_mask & (UINT32_C(1) << i)) connection->ciphers[count++] = tls12[i];
     }
     connection->ciphers[count] = 0;
-    /* A certificate file the page's own configuration names is still parsed whole, for that one
+    /* A certificate file the page's own configuration names is the only trust, for that one
      * connection */
     if (connection->custom_ca_requested) {
-        mbedtls_x509_crt_init(&connection->custom_ca);
-        connection->custom_ca_initialized = 1;
-        result = vitals_load_ca_file(&connection->custom_ca, connection->ca_file);
-        if (result != 0) return VITALS_CURLE_SSL_CACERT_BADFILE;
+        store = load_ca_file(connection->ca_file);
+        if (store == NULL) return VITALS_CURLE_SSL_CACERT_BADFILE;
     }
-    result = mbedtls_ssl_config_defaults(&connection->config, MBEDTLS_SSL_IS_CLIENT,
-        MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
-    if (result != 0) return VITALS_CURLE_OUT_OF_MEMORY;
-    connection->certificate_profile = mbedtls_x509_crt_profile_default;
-    /* System endpoints such as native-vita.np.ac.playstation.net require
-     * SHA-1 certificate signatures */
-    connection->certificate_profile.allowed_mds |= MBEDTLS_X509_ID_FLAG(MBEDTLS_MD_SHA1);
-    mbedtls_ssl_conf_cert_profile(&connection->config, &connection->certificate_profile);
-    mbedtls_ssl_conf_rng(&connection->config, mbedtls_ctr_drbg_random, &browser.random);
-    mbedtls_ssl_conf_min_tls_version(&connection->config, MBEDTLS_SSL_VERSION_TLS1_2);
-    mbedtls_ssl_conf_max_tls_version(&connection->config, MBEDTLS_SSL_VERSION_TLS1_3);
-    mbedtls_ssl_conf_ciphersuites(&connection->config, connection->ciphers);
-    mbedtls_ssl_conf_authmode(&connection->config, MBEDTLS_SSL_VERIFY_OPTIONAL);
-    /* A fixed list (a page's own CA file) gets Mbed TLS's own self-signed rule; the store, read
-     * through a callback, gets the same rule from trust_exact_self_signed */
-    if (connection->custom_ca_requested)
-        mbedtls_ssl_conf_ca_chain(&connection->config, &connection->custom_ca, NULL);
-    else {
-        mbedtls_ssl_conf_ca_cb(&connection->config, vitals_ca_index_find, &browser.ca_index);
-        mbedtls_ssl_conf_verify(&connection->config, trust_exact_self_signed, &browser.ca_index);
+    if (sceSslInternalGetLibrary(&library) != 0) {
+        if (store != NULL) vitalsSslStoreRelease(store);
+        return VITALS_CURLE_SSL_CONNECT_ERROR;
     }
-    result = mbedtls_ssl_conf_alpn_protocols(&connection->config, alpn);
-    if (result != 0) return VITALS_CURLE_SSL_CONNECT_ERROR;
-    result = mbedtls_ssl_setup(&connection->ssl, &connection->config);
-    if (result != 0) return VITALS_CURLE_OUT_OF_MEMORY;
-    result = mbedtls_ssl_set_hostname(&connection->ssl, connection->hostname);
-    if (result != 0) return VITALS_CURLE_OUT_OF_MEMORY;
-    mbedtls_ssl_set_bio(&connection->ssl, connection, browser_send, browser_recv, NULL);
+    context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    if (context == NULL) {
+        if (store != NULL) vitalsSslStoreRelease(store);
+        return VITALS_CURLE_OUT_OF_MEMORY;
+    }
+    /* Verified, but decided after the handshake from curl's options */
+    sceSslInternalCtxSetVerify(context, 1);
+    result = vitalsSslCtxSetDeferredVerify(context, 1);
+    if (result == 0) result = vitalsSslCtxSetCiphersuites(context, connection->ciphers);
+    if (result == 0) result = vitalsSslCtxSetAlpn(context, alpn);
+    if (result == 0 && store != NULL) result = vitalsSslCtxSetStore(context, store);
+    if (result == 0 && store != NULL) result = vitalsSslCtxSetTrustBundle(context, 0);
+    if (store != NULL) vitalsSslStoreRelease(store);
+    if (result == 0) {
+        connection->ssl = sceSslInternalNew(context);
+        if (connection->ssl == NULL) result = VITALS_CURLE_OUT_OF_MEMORY;
+    }
+    /* The connection keeps the context */
+    sceSslInternalCtxFree(context);
+    if (result != 0) return result == VITALS_CURLE_OUT_OF_MEMORY ? result : VITALS_CURLE_SSL_CONNECT_ERROR;
+    bio = vitalsSslBioNew(browser_send, browser_recv, connection);
+    if (bio == NULL) return VITALS_CURLE_OUT_OF_MEMORY;
+    (void)sceSslInternalBioCtrl(bio, VITALS_SSL_BIO_SET_HOST, 0, connection->hostname);
+    sceSslInternalSetBio(connection->ssl, bio, bio);
+    sceSslInternalSetConnectState(connection->ssl);
     connection->state = BROWSER_HANDSHAKING;
     return 0;
 }
@@ -391,6 +406,7 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
     BrowserConnection *connection;
     size_t native_ssl = ssl_offset(index);
     const char *unverified_host;
+    int asked = 0;
     int result;
 
     *handled = 0;
@@ -420,13 +436,17 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
         goto unlock;
     }
     unverified_host = vitals_browser_unverified_host(native);
-    if (unverified_host != NULL && (result = rejected_code(unverified_host)) != 0) {
+    if (unverified_host != NULL && (result = rejected_code(unverified_host, &asked)) != 0 && !asked) {
         VITALS_LOG("browser refused unverified retry: code=%d", result);
         *handled = 1;
         goto unlock;
     }
-    result = vitals_browser_read_options(native, (unsigned int)index, browser.ops.default_ciphers,
-        browser.ops.is_default_ctx_callback, &options);
+    /* The user said yes to WebKit's question: this connection, without verification, stays here */
+    if (asked) VITALS_LOG("browser unverified retry the user allowed");
+    result = asked ? vitals_browser_read_unverified_options(native, (unsigned int)index,
+                         browser.ops.default_ciphers, browser.ops.is_default_ctx_callback, &options)
+                   : vitals_browser_read_options(native, (unsigned int)index, browser.ops.default_ciphers,
+                         browser.ops.is_default_ctx_callback, &options);
     if (result == VITALS_BROWSER_CONFIG_LEGACY) {
         VITALS_LOG("browser connection uses legacy TLS: unsupported custom configuration");
         result = 0;
@@ -441,18 +461,23 @@ static int create_or_acquire(void *native, int index, VitalsRegistryHandle *hand
             goto unlock;
         }
     }
+    result = ensure_library();
+    if (result != 0) {
+        VITALS_LOG("browser libssl unavailable: 0x%08X; using legacy TLS", result);
+        result = 0;
+        goto unlock;
+    }
     *handled = 1;
     connection = calloc(1, sizeof(*connection));
     if (connection == NULL) { result = VITALS_CURLE_OUT_OF_MEMORY; goto unlock; }
     connection->mutex = sceKernelCreateMutex("vitals browser connection", 0, 0, NULL);
     if (connection->mutex < 0) { free(connection); result = VITALS_CURLE_OUT_OF_MEMORY; goto unlock; }
-    mbedtls_ssl_init(&connection->ssl);
-    mbedtls_ssl_config_init(&connection->config);
     connection->native = native;
     connection->index = index;
     connection->socket = options.socket;
     connection->verify_peer = options.verify_peer;
     connection->verify_host = options.verify_host;
+    connection->ssl_info = options.ssl_info;
     connection->custom_ca_requested = options.ca_file != NULL;
     memcpy(connection->hostname, options.hostname, strlen(options.hostname) + 1);
     if (options.ca_file != NULL) memcpy(connection->ca_file, options.ca_file, strlen(options.ca_file) + 1);
@@ -493,27 +518,95 @@ unlock:
     return result;
 }
 
+/* OpenSSL's verify result for curl, from libssl's certificate flags (VITALS_CERT_*) */
 static uint32_t verification_code(uint32_t flags) {
     if (flags == 0) return 0;
-    if (flags == UINT32_MAX) return 1;
-    if (flags & MBEDTLS_X509_BADCERT_CN_MISMATCH) return 62;
-    if (flags & MBEDTLS_X509_BADCERT_EXPIRED) return 10;
-    if (flags & MBEDTLS_X509_BADCERT_FUTURE) return 9;
-    if (flags & MBEDTLS_X509_BADCERT_REVOKED) return 23;
-    if (flags & MBEDTLS_X509_BADCERT_NOT_TRUSTED) return 20;
+    if (flags & VITALS_CERT_HOSTNAME) return 62;
+    if (flags & VITALS_CERT_EXPIRED) return 10;
+    if (flags & VITALS_CERT_FUTURE) return 9;
+    if (flags & VITALS_CERT_UNKNOWN_CA) return 20;
     return 1;
 }
 
 static int verify_connection(BrowserConnection *connection, void *easy) {
-    uint32_t flags = mbedtls_ssl_get_verify_result(&connection->ssl);
-    uint32_t chain_flags = flags & ~MBEDTLS_X509_BADCERT_CN_MISMATCH;
-    vitals_write_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET, verification_code(flags));
-    if (flags == UINT32_MAX || mbedtls_ssl_get_peer_cert(&connection->ssl) == NULL) {
+    uint32_t flags = vitalsSslGetCertificateFlags(connection->ssl);
+    uint32_t chain_flags = flags & ~VITALS_CERT_HOSTNAME;
+    /* Mbed TLS's check didn't run: no certificate came */
+    if (vitalsSslGetVerifyResult(connection->ssl) == UINT32_MAX) {
+        vitals_write_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET, 1);
         return VITALS_CURLE_SSL_CONNECT_ERROR;
     }
+    vitals_write_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET, verification_code(flags));
     if (connection->verify_peer && chain_flags != 0) return VITALS_CURLE_SSL_CACERT;
-    if (connection->verify_host && (flags & MBEDTLS_X509_BADCERT_CN_MISMATCH)) {
+    if (connection->verify_host && (flags & VITALS_CERT_HOSTNAME)) {
         return VITALS_CURLE_PEER_FAILED_VERIFICATION;
+    }
+    return 0;
+}
+
+/* A refused certificate reported to WebKit as the engine's own TLS reports it (ScePsp2Compat's
+ * certificate check): a chain record of the server's certificates, in the engine's OpenSSL, and the
+ * OpenSSL verify error. WebKit then asks the user, and frees the record with the request. The
+ * record is the engine's layout, of 32-bit words: valid flag at +4, the list's head and tail at +8
+ * and +12, how many at +16; each node an entry and the next node; each entry the certificate and two
+ * words the engine fills itself. 1 when it was reported */
+static void *word_pointer(uint32_t word) {
+    return (void *)(uintptr_t)word;
+}
+
+static uint32_t pointer_word(const void *pointer) {
+    return (uint32_t)(uintptr_t)pointer;
+}
+
+static int report_to_webkit(BrowserConnection *connection, uint32_t code) {
+    unsigned char *info = connection->ssl_info;
+    uint32_t *record, *head = NULL, *tail = NULL;
+    int count = 0;
+    if (info == NULL || browser.ops.d2i_x509 == NULL || browser.ops.x509_free == NULL ||
+        browser.ops.record_calloc == NULL || browser.ops.record_free == NULL) return 0;
+    if (vitals_read_u32(info, VITALS_WEBKIT_SSL_FAILED_CHAIN_OFFSET) != 0) return 1;
+    /* The record lists the chain from its top down, the server's certificate last, as the engine
+     * pops it off OpenSSL's: built here from the server's own order, each one in front */
+    for (int i = 0;; ++i) {
+        const unsigned char *der;
+        size_t size;
+        void *certificate;
+        uint32_t *entry, *node;
+        if (vitalsSslGetPeerCertificate(connection->ssl, i, &der, &size) != 0) break;
+        certificate = browser.ops.d2i_x509(NULL, &der, (long)size);
+        entry = certificate != NULL ? browser.ops.record_calloc(3, sizeof(*entry)) : NULL;
+        node = entry != NULL ? browser.ops.record_calloc(2, sizeof(*node)) : NULL;
+        if (node == NULL) {
+            if (entry != NULL) browser.ops.record_free(entry);
+            if (certificate != NULL) browser.ops.x509_free(certificate);
+            goto failed;
+        }
+        entry[0] = pointer_word(certificate);
+        node[0] = pointer_word(entry);
+        node[1] = pointer_word(head);
+        if (head == NULL) tail = node;
+        head = node;
+        ++count;
+    }
+    record = count > 0 ? browser.ops.record_calloc(5, sizeof(*record)) : NULL;
+    if (record == NULL) goto failed;
+    /* No OpenSSL stack: the record's own list holds the certificates */
+    ((uint8_t *)record)[4] = 1;
+    record[2] = pointer_word(head);
+    record[3] = pointer_word(tail);
+    record[4] = (uint32_t)count;
+    vitals_write_u32(info, VITALS_WEBKIT_SSL_FAILED_CHAIN_OFFSET, pointer_word(record));
+    vitals_write_u32(info, VITALS_WEBKIT_SSL_ERROR_OFFSET,
+        info[VITALS_WEBKIT_SSL_REPORT_ERROR_OFFSET] != 0 ? code : 100u);
+    VITALS_LOG("browser certificate reported: certificates=%d error=%u", count, (unsigned int)code);
+    return 1;
+failed:
+    while (head != NULL) {
+        uint32_t *next = word_pointer(head[1]), *entry = word_pointer(head[0]);
+        browser.ops.x509_free(word_pointer(entry[0]));
+        browser.ops.record_free(entry);
+        browser.ops.record_free(head);
+        head = next;
     }
     return 0;
 }
@@ -563,20 +656,25 @@ int vitals_browser_connect(void *native, int index, unsigned char nonblocking,
             }
         }
         connection->net_error = 0;
-        result = mbedtls_ssl_handshake(&connection->ssl);
-        if (result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE) {
-            connection->want = result == MBEDTLS_ERR_SSL_WANT_READ ? 2 : 3;
-            vitals_write_u32(native, ssl_offset(index) + VITALS_CURL_SSL_CONNECTING_OFFSET,
-                (uint32_t)connection->want);
-            if (nonblocking) { result = 0; goto finished; }
-            continue;
-        }
-        if (result != 0) {
-            uint32_t flags = mbedtls_ssl_get_verify_result(&connection->ssl);
+        result = vitalsSslHandshake(connection->ssl);
+        if (result != 1) {
+            int kind = sceSslInternalGetError(connection->ssl, result);
+            /* As Sony's, libssl reports any failed receive as a wait: the socket's own error says */
+            if ((kind == VITALS_SSL_KIND_WANT_READ || kind == VITALS_SSL_KIND_WANT_WRITE) &&
+                connection->net_error == 0) {
+                connection->want = kind;
+                vitals_write_u32(native, ssl_offset(index) + VITALS_CURL_SSL_CONNECTING_OFFSET,
+                    (uint32_t)connection->want);
+                if (nonblocking) { result = 0; goto finished; }
+                continue;
+            }
+            uint32_t flags = vitalsSslGetCertificateFlags(connection->ssl);
             VITALS_LOG("browser handshake failed: tls=0x%08X net=0x%08X verify=0x%08X",
-                result, connection->net_error, flags);
-            if (result == MBEDTLS_ERR_SSL_TIMEOUT) result = VITALS_CURLE_OPERATION_TIMEDOUT;
-            else if (flags != 0 && flags != UINT32_MAX) {
+                vitalsSslGetTlsError(connection->ssl), connection->net_error,
+                vitalsSslGetVerifyResult(connection->ssl));
+            if ((uint32_t)connection->net_error == (uint32_t)SCE_NET_ERROR_ETIMEDOUT)
+                result = VITALS_CURLE_OPERATION_TIMEDOUT;
+            else if (flags != 0) {
                 vitals_write_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET, verification_code(flags));
                 result = VITALS_CURLE_SSL_CACERT;
             } else result = VITALS_CURLE_SSL_CONNECT_ERROR;
@@ -593,14 +691,15 @@ int vitals_browser_connect(void *native, int index, unsigned char nonblocking,
         vitals_write_u32(native, VITALS_CURL_SEND_OFFSET + 4 * (size_t)(unsigned int)index,
             (uint32_t)(uintptr_t)vitals_browser_send);
         VITALS_LOG("browser handshake complete: socket=%d version=%s cipher=%s", connection->socket,
-            mbedtls_ssl_get_version(&connection->ssl), mbedtls_ssl_get_ciphersuite(&connection->ssl));
+            vitalsSslGetVersion(connection->ssl), vitalsSslGetCiphersuite(connection->ssl));
         *done = 1;
         goto finished;
     }
 failed:
     VITALS_LOG("browser connect rejected: socket=%d code=%d", connection->socket, result);
     if (result == VITALS_CURLE_SSL_CACERT || result == VITALS_CURLE_PEER_FAILED_VERIFICATION)
-        remember_rejected(connection->hostname, result);
+        remember_rejected(connection->hostname, result, report_to_webkit(connection,
+            vitals_read_u32(easy, VITALS_CURL_VERIFY_RESULT_OFFSET)));
     connection->state = BROWSER_FAILED;
     connection->error = result;
 finished:
@@ -608,13 +707,17 @@ finished:
     return result;
 }
 
+/* libssl's read or write result for curl: bytes, 0 at the server's close_notify, or -1 with the
+ * error (CURLE_AGAIN to wait) */
 static int map_io(BrowserConnection *connection, int result, int sending, int *error) {
+    int kind;
     if (result > 0) { *error = 0; return result; }
-    if (result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE) {
+    kind = sceSslInternalGetError(connection->ssl, result);
+    if ((kind == VITALS_SSL_KIND_WANT_READ || kind == VITALS_SSL_KIND_WANT_WRITE) && connection->net_error == 0) {
         *error = VITALS_CURLE_AGAIN;
         return -1;
     }
-    if (!sending && result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
+    if (!sending && result == 0 && kind == VITALS_SSL_KIND_ZERO_RETURN) {
         connection->state = BROWSER_EOF;
         *error = 0;
         return 0;
@@ -629,7 +732,6 @@ int vitals_browser_recv(void *native, int index, void *data, unsigned int length
     VitalsRegistryHandle handle;
     BrowserConnection *connection = NULL;
     int handled, result;
-    unsigned int budget = 16;
     if (error == NULL) return -1;
     *error = VITALS_CURLE_RECV_ERROR;
     result = acquire_connection(native, index, &handle, &connection, &handled);
@@ -645,11 +747,9 @@ int vitals_browser_recv(void *native, int index, void *data, unsigned int length
         goto finished;
     }
     if (length > BROWSER_IO_CHUNK) length = BROWSER_IO_CHUNK;
-    do {
-        connection->net_error = 0;
-        result = mbedtls_ssl_read(&connection->ssl, data, length);
-    } while (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET && --budget != 0);
-    if (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) result = MBEDTLS_ERR_SSL_WANT_READ;
+    /* libssl reads past TLS 1.3's session tickets itself */
+    connection->net_error = 0;
+    result = sceSslInternalRead(connection->ssl, data, (int)length);
     result = map_io(connection, result, 0, error);
 finished:
     release_connection(&handle, connection);
@@ -679,11 +779,11 @@ int vitals_browser_send(void *native, int index, const void *data, unsigned int 
         connection->pending_length = length;
     }
     connection->net_error = 0;
-    result = mbedtls_ssl_write(&connection->ssl, connection->pending_write, connection->pending_length);
+    result = sceSslInternalWrite(connection->ssl, connection->pending_write, (int)connection->pending_length);
     result = map_io(connection, result, 1, error);
     if (*error == VITALS_CURLE_AGAIN) goto finished;
 clear:
-    mbedtls_platform_zeroize(connection->pending_write, sizeof(connection->pending_write));
+    wipe(connection->pending_write, sizeof(connection->pending_write));
     connection->pending_length = 0;
 finished:
     release_connection(&handle, connection);
@@ -698,7 +798,7 @@ int vitals_browser_pending(void *native, int index, int *handled) {
     result = acquire_connection(native, index, &handle, &connection, handled);
     if (result != 0 || !*handled) return 0;
     result = connection->state == BROWSER_ACTIVE && connection->pending_length == 0 &&
-        (connection->lookahead_valid || mbedtls_ssl_check_pending(&connection->ssl));
+        (connection->lookahead_valid || vitalsSslCheckPending(connection->ssl));
     release_connection(&handle, connection);
     return result;
 }
@@ -706,7 +806,6 @@ int vitals_browser_pending(void *native, int index, int *handled) {
 int vitals_browser_check(void *native, int *handled) {
     VitalsRegistryHandle handle;
     BrowserConnection *connection = NULL;
-    unsigned int budget = 16;
     int result;
 
     if (handled == NULL) return -1;
@@ -720,21 +819,20 @@ int vitals_browser_check(void *native, int *handled) {
         result = -1;
         goto finished;
     }
-    if (connection->lookahead_valid || mbedtls_ssl_get_bytes_avail(&connection->ssl) != 0) {
+    if (connection->lookahead_valid || sceSslInternalPending(connection->ssl) != 0) {
         result = 1;
         goto finished;
     }
-    do {
-        connection->net_error = 0;
-        result = mbedtls_ssl_read(&connection->ssl, &connection->lookahead, 1);
-    } while (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET && --budget != 0);
+    connection->net_error = 0;
+    result = sceSslInternalRead(connection->ssl, &connection->lookahead, 1);
+    int kind = result > 0 ? VITALS_SSL_KIND_NONE : sceSslInternalGetError(connection->ssl, result);
     if (result > 0) {
         connection->lookahead_valid = 1;
         result = 1;
-    } else if (result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE ||
-        result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) {
+    } else if ((kind == VITALS_SSL_KIND_WANT_READ || kind == VITALS_SSL_KIND_WANT_WRITE) &&
+        connection->net_error == 0) {
         result = -1;
-    } else if (result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
+    } else if (result == 0 && kind == VITALS_SSL_KIND_ZERO_RETURN) {
         connection->state = BROWSER_EOF;
         result = 0;
     } else {
@@ -775,7 +873,7 @@ int vitals_browser_close(void *native, int index, int *handled) {
         if ((connection->state == BROWSER_ACTIVE || connection->state == BROWSER_EOF) &&
             connection->pending_length == 0) {
             connection->notifying_close = 1;
-            (void)mbedtls_ssl_close_notify(&connection->ssl);
+            (void)sceSslInternalShutdown(connection->ssl);
             connection->notifying_close = 0;
         }
         vitals_write_u32(native, VITALS_CURL_RECV_OFFSET + 4 * (size_t)(unsigned int)index, connection->old_recv);

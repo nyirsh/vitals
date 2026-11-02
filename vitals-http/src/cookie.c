@@ -383,6 +383,7 @@ static int split_url(const char *url, char *host, char **path)
 int sceHttpGetCookie(const char *url, char *cookie, unsigned int *cookieLength, unsigned int prepare, int secure)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     char host[VH_HOST_MAX];
     char *path;
     if (url == NULL || cookieLength == NULL)
@@ -413,6 +414,7 @@ int sceHttpGetCookie(const char *url, char *cookie, unsigned int *cookieLength, 
 int sceHttpAddCookie(const char *url, const char *cookie, unsigned int cookieLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     char host[VH_HOST_MAX];
     char *path;
     if (url == NULL || cookie == NULL)
@@ -472,6 +474,7 @@ static size_t export_cookie(const VhCookie *cookie, char *out)
 int sceHttpCookieExport(void *buffer, unsigned int bufferSize, unsigned int *exportSize)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (exportSize == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -496,6 +499,7 @@ int sceHttpCookieExport(void *buffer, unsigned int bufferSize, unsigned int *exp
 int sceHttpCookieImport(const void *buffer, unsigned int bufferSize)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (buffer == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -542,6 +546,7 @@ int sceHttpCookieImport(const void *buffer, unsigned int bufferSize)
 int sceHttpGetCookieStats(void *stats)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     (void)stats;
     return VH_ERROR_UNSUPPORTED;
 }
@@ -559,23 +564,27 @@ static int set_limit(unsigned int *limit, unsigned int value)
 int sceHttpSetCookieMaxNum(unsigned int num)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return set_limit(&g_max_num, num);
 }
 
 int sceHttpSetCookieMaxNumPerDomain(unsigned int num)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return set_limit(&g_max_per_domain, num);
 }
 
 int sceHttpSetCookieMaxSize(unsigned int size)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return set_limit(&g_max_size, size);
 }
 
 int sceHttpSetCookieTotalMaxSize(unsigned int size)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return set_limit(&g_total_max_size, size);
 }

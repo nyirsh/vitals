@@ -67,7 +67,21 @@ typedef struct VitalsBrowserOptions {
     uint32_t tls12_suites;
     uint8_t verify_peer;
     uint8_t verify_host;
+    /* WebKit's request, when the context callback is the browser's default: where a refused
+     * certificate is reported, as the engine's own TLS reports it, so the browser asks the user */
+    void *ssl_info;
 } VitalsBrowserOptions;
+
+/* The engine's own TLS reports a certificate it couldn't verify in WebKit's request (the base
+ * part ScePsp2Compat defines): a chain record, which WebKit takes as the cue to ask the user and
+ * shows the certificates of, and the OpenSSL verify error (100 when the flag at +20 is clear).
+ * Without the record, WebKit retries at once with verification off */
+#define VITALS_WEBKIT_SSL_FAILED_CHAIN_OFFSET 12
+#define VITALS_WEBKIT_SSL_ERROR_OFFSET 16
+#define VITALS_WEBKIT_SSL_REPORT_ERROR_OFFSET 20
+/* ScePsp2Compat's d2i_X509 and X509_free (its OpenSSL), for the records' certificates */
+#define VITALS_BROWSER_D2I_X509_OFFSET 0x48d64
+#define VITALS_BROWSER_X509_FREE_OFFSET 0x48d84
 
 typedef int (*VitalsBrowserContextCallbackValidator)(const void *callback,
     const void *userdata);
@@ -84,6 +98,11 @@ enum {
 
 /* The connection's host when it asks for no peer or no host verification; NULL otherwise */
 const char *vitals_browser_unverified_host(const void *connection);
+/* As vitals_browser_read_options, for a retry the user allowed: verification turned off keeps the
+ * connection, with the browser's default context callback too */
+int vitals_browser_read_unverified_options(const void *connection, unsigned int socket_index,
+    const char *browser_default_ciphers, VitalsBrowserContextCallbackValidator callback_validator,
+    VitalsBrowserOptions *options);
 int vitals_browser_read_options(const void *connection, unsigned int socket_index,
     const char *browser_default_ciphers,
     VitalsBrowserContextCallbackValidator callback_validator,

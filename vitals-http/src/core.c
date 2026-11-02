@@ -277,16 +277,26 @@ int sceHttpTerm(void)
     return 0;
 }
 
+void vh_pool_stats(unsigned int *size, unsigned int *used, unsigned int *peak)
+{
+    vh_lock();
+    *size = g_pool_size;
+    *used = g_pool_used;
+    *peak = g_pool_peak;
+    vh_unlock();
+}
+
 int sceHttpGetMemoryPoolStats(SceHttpMemoryPoolStats *currentStat)
 {
     /* Apps poll this, often each frame: only changes are logged */
 #if VITALS_DEBUG >= 2
     static unsigned int reported_used = UINT32_MAX, reported_peak;
 #endif
-    if (currentStat == NULL)
-        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    /* As Sony's: before sceHttpInit that comes first, then the pointer */
     vh_lock();
     int result = vh_initialized();
+    if (result == 0 && currentStat == NULL)
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
     if (result == 0) {
         currentStat->poolSize = g_pool_size;
         currentStat->maxInuseSize = g_pool_peak;
@@ -345,6 +355,7 @@ int sceHttpSetAuthInfoCallback(int id, SceHttpAuthInfoCallback cbfunc, void *use
 int sceHttpSetAuthEnabled(int id, int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->auth_enabled = enable);
@@ -353,6 +364,7 @@ int sceHttpSetAuthEnabled(int id, int enable)
 int sceHttpGetAuthEnabled(int id, int *enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (enable == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, *enable = settings->auth_enabled);
@@ -367,6 +379,7 @@ int sceHttpSetRedirectCallback(int id, SceHttpRedirectCallback cbfunc, void *use
 int sceHttpSetAutoRedirect(int id, int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->auto_redirect = enable);
@@ -375,6 +388,7 @@ int sceHttpSetAutoRedirect(int id, int enable)
 int sceHttpGetAutoRedirect(int id, int *enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (enable == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, *enable = settings->auto_redirect);
@@ -393,6 +407,7 @@ int sceHttpSetResolveTimeOut(int id, unsigned int usec)
 int sceHttpSetResolveRetry(int id, int retry)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (retry < 0)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->resolve_retry = retry);
@@ -419,6 +434,7 @@ int sceHttpSetRecvTimeOut(int id, unsigned int usec)
 int sceHttpSetResponseHeaderMaxSize(int id, unsigned int headerSize)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (headerSize == 0)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->response_header_max = headerSize);
@@ -427,6 +443,7 @@ int sceHttpSetResponseHeaderMaxSize(int id, unsigned int headerSize)
 int sceHttpSetCookieEnabled(int id, int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->cookie_enabled = enable);
@@ -435,6 +452,7 @@ int sceHttpSetCookieEnabled(int id, int enable)
 int sceHttpGetCookieEnabled(int id, int *enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (enable == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, *enable = settings->cookie_enabled);
@@ -462,6 +480,7 @@ int sceHttpsSetSslCallback(int id, SceHttpsCallback cbfunc, void *userArg)
 int sceHttpSetAcceptEncodingGZIPEnabled(int id, int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->accept_gzip = enable);
@@ -470,6 +489,7 @@ int sceHttpSetAcceptEncodingGZIPEnabled(int id, int enable)
 int sceHttpGetAcceptEncodingGZIPEnabled(int id, int *enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (enable == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, *enable = settings->accept_gzip);
@@ -478,6 +498,7 @@ int sceHttpGetAcceptEncodingGZIPEnabled(int id, int *enable)
 int sceHttpSetInflateGZIPEnabled(int id, int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->inflate_gzip = enable);
@@ -487,6 +508,7 @@ int sceHttpSetInflateGZIPEnabled(int id, int enable)
 int sceHttpSetDefaultAcceptEncodingGZIPEnabled(int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -498,6 +520,7 @@ int sceHttpSetDefaultAcceptEncodingGZIPEnabled(int enable)
 int sceHttpSetNonblock(int id, int enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (!is_switch(enable))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, settings->nonblock = enable);
@@ -506,6 +529,7 @@ int sceHttpSetNonblock(int id, int enable)
 int sceHttpGetNonblock(int id, int *enable)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (enable == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, *enable = settings->nonblock);
@@ -522,6 +546,7 @@ int sceHttpSetIcmOption(int id, int value)
 int sceHttpGetIcmOption(int id, int *value)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (value == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     VH_SET(id, *value = 0);
@@ -543,6 +568,7 @@ static int valid_header_text(const char *text, size_t maximum, int name)
 int sceHttpAddRequestHeader(int id, const char *name, const char *value, unsigned int mode)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (name == NULL || value == NULL || (mode != SCE_HTTP_HEADER_OVERWRITE && mode != SCE_HTTP_HEADER_ADD) ||
         !valid_header_text(name, VH_HEADER_NAME_MAX, 1) || !valid_header_text(value, VH_HEADER_VALUE_MAX, 0)) {
         VITALS_LOG("add header %s mode=%u rejected", name != NULL ? name : "(null)", mode);
@@ -645,6 +671,7 @@ int sceHttpAddRequestHeaderRaw(int id, const char *header, unsigned int mode)
 int sceHttpRemoveRequestHeader(int id, const char *name)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (name == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     int result;
@@ -672,12 +699,28 @@ int sceHttpRemoveRequestHeader(int id, const char *name)
 
 /* ---- HTTPS options, for the whole library ---- */
 
+/* The HTTPS options an app may set (SCE_HTTPS_FLAG_*), and the ones only Sony's code sets with
+ * the private setters, as 0x40 (the console's own handshake); Sony's refuses any other bit with
+ * SCE_HTTP_ERROR_INVALID_VALUE, once initialized and before looking at the object.
+ * Not reproduced: Sony's disable setters also refuse turning off the server, name or known-CA
+ * check (0x25) for an app built with SDK 2.10 or later, unless a system setting allows it */
+#define VH_HTTPS_PUBLIC_FLAGS 0x3Fu
+#define VH_HTTPS_PRIVATE_FLAGS 0x1FFu
+
+static int check_https_flags(unsigned int flags, unsigned int allowed)
+{
+    int result = vh_initialized();
+    if (result == 0 && (flags & ~allowed) != 0)
+        result = (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    return result;
+}
+
 int sceHttpsEnableOption(unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https enable option flags=%08X", sslFlags);
     vh_lock();
-    int result = vh_initialized();
+    int result = check_https_flags(sslFlags, VH_HTTPS_PUBLIC_FLAGS);
     if (result == 0)
         g_https_options |= sslFlags;
     vh_unlock();
@@ -689,7 +732,7 @@ int sceHttpsDisableOption(unsigned int sslFlags)
     VH_TRACE();
     VITALS_LOG("https disable option flags=%08X", sslFlags);
     vh_lock();
-    int result = vh_initialized();
+    int result = check_https_flags(sslFlags, VH_HTTPS_PUBLIC_FLAGS);
     if (result == 0)
         g_https_options &= ~sslFlags;
     vh_unlock();
@@ -698,37 +741,55 @@ int sceHttpsDisableOption(unsigned int sslFlags)
 
 /* ---- HTTPS options, for one template, connection or request ---- */
 
+/* One object's options: the flags checked first, then the object */
+static int set_https_options(int id, unsigned int flags, unsigned int allowed, int enable)
+{
+    vh_lock();
+    int result = check_https_flags(flags, allowed);
+    VhSettings *settings = result == 0 ? settings_of(id, &result) : NULL;
+    if (settings != NULL && enable) {
+        settings->https_enabled |= flags;
+        settings->https_disabled &= ~flags;
+    } else if (settings != NULL) {
+        settings->https_disabled |= flags;
+        settings->https_enabled &= ~flags;
+    }
+    vh_unlock();
+    return result;
+}
+
 int sceHttpsEnableOption2(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https enable option2 id=%d flags=%08X", id, sslFlags);
-    VH_SET(id, settings->https_enabled |= sslFlags; settings->https_disabled &= ~sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PUBLIC_FLAGS, 1);
 }
 
 int sceHttpsDisableOption2(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https disable option2 id=%d flags=%08X", id, sslFlags);
-    VH_SET(id, settings->https_disabled |= sslFlags; settings->https_enabled &= ~sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PUBLIC_FLAGS, 0);
 }
 
 int sceHttpsEnableOptionPrivate(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https enable option private id=%d flags=%08X", id, sslFlags);
-    return sceHttpsEnableOption2(id, sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PRIVATE_FLAGS, 1);
 }
 
 int sceHttpsDisableOptionPrivate(int id, unsigned int sslFlags)
 {
     VH_TRACE();
     VITALS_LOG("https disable option private id=%d flags=%08X", id, sslFlags);
-    return sceHttpsDisableOption2(id, sslFlags);
+    return set_https_options(id, sslFlags, VH_HTTPS_PRIVATE_FLAGS, 0);
 }
 
 int sceHttpsLoadCert(int caCertNum, const SceHttpsData **caList, const SceHttpsData *cert, const SceHttpsData *privKey)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (caCertNum < 0 || (caCertNum > 0 && caList == NULL))
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -754,6 +815,7 @@ int sceHttpsUnloadCert(void)
 int sceHttpsGetCaList(SceHttpsCaList *caList)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (caList == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     caList->caCerts = NULL;
@@ -764,6 +826,7 @@ int sceHttpsGetCaList(SceHttpsCaList *caList)
 int sceHttpsFreeCaList(SceHttpsCaList *caList)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (caList == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     return vh_initialized();

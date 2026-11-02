@@ -1,8 +1,7 @@
 #include "vh.h"
 
 #include "diagnostics.h"
-
-#include <mbedtls/md5.h>
+#include "md5.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +38,7 @@ static int copy_text(char *destination, size_t capacity, const char *source, siz
 int sceHttpCreateTemplate(const char *userAgent, int httpVer, int autoProxyConf)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (httpVer != SCE_HTTP_VERSION_1_0 && httpVer != SCE_HTTP_VERSION_1_1)
         return (int)SCE_HTTP_ERROR_INVALID_VERSION;
     if (userAgent != NULL && strlen(userAgent) >= VH_USER_AGENT_MAX)
@@ -147,6 +147,7 @@ static int delete_object(int id, VhKind kind)
 int sceHttpDeleteTemplate(int tmplId)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return delete_object(tmplId, VH_TEMPLATE);
 }
 
@@ -186,6 +187,7 @@ int sceHttpCreateConnection(int tmplId, const char *serverName, const char *sche
                          int enableKeepalive)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int https;
     if (serverName == NULL || scheme == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
@@ -211,6 +213,7 @@ int sceHttpCreateConnection(int tmplId, const char *serverName, const char *sche
 int sceHttpCreateConnectionWithURL(int tmplId, const char *url, int enableKeepalive)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     VhUrl parts;
     if (url == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
@@ -230,6 +233,7 @@ int sceHttpCreateConnectionWithURL(int tmplId, const char *url, int enableKeepal
 int sceHttpDeleteConnection(int connId)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return delete_object(connId, VH_CONNECTION);
 }
 
@@ -386,6 +390,7 @@ static int create_request_at(int connId, const char *method, const char *target,
 int sceHttpCreateRequest(int connId, int method, const char *path, unsigned long long int contentLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (method < 0 || method >= VH_METHOD_COUNT)
         return (int)SCE_HTTP_ERROR_UNKNOWN_METHOD;
     return create_request(connId, g_methods[method], path, 0, contentLength);
@@ -394,6 +399,7 @@ int sceHttpCreateRequest(int connId, int method, const char *path, unsigned long
 int sceHttpCreateRequestWithURL(int connId, int method, const char *url, unsigned long long int contentLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (method < 0 || method >= VH_METHOD_COUNT)
         return (int)SCE_HTTP_ERROR_UNKNOWN_METHOD;
     return create_request(connId, g_methods[method], url, 1, contentLength);
@@ -402,18 +408,21 @@ int sceHttpCreateRequestWithURL(int connId, int method, const char *url, unsigne
 int sceHttpCreateRequest2(int connId, const char *method, const char *path, unsigned long long int contentLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return create_request(connId, method, path, 0, contentLength);
 }
 
 int sceHttpCreateRequestWithURL2(int connId, const char *method, const char *url, unsigned long long int contentLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return create_request(connId, method, url, 1, contentLength);
 }
 
 int sceHttpDeleteRequest(int reqId)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result = delete_object(reqId, VH_REQUEST);
     VITALS_VERBOSE("delete request %d rc=%08X", reqId, (unsigned int)result);
     return result;
@@ -422,6 +431,7 @@ int sceHttpDeleteRequest(int reqId)
 int sceHttpSetRequestContentLength(int id, unsigned long long int contentLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (contentLength > 0x7fffffffffffffffull)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -1150,20 +1160,13 @@ static int challenge_parameter(const char *value, unsigned int length, const cha
 /* MD5 of the parts, as lowercase hex */
 static void md5_hex(const char *const parts[], size_t count, char out[33])
 {
-    static const char digits[] = "0123456789abcdef";
     unsigned char digest[16];
-    mbedtls_md5_context context;
-    mbedtls_md5_init(&context);
-    mbedtls_md5_starts(&context);
+    VhMd5 context;
+    vh_md5_init(&context);
     for (size_t i = 0; i < count; ++i)
-        mbedtls_md5_update(&context, (const unsigned char *)parts[i], strlen(parts[i]));
-    mbedtls_md5_finish(&context, digest);
-    mbedtls_md5_free(&context);
-    for (int i = 0; i < 16; ++i) {
-        out[i * 2] = digits[digest[i] >> 4];
-        out[i * 2 + 1] = digits[digest[i] & 15];
-    }
-    out[32] = '\0';
+        vh_md5_update(&context, parts[i], strlen(parts[i]));
+    vh_md5_finish(&context, digest);
+    vh_md5_hex(digest, out);
 }
 
 /* The Digest answer (RFC 2617): qop auth, or auth-int over the body, or none; MD5 or MD5-sess */
@@ -1207,13 +1210,12 @@ static int digest_header(VhObject *object, const char *challenge, unsigned int l
     const char *uri = request->path[0] != '\0' ? request->path : "/";
     if (qop != NULL && strcmp(qop, "auth-int") == 0) {
         unsigned char digest[16];
-        static const char digits[] = "0123456789abcdef";
-        mbedtls_md5(body != NULL ? body : (const unsigned char *)"", body != NULL ? body_size : 0, digest);
-        for (int i = 0; i < 16; ++i) {
-            body_hash[i * 2] = digits[digest[i] >> 4];
-            body_hash[i * 2 + 1] = digits[digest[i] & 15];
-        }
-        body_hash[32] = '\0';
+        VhMd5 context;
+        vh_md5_init(&context);
+        if (body != NULL)
+            vh_md5_update(&context, body, body_size);
+        vh_md5_finish(&context, digest);
+        vh_md5_hex(digest, body_hash);
         const char *ha2_parts[] = {request->method, ":", uri, ":", body_hash};
         md5_hex(ha2_parts, 5, ha2);
     } else {
@@ -1508,6 +1510,7 @@ static int async_begin(VhObject *object, VhAsync kind, const void *data, size_t 
 int sceHttpSendRequest(int reqId, const void *postData, unsigned int size)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (postData == NULL && size != 0)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -1604,6 +1607,7 @@ static int async_deliver(VhRequest *request, unsigned char *data, size_t size)
 int sceHttpReadData(int reqId, void *data, unsigned int size)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (data == NULL && size != 0)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     if (size > 0x7fffffffu)
@@ -1672,6 +1676,7 @@ static int abort_request(int reqId)
 int sceHttpAbortRequest(int reqId)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result = abort_request(reqId);
     VITALS_VERBOSE("abort request %d rc=%08X", reqId, (unsigned int)result);
     return result;
@@ -1680,6 +1685,7 @@ int sceHttpAbortRequest(int reqId)
 int sceHttpAbortRequestForce(int reqId)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     return abort_request(reqId);
 }
 
@@ -1710,6 +1716,7 @@ static VhRequest *responded(int reqId, int *result)
 int sceHttpGetStatusCode(int reqId, int *statusCode)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result;
     if (statusCode == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
@@ -1724,6 +1731,7 @@ int sceHttpGetStatusCode(int reqId, int *statusCode)
 int sceHttpGetAllResponseHeaders(int reqId, char **header, unsigned int *headerSize)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result;
     if (header == NULL || headerSize == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
@@ -1741,14 +1749,17 @@ int sceHttpGetAllResponseHeaders(int reqId, char **header, unsigned int *headerS
 int sceHttpGetResponseContentLength(int reqId, unsigned long long int *contentLength)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     int result;
     if (contentLength == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
     VhRequest *request = responded(reqId, &result);
     if (request != NULL) {
+        /* As Sony's: a chunked body has its own error */
         if (request->response_content_length < 0)
-            result = (int)SCE_HTTP_ERROR_NO_CONTENT_LENGTH;
+            result = request->body_mode == VH_BODY_CHUNKED ? (int)SCE_HTTP_ERROR_CHUNK_ENC
+                                                           : (int)SCE_HTTP_ERROR_NO_CONTENT_LENGTH;
         else
             *contentLength = (unsigned long long)request->response_content_length;
     }
@@ -1782,6 +1793,7 @@ int sceHttpRequestGetAllHeaders(int reqId, SceHttpHeaderPair *pairs, unsigned in
 int sceHttpGetLastErrno(int reqId, int *errNum)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (errNum == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();
@@ -1801,6 +1813,7 @@ int sceHttpGetLastErrno(int reqId, int *errNum)
 int sceHttpsGetSslError(int id, int *errNum, unsigned int *detail)
 {
     VH_TRACE();
+    VH_REQUIRE_INIT();
     if (errNum == NULL)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     vh_lock();

@@ -213,6 +213,32 @@ static int provider_is_loaded_by_name(SceUID pid, const char *target_name,
     return result == 0 && named_module_matches(info, provider_name) ? 1 : -1;
 }
 
+/* The provider's TLS is the libssl module's (vitals-ssl), which the browser engine's process doesn't
+ * load: it is loaded and started first, unless it is there already, as the system loads it for an
+ * app (shared: the libhttp there imports from it). 0, or the loader's error */
+static int ensure_libssl(SceUID pid, QueryWorkspace *workspace)
+{
+    tai_module_info_t *info = &workspace->name_info;
+    int result = lookup_name(pid, "SceLibSsl", info);
+    if (result == 0 && named_module_matches(info, "SceLibSsl"))
+        return 0;
+    /* Only taiHEN's explicit not-found result establishes absence */
+    if (result != (int32_t)UINT32_C(0x90010002))
+        return -1;
+    int status = SCE_KERNEL_START_FAILED, started = -1;
+    SceUID modid = vitals_kernel_load_system_libssl(pid, &started, &status);
+    ksceDebugPrintf("vitals: libssl for the browser pid=0x%X modid=0x%08X start=0x%08X status=%d\n", pid, modid,
+                    started, status);
+    if (modid <= 0)
+        return modid < 0 ? modid : -1;
+    if (started < 0 || status != SCE_KERNEL_START_SUCCESS)
+    {
+        (void)ksceKernelUnloadModuleForPid(pid, modid, 0, NULL);
+        return -1;
+    }
+    return 0;
+}
+
 static int target_matches(const LoaderTarget *target, SceUID module_namespace_pid)
 {
     uint8_t digest[SCE_SHA256_DIGEST_SIZE];
@@ -398,6 +424,9 @@ static int inject_target(SceUID pid, SceUID module_id, const char *provider_path
         goto cleanup;
     }
 
+    result = ensure_libssl(pid, workspace);
+    if (result < 0)
+        goto cleanup;
     provider_modid = ksceKernelLoadStartModuleForPid(
         pid,
         file_path,

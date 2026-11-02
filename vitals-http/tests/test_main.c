@@ -1,8 +1,17 @@
 /* Host tests of the engine, through the exported API, against tests/server.py */
 #include "http_extra.h"
+#include "md5.h"
 #include "vh.h"
+#include "vitals_ssl.h"
 
+#include <psp2/libssl.h>
+
+#include <psa/crypto.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <pthread.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -202,9 +211,17 @@ static void test_bodies(int template_)
     int request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/chunked"), 0);
     unsigned long long content_length;
     sceHttpSendRequest(request, NULL, 0);
-    CHECK_EQ(sceHttpGetResponseContentLength(request, &content_length), SCE_HTTP_ERROR_NO_CONTENT_LENGTH);
+    /* As Sony's: a chunked body is its own case */
+    CHECK_EQ(sceHttpGetResponseContentLength(request, &content_length), SCE_HTTP_ERROR_CHUNK_ENC);
     CHECK_EQ(read_all(request, body, sizeof(body), 1), length);
     sceHttpDeleteRequest(request);
+    /* A body that runs until the server closes has no length */
+    int closing = sceHttpCreateConnectionWithURL(template_, g_base, 0);
+    request = sceHttpCreateRequestWithURL(closing, SCE_HTTP_METHOD_GET, url(g_base, "/close"), 0);
+    CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
+    CHECK_EQ(sceHttpGetResponseContentLength(request, &content_length), SCE_HTTP_ERROR_NO_CONTENT_LENGTH);
+    sceHttpDeleteRequest(request);
+    sceHttpDeleteConnection(closing);
 
     /* A Content-Length body arriving in pieces comes whole from one read, as Sound Shapes needs */
     request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/split"), 0);
@@ -717,11 +734,18 @@ static void test_https(int template_)
     fclose(file);
     SceHttpsData data = {pem, (unsigned int)size};
     const SceHttpsData *list[] = {&data};
-    /* A key that isn't one is refused */
-    CHECK_EQ(sceHttpsLoadCert(1, list, &data, &data), SCE_HTTP_ERROR_INVALID_VALUE);
+    /* As Sony's, what is loaded is kept and read at the connection: a CA certificate that isn't one
+     * isn't trusted, and a key that isn't one isn't sent */
     SceHttpsData garbage = {"not a certificate", 17};
     const SceHttpsData *bad[] = {&garbage};
-    CHECK_EQ(sceHttpsLoadCert(1, bad, NULL, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsLoadCert(1, bad, &data, &data), 0);
+    int fresh = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK_EQ(fetch(fresh, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body), NULL),
+             SCE_HTTP_ERROR_SSL);
+    sceHttpDeleteConnection(fresh);
+    SceHttpsData empty = {pem, 0};
+    const SceHttpsData *none[] = {&empty};
+    CHECK_EQ(sceHttpsLoadCert(1, none, NULL, NULL), SCE_HTTP_ERROR_INVALID_VALUE);
     /* Self-signed and loaded by the app: trusted as itself */
     CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
     char first[32], second[32];
@@ -1383,6 +1407,208 @@ static void test_uri(void)
     CHECK(strcmp(out, "/a/c") == 0);
 }
 
+/* ---- libhttp's certificate check on another module's libssl context ---- */
+
+/* As libhttp lays its argument out (VhCertCheck in tls.c) */
+typedef struct CertCheckArgument
+{
+    uint32_t flags;
+    const char *host;
+    int *result;
+    unsigned int *bits;
+    int (*callback)(unsigned int bits, void *const certificates[], int count, void *argument);
+    void *argument;
+    void *reserved[4];
+    int (*lock)(void *argument);
+    int (*unlock)(void *argument);
+} CertCheckArgument;
+
+static int g_check_calls, g_check_count, g_locks, g_unlocks;
+static unsigned int g_check_bits;
+
+static int check_callback(unsigned int bits, void *const certificates[], int count, void *argument)
+{
+    (void)certificates;
+    ++g_check_calls;
+    g_check_bits = bits;
+    g_check_count = count;
+    return *(int *)argument;
+}
+
+static int check_lock(void *argument)
+{
+    (void)argument;
+    return ++g_locks;
+}
+
+static int check_unlock(void *argument)
+{
+    (void)argument;
+    return ++g_unlocks;
+}
+
+/* A connection on a libssl context of its own, as the NetCheck dialog makes one: the BIO gives no
+ * host name, the argument does. 1 when connected */
+static int checked_connect(CertCheckArgument *argument)
+{
+    void *library = NULL;
+    CHECK_EQ(sceSslInternalGetLibrary(&library), 0);
+    void *context = sceSslInternalCtxNew(library, sceSslInternalClientMethod());
+    CHECK(context != NULL);
+    CHECK_EQ(sceHttpPrivateSslContextAddCertCheck(context, argument), 0);
+    void *ssl = sceSslInternalNew(context);
+    sceSslInternalCtxFree(context);
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_port = htons((unsigned short)(g_port + 1));
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    CHECK_EQ(connect(fd, (struct sockaddr *)&address, sizeof(address)), 0);
+    void *bio = sceSslInternalBioNewSocket(fd, 0);
+    sceSslInternalSetBio(ssl, bio, bio);
+    sceSslInternalSetConnectState(ssl);
+    int connected = sceSslInternalConnect(ssl) == 1;
+    sceSslInternalFree(ssl);
+    close(fd);
+    return connected;
+}
+
+/* Digest authentication's MD5: RFC 1321's vectors, and Mbed TLS's digest (the test build has it,
+ * for vitals-ssl) over every length across the padding's edges, whole and a byte at a time */
+static void test_md5(void)
+{
+    static const char *const vectors[][2] = {
+        {"", "d41d8cd98f00b204e9800998ecf8427e"},
+        {"a", "0cc175b9c0f1b6a831c399e269772661"},
+        {"abc", "900150983cd24fb0d6963f7d28e17f72"},
+        {"message digest", "f96b697d7cb7938d525a2f31aaf161d0"},
+        {"abcdefghijklmnopqrstuvwxyz", "c3fcd3d76192e4007dfb496cca67e13b"},
+        {"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", "d174ab98d277d9f5a5611c2c9f419d9f"},
+        {"12345678901234567890123456789012345678901234567890123456789012345678901234567890",
+         "57edf4a22be3c955ac49da2e2107b67a"},
+    };
+    for (size_t i = 0; i < sizeof(vectors) / sizeof(vectors[0]); ++i) {
+        unsigned char digest[16];
+        char hex[33];
+        VhMd5 md5;
+        vh_md5_init(&md5);
+        vh_md5_update(&md5, vectors[i][0], strlen(vectors[i][0]));
+        vh_md5_finish(&md5, digest);
+        vh_md5_hex(digest, hex);
+        CHECK(strcmp(hex, vectors[i][1]) == 0);
+    }
+    static unsigned char data[300];
+    for (size_t i = 0; i < sizeof(data); ++i)
+        data[i] = (unsigned char)(i * 7 + 3);
+    int whole_ok = 1, split_ok = 1;
+    for (size_t size = 0; size <= sizeof(data); ++size) {
+        unsigned char expected[16], whole[16], split[16];
+        size_t expected_length = 0;
+        /* TF-PSA-Crypto's MD5, set up by sceSslInit */
+        CHECK_EQ(psa_hash_compute(PSA_ALG_MD5, data, size, expected, sizeof(expected), &expected_length), PSA_SUCCESS);
+        VhMd5 md5;
+        vh_md5_init(&md5);
+        vh_md5_update(&md5, data, size);
+        vh_md5_finish(&md5, whole);
+        vh_md5_init(&md5);
+        for (size_t at = 0; at < size; ++at)
+            vh_md5_update(&md5, data + at, 1);
+        vh_md5_finish(&md5, split);
+        whole_ok &= memcmp(whole, expected, 16) == 0;
+        split_ok &= memcmp(split, expected, 16) == 0;
+    }
+    CHECK(whole_ok);
+    CHECK(split_ok);
+}
+
+/* The HTTPS options as Sony's checks them: an app's bits (0x3F) with the public setters, up to
+ * 0x1FF with the private ones Sony's code uses, any other bit refused before the object is looked
+ * at; and the pool's stats, which need a place to go */
+static void test_option_checks(int template_)
+{
+    SceHttpMemoryPoolStats stats;
+    CHECK_EQ(sceHttpGetMemoryPoolStats(NULL), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
+
+    CHECK_EQ(sceHttpsEnableOption(0x40), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOption(0x80000000u), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOption(SCE_HTTPS_FLAG_KNOWN_CA_CHECK), 0);
+    CHECK_EQ(sceHttpsEnableOption(SCE_HTTPS_FLAG_KNOWN_CA_CHECK), 0);
+
+    int connection = sceHttpCreateConnectionWithURL(template_, g_secure_base, 1);
+    CHECK(connection > 0);
+    CHECK_EQ(sceHttpsEnableOption2(connection, 0x40), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOption2(connection, 0x100), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOption2(connection, 0x3F), 0);
+    CHECK_EQ(sceHttpsDisableOption2(connection, SCE_HTTPS_FLAG_CLIENT_VERIFY), 0);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(connection, 0x200), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsDisableOptionPrivate(connection, 0x400), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(connection, 0x40), 0);
+    CHECK_EQ(sceHttpsDisableOptionPrivate(connection, 0x1FF), 0);
+    /* The bits come first, the object after */
+    CHECK_EQ(sceHttpsEnableOption2(12345, 0x40), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOption2(12345, SCE_HTTPS_FLAG_SERVER_VERIFY), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x200), SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x40), SCE_HTTP_ERROR_INVALID_ID);
+    CHECK_EQ(sceHttpDeleteConnection(connection), 0);
+}
+
+static void test_cert_check(void)
+{
+    printf("libhttp's certificate check\n");
+    int result = 1, verdict = 0;
+    unsigned int bits = 99;
+    CertCheckArgument argument = {0, "127.0.0.1", &result, &bits, NULL, NULL, {NULL}, NULL, NULL};
+    CHECK_EQ(sceHttpPrivateSslContextAddCertCheck(NULL, &argument), 0x80435801);
+    CHECK_EQ(sceHttpPrivateSslContextAddCertCheck(&argument, NULL), 0x80435801);
+    /* Sony's flags when none are given: the server isn't known */
+    CHECK_EQ(checked_connect(&argument), 0);
+    CHECK_EQ(result, 0x80435806);
+    CHECK_EQ(bits, SCE_HTTPS_ERROR_SSL_UNKNOWN_CA);
+    /* Without the server check, anything goes */
+    argument.flags = SCE_HTTPS_FLAG_CN_CHECK | SCE_HTTPS_FLAG_KNOWN_CA_CHECK;
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(result, 0);
+    CHECK_EQ(bits, 0);
+    /* The app's callback decides: it sees what was found, and the certificates */
+    argument.flags = 0;
+    argument.callback = check_callback;
+    argument.argument = &verdict;
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(g_check_calls, 1);
+    CHECK_EQ(g_check_bits, SCE_HTTPS_ERROR_SSL_UNKNOWN_CA);
+    CHECK_EQ(g_check_count, 1);
+    verdict = -1;
+    CHECK_EQ(checked_connect(&argument), 0);
+    CHECK_EQ(result, 0x80435806);
+    argument.callback = NULL;
+    /* The certificates the app loaded are trusted, the server's as itself */
+    FILE *file = fopen(g_cert_path, "rb");
+    static char pem[8192];
+    size_t size = fread(pem, 1, sizeof(pem), file);
+    fclose(file);
+    SceHttpsData data = {pem, (unsigned int)size};
+    const SceHttpsData *list[] = {&data};
+    CHECK_EQ(sceHttpsLoadCert(1, list, NULL, NULL), 0);
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(result, 0);
+    CHECK_EQ(bits, 0);
+    /* Another name: the CN check, unless it's off */
+    argument.host = "localhost";
+    CHECK_EQ(checked_connect(&argument), 0);
+    CHECK_EQ(bits, SCE_HTTPS_ERROR_SSL_CN_CHECK);
+    argument.flags = SCE_HTTPS_FLAG_SERVER_VERIFY | SCE_HTTPS_FLAG_KNOWN_CA_CHECK;
+    CHECK_EQ(checked_connect(&argument), 1);
+    /* The caller's lock, taken around the check */
+    argument.flags |= 0x40000000u;
+    argument.lock = check_lock;
+    argument.unlock = check_unlock;
+    CHECK_EQ(checked_connect(&argument), 1);
+    CHECK_EQ(g_locks, 1);
+    CHECK_EQ(g_unlocks, 1);
+    CHECK_EQ(sceHttpsUnloadCert(), 0);
+}
+
 int main(int argc, char **argv)
 {
     if (argc < 9)
@@ -1398,12 +1624,45 @@ int main(int argc, char **argv)
     snprintf(g_secure_base, sizeof(g_secure_base), "https://127.0.0.1:%d", g_port + 1);
 
     CHECK_EQ(sceHttpCreateTemplate("x", SCE_HTTP_VERSION_1_1, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* As Sony's: before sceHttpInit that is the error, whatever the arguments */
+    CHECK_EQ(sceHttpGetMemoryPoolStats(NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsEnableOption(0x40), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsEnableOption2(12345, 0x40), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsEnableOptionPrivate(12345, 0x200), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* Every export Sony's checks it in: initialization before the arguments */
+    CHECK_EQ(sceHttpCreateTemplate(NULL, 99, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateConnectionWithURL(1, NULL, 1), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateRequestWithURL(1, 999, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateRequest2(1, NULL, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpDeleteTemplate(12345), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSendRequest(12345, NULL, 5), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpReadData(12345, NULL, 5), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpGetStatusCode(12345, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpGetResponseContentLength(12345, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpAddRequestHeader(12345, NULL, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetAutoRedirect(12345, 7), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpGetAutoRedirect(12345, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetNonblock(12345, 7), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpWaitRequest(NULL, NULL, -1, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpCreateEpoll(NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpAddCookie(NULL, NULL, 0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetCookieTotalMaxSize(0), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpSetDefaultAcceptEncodingGZIPEnabled(7), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsLoadCert(-1, NULL, NULL, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsGetSslError(12345, NULL, NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    CHECK_EQ(sceHttpsGetCaList(NULL), SCE_HTTP_ERROR_BEFORE_INIT);
+    /* The URI functions need no initialization */
+    CHECK_EQ(sceHttpUriSweepPath(NULL, NULL, 0), SCE_HTTP_ERROR_INVALID_VALUE);
+    /* As with Sony's, https needs libssl set up by the app */
+    CHECK_EQ(sceSslInit(512 * 1024), 0);
     CHECK_EQ(sceHttpInit(1024 * 1024), 0);
     CHECK_EQ(sceHttpInit(1024 * 1024), SCE_HTTP_ERROR_ALREADY_INITED);
     int template_ = sceHttpCreateTemplate("vh-test", SCE_HTTP_VERSION_1_1, 0);
     CHECK(template_ > 0);
 
     test_uri();
+    test_md5();
+    test_option_checks(template_);
     test_parse_header();
     test_record_scan();
     test_user_agent();
@@ -1422,6 +1681,7 @@ int main(int argc, char **argv)
     test_private(template_);
     test_proxy();
     test_console_profile(template_);
+    test_cert_check();
     test_host_redirects(template_);
 
     /* Everything deleted, nothing left in the pool (the host redirect list is outside it) */
@@ -1458,6 +1718,26 @@ int main(int argc, char **argv)
         CHECK_EQ(sceHttpDeleteTemplate(templates[i]), 0);
     CHECK_EQ(sceHttpGetMemoryPoolStats(&stats), 0);
     CHECK_EQ(stats.currentInuseSize, 0);
+    CHECK_EQ(sceHttpTerm(), 0);
+
+    /* Without libssl set up there is no https, as with Sony's */
+    printf("https without sceSslInit\n");
+    CHECK_EQ(sceSslTerm(), 0);
+    CHECK_EQ(sceHttpInit(1024 * 1024), 0);
+    int plain = sceHttpCreateTemplate("vh-test", SCE_HTTP_VERSION_1_1, 0);
+    int secure = sceHttpCreateConnectionWithURL(plain, g_secure_base, 1);
+    char body[64];
+    int status, request = 0, ssl_error = 0;
+    unsigned int detail = 0;
+    CHECK_EQ(fetch(secure, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), NULL, &status, body, sizeof(body),
+                   &request), SCE_HTTP_ERROR_SSL);
+    CHECK_EQ(sceHttpsGetSslError(request, &ssl_error, &detail), 0);
+    CHECK_EQ(ssl_error, SCE_HTTPS_ERROR_INTERNAL);
+    sceHttpDeleteRequest(request);
+    /* Plain http doesn't need it */
+    int insecure = sceHttpCreateConnectionWithURL(plain, g_base, 1);
+    CHECK_EQ(fetch(insecure, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), NULL, &status, body, sizeof(body), NULL), 11);
+    sceHttpDeleteTemplate(plain);
     CHECK_EQ(sceHttpTerm(), 0);
 
     printf("%d checks, %d failed\n", g_checks, g_failures);

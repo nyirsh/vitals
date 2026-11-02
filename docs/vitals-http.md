@@ -8,8 +8,8 @@ build options and its source layout are described in [vitals-http/README.md](../
 In one paragraph: every process that loads Sony's libhttp gets `vitals-http` instead, shared as
 Sony's is, the shell included. Apps call the same `sceHttp`/`sceHttps` functions under the same
 NIDs, and nothing is injected or hooked. `sceHttpInit` gives the library its pool; templates,
-connections and requests live in it. A request's first HTTPS connection sets up Mbed TLS in a heap
-of its own; each connection then does its TLS 1.2 or 1.3 handshake on a worker thread, checks the
+connections and requests live in it. HTTPS goes through the libssl module
+([vitals-ssl](../vitals-ssl/)), as Sony's libhttp's does, in the pool the app gives `sceSslInit`; each connection then does its TLS 1.2 or 1.3 handshake on a worker thread, checks the
 server against the installed certificate store, and stays open for the next request when the
 server allows it. The host redirect list and the User-Agent suffix are read through the kernel
 plugin, since games can't open `ux0:data` themselves.
@@ -23,14 +23,14 @@ plugin, since games can't open `ux0:data` themselves.
 | Memory                            | Taken when                           | Size                                                             | Freed            |
 | --------------------------------- | ------------------------------------ | ---------------------------------------------------------------- | ---------------- |
 | the pool (`vh_pool`), per process | `sceHttpInit`                        | what the app asks for, plus an eighth and 64 KiB for bookkeeping | `sceHttpTerm`    |
-| the TLS heap, per process         | the process's first HTTPS connection | 128 KiB (`TLS_HEAP_KIB`); about 40 KiB per open connection       | the module stops |
+| the TLS heap, per process         | the process's first HTTPS connection | 64 KiB (`TLS_HEAP_KIB`): each connection's state, the app's loaded certificates; the TLS itself is in libssl's pool | the module stops |
 
 ## 1. On disk
 
 | File on the console                       | Comes from                                                        | Installed by                                                   |
 | ----------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
 | `vs0:/data/external/vitals/libhttp.suprx` | built from [vitals-http/](../vitals-http/)                        | `install_http_modules` in [install.c](../vitals-app/install.c) |
-| `vs0:/data/external/vitals/libssl.suprx`  | `app0:lssl.suprx`, see [libssl.md](libssl.md)                     | same function                                                  |
+| `vs0:/data/external/vitals/libssl.suprx`  | built from [vitals-ssl/](../vitals-ssl/), see [libssl.md](libssl.md) | same function                                                  |
 | `vs0:/data/external/cert/CA_LIST.cer`     | the certificate store: Sony's, Mozilla's and `custom-certs.pem`'s | `install_certificates`                                         |
 | `ux0:data/vitals/redirects.txt`           | the host redirect list, created once with examples                | the installer; never overwritten                               |
 | `ux0:data/vitals/useragent.txt`           | the User-Agent suffix, optional                                   | you                                                            |
@@ -143,12 +143,18 @@ call has returned.
 
 ## 8. TLS
 
-[tls.c](../vitals-http/src/tls.c), with Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/),
-the same build as the browser provider's).
+[tls.c](../vitals-http/src/tls.c), through the libssl module, [vitals-ssl](../vitals-ssl/) (Mbed TLS
+4.2), imported as Sony's libhttp imports Sony's libssl, with a weak stub: a process that loads
+libhttp without libssl still loads it. Its memory is the pool the app gives `sceSslInit`; a process
+that hasn't called it gets `SCE_HTTP_ERROR_SSL` with `SCE_HTTPS_ERROR_INTERNAL`, and the log says
+`libssl not initialized`, as with Sony's.
+Each connection is a vitals-ssl connection over vitals-http's own socket functions, so timeouts,
+aborts and proxies work as before; vitals-http decides on the certificate from what vitals-ssl
+found, the HTTPS options and the app's callback.
 
-**Set up once per process.** The first HTTPS connection starts the TLS heap and the random number
-generator, and builds an **index** of the certificate store: where each root is in
-`CA_LIST.cer`, not the roots themselves. The log says `tls ready roots=<count>`.
+**Set up once per process.** The first HTTPS connection starts the TLS heap; libssl's
+`sceSslInit` has started its random number generator, and its first check builds an **index** of the certificate store: where each root
+is in `CA_LIST.cer`, not the roots themselves. The log says `tls ready rc=1`, then `roots=<count>`.
 
 **Two profiles:**
 
@@ -182,7 +188,7 @@ The log, with debug output on: `handshake ok host=… <version> <cipher> profile
   Otherwise it deletes requests, then connections, then templates, and forgets the cookie jar, the
   redirect list, the User-Agent suffix, the epolls and the loaded certificates, then frees the
   pool. A later `sceHttpInit` reads the lists again.
-- **The TLS heap** stays until the module stops, since Mbed TLS keeps its global state in it.
+- **The TLS heap** stays until the module stops; libssl's pool goes with the app's `sceSslTerm`.
 - **The module** is unloaded when the last process using it unloads it or exits; its
   `module_stop` terminates what the process left initialized.
 

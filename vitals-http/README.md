@@ -2,8 +2,16 @@
 
 Sony's HTTP library (`SceLibHttp`, the `sceHttp*` API) written from scratch, as a user module
 exported under libhttp's own library and function NIDs ([vitals_http_api.yml.in](vitals_http_api.yml.in)),
-all 116 of them. Its TLS is Mbed TLS 3.6 ([tls13-vita/crypto](../tls13-vita/crypto/), shared with the browser provider) with tls13-vita's CA bundle index, exact
-trust of self-signed certificates, certificate-problem mapping and heap runtime.
+all 116 of them. Its TLS is the libssl module's, [vitals-ssl](../vitals-ssl/), imported as Sony's
+libhttp imports Sony's libssl: Mbed TLS 4.2 lives there, not here. It calls Sony's functions and
+the VitalsSsl additions, declared in vitals-ssl's `include/vitals_ssl.h`, through the stub
+vitals-ssl's build makes, linked weak: a process that loads libhttp without libssl (Adrenaline's
+bubble booter, the browser's WebKit process) still loads it and does no https, as with Sony's.
+As with Sony's, only an https connection calls into it: the module is shared, so in a process
+without libssl its imports point at the libssl another process loaded. `sceHttpsLoadCert` keeps
+what it is given, read when a connection starts, and `sceHttpTerm` and plain http never touch it.
+A connection's memory is the pool the app gives `sceSslInit`; without it https fails with
+`SCE_HTTP_ERROR_SSL`, as Sony's does.
 
 The kernel plugin loads it in place of Sony's libhttp in every process, shared as Sony's is, and
 the vitals app installs it as `vs0:/data/external/vitals/libhttp.suprx`. Its whole lifetime, from the
@@ -19,8 +27,10 @@ make test       # host tests (needs VITASDK for <psp2/net/http.h>; skipped witho
 
 `USER_AGENT` (`libhttp/3.74 (PS Vita)` by default) sets what follows each app's own User-Agent
 when there is no `ux0:data/vitals/useragent.txt`, e.g. `make USER_AGENT="libhttp/3.74 (PS Vita) MyFork/1.0"`.
-`TLS_HEAP_KIB` (128 by default) sets the TLS heap, one memory block per process, apart from the pool
-the app gives `sceHttpInit`. An open https connection takes about 40 KiB of it.
+`TLS_HEAP_KIB` (64 by default) sets the small heap for what this library keeps of TLS (each
+connection's state, the app's `sceHttpsLoadCert` certificates), one memory block per process, apart
+from the pool the app gives `sceHttpInit`. The connections themselves are in libssl's pool.
+vitals-ssl is built first (`make` at the top does this), since this links its stub.
 
 ## Layout
 
@@ -36,20 +46,21 @@ the app gives `sceHttpInit`. An open https connection takes about 40 KiB of it.
 | [src/redirect.c](src/redirect.c) | the host redirect list, `ux0:data/vitals/redirects.txt` |
 | [src/useragent.c](src/useragent.c) | the User-Agent suffix, `ux0:data/vitals/useragent.txt` |
 | [src/private.c](src/private.c) | the 23 exports nothing names, as Sony's code does them |
-| [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, `sceHttpsLoadCert` |
+| [src/md5.c](src/md5.c) | MD5 (RFC 1321), for Digest authentication |
+| [src/tls.c](src/tls.c) | TLS 1.2 and 1.3 over a connection, through the libssl module, and `sceHttpsLoadCert` |
 | [src/platform_vita.c](src/platform_vita.c) | module start, the pool's memory, the lock, SceNet |
-| [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |
+| [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py`, with vitals-ssl built in (its platform in `ssl_platform.c`) |
 
-From tls13-vita it uses the Mbed TLS build in `crypto/`, `provider/ca_index.c`,
-`provider/platform_shims.c` (Mbed TLS's mutexes, entropy and time, on the kernel and the RTC),
-`provider/user_runtime.c` (the heap, and the C library the module is linked without), `src/error_map.c`, and `src/host_map.c` with
-`src/redirect_list.c` for the redirect list.
+It links no crypto library: Digest authentication's MD5 is [src/md5.c](src/md5.c). From tls13-vita
+it uses `provider/user_runtime.c` (the heap, and the C library the module is linked without), `src/error_map.c`, and `src/host_map.c` with `src/redirect_list.c` for
+the redirect list.
 
 ## Sony's own connections
 
 The shell's PSN sign-in goes through a CDN that refuses TLS handshakes that don't look like the
 console's. Sony's TLS is RSA BSAFE SSL-C 2.8.1, which offers only static-RSA and DHE suites;
-Mbed TLS 4 has neither, which is why vitals-http is on 3.6. Connections with Sony's private HTTPS
+Mbed TLS 4 has neither, so vitals-ssl's copy is patched back to static RSA, client side
+(`tls13-vita/crypto/rsa-client.patch`). Connections with Sony's private HTTPS
 option `0x40` (`sceHttpsEnableOptionPrivate`, which only Sony's code sets) send the console's own
 ClientHello, as a capture of a working sign-in shows it, byte for byte but for the random bytes:
 TLS 1.2, no session ID, AES256-SHA256, AES128-SHA256, AES256-SHA, AES128-SHA, 3DES-SHA, RC4-SHA,
@@ -58,7 +69,8 @@ RC4-MD5 and the renegotiation SCSV, null compression, and only `server_name` and
 RC4 suites, so they are only offered, through a small patch
 ([tls13-vita/crypto/offer-unknown-ciphersuites.patch](../tls13-vita/crypto/offer-unknown-ciphersuites.patch)); every server
 seen picks AES128-SHA256, and one that picked one of them would fail the handshake. Every other
-connection gets TLS 1.2 to 1.3 with Mbed TLS's default suites.
+connection gets TLS 1.2 to 1.3 with Mbed TLS's default suites. Both are vitals-ssl's profiles
+(`vitalsSslCtxSetProfile`).
 
 ## Trust
 
@@ -71,8 +83,10 @@ installs, plus the CA certificates an app loads with `sceHttpsLoadCert`. As with
 - an app's SSL callback gets the problems and an empty certificate list
 
 A client certificate and key given to `sceHttpsLoadCert` (PEM or DER) are presented to servers
-that ask for one; each connection parses its own copy. One that doesn't parse is refused with
-`SCE_HTTP_ERROR_INVALID_VALUE`, and with `DEBUG=1` every load is logged with what parsed.
+that ask for one; each connection parses its own copy. As with Sony's, what is loaded is only kept
+(an empty entry is `SCE_HTTP_ERROR_INVALID_VALUE`) and read when an https connection starts: a CA
+certificate that doesn't parse isn't trusted, and a certificate or key that doesn't isn't sent,
+with the reason logged with `DEBUG=1`.
 
 ## Host redirects
 
@@ -138,7 +152,7 @@ them by NID, so they don't change anything for them.
 | `LoadedCertSetClientCert` | `031EBD2A` | sets the client certificate |
 | `LoadedCertSetClientKey` | `802E3C30` | sets the client key |
 | `LoadedCertClearClient` | `42108FBE` | forgets the client certificate and key |
-| `SslContextAddCertCheck` | `A9A39BA1` | installs libhttp's certificate check on a libssl context its caller made (the NetCheck dialog's own TLS). It succeeds without installing anything, so that context keeps only libssl's own checks, because failing it ends a game's PSN sign-in |
+| `SslContextAddCertCheck` | `A9A39BA1` | installs libhttp's certificate check on a libssl context its caller made (the NetCheck dialog's own TLS), as Sony's: the verify mode on, and a check that does what Sony's libhttp's does with the caller's argument (its `SCE_HTTPS_FLAG_*` flags, host name, result and bits, callback and lock), on the bundle and the app's loaded certificates (`tls.c`). The context is the libssl module's, which is vitals-ssl too |
 | `CertCheckNothing` | `A4CF892E` | only succeeds, as Sony's |
 
 With `DEBUG=1`, the settings and certificate calls are logged.

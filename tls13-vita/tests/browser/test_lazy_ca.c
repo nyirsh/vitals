@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include "backend.h"
-#include "ca_index.h"
 #include "vitals/sony_abi.h"
 #include <vita_mock.h>
 
@@ -14,12 +13,13 @@
 static int ca_calls;
 static int ca_failure;
 
-/* The default store's index is built on the first connection that needs it */
-int __wrap_vitals_ca_index_build(VitalsCaIndex *index, const char *path) {
-    assert(index != NULL);
-    assert(strcmp(path, "wb0:/cert/CA_LIST.cer") == 0);
+/* The bundle is looked for on the first connection that needs it (libssl reads it itself); without
+ * one the browser keeps its own TLS */
+int __real_sceIoOpen(const char *path, int flags, int mode);
+int __wrap_sceIoOpen(const char *path, int flags, int mode) {
+    if (strcmp(path, "wb0:/cert/CA_LIST.cer") != 0) return __real_sceIoOpen(path, flags, mode);
     ++ca_calls;
-    return ca_failure ? -0x2180 : 0;
+    return ca_failure ? (int)0x80010002 : __real_sceIoOpen("/dev/null", flags, mode);
 }
 
 static int timeleft(void *easy, void *now, int connecting) {
