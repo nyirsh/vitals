@@ -1,5 +1,5 @@
 /* The CA store: Sony's CA certificates in flash, as Sony's libssl gives them to games and libhttp
- * (ps3-dumps/libssl.prx: its table at 0x54f18, cellSslCertificateLoader at 0x245c and 0x21ec,
+ * (dumps/ps3/4.93-cex/libssl.prx: its table at 0x54f18, cellSslCertificateLoader at 0x245c and 0x21ec,
  * 205B060C at 0x1d10, 68D3409E at 0x2028, the file reader at 0x1e00, CC6A0CB5 at 0x2464), and
  * Mozilla's bundle behind them, for the servers Sony's CAs no longer sign. Sony's CAs are read from
  * flash when asked for and checked

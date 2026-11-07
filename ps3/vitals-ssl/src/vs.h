@@ -9,7 +9,7 @@
 /* SSL-C's objects as Sony's libhttp uses them (the Vita's vitals-ssl/src/vs.h, for the PS3's API):
  * client methods, contexts (SSL_CTX), connections (SSL) and socket BIOs, all opaque to their
  * callers. Where Sony's PS3 libssl behaves differently from the Vita's, the function's comment says
- * so, with the address of Sony's code (ps3-dumps/libssl.prx) */
+ * so, with the address of Sony's code (dumps/ps3/4.93-cex/libssl.prx) */
 
 /* The objects' first word, which tells them apart */
 #define VS_METHOD_MAGIC 0x4D535356u

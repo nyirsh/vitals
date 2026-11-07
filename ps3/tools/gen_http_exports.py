@@ -5,8 +5,8 @@ dumped modules that import it:
 
     tools/gen_http_exports.py <libhttp.prx> [dumps folder]
 
-The dumps folder (default: the module's own) is searched for every .prx and vsh.elf importing
-cellHttp or cellHttpUtil. Names come from tools/names; the unnamed are cellHttp_<NID>."""
+The dumps folder (default: the module's own) is searched for every .prx, and the vsh.elf in each
+vsh/<cfw>/ (or the folder's own), importing cellHttp or cellHttpUtil. Names come from tools/names; the unnamed are cellHttp_<NID>."""
 
 import os
 import sys
@@ -25,14 +25,19 @@ LIBRARIES = ("cellHttp", "cellHttpUtil")
 def callers(folder):
     """{(library, nid): [module names]} from the folder's modules' imports"""
     found = {}
-    for file_name in sorted(os.listdir(folder)):
-        if not (file_name.endswith(".prx") or file_name == "vsh.elf"):
-            continue
+    paths = [os.path.join(folder, name) for name in sorted(os.listdir(folder))
+             if name.endswith(".prx") or name == "vsh.elf"]
+    # The XMB comes from a custom firmware, which may patch it: one folder each, the first counted
+    builds = os.path.join(folder, "vsh")
+    if not any(os.path.basename(path) == "vsh.elf" for path in paths) and os.path.isdir(builds):
+        paths += [os.path.join(builds, name, "vsh.elf") for name in sorted(os.listdir(builds))
+                  if os.path.isfile(os.path.join(builds, name, "vsh.elf"))][:1]
+    for path in paths:
         try:
-            imports = Prx(os.path.join(folder, file_name)).imports()
+            imports = Prx(path).imports()
         except (ValueError, IndexError, KeyError, OSError):
             continue
-        module = file_name.rsplit(".", 1)[0]
+        module = os.path.basename(path).rsplit(".", 1)[0]
         for library, entries in imports:
             if library in LIBRARIES:
                 for nid, _stub in entries:

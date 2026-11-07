@@ -2,7 +2,7 @@
  * at 0x25dcc, its client certificate at 0x26058): certificates, names and their entries,
  * extensions, keys, BER items and times, over Mbed TLS. From the Vita's
  * vitals-ssl/src/certificate.c, for the PS3's API, which is SSL-C's own (SSLCERT_*) rather than
- * Cert-C's; each function's comment gives the address of Sony's code (ps3-dumps/libssl.prx), where
+ * Cert-C's; each function's comment gives the address of Sony's code (dumps/ps3/4.93-cex/libssl.prx), where
  * SSLCERT's go through SSL-C's table */
 
 #include "certificate.h"

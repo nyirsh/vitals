@@ -1,4 +1,4 @@
-# sysPrxForUser (liblv2): the 24 functions Sony's libssl imports (ps3-dumps/libssl.prx), named by their NIDs
+# sysPrxForUser (liblv2): the 24 functions Sony's libssl imports (dumps/ps3/4.93-cex/libssl.prx), named by their NIDs
 _sys_heap_create_heap
 _sys_heap_delete_heap
 _sys_heap_free

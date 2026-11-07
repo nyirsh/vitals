@@ -1,4 +1,4 @@
-# sys_net: the functions Sony's libssl and libhttp import (ps3-dumps/libssl.prx, libhttp.prx), named
+# sys_net: the functions Sony's libssl and libhttp import (dumps/ps3/4.93-cex/libssl.prx, libhttp.prx), named
 # by their NIDs (tools/nids.py; 5 of libhttp's 20 are still unnamed)
 _sys_net_errno_loc
 inet_addr

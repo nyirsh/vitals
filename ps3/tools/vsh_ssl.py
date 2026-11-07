@@ -2,7 +2,7 @@
 """How the XMB (vsh.elf, decrypted) holds and uses its own copy of SSL-C, for patching it to vitals'
 libssl:
 
-    tools/vsh_ssl.py [--vsh ../../ps3-dumps/vsh.elf] [--libssl ../../ps3-dumps/libssl.prx] [--header FILE]
+    tools/vsh_ssl.py [--vsh ../dumps/ps3/4.93-cex/vsh/evilnat-cobra-8.5/vsh.elf] [--libssl ../dumps/ps3/4.93-cex/libssl.prx] [--header FILE]
 
 - the function starts (OPDs and bl targets) and the direct calls;
 - SSL-C's bounds, found by matching libssl.prx's functions to vsh.elf's by their code with the
@@ -205,8 +205,10 @@ static const XmbFunction k_xmb_http[XMB_HTTP_COUNT] = {{
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    dumps = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(HERE))), "ps3-dumps")
-    parser.add_argument("--vsh", default=os.path.join(dumps, "vsh.elf"))
+    # The repository's dumps/ps3/4.93-cex (not committed: Sony's modules), the firmware the tables are
+    # for, and the XMB from the custom firmware it was dumped on (vsh/<cfw>/)
+    dumps = os.path.join(os.path.dirname(os.path.dirname(HERE)), "dumps", "ps3", "4.93-cex")
+    parser.add_argument("--vsh", default=os.path.join(dumps, "vsh", "evilnat-cobra-8.5", "vsh.elf"))
     parser.add_argument("--libssl", default=os.path.join(dumps, "libssl.prx"))
     parser.add_argument("--header", help="write the boot plugin's tables of SSL-C's and libhttp's functions there")
     arguments = parser.parse_args()

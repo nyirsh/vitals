@@ -1,5 +1,5 @@
 /* cellSslInit and cellSslEnd: the library's pool, its lock and Mbed TLS, in the order Sony's checks
- * and builds them (ps3-dumps/libssl.prx: cellSslInit at 0x15f0, cellSslEnd at 0x155c); and what the
+ * and builds them (dumps/ps3/4.93-cex/libssl.prx: cellSslInit at 0x15f0, cellSslEnd at 0x155c); and what the
  * rest of the library shares: whether it's set up, its lock, and SSL-C's error queue */
 
 #include "core.h"

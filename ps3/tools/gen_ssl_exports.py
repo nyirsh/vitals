@@ -4,7 +4,7 @@ one CELLSSL_EXPORT(nid, name) line each, named from tools/names (cellSsl_<NID> w
 module's export table and its stubs are generated from it, so the replacement exports exactly
 Sony's 114 NIDs. Run against a decrypted libssl.prx (the file itself isn't in the repository):
 
-    tools/gen_ssl_exports.py ../../ps3-dumps/libssl.prx"""
+    tools/gen_ssl_exports.py ../dumps/ps3/4.93-cex/libssl.prx"""
 
 import os
 import sys

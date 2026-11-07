@@ -7,7 +7,7 @@
 #include <sys/synchronization.h>
 
 /* libssl's memory: liblv2's heap on the block the app gives cellSslInit, as Sony's libssl, which
- * creates it the same way (in cellSslInit, ps3-dumps/libssl.prx 0x1660: the name, the size, flags
+ * creates it the same way (in cellSslInit, dumps/ps3/4.93-cex/libssl.prx 0x1660: the name, the size, flags
  * 0x80000000 and {8, the block}); Mbed TLS's allocations come from it too */
 
 typedef struct VitalsHeapMemory {

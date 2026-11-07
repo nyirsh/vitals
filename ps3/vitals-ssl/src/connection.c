@@ -1,7 +1,7 @@
 /* SSL-C's connection API as Sony's libhttp calls it, which is OpenSSL 0.9.8's: client methods,
  * SSL_CTX, SSL and a socket BIO, with TLS 1.2 and 1.3 from Mbed TLS. Ported from the Vita's
- * vitals-ssl/src/connection.c; the PS3's differences, from Sony's code (ps3-dumps/libssl.prx) and
- * libhttp's calls (ps3-dumps/libhttp.prx: connecting at 0x2491c, reading at 0x24520, closing at
+ * vitals-ssl/src/connection.c; the PS3's differences, from Sony's code (dumps/ps3/4.93-cex/libssl.prx) and
+ * libhttp's calls (dumps/ps3/4.93-cex/libhttp.prx: connecting at 0x2491c, reading at 0x24520, closing at
  * 0x2435c):
  * - the socket BIO is Sony's (0xf990): a failed receive or send returns -1 and leaves sys_net's
  *   errno as it was, which libhttp reads for its own error; only EAGAIN asks for a retry

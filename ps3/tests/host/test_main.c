@@ -1,6 +1,6 @@
 /* vitals' libssl's host tests: the library built for this machine (platform_posix.c and its
  * neighbours in place of the console's), called as Sony's PS3 libhttp calls it
- * (ps3-dumps/libhttp.prx: its context at 0x24808, connecting at 0x2491c, reading at 0x24520,
+ * (dumps/ps3/4.93-cex/libhttp.prx: its context at 0x24808, connecting at 0x2491c, reading at 0x24520,
  * closing at 0x2435c), against server.py (run_tests.py starts it):
  *     test_main <port> <certificates' folder> <the CA's subject hash>
  * The server echoes lines after sending "sni=<name>\n", "quit" ends with close_notify, "drop"
@@ -1145,7 +1145,7 @@ static void test_ca_store(void)
 		memset(vs_test_title_id, 0, 10);
 		/* CA01 isn't there */
 		CHECK_EQ(cellSslCertificateLoader(1, NULL, 0, &required), CA_UNKNOWN);
-		fprintf(stderr, "ca store: Sony's CA files aren't here (ps3-dumps/cert): only stand-ins tested\n");
+		fprintf(stderr, "ca store: Sony's CA files aren't here (dumps/ps3/4.93-cex/cert): only stand-ins tested\n");
 	}
 }
 

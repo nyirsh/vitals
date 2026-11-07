@@ -1,5 +1,5 @@
 /* The public cellSsl certificate functions games and np_oauth call (cellSslCertGet*), and
- * cellSslGetMemoryInfo, over certificate.c's objects. As Sony's (ps3-dumps/libssl.prx 0x30 to
+ * cellSslGetMemoryInfo, over certificate.c's objects. As Sony's (dumps/ps3/4.93-cex/libssl.prx 0x30 to
  * 0x1408), each checks, in order: cellSslInit (0x80740001), that its object can be read
  * (0x80740005; Sony's asks the kernel, syscall 351), that its out pointers aren't NULL
  * (0x80740004), then what it reads (0x80740006 and on) */

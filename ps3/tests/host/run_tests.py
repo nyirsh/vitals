@@ -3,7 +3,7 @@
 with a server certificate it signed for chain.test, and a client certificate the CA signed),
 starts ../shared/tests/server.py (TLS on a port, a server that never answers on the next, the CA's chain on the
 one after) and runs the test binary against it. Sony's CA files go in sony/: the console's own when
-ps3-dumps/cert is next to the vitals repository (or VITALS_PS3_CERTS names them), else two stand-ins
+they're in the repository's dumps/ps3/4.93-cex/cert (not committed; or VITALS_PS3_CERTS names them), else two stand-ins
 that aren't what Sony's table says; Mozilla's bundle is bundle.pem, two of the certificates made here:
 
     tests/host/run_tests.py <test binary>
@@ -19,7 +19,7 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
-SONY_CERTS = pathlib.Path(os.environ.get("VITALS_PS3_CERTS", HERE.parents[3] / "ps3-dumps" / "cert"))
+SONY_CERTS = pathlib.Path(os.environ.get("VITALS_PS3_CERTS", HERE.parents[2] / "dumps" / "ps3" / "4.93-cex" / "cert"))
 
 
 def openssl(directory, *arguments):

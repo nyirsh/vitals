@@ -258,14 +258,17 @@ yet are logged in every build.
 
 ## Reading Sony's modules
 
-Decrypted modules (RPCS3: Utilities → Decrypt PS3 Binaries) are kept outside the repository, in
-`../ps3-dumps/`.
+Decrypted modules (RPCS3: Utilities → Decrypt PS3 Binaries) are kept in the repository's
+`dumps/`, which git ignores (they're Sony's), a folder per console and firmware: `dumps/ps3/4.93-cex/`,
+with the console's CA files in `cert/` for the libssl host test and the XMB in `vsh/<cfw>/` (a custom
+firmware may patch it; the modules are Sony's on any), and the Vita's in `dumps/vita/3.65/`. Its
+`SOURCE.txt` says where they came from. The addresses the code quotes from Sony's modules are 4.93's.
 
 ```
-python3 tools/prx_report.py ../ps3-dumps/libssl.prx --exports
-python3 tools/prx_report.py ../ps3-dumps/libhttp.prx --imports --library cellSsl
-python3 tools/ps3_disasm.py ../ps3-dumps/libssl.prx fn SSL_get_error
-python3 tools/ps3_disasm.py ../ps3-dumps/libhttp.prx callers SSL_do_handshake
+python3 tools/prx_report.py ../dumps/ps3/4.93-cex/libssl.prx --exports
+python3 tools/prx_report.py ../dumps/ps3/4.93-cex/libhttp.prx --imports --library cellSsl
+python3 tools/ps3_disasm.py ../dumps/ps3/4.93-cex/libssl.prx fn SSL_get_error
+python3 tools/ps3_disasm.py ../dumps/ps3/4.93-cex/libhttp.prx callers SSL_do_handshake
 ```
 
 ## Thanks
