@@ -1,30 +1,30 @@
-#ifndef VITALS_APP_CUSTOM_CERTS_H
-#define VITALS_APP_CUSTOM_CERTS_H
+#ifndef VITALS_APP_STORE_CERTS_H
+#define VITALS_APP_STORE_CERTS_H
 
 #include <stddef.h>
 
 #include "vitals_paths.h"
 
-/* The user's own certificates (/dev_hdd0/vitals/custom-certs.pem, for example their servers'
- * self-signed ones), added after Mozilla's in system/cacert.pem whenever the app installs, updates,
- * reinstalls or updates the certificates, as the Vita's custom-certs.pem. libssl reads every
- * certificate in cacert.pem and skips any that doesn't parse, so the merge works on the PEM text
- * alone: a certificate already there is added once, and a block that isn't a whole certificate is
- * left out */
+/* Mozilla's part of the CA store (VITALS_BUNDLE), as on the Vita: Mozilla's bundle without the
+ * certificates Sony's CAs already are (common/sony_cas.h, read from flash), which the app writes at
+ * every install and certificate update. libssl reads the user's custom-certs.pem itself, after it,
+ * so nothing of the user's is written here. Plain C on the PEM text, so the host tests run it as it
+ * is: a certificate is Sony's when the base64 between its lines is, wherever the lines break */
 
-/* The line the user's certificates come after, which the next merge cuts the bundle at */
-#define VITALS_CUSTOM_MARKER "# vitals: custom certificates (" VITALS_CUSTOM_CERTS ")\n"
+/* What earlier versions put before the user's certificates when they merged them into the bundle:
+ * the bundle is cut there */
+#define VITALS_EARLIER_CUSTOM_MARKER "# vitals: custom certificates"
 
 typedef struct {
-	unsigned added, duplicates, skipped;
-} VitalsCustomMerge;
+	/* Mozilla's certificates kept, those left out as Sony's, and whether an earlier version's
+	 * merged custom certificates were cut off */
+	unsigned kept, sony, cut_custom;
+} VitalsStoreFilter;
 
-/* How much of bundle is its own: everything before an earlier merge's marker line */
-size_t vitals_bundle_own_length(const char *bundle, size_t length);
-
-/* bundle's own part, then, when custom has any certificate it doesn't, the marker and each such
- * certificate (custom may be NULL). Returns the merged length, or 0 when out is too small */
-size_t vitals_bundle_merge(const char *bundle, size_t bundle_length, const char *custom, size_t custom_length,
-                           char *out, size_t capacity, VitalsCustomMerge *merge);
+/* bundle (Mozilla's, or an earlier version's file) up to an earlier merge's marker, without the
+ * whole certificate blocks that sony (Sony's CAs, PEM text, may be NULL) holds; all else, comments
+ * included, as it is. Returns the length written to out, or 0 when out is too small */
+size_t vitals_store_mozilla(const char *bundle, size_t bundle_length, const char *sony, size_t sony_length,
+                            char *out, size_t capacity, VitalsStoreFilter *filter);
 
 #endif

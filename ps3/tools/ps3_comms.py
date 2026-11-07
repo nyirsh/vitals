@@ -21,7 +21,7 @@ screen loading the real-signed libssl and libhttp), the release builds of libssl
 plugin (build/vitals-ssl, build/vitals-http, build/vitals-boot, build/vitals-dns) unless --debug 1 or
 2 asks for debug ones (build/vitals-ssl-debugN and the like, make install DEBUG=N builds them), and Mozilla's CA bundle (VITALS_BUNDLE, else the app's,
 vitals-app/assets/mozilla-certs.pem) when the console has none, so the app's Update certificates
-isn't undone, with the user's custom-certs.pem added after Mozilla's as the app adds them; the
+isn't undone, without Sony's CAs (read from the console's flash) as the app writes it; the
 example redirects.txt and dns.txt likewise only when the console has none, so the user's lists stay. The boot plugin maps libssl and libhttp at every boot, and loads the DNS
 kernel plugin (make dns-plugin), except on a boot after one that didn't end properly
 (vitals-boot/src/boot.c). The DNS plugin isn't listed in boot_plugins_kernel.txt: loaded from there it froze the
@@ -35,6 +35,7 @@ import datetime
 import ftplib
 import io
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -58,13 +59,19 @@ REPORTS = VITALS + "/reports"
 REDIRECTS = VITALS + "/redirects.txt"
 DNS = VITALS + "/dns.txt"
 USER_AGENT = VITALS + "/useragent.txt"
-# The user's own certificates, added after Mozilla's in the bundle (vitals-app/src/custom_certs.c)
+# The user's own certificates, which libssl reads as they are after Sony's and Mozilla's
 CUSTOM_CERTS = VITALS + "/custom-certs.pem"
-CUSTOM_MARKER = b"# vitals: custom certificates (" + CUSTOM_CERTS.encode() + b")\n"
+# What earlier versions put before the user's certificates they merged into the bundle
+# (vitals-app/src/store_certs.h): the bundle is cut there
+EARLIER_CUSTOM_MARKER = b"# vitals: custom certificates"
 LIBSSL = SYSTEM + "/libssl.sprx"
 LIBHTTP = SYSTEM + "/libhttp.sprx"
 DNS_PLUGIN = SYSTEM + "/vitals_dns.bin"
-BUNDLE = SYSTEM + "/cacert.pem"
+# Mozilla's certificates that Sony's lack (common/vitals_paths.h); earlier versions' whole bundle
+BUNDLE = SYSTEM + "/mozilla-certs.pem"
+BUNDLE_EARLIER = SYSTEM + "/cacert.pem"
+# Sony's CAs, which libssl reads from flash (common/sony_cas.h)
+SONY_CERTS = "/dev_flash/data/cert"
 # Which version and debug level are installed, as the vitals app writes it (vitals-app/src/install.c)
 INSTALLED = SYSTEM + "/installed.txt"
 # The boot plugin's mark of a boot that maps vitals' libhttp, for the app's test
@@ -79,7 +86,7 @@ ASSETS = os.path.join(ROOT, "vitals-app", "assets")
 # Earlier versions kept everything in /dev_hdd0/vitals itself and the logs in /dev_hdd0/tmp: install
 # moves what the user chose or got to its folder (MOVED), and deletes the rest (GONE)
 # (and the single XMB switch of earlier builds, xmb.off, is xmb-tls.off now)
-MOVED = {VITALS + "/cacert.pem": BUNDLE, VITALS + "/dns.off": DNS_OFF, FLAGS + "/xmb.off": FLAGS + "/xmb-tls.off"}
+MOVED = {VITALS + "/cacert.pem": BUNDLE, BUNDLE_EARLIER: BUNDLE, VITALS + "/dns.off": DNS_OFF, FLAGS + "/xmb.off": FLAGS + "/xmb-tls.off"}
 GONE = [VITALS + "/" + name for name in ("libssl.sprx", "libhttp.sprx", "vitals_dns.bin", "installed.txt",
                                          "libhttp.active", "libhttp.once", "dns.once", "dns.loading", "dns.delay",
                                          "boot_plugins.txt.bak", "boot_plugins_kernel.txt.bak")] + [
@@ -236,7 +243,7 @@ def find_line(data, needle, start=0):
 
 
 def pem_blocks(data):
-    """Each certificate block in data, as the app's custom_certs.c reads them: (whole, start, end, base64)
+    """Each certificate block in data, as the app's store_certs.c reads them: (whole, start, end, base64)
     for a whole one, its base64 without spaces; base64 None for a broken one (no END, another block
     before it, anything but base64 inside, text after END, or empty)"""
     at = 0
@@ -259,59 +266,73 @@ def pem_blocks(data):
         at = end
 
 
-def merge_custom_certificates(bundle, custom):
-    """The bundle with the user's certificates after Mozilla's, as the vitals app merges them
-    (vitals-app/src/custom_certs.c): an earlier merge cut off at its marker line, then, when custom has
-    any certificate the bundle doesn't, the marker and each such certificate once. custom may be None.
-    Returns (merged, added, duplicates, skipped)"""
-    own = bundle[:find_line(bundle, b"# vitals: custom certificates")]
-    if own and not own.endswith(b"\n"):
-        own += b"\n"
-    seen = {body for whole, _start, _end, body in pem_blocks(own) if whole}
-    merged, added, duplicates, skipped = [own], 0, 0, 0
-    for whole, start, end, body in pem_blocks(custom or b""):
-        if not whole:
-            skipped += 1
-        elif body in seen:
-            duplicates += 1
+def sony_cas():
+    """Sony's CAs as common/sony_cas.h lists them: (file, offset, length), length 0 for the whole file"""
+    with open(os.path.join(ROOT, "common", "sony_cas.h"), encoding="utf-8") as file:
+        header = file.read()
+    entries = re.findall(r"\{(\d+), \d+, (\d+), (\d+), 0x[0-9a-f]+u, \{", header)
+    return [(f"CA{int(number):02d}.cer" if int(number) else "CA_LIST.cer", int(offset), int(length))
+            for number, offset, length in entries]
+
+
+def sony_text(read_file):
+    """Sony's CAs one after another (read_file(name) gives a flash file's bytes, or None), as the app
+    reads them to leave out of Mozilla's file"""
+    files, parts = {}, []
+    for name, offset, length in sony_cas():
+        if name not in files:
+            files[name] = read_file(name)
+        data = files[name]
+        if data is not None:
+            parts.append((data[offset:offset + length] if length else data) + b"\n")
+    return b"".join(parts) or None
+
+
+def store_mozilla(bundle, sony):
+    """Mozilla's part of the store, as the vitals app writes it (vitals-app/src/store_certs.c): bundle
+    up to an earlier merge's marker line, without the whole certificates sony (bytes, or None) holds,
+    everything else as it is. Returns (data, kept, left out as Sony's, earlier merge cut)"""
+    own = bundle[:find_line(bundle, EARLIER_CUSTOM_MARKER)]
+    sonys = {body for whole, _start, _end, body in pem_blocks(sony or b"") if whole}
+    out, kept, left_out, at = [], 0, 0, 0
+    for whole, start, end, body in pem_blocks(own):
+        out.append(own[at:start])
+        if whole and body in sonys:
+            left_out += 1
         else:
-            seen.add(body)
-            if added == 0:
-                merged.append(CUSTOM_MARKER)
-            block = custom[start:end]
-            merged.append(block if block.endswith(b"\n") else block + b"\n")
-            added += 1
-    return b"".join(merged), added, duplicates, skipped
+            out.append(own[start:end])
+            kept += whole
+        at = end
+    out.append(own[at:])
+    data = b"".join(out)
+    if data and not data.endswith(b"\n"):
+        data += b"\n"
+    return data, kept, left_out, len(own) != len(bundle)
 
 
-def install_custom_certificates(ftp):
-    """custom-certs.pem merged into the console's bundle as the app does it at an install, the bundle's
-    date kept (the app's "Last update": Mozilla's, not this merge's) with MFMT where the server has it"""
-    bundle = read(ftp, BUNDLE)
-    if bundle is None:
+def install_mozilla(ftp, bundle, keep_date):
+    """Mozilla's part of the store onto the console, Sony's CAs (read from its flash) left out; the
+    date kept when it's the console's own bundle (the app's "Last update") with MFMT where the server
+    has it"""
+    data, kept, left_out, cut = store_mozilla(bundle, sony_text(lambda name: read(ftp, f"{SONY_CERTS}/{name}")))
+    if keep_date and data == bundle:
+        print(f"{BUNDLE}: kept (the console's own), {kept} certificates")
         return
-    custom = read(ftp, CUSTOM_CERTS)
-    merged, added, duplicates, skipped = merge_custom_certificates(bundle, custom)
-    if merged == bundle:
-        if custom is not None:
-            print(f"{CUSTOM_CERTS}: {added} already in {BUNDLE}")
-    else:
+    stamp = None
+    if keep_date:
         try:
             stamp = ftp.sendcmd("MDTM " + BUNDLE).split()[-1]
         except ftplib.all_errors:
             stamp = None
-        write(ftp, BUNDLE, merged)
-        if stamp:
-            try:
-                ftp.sendcmd(f"MFMT {stamp} {BUNDLE}")
-            except ftplib.all_errors:
-                pass  # the date moves to now: the app's Update certificates sets it again
-        print(f"{CUSTOM_CERTS}: {added} added to {BUNDLE}" if custom is not None
-              else f"{BUNDLE}: earlier custom certificates taken out ({CUSTOM_CERTS} is gone)")
-    if duplicates:
-        print(f"{CUSTOM_CERTS}: {duplicates} already there, added once")
-    if skipped:
-        print(f"{CUSTOM_CERTS}: {skipped} skipped, not a whole certificate")
+    write(ftp, BUNDLE, data)
+    if stamp:
+        try:
+            ftp.sendcmd(f"MFMT {stamp} {BUNDLE}")
+        except ftplib.all_errors:
+            pass  # the date moves to now: the app's Update certificates sets it again
+    print(f"{BUNDLE}: {kept} of Mozilla's certificates, {left_out} Sony's already has left out")
+    if cut:
+        print(f"{BUNDLE}: the copy of {CUSTOM_CERTS} an earlier version merged in taken out (it's read as it is now)")
 
 
 def install(ftp, signed, debug):
@@ -320,19 +341,25 @@ def install(ftp, signed, debug):
                LIBHTTP: os.path.join(BUILD, f"vitals-http-debug{debug}" if debug else "vitals-http", "libhttp" + suffix),
                PLUGIN: os.path.join(BUILD, f"vitals-boot-debug{debug}" if debug else "vitals-boot", "vitals_boot" + suffix),
                DNS_PLUGIN: os.path.join(BUILD, f"vitals-dns-debug{debug}" if debug else "vitals-dns", "vitals_dns.bin"),
-               BUNDLE: bundle_source(),
                REDIRECTS: os.path.join(ASSETS, "redirects.txt"),
                DNS: os.path.join(ASSETS, "dns.txt")}
     for target, source in sources.items():
         if not os.path.isfile(source):
-            sys.exit(f"{source} is missing: " + ("set VITALS_BUNDLE to Mozilla's CA bundle" if target == BUNDLE
-                                                else "build the modules first"))
+            sys.exit(f"{source} is missing: build the modules first")
+    if not os.path.isfile(bundle_source()):
+        sys.exit(f"{bundle_source()} is missing: set VITALS_BUNDLE to Mozilla's CA bundle")
     for folder in (VITALS, SYSTEM, FLAGS, LOGS, REPORTS, "/dev_hdd0/plugins"):
         make_directory(ftp, folder)
     move_earlier_layout(ftp)
     # The console's bundle may be newer (the vitals app's Update certificates), and its lists are the
     # user's: only missing ones are sent
-    for kept in (BUNDLE, REDIRECTS, DNS):
+    console_bundle = read(ftp, BUNDLE)
+    if console_bundle is not None:
+        install_mozilla(ftp, console_bundle, True)
+    else:
+        with open(bundle_source(), "rb") as file:
+            install_mozilla(ftp, file.read(), False)
+    for kept in (REDIRECTS, DNS):
         if read(ftp, kept) is not None:
             del sources[kept]
             print(f"{kept}: kept (the console's own)")
@@ -340,7 +367,6 @@ def install(ftp, signed, debug):
         with open(source, "rb") as file:
             write(ftp, target, file.read())
         print(f"{os.path.relpath(source, ROOT)} -> {target}")
-    install_custom_certificates(ftp)
     add_line(ftp, BOOT_PLUGINS, PLUGIN)
     with open(os.path.join(ROOT, "..", "VERSION"), encoding="utf-8") as file:
         version = file.read().strip()
@@ -383,7 +409,7 @@ def uninstall(ftp):
     remove_line(ftp, BOOT_PLUGINS_KERNEL, DNS_PLUGIN)
     move_earlier_layout(ftp)
     # system/ and logs/ go; the user's lists, flags/ and reports/ stay, as on the Vita
-    for path in (PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, BUNDLE, INSTALLED, LIBHTTP_ACTIVE,
+    for path in (PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, BUNDLE, BUNDLE_EARLIER, INSTALLED, LIBHTTP_ACTIVE,
                  SYSTEM + "/boot_plugins.txt.bak", SYSTEM + "/boot_plugins_kernel.txt.bak", LOG, APP_LOG):
         if delete(ftp, path):
             print(f"{path}: deleted")

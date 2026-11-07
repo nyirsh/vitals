@@ -32,7 +32,7 @@ int cellSsl_86C38810(uint64_t *flags, void *bio, char *buffer, uint32_t size);
 void vs_ca_store_end(void);
 
 /* For the debug log: where the CA with that subject (its DER, tag and all) is, "Sony's CA05",
- * "Sony's CA_LIST.cer", "Mozilla's bundle", or NULL for neither, in text (24 bytes) */
+ * "Sony's CA_LIST.cer", "Mozilla's or custom", or NULL for neither, in text (24 bytes) */
 const char *vs_ca_store_source(const unsigned char *der, size_t length, char text[24]);
 
 #endif

@@ -22,7 +22,8 @@
 #define VITALS_REDIRECTS VITALS_DIRECTORY "/redirects.txt"
 #define VITALS_USER_AGENT VITALS_DIRECTORY "/useragent.txt"
 #define VITALS_DNS VITALS_DIRECTORY "/dns.txt"
-/* Certificates of the user's own, added after Mozilla's by the app (vitals-app/src/custom_certs.h) */
+/* Certificates of the user's own, which libssl reads as they are after Sony's and Mozilla's, so an
+ * edit applies to the next game (vitals-ssl/src/ca_store.c) */
 #define VITALS_CUSTOM_CERTS VITALS_DIRECTORY "/custom-certs.pem"
 
 /* system/ */
@@ -33,7 +34,12 @@
 #define VITALS_LIBSSL_XMB VITALS_SYSTEM_DIRECTORY "/libssl-xmb.sprx"
 #define VITALS_LIBHTTP_XMB VITALS_SYSTEM_DIRECTORY "/libhttp-xmb.sprx"
 #define VITALS_DNS_PLUGIN VITALS_SYSTEM_DIRECTORY "/vitals_dns.bin"
-#define VITALS_BUNDLE VITALS_SYSTEM_DIRECTORY "/cacert.pem"
+/* Mozilla's certificates that Sony's lack, which the app writes and its certificate update rewrites
+ * (vitals-app/src/store_certs.h) */
+#define VITALS_BUNDLE VITALS_SYSTEM_DIRECTORY "/mozilla-certs.pem"
+/* Where earlier versions kept Mozilla's whole bundle, the user's certificates merged in: the app's
+ * install takes it from there */
+#define VITALS_BUNDLE_EARLIER VITALS_SYSTEM_DIRECTORY "/cacert.pem"
 #define VITALS_INSTALLED VITALS_SYSTEM_DIRECTORY "/installed.txt"
 /* Written by the boot plugin on a boot that maps vitals' libhttp, for the app's test */
 #define VITALS_LIBHTTP_ACTIVE VITALS_SYSTEM_DIRECTORY "/libhttp.active"

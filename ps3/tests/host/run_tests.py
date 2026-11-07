@@ -4,7 +4,8 @@ with a server certificate it signed for chain.test, and a client certificate the
 starts ../shared/tests/server.py (TLS on a port, a server that never answers on the next, the CA's chain on the
 one after) and runs the test binary against it. Sony's CA files go in sony/: the console's own when
 they're in the repository's dumps/ps3/4.93-cex/cert (not committed; or VITALS_PS3_CERTS names them), else two stand-ins
-that aren't what Sony's table says; Mozilla's bundle is bundle.pem, two of the certificates made here:
+that aren't what Sony's table says; Mozilla's file is bundle.pem, two of the certificates made here,
+and the user's custom-certs.pem is custom.pem, the client certificate among mistakes:
 
     tests/host/run_tests.py <test binary>
 
@@ -84,6 +85,12 @@ def main():
         (directory / "server-crlf.pem").write_bytes(server_crlf)
         (directory / "bundle.pem").write_bytes(b"# Mozilla's roots\r\n\r\n" + server_crlf + b"\n" +
                                                (directory / "ca.pem").read_bytes())
+        # The user's custom-certs.pem, as they might write it: mistakes around a certificate, which
+        # libssl reads after Mozilla's
+        (directory / "custom.pem").write_bytes(
+            b"# my certificates\n-----BEGIN CERTIFICATE-----\nbroken\n-----END CERTIFICATE-----\n"
+            b"-----BEGIN PRIVATE KEY-----\nnot a certificate\n-----END PRIVATE KEY-----\n" +
+            (directory / "client.pem").read_bytes() + b"-----BEGIN CERTIFICATE-----\nnever ends")
         # cellSsl_597BE64A's: data the CA's key signed, with SHA-256 and SHA-1
         (directory / "signed.txt").write_bytes(b"signed by the vitals-ssl test CA\n")
         for digest in ("sha256", "sha1"):

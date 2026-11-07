@@ -17,7 +17,7 @@
 
 /* Where the tests put Sony's CA files and Mozilla's bundle, and the title ID they pretend to be */
 char vs_test_sony_cert_directory[512];
-char vs_test_bundle_path[512];
+char vs_test_bundle_path[512], vs_test_custom_path[512];
 char vs_test_title_id[10];
 
 static pthread_mutex_t g_lock;
@@ -121,9 +121,9 @@ int vs_platform_sony_cert_path(char *path, size_t size, const char *file)
 	return length > 0 && (size_t)length < size ? 0 : -1;
 }
 
-const char *vs_platform_bundle_path(void)
+const char *vs_platform_store_path(unsigned part)
 {
-	return vs_test_bundle_path;
+	return part == 0 ? vs_test_bundle_path : part == 1 ? vs_test_custom_path : NULL;
 }
 
 int vs_platform_readable(const void *pointer)

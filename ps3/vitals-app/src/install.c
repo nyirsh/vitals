@@ -5,7 +5,8 @@
 
 #include "app_log.h"
 #include "boot_plugins.h"
-#include "custom_certs.h"
+#include "sony_cas.h"
+#include "store_certs.h"
 #include "dates.h"
 #include "download.h"
 
@@ -257,6 +258,7 @@ static void make_directories(void)
 static void move_earlier_layout(VitalsNote note)
 {
 	static const char *const moved[][2] = {{VITALS_DIRECTORY "/cacert.pem", VITALS_BUNDLE},
+	                                       {VITALS_BUNDLE_EARLIER, VITALS_BUNDLE},
 	                                       {VITALS_DIRECTORY "/dns.off", VITALS_DNS_OFF},
 	                                       {VITALS_XMB_OLD_OFF, VITALS_XMB_TLS_OFF}};
 	for (unsigned i = 0; i < sizeof(moved) / sizeof(moved[0]); ++i) {
@@ -301,7 +303,7 @@ static void move_earlier_layout(VitalsNote note)
 	}
 }
 
-static void merge_custom_certificates(int keep_date, VitalsNote note);
+static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date, VitalsNote note);
 
 int vitals_install_run(int debug_level, VitalsNote note)
 {
@@ -312,13 +314,27 @@ int vitals_install_run(int debug_level, VitalsNote note)
 	notef(note, "Debug output: %s", level_names[debug_level]);
 	if (copy_builds(debug_level, note) < 0)
 		return -1;
-	/* A bundle the certificate update wrote stays: it's newer than the app's */
+	/* A bundle the certificate update wrote stays, as it's newer than the app's: only Sony's, and
+	 * what an earlier version merged in of the user's, are taken out */
+	size_t bundle_length = 0;
 	int kept = exists(VITALS_BUNDLE);
-	if (kept)
+	char *bundle = NULL;
+	if (kept) {
 		note("Kept Mozilla's certificates already in " VITALS_BUNDLE);
-	else if (copy_file("cacert.pem", VITALS_BUNDLE, note) < 0)
+		bundle = read_file(VITALS_BUNDLE, CA_BUNDLE_LIMIT, &bundle_length);
+	} else {
+		char from[320];
+		snprintf(from, sizeof(from), "%s/" VITALS_APP_CA_BUNDLE, source);
+		bundle = read_file(from, CA_BUNDLE_LIMIT, &bundle_length);
+	}
+	if (bundle == NULL) {
+		notef(note, "Can't read Mozilla's certificates (%s)", kept ? VITALS_BUNDLE : VITALS_APP_CA_BUNDLE);
 		return -1;
-	merge_custom_certificates(kept, note);
+	}
+	int written = write_mozilla(bundle, bundle_length, kept, note);
+	free(bundle);
+	if (written < 0)
+		return -1;
 	/* The example lists, only where there are none: what's there is the user's */
 	static const char *const examples[][2] = {{"redirects.txt", VITALS_REDIRECTS}, {"dns.txt", VITALS_DNS}};
 	for (unsigned i = 0; i < sizeof(examples) / sizeof(examples[0]); ++i)
@@ -342,7 +358,7 @@ int vitals_uninstall_run(VitalsNote note)
 	/* system/ and logs/ go; the user's lists, flags/ and reports/ stay, as on the Vita, and so does
 	 * the folder when anything's left in it */
 	static const char *const files[] = {VITALS_PLUGIN,      VITALS_LIBSSL,  VITALS_LIBHTTP,
-	                                    VITALS_DNS_PLUGIN,  VITALS_BUNDLE,  VITALS_INSTALLED,
+	                                    VITALS_DNS_PLUGIN,  VITALS_BUNDLE,  VITALS_BUNDLE_EARLIER, VITALS_INSTALLED,
 	                                    VITALS_LIBHTTP_ACTIVE, VITALS_SYSTEM_DIRECTORY "/boot_plugins.txt.bak",
 	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins_kernel.txt.bak", VITALS_LOG,
 	                                    VITALS_APP_LOG};
@@ -370,60 +386,94 @@ int vitals_install_set_debug_level(int debug_level, VitalsNote note)
 	return 0;
 }
 
-/* The user's certificates (custom-certs.pem) after Mozilla's in the bundle, again each time, so an
- * edited file replaces what an earlier merge added. Nothing in the file stops an install or an
- * update: a problem is noted and the bundle left as it was. keep_date keeps the bundle's time, the
- * menu's "Last update", when only the user's part changed */
-static void merge_custom_certificates(int keep_date, VitalsNote note)
+/* Sony's CAs, as libssl reads them from flash (common/sony_cas.h), one after another as PEM text:
+ * what Mozilla's file leaves out. NULL when none can be read (then nothing is left out) */
+static char *read_sony_cas(size_t *length)
 {
-	size_t bundle_length = 0, custom_length = 0;
-	char *bundle = read_file(VITALS_BUNDLE, CA_BUNDLE_LIMIT, &bundle_length);
-	if (bundle == NULL) {
-		note("Your certificates weren't added: " VITALS_BUNDLE " can't be read");
-		return;
-	}
-	int has_file = exists(VITALS_CUSTOM_CERTS);
-	char *custom = has_file ? read_file(VITALS_CUSTOM_CERTS, CA_BUNDLE_LIMIT, &custom_length) : NULL;
-	if (has_file && custom == NULL)
-		note("Your certificates weren't added: " VITALS_CUSTOM_CERTS " can't be read (1 MB at most)");
-	int had_custom = vitals_bundle_own_length(bundle, bundle_length) != bundle_length;
-	if (custom == NULL && !had_custom) {
-		free(bundle);
-		return;
-	}
-	size_t capacity = bundle_length + custom_length + sizeof(VITALS_CUSTOM_MARKER) + 64;
-	char *merged = malloc(capacity);
-	VitalsCustomMerge merge;
-	size_t length = merged != NULL ? vitals_bundle_merge(bundle, bundle_length, custom, custom_length, merged, capacity, &merge) : 0;
-	CellFsStat status;
-	int dated = cellFsStat(VITALS_BUNDLE, &status) == CELL_FS_SUCCEEDED;
-	if (length == 0)
-		note("Your certificates weren't added: out of memory");
-	else if (length == bundle_length && memcmp(merged, bundle, length) == 0) {
-		if (custom != NULL)
-			notef(note, "Your certificates (" VITALS_CUSTOM_CERTS "): %u already in place", merge.added);
-	} else {
-		int rc = write_file(VITALS_BUNDLE, merged, length);
-		if (rc != CELL_FS_SUCCEEDED)
-			notef(note, "Your certificates weren't added: can't write " VITALS_BUNDLE " (0x%08X)", (unsigned)rc);
-		else {
-			if (custom == NULL)
-				note("Took out your earlier certificates: " VITALS_CUSTOM_CERTS " is gone");
-			else
-				notef(note, "Added %u of your certificates from " VITALS_CUSTOM_CERTS, merge.added);
-			if (keep_date && dated) {
-				CellFsUtimbuf times = {status.st_atime, status.st_mtime};
-				cellFsUtime(VITALS_BUNDLE, &times);
+	size_t used = 0, capacity = 0, list_length = 0;
+	char *text = NULL, *list = NULL;
+	*length = 0;
+	for (size_t i = 0; i < VS_SONY_CAS; ++i) {
+		const SonyCa *ca = &k_sony_cas[i];
+		char path[64];
+		size_t part_length = 0;
+		char *part = NULL;
+		const char *from = NULL;
+		if (ca->number != 0) {
+			snprintf(path, sizeof(path), "/dev_flash/data/cert/CA%02u.cer", (unsigned)ca->number);
+			part = read_file(path, 64u * 1024u, &part_length);
+			from = part;
+		} else {
+			if (list == NULL)
+				list = read_file("/dev_flash/data/cert/CA_LIST.cer", 256u * 1024u, &list_length);
+			if (list != NULL && (size_t)ca->offset + ca->length <= list_length) {
+				from = list + ca->offset;
+				part_length = ca->length;
 			}
 		}
+		if (from != NULL && part_length != 0) {
+			if (used + part_length + 2 > capacity) {
+				size_t grown = (used + part_length + 2) * 2;
+				char *bigger = realloc(text, grown);
+				if (bigger == NULL) {
+					free(part);
+					break;
+				}
+				text = bigger;
+				capacity = grown;
+			}
+			memcpy(text + used, from, part_length);
+			used += part_length;
+			text[used++] = '\n';
+			text[used] = '\0';
+		}
+		free(part);
 	}
-	if (merge.duplicates && length != 0)
-		notef(note, "%u of your certificates were already there, added once", merge.duplicates);
-	if (merge.skipped && length != 0)
-		notef(note, "%u of your entries skipped: not a whole certificate", merge.skipped);
-	free(merged);
-	free(custom);
-	free(bundle);
+	free(list);
+	*length = used;
+	return text;
+}
+
+/* Mozilla's part of the store (store_certs.h): bundle without Sony's CAs, and without the user's
+ * certificates an earlier version merged in, into VITALS_BUNDLE when that changes it. keep_date
+ * keeps the file's time, the menu's "Last update", when the bundle is the one already there. 0, or
+ * -1 when it can't be written */
+static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date, VitalsNote note)
+{
+	size_t sony_length = 0;
+	char *sony = read_sony_cas(&sony_length);
+	if (sony == NULL)
+		note("Sony's certificates can't be read: Mozilla's are kept whole");
+	char *out = malloc(bundle_length + 2);
+	VitalsStoreFilter filter;
+	size_t length = out != NULL ? vitals_store_mozilla(bundle, bundle_length, sony, sony_length, out, bundle_length + 2, &filter) : 0;
+	free(sony);
+	if (length == 0) {
+		free(out);
+		note("Mozilla's certificates weren't written: out of memory");
+		return -1;
+	}
+	int rc = CELL_FS_SUCCEEDED;
+	CellFsStat status;
+	int dated = keep_date && cellFsStat(VITALS_BUNDLE, &status) == CELL_FS_SUCCEEDED;
+	if (!(keep_date && length == bundle_length && memcmp(out, bundle, length) == 0)) {
+		rc = write_file(VITALS_BUNDLE, out, length);
+		if (rc != CELL_FS_SUCCEEDED)
+			notef(note, "Can't write " VITALS_BUNDLE " (0x%08X)", (unsigned)rc);
+		else if (dated) {
+			CellFsUtimbuf times = {status.st_atime, status.st_mtime};
+			cellFsUtime(VITALS_BUNDLE, &times);
+		}
+	}
+	free(out);
+	if (rc != CELL_FS_SUCCEEDED)
+		return -1;
+	notef(note, "Mozilla's certificates in " VITALS_BUNDLE ": %u, and %u Sony's already has left out", filter.kept,
+	      filter.sony);
+	if (filter.cut_custom)
+		note("Took out the copy of your certificates an earlier version merged in: " VITALS_CUSTOM_CERTS
+		     " is read as it is now");
+	return 0;
 }
 
 /* A downloaded bundle is used only when it looks like curl's: its header, and at least 100
@@ -493,13 +543,7 @@ static int download_certificates(VitalsNote note)
 		notef(note, "Received %u certificates, %u bytes%s%s", count, (unsigned)result.size,
 		      when[0] ? ", Mozilla's of " : "", when);
 		make_directories();
-		rc = write_file(VITALS_BUNDLE, result.data, result.size);
-		if (rc != CELL_FS_SUCCEEDED)
-			notef(note, "Can't write " VITALS_BUNDLE " (0x%08X)", (unsigned)rc);
-		else {
-			note("Saved to " VITALS_BUNDLE);
-			merge_custom_certificates(0, note);
-		}
+		rc = write_mozilla(result.data, result.size, 0, note);
 	}
 	vitals_download_free(&result);
 	return rc;

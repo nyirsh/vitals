@@ -30,7 +30,7 @@ add_executable(vitals_ssl_tests
 	test_main.c)
 # include/ first: its vitals_log.h in place of the console's
 target_include_directories(vitals_ssl_tests BEFORE PRIVATE include)
-target_include_directories(vitals_ssl_tests PRIVATE ${SSL}/src ${SSL}/src/platform)
+target_include_directories(vitals_ssl_tests PRIVATE ${SSL}/src ${SSL}/src/platform ${SSL}/../common)
 # With the debug log compiled in, so its lines run too
 target_compile_definitions(vitals_ssl_tests PRIVATE VITALS_DEBUG=2)
 target_compile_options(vitals_ssl_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
@@ -105,7 +105,7 @@ if(EXISTS ${VITALS_PS3DK_INCLUDE}/cell/http.h)
 	set_source_files_properties(
 		${SSL}/src/core.c ${SSL}/src/ca_store.c ${SSL}/src/sha1.c ${SSL}/src/certificate.c ${SSL}/src/connection.c
 		${SSL}/src/public.c ${SSL}/src/platform/gmtime.c platform_posix.c pool_posix.c crypto_platform_posix.c
-		PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include;${SSL}/src;${SSL}/src/platform")
+		PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include;${SSL}/src;${SSL}/src/platform;${SSL}/../common")
 	target_compile_definitions(vitals_http_probe PRIVATE VITALS_DEBUG=2)
 	target_compile_options(vitals_http_probe PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
 		-fsanitize=address,undefined -fno-omit-frame-pointer)

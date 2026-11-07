@@ -1,12 +1,12 @@
-/* The user's certificates after Mozilla's (custom_certs.h): plain C on the PEM text, so the host
+/* Mozilla's part of the CA store, without Sony's (store_certs.h): plain C on the PEM text, so the host
  * tests run it as it is */
 
-#include "custom_certs.h"
+#include "store_certs.h"
 
 #include <string.h>
 
 static const char k_begin[] = "-----BEGIN CERTIFICATE-----", k_end[] = "-----END CERTIFICATE-----",
-                  k_marker_start[] = "# vitals: custom certificates";
+                  k_marker_start[] = VITALS_EARLIER_CUSTOM_MARKER;
 
 /* Where needle starts in data from offset from, or length when it isn't there */
 static size_t find(const char *data, size_t length, size_t from, const char *needle)
@@ -106,11 +106,6 @@ static int holds(const char *data, size_t length, const char *source, const Bloc
 	return 0;
 }
 
-size_t vitals_bundle_own_length(const char *bundle, size_t length)
-{
-	return bundle != NULL ? find_line(bundle, length, 0, k_marker_start) : 0;
-}
-
 static int put(char *out, size_t capacity, size_t *used, const char *data, size_t length)
 {
 	if (length > capacity - *used)
@@ -120,35 +115,30 @@ static int put(char *out, size_t capacity, size_t *used, const char *data, size_
 	return 1;
 }
 
-size_t vitals_bundle_merge(const char *bundle, size_t bundle_length, const char *custom, size_t custom_length,
-                           char *out, size_t capacity, VitalsCustomMerge *merge)
+size_t vitals_store_mozilla(const char *bundle, size_t bundle_length, const char *sony, size_t sony_length,
+                            char *out, size_t capacity, VitalsStoreFilter *filter)
 {
-	memset(merge, 0, sizeof(*merge));
-	size_t own = vitals_bundle_own_length(bundle, bundle_length), used = 0;
-	if (!put(out, capacity, &used, bundle, own))
-		return 0;
-	if (own != 0 && bundle[own - 1] != '\n' && !put(out, capacity, &used, "\n", 1))
-		return 0;
-	size_t certificates = used;
+	memset(filter, 0, sizeof(*filter));
+	size_t own = find_line(bundle, bundle_length, 0, k_marker_start), used = 0, at = 0;
+	filter->cut_custom = own != bundle_length;
 	Block block;
 	int status;
-	for (size_t at = 0; custom != NULL && (status = next_block(custom, custom_length, at, &block)) >= 0; at = block.end) {
-		if (status == 0) {
-			++merge->skipped;
-			continue;
+	while ((status = next_block(bundle, own, at, &block)) >= 0) {
+		/* What's before the block, then the block unless it's Sony's */
+		if (!put(out, capacity, &used, bundle + at, block.start - at))
+			return 0;
+		if (status == 1 && sony != NULL && holds(sony, sony_length, bundle, &block)) {
+			++filter->sony;
+		} else {
+			if (!put(out, capacity, &used, bundle + block.start, block.end - block.start))
+				return 0;
+			filter->kept += status == 1;
 		}
-		/* Already in Mozilla's, or earlier in the user's file */
-		if (holds(out, certificates, custom, &block) || holds(custom, block.start, custom, &block)) {
-			++merge->duplicates;
-			continue;
-		}
-		if (merge->added == 0 && !put(out, capacity, &used, VITALS_CUSTOM_MARKER, sizeof(VITALS_CUSTOM_MARKER) - 1))
-			return 0;
-		if (!put(out, capacity, &used, custom + block.start, block.end - block.start))
-			return 0;
-		if (custom[block.end - 1] != '\n' && !put(out, capacity, &used, "\n", 1))
-			return 0;
-		++merge->added;
+		at = block.end;
 	}
+	if (!put(out, capacity, &used, bundle + at, own - at))
+		return 0;
+	if (used != 0 && out[used - 1] != '\n' && !put(out, capacity, &used, "\n", 1))
+		return 0;
 	return used;
 }

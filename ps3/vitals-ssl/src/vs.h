@@ -189,10 +189,11 @@ int vs_platform_file_read(int fd, void *data, size_t size);
 int vs_platform_file_seek(int fd, uint32_t offset);
 int64_t vs_platform_file_size(int fd);
 void vs_platform_file_close(int fd);
-/* Where the CA certificates are: Sony's (/dev_flash/data/cert/), with the file's name after it, and
- * Mozilla's bundle (/dev_hdd0/vitals/system/cacert.pem) */
+/* Where the CA certificates are: Sony's (/dev_flash/data/cert/), with the file's name after it, then
+ * the store's other parts, in order: 0 Mozilla's that Sony's lack (/dev_hdd0/vitals/system/
+ * mozilla-certs.pem), 1 the user's own (/dev_hdd0/vitals/custom-certs.pem); NULL past the last */
 int vs_platform_sony_cert_path(char *path, size_t size, const char *file);
-const char *vs_platform_bundle_path(void);
+const char *vs_platform_store_path(unsigned part);
 /* 1 when the memory at pointer can be read: Sony's public functions check their object so (syscall
  * 351, sys_memory_get_page_attribute) before using it */
 int vs_platform_readable(const void *pointer);

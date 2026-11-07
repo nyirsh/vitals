@@ -31,7 +31,7 @@ const char *vitals_install_source(void);
 /* Here, vitals_install_detect is 1 when boot_plugins.txt lists the plugin and its files are there;
  * vitals_install_read reads installed.txt; vitals_install_set_debug_level changes only libssl's and
  * libhttp's builds; vitals_update_certificates downloads Mozilla's bundle again (curl.se), checks it
- * and writes it into VITALS_BUNDLE, then closes libhttp; vitals_certificates_date is in UTC; and
+ * and writes it into VITALS_BUNDLE without Sony's CAs, then closes libhttp; vitals_certificates_date is in UTC; and
  * vitals_reboot is a hard reboot (lv2's sys_sm_shutdown), which Cobra needs to load its boot plugins
  * again, with the system's "turned off" marker deleted first so the next start doesn't warn */
 /* A component's switch in flags/ (VITALS_TLS_OFF and the others): 1 when it's off, its .off there */

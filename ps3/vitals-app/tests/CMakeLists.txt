@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 # Host tests of the app's C code, as the Vita's vitals-app/tests: the connection test's rules and
-# its BrowserLeaks parser, boot_plugins.txt's editing, the custom certificates' merge and the
+# its BrowserLeaks parser, boot_plugins.txt's editing, Mozilla's part of the CA store and the
 # changelog's layout, built for this machine with AddressSanitizer and UBSan; `make test` runs them,
 # then the Python tests next to them
 project(vitals_app_tests C)
@@ -54,10 +54,10 @@ add_test(NAME vitals_app_changelog COMMAND vitals_app_changelog_tests)
 add_executable(vitals_app_release_version_tests ${SHARED}/app/tests/test_release_version.c ${SHARED}/app/release_version.c)
 add_test(NAME vitals_app_release_version COMMAND vitals_app_release_version_tests)
 
-# The user's certificates after Mozilla's, which install.c writes into system/cacert.pem
-add_executable(vitals_app_custom_certs_tests test_custom_certs.c ${APP_DIR}/src/custom_certs.c)
-target_include_directories(vitals_app_custom_certs_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
-add_test(NAME vitals_app_custom_certs COMMAND vitals_app_custom_certs_tests)
+# Mozilla's certificates without Sony's, which install.c writes into system/mozilla-certs.pem
+add_executable(vitals_app_store_certs_tests test_store_certs.c ${APP_DIR}/src/store_certs.c)
+target_include_directories(vitals_app_store_certs_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
+add_test(NAME vitals_app_store_certs COMMAND vitals_app_store_certs_tests)
 
 # The shared download (../../../shared/app/download.c) and the release check's fetch on curl's Mbed
 # TLS backend, the PS3's, with this machine's mutexes, entropy and time (../../tests/host): run by

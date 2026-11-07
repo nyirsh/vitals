@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 
 	static const char *const lines[] = {"Copying libssl.sprx to /dev_hdd0/vitals/system/libssl.sprx",
 	                                    "Copying vitals_boot.sprx to /dev_hdd0/plugins/vitals_boot.sprx",
-	                                    "Copying Mozilla's certificates to /dev_hdd0/vitals/system/cacert.pem",
+	                                    "Copying Mozilla's certificates to /dev_hdd0/vitals/system/mozilla-certs.pem",
 	                                    "Adding vitals to /dev_hdd0/boot_plugins.txt"};
 	static const AppHint waiting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "Please wait and keep your PS3 turned on."};
 	AppTask task = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5", NULL}, "Installing vitals", lines, 4, CHECK_RUNNING, "Working...", &waiting, 1};

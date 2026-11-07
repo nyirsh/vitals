@@ -2,8 +2,9 @@
 """Refreshes the app's bundled Mozilla CA bundle (vitals-app/assets/mozilla-certs.pem), as the Vita's
 vitals-app/tools/update_certs.py does for its own: downloads curl's cacert.pem, checks it against the
 SHA-256 curl publishes next to it and that it looks like a CA bundle (the app's own check: curl's
-header, at least 100 certificates), then updates certificate-sources.json. The PS3 installs
-Mozilla's bundle as it is (/dev_hdd0/vitals/system/cacert.pem), so there's nothing to merge with Sony's.
+header, at least 100 certificates), then updates certificate-sources.json. The app writes
+it onto the console without Sony's CAs, which it reads from flash (/dev_hdd0/vitals/system/
+mozilla-certs.pem), so the bundled copy stays curl's own.
 Nothing changes when the bundle is already current; review and commit the result.
 
     tools/update_certs.py [--bundle cacert.pem]

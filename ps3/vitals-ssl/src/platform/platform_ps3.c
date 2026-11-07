@@ -159,9 +159,9 @@ int vs_platform_sony_cert_path(char *path, size_t size, const char *file)
 	return length > 0 && (size_t)length < size ? 0 : -1;
 }
 
-const char *vs_platform_bundle_path(void)
+const char *vs_platform_store_path(unsigned part)
 {
-	return VITALS_BUNDLE;
+	return part == 0 ? VITALS_BUNDLE : part == 1 ? VITALS_CUSTOM_CERTS : NULL;
 }
 
 int vs_platform_readable(const void *pointer)

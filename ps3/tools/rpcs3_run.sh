@@ -42,7 +42,7 @@ restore() {
 trap restore EXIT INT TERM
 cp "$module" "$external/libssl.sprx"
 if [ -n "$http" ]; then cp "$http" "$external/libhttp.sprx"; fi
-if [ -f "$bundle" ]; then mkdir -p "$hdd/vitals" && cp "$bundle" "$hdd/vitals/cacert.pem"; fi
+if [ -f "$bundle" ]; then mkdir -p "$hdd/vitals/system" && cp "$bundle" "$hdd/vitals/system/mozilla-certs.pem"; fi
 perl -pi -e 's/^(\s*Internet enabled:).*/$1 Connected/' "$config"
 perl -0pi -e 's/(\n  Libraries Control:)\n    \[\]/$1\n    - libhttp.sprx:lle/' "$config"
 grep -q "libhttp.sprx:lle" "$config" || echo "warning: couldn't set libhttp.sprx:lle in $config; RPCS3 may use its own cellHttp" >&2

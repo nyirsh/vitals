@@ -29,7 +29,7 @@ Everything vitals keeps is in `/dev_hdd0/vitals`, which itself holds only what y
 /dev_hdd0/vitals/
   redirects.txt   dns.txt   useragent.txt      your lists (installing never overwrites them)
   custom-certs.pem                              your own certificates, if any (none to start with)
-  system/    libssl.sprx  libhttp.sprx  vitals_dns.bin  cacert.pem  installed.txt  ...
+  system/    libssl.sprx  libhttp.sprx  vitals_dns.bin  mozilla-certs.pem  installed.txt  ...
   flags/     tls.off  http.off  dns.off  redirects.off
   logs/      vitals.log (debug builds)  vitals-app.log
   reports/   the app's connection test reports
@@ -154,12 +154,15 @@ certificates in `/dev_hdd0/vitals/custom-certs.pem`, one or more PEM blocks
 (`-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`), as on the Vita. Comments and anything
 that isn't a certificate are ignored.
 
-The file is optional. Its certificates are added after Mozilla's in `system/cacert.pem` whenever the
-app installs, updates, reinstalls or updates the certificates, and at `make install`, so after
-editing it run **Update certificates** (or Reinstall). Each is added once, even if Mozilla's already has it or the file lists
-it twice; a block that isn't a whole certificate is skipped, and nothing in the file ever stops an
-install or an update. Taking a certificate out of the file takes it out of the bundle at the next
-merge. The progress log says how many were added. Uninstalling leaves the file in place.
+The file is optional. vitals' libssl reads it as it is, after Sony's certificates and Mozilla's, so
+an edit applies to the next game or app you start: there's nothing to update. A block that isn't a
+whole certificate is skipped without affecting the rest. Uninstalling leaves the file in place.
+
+The store works as the Vita's: Sony's CAs first (on the PS3, the system's own in
+`/dev_flash/data/cert`, never written), then Mozilla's certificates Sony's lack
+(`system/mozilla-certs.pem`, which installing and **Update certificates** write, leaving Sony's
+out), then yours. Updating from a version that kept `system/cacert.pem`, with your certificates
+merged in, moves it there and takes the merged copy out.
 
 A server's self-signed certificate is trusted as itself, exactly as it appears in the file, whether
 or not it's marked as a certificate authority. For a server whose certificate was issued by a
@@ -188,7 +191,7 @@ Its menu, as the Vita's:
 - **Installation**: Left and Right pick Install, Update, Reinstall or Uninstall (as fits what's
   installed), and the confirm button (X, or O where the console confirms with O) does it.
 - **Update certificates**: downloads Mozilla's CA bundle as curl publishes it
-  (`https://curl.se/ca/cacert.pem`). Its "Last update" date turns red once it's more than three
+  (`https://curl.se/ca/cacert.pem`) and writes the certificates in it that Sony's lack. Its "Last update" date turns red once it's more than three
   months old. The app downloads it with its own curl and Mbed TLS, as the Vita's app does, trusting
   only the Mozilla bundle it carries, so it works with vitals' TLS switched off or not installed.
 - The menu shows when GitHub or GitLab has a newer release than the app, found the same way.

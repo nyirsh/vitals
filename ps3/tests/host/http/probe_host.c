@@ -15,7 +15,7 @@
 
 int vitals_probe_main(void);
 
-extern char vs_test_sony_cert_directory[512], vs_test_bundle_path[512], vs_test_title_id[10];
+extern char vs_test_sony_cert_directory[512], vs_test_bundle_path[512], vs_test_custom_path[512], vs_test_title_id[10];
 
 static char g_hdd[512] = ".";
 
@@ -84,7 +84,8 @@ int main(void)
 		snprintf(g_hdd, sizeof(g_hdd), "%s", hdd);
 	const char *certs = getenv("VITALS_PS3_CERTS");
 	snprintf(vs_test_sony_cert_directory, sizeof(vs_test_sony_cert_directory), "%s", certs != NULL ? certs : g_hdd);
-	snprintf(vs_test_bundle_path, sizeof(vs_test_bundle_path), "%s/vitals/cacert.pem", g_hdd);
+	snprintf(vs_test_bundle_path, sizeof(vs_test_bundle_path), "%s/vitals/system/mozilla-certs.pem", g_hdd);
+	snprintf(vs_test_custom_path, sizeof(vs_test_custom_path), "%s/vitals/custom-certs.pem", g_hdd);
 	memset(vs_test_title_id, 0, sizeof(vs_test_title_id));
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	return vitals_probe_main();

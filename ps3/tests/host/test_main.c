@@ -32,7 +32,7 @@
 extern size_t vs_test_pool_used, vs_test_pool_peak;
 extern uint32_t vs_test_refused_pool;
 /* platform_posix.c's */
-extern char vs_test_sony_cert_directory[512], vs_test_bundle_path[512], vs_test_title_id[10];
+extern char vs_test_sony_cert_directory[512], vs_test_bundle_path[512], vs_test_custom_path[512], vs_test_title_id[10];
 
 static int g_failures, g_checks;
 static int g_port;
@@ -1076,6 +1076,8 @@ static void test_ca_store(void)
 {
 	snprintf(vs_test_sony_cert_directory, sizeof(vs_test_sony_cert_directory), "%s/sony", g_directory);
 	snprintf(vs_test_bundle_path, sizeof(vs_test_bundle_path), "%s/bundle.pem", g_directory);
+	snprintf(vs_test_custom_path, sizeof(vs_test_custom_path), "%s/custom.pem", g_directory);
+	vs_ca_store_end();
 	memset(vs_test_title_id, 0, 10);
 	char path[1024];
 	snprintf(path, sizeof(path), "%s/sony/CA_LIST.cer", g_directory);
@@ -1124,6 +1126,32 @@ static void test_ca_store(void)
 	check_ca_by_name(SSLCERT_get_subject_name(ca), 0, text, length);
 	free(text);
 	SSLCERT_free(ca);
+	/* The user's custom-certs.pem, read after Mozilla's as they wrote it: its mistakes skipped */
+	ca = read_certificate("client.pem");
+	text = read_file("client.pem", &length);
+	check_ca_by_name(SSLCERT_get_subject_name(ca), 0, text, length);
+	free(text);
+	/* Without it (missing), Mozilla's file is still the store */
+	vs_ca_store_end();
+	snprintf(vs_test_custom_path, sizeof(vs_test_custom_path), "%s/missing-custom.pem", g_directory);
+	CHECK_EQ(cellSsl_68D3409E(SSLCERT_get_subject_name(ca), NULL, 0, &required, ~UINT64_C(0)), CA_UNKNOWN);
+	SSLCERT_free(ca);
+	ca = read_certificate("ca.pem");
+	text = read_file("ca.pem", &length);
+	check_ca_by_name(SSLCERT_get_subject_name(ca), 1, text, length);
+	free(text);
+	SSLCERT_free(ca);
+	/* Nor Mozilla's: the user's alone */
+	vs_ca_store_end();
+	snprintf(vs_test_bundle_path, sizeof(vs_test_bundle_path), "%s/missing-bundle.pem", g_directory);
+	snprintf(vs_test_custom_path, sizeof(vs_test_custom_path), "%s/custom.pem", g_directory);
+	ca = read_certificate("client.pem");
+	text = read_file("client.pem", &length);
+	check_ca_by_name(SSLCERT_get_subject_name(ca), 0, text, length);
+	free(text);
+	SSLCERT_free(ca);
+	vs_ca_store_end();
+	snprintf(vs_test_bundle_path, sizeof(vs_test_bundle_path), "%s/bundle.pem", g_directory);
 	/* A name in neither */
 	ca = read_certificate("leaf.pem");
 	CHECK_EQ(cellSsl_68D3409E(SSLCERT_get_subject_name(ca), NULL, 0, &required, ~UINT64_C(0)), CA_UNKNOWN);
