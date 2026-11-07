@@ -26,6 +26,17 @@ int main(void) {
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i) assert(strstr(check_endpoint(i), "playstation") == NULL);
     assert(check_endpoint(CHECK_TEST_COUNT) == NULL);
 
+    /* vitals' libhttp is the one loaded when SceLibHttp has started from ux0:data/vitals/system,
+     * named with or without the slash; not from an earlier version's place, nor Sony's */
+    assert(check_http_module_active("SceLibHttp", "ux0:data/vitals/system/libhttp.suprx", 6));
+    assert(check_http_module_active("SceLibHttp", "ux0:/data/vitals/system/libhttp.suprx", 6));
+    assert(!check_http_module_active("SceLibHttp", "ux0:data/vitals/system/libhttp.suprx", 5));
+    assert(!check_http_module_active("SceLibSsl", "ux0:data/vitals/system/libhttp.suprx", 6));
+    assert(!check_http_module_active("SceLibHttp", "vs0:/data/external/vitals/libhttp.suprx", 6));
+    assert(!check_http_module_active("SceLibHttp", "vs0:sys/external/libhttp.suprx", 6));
+    assert(!check_http_module_active("SceLibHttp", "uma0:data/vitals/system/libhttp.suprx", 6));
+    assert(!check_http_module_active("SceLibHttp", NULL, 6));
+
     const CheckBadssl *valid = check_badssl(0), *expired = check_badssl(5);
     assert(!valid->refuse && strcmp(expired->host, "expired.badssl.com") == 0 && expired->refuse);
 

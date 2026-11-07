@@ -34,27 +34,31 @@ enum
 
 /* libhttp's is vitals-http, which does its own TLS (tls13-vita's), in every process */
 static const char *const g_replacement_modules[MODULE_COUNT] = {
-    "vs0:/data/external/vitals/ScePsp2Compat.suprx",
-    "vs0:/data/external/vitals/libhttp.suprx",
+    VITALS_COMPAT_PATH,
+    VITALS_LIBHTTP_PATH,
     VITALS_LIBSSL_PATH,
 };
 
-static uint8_t g_replace[MODULE_COUNT];
-static uint8_t g_replace_iap;
+/* The browser engine's replacement, on vs0, which is there from boot */
+static uint8_t g_replace_compat;
 
 static int g_loader_hook_id = -1;
 static tai_hook_ref_t g_loader_hook_ref;
 static int g_start_hook_id = -1;
 static tai_hook_ref_t g_start_hook_ref;
 
-static int add_replace_flags(void)
+static int module_present(unsigned module)
 {
     SceIoStat stat;
+    return ksceIoGetstat(g_replacement_modules[module], &stat) >= 0;
+}
 
-    for (size_t i = 0; i < MODULE_COUNT; ++i)
-        g_replace[i] = ksceIoGetstat(g_replacement_modules[i], &stat) >= 0;
-    g_replace_iap = g_replace[MODULE_LIBHTTP] && g_replace[MODULE_LIBSSL];
-    return g_replace[MODULE_COMPAT] || g_replace_iap;
+/* vitals' libhttp and libssl, always swapped together, looked for at each load rather than once at
+ * boot: they're on ux0, which a plugin loaded after this one may still be mapping when it starts (an
+ * SD2Vita's), and while they aren't there Sony's load */
+static int replace_iap(void)
+{
+    return module_present(MODULE_LIBHTTP) && module_present(MODULE_LIBSSL);
 }
 
 static int path_is(const char *path, const char *a, const char *b)
@@ -71,21 +75,21 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     char browser_provider[VITALS_PENDING_BROWSER_PATH_SIZE];
     int module = -1;
 
-    if (g_replace_iap && (path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
-                          path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)))
+    if ((path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
+         path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)) &&
+        replace_iap())
     {
         ksceDebugPrintf("vitals: libhttp load pid=0x%X flags=0x%08X path=%s\n", target_pid, flags, path);
         module = MODULE_LIBHTTP;
         path = g_replacement_modules[module];
     }
-    else if (g_replace_iap && path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx"))
+    else if (path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx") && replace_iap())
     {
         ksceDebugPrintf("vitals: libssl load pid=0x%X flags=0x%08X\n", target_pid, flags);
         module = MODULE_LIBSSL;
         path = g_replacement_modules[module];
     }
-    else if (g_replace[MODULE_COMPAT] &&
-             vitals_browser_replacement_path(path, browser_path, sizeof(browser_path)))
+    else if (g_replace_compat && vitals_browser_replacement_path(path, browser_path, sizeof(browser_path)))
     {
         module = MODULE_COMPAT;
         path = browser_path;
@@ -143,8 +147,8 @@ int module_start(SceSize argc, const void *args)
     (void)args;
 
     ksceDebugPrintf("vitals module loaded\n");
-    if (!add_replace_flags())
-        return SCE_KERNEL_START_SUCCESS;
+    /* The hooks go in whatever is there now: libhttp and libssl are looked for at each load */
+    g_replace_compat = module_present(MODULE_COMPAT);
 
 #if defined(__arm__)
     /* Resolve once here, never from a loader-hook callback */
@@ -152,7 +156,7 @@ int module_start(SceSize argc, const void *args)
         return SCE_KERNEL_START_FAILED;
 #endif
     /* The browser provider, injected after vitals' browser engine starts */
-    if (g_replace[MODULE_COMPAT])
+    if (g_replace_compat)
     {
         int init = vitals_kernel_loader_init();
         ksceDebugPrintf("vitals: loader init=%d browser=%d\n", init, vitals_kernel_browser_loader_ready());

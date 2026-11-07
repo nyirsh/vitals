@@ -4,6 +4,7 @@
  * shared/app/model.c */
 
 #include "check_model.h"
+#include "vitals/path.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -145,17 +146,23 @@ void check_record_retry(CheckResult *r, const CheckResult *retry) {
         r->state = CHECK_WARNING;
     /* Keep the verified attempt's errors, HTTP result and message intact */
 }
+/* "dev:x" and "dev:/x" name the same file */
+static int same_file(const char *a, const char *b) {
+    const char *colon_a = strchr(a, ':'), *colon_b = strchr(b, ':');
+    if (colon_a == NULL || colon_b == NULL || colon_a - a != colon_b - b || strncmp(a, b, (size_t)(colon_a - a)) != 0)
+        return 0;
+    a = colon_a + 1 + (colon_a[1] == '/');
+    b = colon_b + 1 + (colon_b[1] == '/');
+    return strcmp(a, b) == 0;
+}
 int check_http_module_active(const char *name, const char *path, unsigned state) {
     /* vitals-http keeps libhttp's name; the kernel plugin's swap is what loads it from vitals'
-     * folder. Sony reports STARTED=6; presence alone does not establish activation */
+     * folder (ux0:data/vitals/system). Sony reports STARTED=6; presence alone does not establish
+     * activation */
     static const char module[] = "SceLibHttp";
-    static const char folder[] = "vs0:data/external/vitals/libhttp.suprx";
     if (name == NULL || path == NULL || state != 6 || strncmp(name, module, sizeof(module)) != 0)
         return 0;
-    /* With or without the slash after vs0: */
-    if (strncmp(path, "vs0:/", 5) == 0)
-        return strncmp(path + 5, folder + 4, sizeof(folder) - 4) == 0;
-    return strncmp(path, folder, sizeof(folder)) == 0;
+    return same_file(path, VITALS_LIBHTTP_PATH);
 }
 int check_protocol_body(unsigned version, const char *b, size_t n) {
     char expected[16];

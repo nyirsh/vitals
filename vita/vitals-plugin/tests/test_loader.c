@@ -391,6 +391,21 @@ static void test_extended_stack_contract(void) {
     reset();
 }
 
+/* The provider on ux0 not there at boot (an SD2Vita's card not mapped yet): the loader isn't ready,
+ * nothing is injected, and it becomes ready at the first engine load after the file appears */
+static void test_provider_appears_later(void) {
+    reset();
+    browser_file = 0;
+    assert(vitals_kernel_loader_init() < 0);
+    assert(!vitals_kernel_browser_loader_ready());
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) < 0 && loads == 0);
+    browser_file = 1;
+    assert(vitals_kernel_browser_loader_ready());
+    assert(vitals_kernel_inject_browser_for_pid(99, 88, expected_path) == 0 && loads == 1);
+    reset();
+    assert(!mutex_live && !locked);
+}
+
 /* Failure paths the loader must survive, run by the production test */
 static void test_loader_failure_paths(void) {
     reset();

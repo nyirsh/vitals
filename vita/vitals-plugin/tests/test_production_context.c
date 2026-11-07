@@ -72,6 +72,7 @@ int main(void) {
     test_query_workspace_failures();
     test_workspace_failures();
     test_loader_failure_paths();
+    test_provider_appears_later();
     test_libssl_first();
     puts("browser provider: native stack, narrow lookup, duplicate/failure gates PASS");
     return 0;

@@ -103,15 +103,24 @@ static int is(const char *vita_path, const char *expected)
 #define OLD_HTTP_PROVIDER "vs0:/data/external/vitals/native/vitals_http.suprx"
 #define OLD_REAUTH "vs0:/data/external/vitals/native/vitals-reauth.suprx"
 
-/* What vitals installs, and the app0: file each comes from */
+/* What vitals installs, and the app0: file each comes from: its modules in ux0:data/vitals/system,
+ * but for the browser engine's, next to Sony's */
 static const char *const installed[][2] = {
     {"ur0:tai/vitals.skprx", "app0:vitals.skprx"},
-    {"ur0:tai/vitals-native/vitals.suprx", "app0:vitals.suprx"},
+    {"ux0:data/vitals/system/vitals.suprx", "app0:vitals.suprx"},
     {"vs0:/data/external/vitals/ScePsp2Compat.suprx", "app0:compat.suprx"},
-    {"vs0:/data/external/vitals/libhttp.suprx", "app0:libhttp.suprx"},
-    {"vs0:/data/external/vitals/libssl.suprx", "app0:libssl.suprx"},
-    {"vs0:/data/external/vitals/native/vitals.suprx", "app0:vitals.suprx"},
+    {"ux0:data/vitals/system/libhttp.suprx", "app0:libhttp.suprx"},
+    {"ux0:data/vitals/system/libssl.suprx", "app0:libssl.suprx"},
 };
+
+/* Where earlier versions kept those modules, which an install or uninstall takes out */
+static const char *const old_layout[] = {
+    "vs0:/data/external/vitals/libhttp.suprx",
+    "vs0:/data/external/vitals/libssl.suprx",
+    "vs0:/data/external/vitals/native/vitals.suprx",
+    "ur0:tai/vitals-native/vitals.suprx",
+};
+#define OLD_LAYOUT_COUNT (sizeof(old_layout) / sizeof(old_layout[0]))
 #define INSTALLED_COUNT (sizeof(installed) / sizeof(installed[0]))
 
 /* A fresh console with taiHEN, Sony's certificates and the app's files */
@@ -178,6 +187,42 @@ static void expect_uninstalled(void)
     assert(vitals_install_complete() == 0);
 }
 
+/* An earlier version's layout: its modules on vs0 and in ur0:tai/vitals-native */
+static void put_old_layout(void)
+{
+    make_directories("vs0:/data/external/vitals/native");
+    make_directories("ur0:tai/vitals-native");
+    for (size_t i = 0; i < OLD_LAYOUT_COUNT; ++i)
+        put(old_layout[i], "an earlier version's module\n");
+}
+
+static void expect_no_old_layout(void)
+{
+    for (size_t i = 0; i < OLD_LAYOUT_COUNT; ++i)
+        assert(!exists(old_layout[i]));
+    assert(!exists("vs0:/data/external/vitals/native") && !exists("ur0:tai/vitals-native"));
+    assert(vitals_install_old_layout() == 0);
+}
+
+/* An install over an earlier version's layout moves it: the modules go to ux0:data/vitals/system and
+ * the old copies and their folders go; while any is left, vitals doesn't count as installed */
+static void test_old_layout_moves(void)
+{
+    fresh_console();
+    put_old_layout();
+    assert(vitals_install_old_layout() == 1);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_installed();
+    expect_no_old_layout();
+    put("ur0:tai/vitals-native/vitals.suprx", "an earlier version's module\n");
+    assert(vitals_install_old_layout() == 1 && vitals_install_complete() == 0);
+    /* Uninstalling takes the old copies out too */
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
+    expect_uninstalled();
+    expect_no_old_layout();
+    assert(!exists("ux0:data/vitals/system"));
+}
+
 static void test_install_reinstall_uninstall(void)
 {
     fresh_console();
@@ -236,10 +281,9 @@ static void test_install_reinstall_uninstall(void)
 static void expect_debug_level(int level)
 {
     static const char *const modules[][2] = {
-        {"vs0:/data/external/vitals/libhttp.suprx", "libhttp.suprx"},
-        {"vs0:/data/external/vitals/libssl.suprx", "libssl.suprx"},
-        {"vs0:/data/external/vitals/native/vitals.suprx", "vitals.suprx"},
-        {"ur0:tai/vitals-native/vitals.suprx", "vitals.suprx"},
+        {"ux0:data/vitals/system/libhttp.suprx", "libhttp.suprx"},
+        {"ux0:data/vitals/system/libssl.suprx", "libssl.suprx"},
+        {"ux0:data/vitals/system/vitals.suprx", "vitals.suprx"},
         {"ur0:tai/vitals.skprx", "vitals.skprx"},
     };
     for (size_t i = 0; i < sizeof(modules) / sizeof(modules[0]); ++i)
@@ -278,7 +322,7 @@ static void test_debug_levels(void)
     expect_installed();
     expect_debug_level(0);
     /* A libhttp that matches none of the app's builds (another version's) has no level */
-    put("vs0:/data/external/vitals/libhttp.suprx", "another version's libhttp\n");
+    put("ux0:data/vitals/system/libhttp.suprx", "another version's libhttp\n");
     assert(vitals_install_debug_level() < 0);
 }
 
@@ -476,6 +520,7 @@ int main(void)
 {
     test_supported_firmware();
     test_install_reinstall_uninstall();
+    test_old_layout_moves();
     test_debug_levels();
     test_conflicting_installs_are_removed();
     test_moved_plugin_line();

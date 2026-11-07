@@ -32,14 +32,14 @@ APP_VPK = os.path.join(BUILD, "vitals-app", "vitals-app.vpk")
 VITALS = "/ux0:/data/vitals"
 APP_TARGET = VITALS + "/vitals-app.vpk"
 CONFIG = "/ur0:/tai/config.txt"
-# What the app installs (vitals-app/install.c)
+# What the app installs (vitals-app/install.c): the kernel plugin in ur0:tai, vitals' modules in
+# ux0:data/vitals/system, the browser engine's next to Sony's on vs0
 INSTALLED = [
     "/ur0:/tai/vitals.skprx",
-    "/ur0:/tai/vitals-native/vitals.suprx",
+    VITALS + "/system/libhttp.suprx",
+    VITALS + "/system/libssl.suprx",
+    VITALS + "/system/vitals.suprx",
     "/vs0:/data/external/vitals/ScePsp2Compat.suprx",
-    "/vs0:/data/external/vitals/libhttp.suprx",
-    "/vs0:/data/external/vitals/libssl.suprx",
-    "/vs0:/data/external/vitals/native/vitals.suprx",
     # Sony's certificate store, which the app rewrites, and its copy of Sony's original
     "/vs0:/data/external/cert/CA_LIST.cer",
     "/vs0:/data/external/cert/CA_LIST.cer_old",

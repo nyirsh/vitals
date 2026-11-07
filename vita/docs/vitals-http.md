@@ -18,7 +18,7 @@ plugin, since games can't open `ux0:data` themselves.
 
 | Module                     | File loaded                                                                             | Loaded when                    | Into                                                           | Shared or private | Until                                         |
 | -------------------------- | --------------------------------------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------- | ----------------- | --------------------------------------------- |
-| `SceLibHttp` (vitals-http) | `vs0:/data/external/vitals/libhttp.suprx`, in place of `vs0:sys/external/libhttp.suprx` | a process loads Sony's libhttp | every process that loads it, mapped once, as Sony's library is | always **shared** | the last process using it unloads it or exits |
+| `SceLibHttp` (vitals-http) | `ux0:data/vitals/system/libhttp.suprx`, in place of `vs0:sys/external/libhttp.suprx` | a process loads Sony's libhttp | every process that loads it, mapped once, as Sony's library is | always **shared** | the last process using it unloads it or exits |
 
 | Memory                            | Taken when                           | Size                                                             | Freed            |
 | --------------------------------- | ------------------------------------ | ---------------------------------------------------------------- | ---------------- |
@@ -29,8 +29,8 @@ plugin, since games can't open `ux0:data` themselves.
 
 | File on the console                       | Comes from                                                        | Installed by                                                   |
 | ----------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
-| `vs0:/data/external/vitals/libhttp.suprx` | built from [vitals-http/](../vitals-http/)                        | `install_http_modules` in [install.c](../vitals-app/install.c) |
-| `vs0:/data/external/vitals/libssl.suprx`  | built from [vitals-ssl/](../vitals-ssl/), see [libssl.md](libssl.md) | same function                                                  |
+| `ux0:data/vitals/system/libhttp.suprx` | built from [vitals-http/](../vitals-http/)                        | `install_http_modules` in [install.c](../vitals-app/install.c) |
+| `ux0:data/vitals/system/libssl.suprx`  | built from [vitals-ssl/](../vitals-ssl/), see [libssl.md](libssl.md) | same function                                                  |
 | `vs0:/data/external/cert/CA_LIST.cer`     | the certificate store: Sony's, Mozilla's and `custom-certs.pem`'s | `install_certificates`                                         |
 | `ux0:data/vitals/redirects.txt`           | the host redirect list, created once with examples                | the installer; never overwritten                               |
 | `ux0:data/vitals/useragent.txt`           | the User-Agent suffix, optional                                   | you                                                            |
@@ -40,16 +40,18 @@ versions used in its place: the old HTTP provider and reAuth's module.
 
 ## 2. Boot
 
-The kernel plugin's `add_replace_flags` ([vitals-plugin/main.c](../vitals-plugin/main.c)) looks for
-vitals' libhttp and libssl. `g_replace_iap` is set only when **both** exist: the two libraries are
-always swapped together.
+The kernel plugin's hooks go in at boot, whatever is installed. vitals' libhttp and libssl are in
+`ux0:data/vitals/system`, which may not be ready when the plugin starts (a plugin loaded after it maps
+an SD2Vita's card), so they're looked for at each load of Sony's libhttp or libssl (`replace_iap` in
+[vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, as the
+two libraries are always swapped together, and otherwise Sony's load.
 
 ## 3. A process asks for libhttp
 
 Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-plugin/main.c)):
 
 1. **Path swap:** `vs0:sys/external/libhttp.suprx`, `vs0:/sys/external/libhttp.suprx` and reAuth's
-   `ur0:data/reAuth/libhttp.suprx` all become `vs0:/data/external/vitals/libhttp.suprx`. The load is
+   `ur0:data/reAuth/libhttp.suprx` all become `ux0:data/vitals/system/libhttp.suprx`. The load is
    logged as `vitals: libhttp load pid=… path=…`.
 2. **Flags left alone:** the loader's shared mapping is kept, so one copy of the code serves every
    process, each with its own data, exactly as with Sony's library.

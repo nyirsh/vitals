@@ -84,7 +84,7 @@ typedef struct LoaderTarget
 
 /* The browser provider, injected after vitals' ScePsp2Compat (the browser engine's) starts */
 static const LoaderTarget g_browser_target = {
-    "vs0:/data/external/vitals/ScePsp2Compat.suprx", VITALS_BROWSER_PROVIDER_BOOT_PATH,
+    VITALS_COMPAT_PATH, VITALS_BROWSER_PROVIDER_BOOT_PATH,
     "vitals", g_expected_browser_sha256, VITALS_BROWSER_START_MAGIC, VITALS_BROWSER_START_VERSION};
 
 static uint8_t ready;
@@ -258,13 +258,13 @@ int vitals_kernel_loader_init(void)
         return -1;
     ready = 0;
     memset(in_flight, 0, sizeof(in_flight));
-    if (!target_matches(&g_browser_target, 0))
-        return -1;
     g_injection_mutex = ksceKernelCreateMutex("vitals inject", 0, 0, NULL);
     if (g_injection_mutex < 0)
         return g_injection_mutex;
-    ready = 1;
-    return 0;
+    /* The provider is on ux0, which may not be mapped yet when this plugin starts (an SD2Vita's):
+     * when it isn't found now, vitals_kernel_browser_loader_ready looks again at each engine load */
+    ready = target_matches(&g_browser_target, 0);
+    return ready ? 0 : -1;
 }
 
 void vitals_kernel_loader_destroy(void)
@@ -279,6 +279,9 @@ void vitals_kernel_loader_destroy(void)
 
 int vitals_kernel_browser_loader_ready(void)
 {
+    /* Once ready it stays so; until then, after an init that created the lock, it's checked again */
+    if (!ready && g_injection_mutex >= 0 && target_matches(&g_browser_target, 0))
+        ready = 1;
     return ready;
 }
 

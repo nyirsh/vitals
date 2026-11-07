@@ -33,7 +33,7 @@ You need a hacked PS Vita on **firmware 3.60 or 3.65** with taiHEN. Supporting o
   _This installs everything: the browser plugin, the system plugin and the certificates. The certificates are also downloaded from the internet, so there's no need to update them -- yet_
 - When it's done, press **START** to reboot the Vita (or **Circle** to reboot later): `vitals` starts at the next boot
 
-`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins.
+`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins. Its kernel plugin is `ur0:tai/vitals.skprx`; its other modules are in `ux0:data/vitals/system/`, next to your lists, but for the browser engine's (`vs0:/data/external/vitals/`) and the certificate store, which stay on `vs0:`. Updating from a version that kept them on `vs0:` moves them.
 
 Once `vitals` is installed, from the same application you'll be able to:
 
@@ -213,7 +213,7 @@ Every build includes all three levels; choose one on the console in the app's **
 - `make fetch`: brings the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, and deletes them from the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed
 - `make status`: `config.txt`, vitals' plugin and modules, the certificate store and your lists, as they are on the Vita
 
-Installing, uninstalling and switching the debug output stay the app's: they need `vs0:` mounted for writing and a reboot, which the app takes care of.
+Installing, uninstalling and switching the debug output stay the app's, with the reboot they need: installing and uninstalling also write `vs0:` (the browser engine's module and the certificate store), which the app mounts for writing.
 
 ### Updating `Mbed TLS` or `curl`
 

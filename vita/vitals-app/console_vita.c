@@ -79,7 +79,8 @@ int vitals_install_detect(void)
 
 int vitals_install_read(char *version, size_t size, int *debug_level)
 {
-    if (vitals_install_plugin_version(version, size) < 0)
+    /* An earlier layout's install reads as unknown, so the menu offers to update it */
+    if (vitals_install_old_layout() || vitals_install_plugin_version(version, size) < 0)
         return -1;
     /* Modules that match none of this app's builds (another version's) count as release ones */
     int level = vitals_install_debug_level();

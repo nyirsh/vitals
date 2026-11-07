@@ -20,6 +20,7 @@
 #include "config_edit.h"
 #include "install.h"
 #include "module_version.h"
+#include "vitals/path.h"
 
 /* Progress messages go to the app's screen through install_note (see vitals_install_apply) */
 #define printf install_note
@@ -48,7 +49,6 @@ static const char vitals_config_block[] =
  * the user moved it */
 static const char vitals_plugin_path[] = "ur0:tai/vitals.skprx";
 static const char vitals_plugin_name[] = "vitals.skprx";
-static const char browser_provider_global[] = "ur0:tai/vitals-native/vitals.suprx";
 static const char redirect_list[] = "ux0:data/vitals/redirects.txt";
 static const char dns_list[] = "ux0:data/vitals/dns.txt";
 
@@ -62,16 +62,32 @@ enum
     MODULE_OLD_REAUTH,
 };
 
+/* vitals' modules in ux0:data/vitals/system, but for the browser engine's, which stays next to Sony's
+ * on vs0 (vitals/path.h) */
 static const char *const new_modules[] = {
-    [MODULE_COMPAT] = "vs0:/data/external/vitals/ScePsp2Compat.suprx",
+    [MODULE_COMPAT] = VITALS_COMPAT_PATH,
     /* vitals-http, which does its own TLS */
-    [MODULE_LIBHTTP] = "vs0:/data/external/vitals/libhttp.suprx",
-    [MODULE_LIBSSL] = "vs0:/data/external/vitals/libssl.suprx",
+    [MODULE_LIBHTTP] = VITALS_LIBHTTP_PATH,
+    [MODULE_LIBSSL] = VITALS_LIBSSL_PATH,
     /* The HTTP provider earlier versions injected into Sony's libhttp; vitals-http replaces both */
     [MODULE_OLD_HTTP_PROVIDER] = "vs0:/data/external/vitals/native/vitals_http.suprx",
-    [MODULE_BROWSER_PROVIDER] = "vs0:/data/external/vitals/native/vitals.suprx",
+    [MODULE_BROWSER_PROVIDER] = VITALS_BROWSER_PROVIDER_BOOT_PATH,
     /* The PSN redirect earlier versions injected; vitals-http applies redirects.txt itself */
     [MODULE_OLD_REAUTH] = "vs0:/data/external/vitals/native/vitals-reauth.suprx",
+};
+
+/* Where earlier versions kept the modules that are in ux0:data/vitals/system now: libhttp and libssl
+ * on vs0, and the browser provider twice, the kernel plugin's copy in ur0:tai and a second on vs0.
+ * Every install and uninstall takes them out, and their folders when empty */
+static const char *const old_layout[] = {
+    "vs0:/data/external/vitals/libhttp.suprx",
+    "vs0:/data/external/vitals/libssl.suprx",
+    "vs0:/data/external/vitals/native/vitals.suprx",
+    "ur0:tai/vitals-native/vitals.suprx",
+};
+static const char *const old_layout_folders[] = {
+    "vs0:/data/external/vitals/native",
+    "ur0:tai/vitals-native",
 };
 
 static int path_exists(const char *path)
@@ -88,6 +104,26 @@ static int remove_if_exists(const char *path)
         return 0;
     }
     return sceIoRemove(path);
+}
+
+static int remove_old_layout(void)
+{
+    int result = 0;
+    for (size_t i = 0; i < sizeof(old_layout) / sizeof(old_layout[0]) && result >= 0; ++i)
+        result = remove_if_exists(old_layout[i]);
+    for (size_t i = 0; i < sizeof(old_layout_folders) / sizeof(old_layout_folders[0]); ++i)
+        if (path_exists(old_layout_folders[i]))
+            (void)sceIoRmdir(old_layout_folders[i]);
+    return result;
+}
+
+/* ux0:data/vitals/system, and ux0:data/vitals above it */
+static int make_system_directory(void)
+{
+    if (path_exists(VITALS_SYSTEM_DIRECTORY))
+        return 0;
+    (void)sceIoMkdir("ux0:data/vitals", 0777);
+    return sceIoMkdir(VITALS_SYSTEM_DIRECTORY, 0777);
 }
 
 static int write_all(SceUID descriptor, const void *data, SceSize size)
@@ -843,28 +879,14 @@ static int install_compat(int requested_state)
     if (removing)
     {
         printf("Removing browser compatibility and TLS 1.3 modules... \n");
-        result = remove_if_exists(browser_provider_global);
-        if (result >= 0)
-            result = remove_if_exists(new_modules[MODULE_BROWSER_PROVIDER]);
+        result = remove_if_exists(new_modules[MODULE_BROWSER_PROVIDER]);
         if (result >= 0)
             result = remove_if_exists(new_modules[MODULE_COMPAT]);
         return result;
     }
 
     printf("Installing browser compatibility and TLS 1.3 modules... \n");
-    if (!path_exists("ur0:tai/vitals-native"))
-    {
-        result = sceIoMkdir("ur0:tai/vitals-native", 0777);
-        if (result < 0)
-            return result;
-    }
-    if (!path_exists("vs0:/data/external/vitals/native"))
-    {
-        result = sceIoMkdir("vs0:/data/external/vitals/native", 0777);
-        if (result < 0)
-            return result;
-    }
-    result = replace_file("app0:vitals.suprx", browser_provider_global);
+    result = make_system_directory();
     if (result >= 0)
         result = replace_file("app0:vitals.suprx", new_modules[MODULE_BROWSER_PROVIDER]);
     if (result >= 0)
@@ -898,20 +920,23 @@ static int install_http_modules(int requested_state)
         {
             result = remove_if_exists(new_modules[MODULE_LIBSSL]);
         }
+        if (result >= 0)
+            result = remove_old_layout();
+        if (result >= 0 && path_exists(VITALS_SYSTEM_DIRECTORY))
+            (void)sceIoRmdir(VITALS_SYSTEM_DIRECTORY);
     }
     else
     {
         printf("Installing the vitals HTTP, SSL, and TLS 1.3 modules... \n");
-        if (!path_exists("vs0:/data/external/vitals/native"))
-        {
-            result = sceIoMkdir("vs0:/data/external/vitals/native", 0777);
-            if (result < 0)
-                return result;
-        }
-        /* Earlier versions' provider and PSN redirect, which vitals-http replaces */
+        /* Earlier versions' provider and PSN redirect, which vitals-http replaces, and the modules
+         * where earlier versions kept them */
         result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
         if (result >= 0)
             result = remove_if_exists(new_modules[MODULE_OLD_REAUTH]);
+        if (result >= 0)
+            result = remove_old_layout();
+        if (result >= 0)
+            result = make_system_directory();
         if (result >= 0)
         {
             result = replace_file("app0:libhttp.suprx", new_modules[MODULE_LIBHTTP]);
@@ -1060,6 +1085,14 @@ static int apply_component(void *context, unsigned component, int removing)
     }
 }
 
+int vitals_install_old_layout(void)
+{
+    for (size_t i = 0; i < sizeof(old_layout) / sizeof(old_layout[0]); ++i)
+        if (path_exists(old_layout[i]))
+            return 1;
+    return 0;
+}
+
 int vitals_install_complete(void)
 {
     /* vitals counts as installed when its plugin, every module and the certificates are in place */
@@ -1067,7 +1100,7 @@ int vitals_install_complete(void)
            !path_exists("vs0:/data/external/webcore/ScePsp2Compat.supr0") &&
            path_exists("ur0:tai/vitals.skprx") && plugin_configured() &&
            path_exists(new_modules[MODULE_COMPAT]) && path_exists(new_modules[MODULE_BROWSER_PROVIDER]) &&
-           path_exists(browser_provider_global) && path_exists(new_modules[MODULE_LIBHTTP]) &&
+           path_exists(new_modules[MODULE_LIBHTTP]) && !vitals_install_old_layout() &&
            path_exists(new_modules[MODULE_LIBSSL]) && !path_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]) &&
            !path_exists(new_modules[MODULE_OLD_REAUTH]) &&
            path_exists("vs0:/data/external/cert/CA_LIST.cer_old");
@@ -1152,34 +1185,25 @@ int vitals_install_debug_level(void)
 
 int vitals_install_debug_modules(int level, VitalsNote note)
 {
-    uint8_t mount_data[0x100] = {0};
     char source[64];
     int result;
 
     if (level < 0 || level >= VITALS_DEBUG_LEVEL_COUNT)
         return -1;
     g_note = note;
-    (void)vshIoUmount(0x300, 0, 0, 0);
-    (void)vshIoUmount(0x300, 1, 0, 0);
-    result = _vshIoMount(0x300, 0, 2, mount_data);
-    if (result >= 0)
-    {
-        printf("Installing the %s modules... \n", level == 0 ? "release" : "debug");
-        debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
-        result = replace_file(source, new_modules[MODULE_LIBHTTP]);
-    }
+    /* Every build switched is in ux0:data/vitals/system or ur0:tai: vs0 isn't touched */
+    printf("Installing the %s modules... \n", level == 0 ? "release" : "debug");
+    debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
+    result = replace_file(source, new_modules[MODULE_LIBHTTP]);
     if (result >= 0)
     {
         debug_source(level, DEBUG_LIBSSL, source, sizeof(source));
         result = replace_file(source, new_modules[MODULE_LIBSSL]);
     }
-    /* The browser provider has two copies, like a full install leaves */
     if (result >= 0)
     {
         debug_source(level, DEBUG_BROWSER_PROVIDER, source, sizeof(source));
-        result = replace_file(source, browser_provider_global);
-        if (result >= 0)
-            result = replace_file(source, new_modules[MODULE_BROWSER_PROVIDER]);
+        result = replace_file(source, new_modules[MODULE_BROWSER_PROVIDER]);
     }
     /* The kernel plugin's own debug output (every DNS query); it is loaded at boot, so this one
      * applies after a reboot */

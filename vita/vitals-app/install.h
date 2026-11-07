@@ -16,6 +16,9 @@
 
 /* 1 on firmware 3.60 or 3.65; otherwise 0, with the detected firmware described in description */
 int vitals_install_firmware_supported(char *description, size_t size);
+/* 1 when an earlier version's modules are where it kept them (vs0, ur0:tai/vitals-native) rather than
+ * in ux0:data/vitals/system: an update moves them */
+int vitals_install_old_layout(void);
 /* 1 when the plugin, every module and the certificates are installed */
 int vitals_install_complete(void);
 /* 1 when the installed kernel plugin is the one this app carries, 0 when it differs (another

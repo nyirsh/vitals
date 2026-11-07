@@ -130,10 +130,15 @@ static int finish_start(SceUID pid) {
 }
 
 static void test_startup_failures(void) {
+    /* Nothing on vs0 yet: the hooks still go in, as libhttp and libssl are looked for at each load
+     * (ux0 may not be mapped yet), but the browser loader doesn't start */
     reset_startup();
     stat_result = -1;
     assert(module_start(0, NULL) == SCE_KERNEL_START_SUCCESS);
-    assert(hook_installations == 0 && loader_initializations == 0 && !mutex_live);
+    assert(hook_installations == 2 && loader_initializations == 0 && mutex_live && !g_replace_compat);
+    assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);
+    g_start_hook_id = g_loader_hook_id = -1;
+    assert(module_stop(0, NULL) == SCE_KERNEL_STOP_SUCCESS && !mutex_live);
 
     reset_startup();
     hook_validation_result = -1;
@@ -156,7 +161,7 @@ static void test_startup_failures(void) {
     assert(loader_destructions == 1 && !mutex_live);
     /* The DNS hooks start and stop with the plugin */
     assert(dns_starts >= 1 && dns_stops >= 1);
-    puts("kernel startup: no-replacement, validation, start-hook and load-hook failures, DNS hooks PASS");
+    puts("kernel startup: nothing installed yet, validation, start-hook and load-hook failures, DNS hooks PASS");
 }
 
 static void test_routes(void) {
@@ -195,6 +200,17 @@ static void test_routes(void) {
     assert(installed_load(0, "vs0:sys/external/libssl.suprx", 0, NULL) == 88);
     assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBSSL]) == 0);
 
+    /* libhttp and libssl not there at this load (the card not mapped yet, or taken out): Sony's */
+    reset();
+    stat_result = -1;
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
+    assert(strcmp(selected_path, libhttp_paths[0]) == 0);
+    assert(installed_load(0, "vs0:sys/external/libssl.suprx", 0, NULL) == 88);
+    assert(strcmp(selected_path, "vs0:sys/external/libssl.suprx") == 0);
+    stat_result = 0;
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
+
     reset();
     assert(installed_load(0, "ux0:/unrelated.suprx", 0x8001, NULL) == 88);
     assert(strcmp(selected_path, "ux0:/unrelated.suprx") == 0 && seen_flags == 0x8001);
@@ -219,7 +235,7 @@ int main(void) {
     reset_startup();
     assert(module_start(0, NULL) == SCE_KERNEL_START_SUCCESS);
     assert(hook_installations == 2 && loader_initializations == 1 && mutex_live);
-    assert(g_replace_iap && g_replace[MODULE_COMPAT]);
+    assert(g_replace_compat && replace_iap());
     test_routes();
     test_shared_flags();
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);

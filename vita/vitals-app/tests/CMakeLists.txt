@@ -9,6 +9,8 @@ set(APP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # and check_result.h from this app's folder, which each test adds
 set(SHARED_APP ${APP_DIR}/../../shared/app)
 include_directories(AFTER ${SHARED_APP})
+# vitals/path.h: where the kernel plugin and the installer keep vitals' modules
+include_directories(AFTER ${APP_DIR}/../tls13-vita/include)
 
 option(VITALS_ENABLE_SANITIZERS "Build the tests with AddressSanitizer and UBSan" ON)
 if(VITALS_ENABLE_SANITIZERS)
