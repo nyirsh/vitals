@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-/* Text in the system font, from the Vita's vitals-app font.h: glyphs rasterised by a backend
- * (font_ps3.c, cellFont; host/font_host.c, CoreText) and kept in a cache. The PS3's screen is
- * 1280x720, so glyphs are larger than the Vita's: up to 96 pixels a side, sizes 12 to 64 */
+/* Text in the system font: glyphs rasterised by each console's backend (the PS3's font_ps3.c with
+ * cellFont, the preview's host/font_host.c with CoreText) and kept in a cache (font.c). Sizes are the
+ * canvas's, so up to 1.5 times the layout's at 1080 */
 
 #define CHECK_GLYPH_SIDE 112
 #define CHECK_FONT_MIN_SIZE 12

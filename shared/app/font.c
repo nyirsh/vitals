@@ -1,5 +1,5 @@
-/* The glyph cache and text drawing, from the Vita's vitals-app font.c: sizes up to
- * CHECK_FONT_MAX_SIZE, and the screen's size from ui.h */
+/* The glyph cache and text drawing, on every console: sizes up to CHECK_FONT_MAX_SIZE, and the
+ * canvas's size (check_canvas_set) */
 
 #include "font.h"
 #include "ui.h"

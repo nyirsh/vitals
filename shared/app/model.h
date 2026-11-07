@@ -6,9 +6,10 @@
 
 #include "vitals_paths.h"
 
-/* The connection test's results, as the Vita's vitals-app model.h has them, for Sony's libhttp:
- * a request's error is libhttp's (0x8071xxxx), and a refused certificate gives libhttp's verify
- * flags (CELL_HTTPS_VERIFY_ERROR_*) */
+/* The connection test's results, which ui.c draws. A request's error and a refused certificate's flags
+ * are the console's HTTP library's (on the PS3, libhttp's 0x8071xxxx and CELL_HTTPS_VERIFY_ERROR_*),
+ * which the console's check_model.c judges and names. vitals_paths.h is the console's: where its
+ * redirect and DNS lists are (VITALS_REDIRECTS, VITALS_DNS) */
 
 #define CHECK_BODY_MAX (96u * 1024u)
 #define CHECK_LIST_MAX 64

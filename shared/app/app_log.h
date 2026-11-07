@@ -1,8 +1,8 @@
 #ifndef VITALS_APP_LOG_H
 #define VITALS_APP_LOG_H
 
-/* The app's own log, /dev_hdd0/vitals/logs/vitals-app.log (VITALS_APP_LOG, common/vitals_paths.h; and
- * the TTY): a line a step of starting up and of each operation, each written and synced at once, so
+/* The app's own log, which each console keeps (the PS3's app_log.c: /dev_hdd0/vitals/logs/vitals-app.log
+ * and the TTY): a line a step of starting up and of each operation, each written and synced at once, so
  * a crash leaves the last step before it */
 
 #include "vitals_paths.h"

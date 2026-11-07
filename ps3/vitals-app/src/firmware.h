@@ -1,5 +1,5 @@
-#ifndef VITALS_APP_CONSOLE_H
-#define VITALS_APP_CONSOLE_H
+#ifndef VITALS_APP_FIRMWARE_H
+#define VITALS_APP_FIRMWARE_H
 
 /* What the console runs: its firmware, CEX or DEX, and Cobra or PS3HEN, the way webMAN MOD finds
  * them (its include/init/firmware.h and cpursx.h). Read once, at the first call */
@@ -21,7 +21,6 @@ typedef struct {
 
 const ConsoleInfo *console_info(void);
 
-/* While flags/unsupported.ok is there, the app installs on an unsupported system too: for testers */
-int console_unsupported_allowed(void);
+/* console_unsupported_allowed (console.h): while flags/unsupported.ok is there, for testers */
 
 #endif

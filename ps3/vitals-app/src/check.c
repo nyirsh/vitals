@@ -6,7 +6,7 @@
 #include "check.h"
 
 #include "app_log.h"
-#include "console.h"
+#include "firmware.h"
 #include "http.h"
 #include "install.h"
 #include "vitals/redirect_list.h"

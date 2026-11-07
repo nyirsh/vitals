@@ -1,3 +1,5 @@
+#include "firmware.h"
+
 #include "console.h"
 
 #include "app_log.h"

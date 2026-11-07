@@ -41,6 +41,11 @@ void vitals_install_set_source(const char *eboot_path)
 	}
 }
 
+const char *vitals_install_source(void)
+{
+	return source;
+}
+
 static void notef(VitalsNote note, const char *format, ...) __attribute__((format(printf, 2, 3)));
 static void notef(VitalsNote note, const char *format, ...)
 {
@@ -438,7 +443,8 @@ static int bundle_looks_right(const char *data, size_t length, unsigned *count)
 	return *count >= 100;
 }
 
-int vitals_update_certificates(VitalsNote note)
+/* The download and check; vitals_update_certificates closes libhttp after it */
+static int download_certificates(VitalsNote note)
 {
 	note("Connecting to the network...");
 	int rc = http_open();
@@ -536,6 +542,13 @@ void vitals_certificates_date(char *text, size_t size, int *stale)
  * next start, it says "The system was not turned off properly". webMAN MOD deletes it before its own
  * reboots, as a reboot through sys_sm_shutdown doesn't */
 #define TURNOFF_MARKER "/dev_hdd0/tmp/turnoff"
+
+int vitals_update_certificates(VitalsNote note)
+{
+	int rc = download_certificates(note);
+	http_close();
+	return rc;
+}
 
 void vitals_reboot(void)
 {

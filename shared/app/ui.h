@@ -4,8 +4,8 @@
 #include "changelog.h"
 #include "model.h"
 
-/* The screens, drawn into a 1280x720 canvas (0xAARRGGBB, alpha ignored): the Vita's vitals-app
- * ui.h, at the PS3's size */
+/* The app's screens, the same on every console: drawn in a 1280x720 layout (0xAARRGGBB, alpha
+ * ignored), which ui.c scales to the console's canvas (check_canvas_set) */
 
 #define CHECK_WIDTH 1280
 #define CHECK_HEIGHT 720

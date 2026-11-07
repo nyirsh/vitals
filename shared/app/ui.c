@@ -1,5 +1,5 @@
-/* The screens: the Vita's vitals-app ui.c at 1280x720. Its layout is kept by scaling the Vita's
- * coordinates, 960x544, to the PS3's: X() across (4/3), Y() down (720/544), F() for text sizes.
+/* The app's screens, the same on every console. They began as the Vita's vitals-app ui.c at 960x544,
+ * so its coordinates are scaled to the 1280x720 layout: X() across (4/3), Y() down (720/544), F() for text sizes.
  * Those are layout pixels, 1280x720; the canvas may be the screen's own size, bigger (1920x1080), and
  * every drawing function here turns layout pixels into the canvas's (S()), so text is rendered and
  * shapes are drawn at the screen's resolution instead of stretched after */

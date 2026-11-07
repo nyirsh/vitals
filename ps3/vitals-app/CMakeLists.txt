@@ -14,26 +14,30 @@ set(VITALS_CONTENT_ID "UP0001-${VITALS_TITLE_ID}_00-VITALSTLSTOOLKIT")
 set(STAGING "${CMAKE_CURRENT_BINARY_DIR}/pkg_files" CACHE PATH "The .pkg's other files, as the Makefile stages them")
 
 add_executable(vitals-app
+	# The app itself, the same on the Vita (../../shared/app)
+	../../shared/app/app.c
+	../../shared/app/ui.c
+	../../shared/app/font.c
+	../../shared/app/changelog.c
+	../../shared/app/input.c
+	# The PS3's part of it (console.h, platform.h, check.h)
 	src/main.c
+	src/console_ps3.c
+	src/firmware.c
 	src/app_log.c
 	src/platform_ps3.c
 	src/font_ps3.c
-	src/font.c
-	src/ui.c
 	src/check.c
 	src/check_model.c
 	src/http.c
 	src/install.c
 	src/custom_certs.c
 	src/boot_plugins.c
-	../../shared/app/changelog.c
-	src/console.c
-	../../shared/app/input.c
 	# The host redirect list's parser, shared with the Vita, as vitals' libhttp reads the list
 	../../shared/src/host_map.c
 	../../shared/src/redirect_list.c)
-# With the changelog, input and redirect list code shared with the Vita's app (../../shared)
-target_include_directories(vitals-app PRIVATE ../common ../../shared/include ../../shared/app)
+# With the app and the redirect list code shared with the Vita (../../shared)
+target_include_directories(vitals-app PRIVATE src ../common ../../shared/include ../../shared/app)
 target_compile_features(vitals-app PRIVATE c_std_11)
 # Optimised: the PPU is in order, and the screens are drawn and scaled to 1080p in software
 target_compile_options(vitals-app PRIVATE -O2 -Wall -Wextra -Werror)

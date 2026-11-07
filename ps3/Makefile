@@ -159,7 +159,7 @@ app:
 preview:
 	mkdir -p build/preview
 	clang -std=c11 -Wall -Wextra -DVITALS_VERSION='"$(VERSION)"' -Ivitals-app/src -Icommon -I../shared/app -I../shared/include \
-		vitals-app/host/preview.c vitals-app/host/font_host.c vitals-app/src/ui.c vitals-app/src/font.c ../shared/app/changelog.c \
+		vitals-app/host/preview.c vitals-app/host/font_host.c ../shared/app/ui.c ../shared/app/font.c ../shared/app/changelog.c \
 		vitals-app/src/check_model.c -framework CoreText -framework CoreGraphics -framework CoreFoundation \
 		-o build/preview/preview
 	build/preview/preview build/preview
