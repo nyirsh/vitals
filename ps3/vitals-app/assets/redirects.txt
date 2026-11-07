@@ -1,0 +1,8 @@
+# vitals host redirects
+# One "old-host new-host" pair per line; '#' starts a comment
+# Games and apps that use Sony's HTTP library connect to the new host instead: the scheme, port,
+# path and query are kept, and the certificate is checked against the new name
+# At most 32 pairs; changes apply the next time a game or app starts
+# While a file named redirects.off is in the flags folder next to this one, no host is redirected
+#
+# old.server.example        new.server.example

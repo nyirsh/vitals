@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<sfo>
+	<value name="APP_VER" type="string">
+		@VITALS_APP_VERSION@
+	</value>
+	<value name="ATTRIBUTE" type="integer">
+		0
+	</value>
+	<value name="BOOTABLE" type="integer">
+		1
+	</value>
+	<value name="CATEGORY" type="string">
+		CB
+	</value>
+	<value name="LICENSE" type="string">
+		vitals, under the 0BSD license. Built with PS3DK. Not affiliated with Sony Interactive Entertainment.
+	</value>
+	<value name="PARENTAL_LEVEL" type="integer">
+		0
+	</value>
+	<value name="PS3_SYSTEM_VER" type="string">
+		01.8000
+	</value>
+	<value name="RESOLUTION" type="integer">
+		63
+	</value>
+	<value name="SOUND_FORMAT" type="integer">
+		279
+	</value>
+	<value name="TITLE" type="string">
+		vitals
+	</value>
+	<value name="TITLE_ID" type="string">
+		@VITALS_TITLE_ID@
+	</value>
+	<value name="VERSION" type="string">
+		01.00
+	</value>
+</sfo>

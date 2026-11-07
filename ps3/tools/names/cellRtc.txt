@@ -1,0 +1,3 @@
+# cellRtc: the 2 functions Sony's libssl imports (ps3-dumps/libssl.prx), named by their NIDs
+cellRtcGetCurrentClock
+cellRtcGetTime_t

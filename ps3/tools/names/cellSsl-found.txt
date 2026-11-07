@@ -1,0 +1,2 @@
+# cellSsl names found by hashing OpenSSL-style candidates against the NIDs Sony's libssl exports
+SSLCERT_NAME_hash

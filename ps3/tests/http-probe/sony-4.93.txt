@@ -1,0 +1,2386 @@
+start
+SslInit rc=0x00000000
+before init CreateClient rc=0x80710002
+before init End rc=0x80710002
+before init GetProxy rc=0x80710002
+before init SetProxy rc=0x80710002
+before init InitCookie rc=0x00000000
+before init EndCookie rc=0x00000000
+before init AuthCacheFlush rc=0x80710002
+before init AuthCacheGetEntryMax rc=0x80710002
+before init ParseUri rc=0x00000000 required=22 host=example.com
+init NULL rc=0x80710004
+init size 0 rc=0x80710004
+init rc=0x00000000
+init again rc=0x80710001
+CreateClient NULL rc=0x80710004
+CreateClient rc=0x00000000 id
+default KeepAlive rc=0x00000000 1
+default Pipeline rc=0x00000000 0
+default AutoRedirect rc=0x00000000 1
+default AutoAuthentication rc=0x00000000 1
+default AuthenticationCacheStatus rc=0x00000000 1
+default CookieStatus rc=0x00000000 0
+default ConnectionWaitStatus rc=0x00000000 0
+default ConnTimeout rc=0x00000000 30000000
+default RecvTimeout rc=0x00000000 120000000
+default SendTimeout rc=0x00000000 120000000
+default ConnectionWaitTimeout rc=0x00000000 150000000
+default TotalPoolSize rc=0x00000000 24
+default PerHostPoolSize rc=0x00000000 8
+default PerHostKeepAliveMax rc=0x00000000 2
+default PerPipelineMax rc=0x00000000 4
+default ResponseBufferMax rc=0x00000000 5000
+default RecvBufferSize rc=0x00000000 65535
+default SendBufferSize rc=0x00000000 65535
+default Version rc=0x00000000 1.1
+default SslVersion rc=0x00000000 0
+default MinSslVersion rc=0x00000000 0
+default UserAgent size rc=0x00000000 required=42
+default UserAgent small rc=0x80710006 required=42
+default UserAgent rc=0x00000000 "PS3Application libhttp/4.9.3-000 (CellOS)" required=42
+bad client rc=0x80710010
+NULL client rc=0x80710010
+NULL out rc=0x80710004
+set UserAgent rc=0x00000000
+set UserAgent NULL rc=0x80710004
+set Version 1.0 rc=0x00000000
+set Version 2.0 rc=0x00000000
+set Version 1.1 rc=0x00000000
+set RecvTimeout -1 rc=0x00000000
+set RecvTimeout 5s rc=0x00000000
+client header add rc=0x00000000
+CreateTransaction NULL id rc=0x80710004
+CreateTransaction NULL method rc=0x80710009
+CreateTransaction NULL uri rc=0x80710007
+CreateTransaction ftp rc=0x00000000
+CreateTransaction no host rc=0x80710007
+plain create rc=0x00000000
+plain send rc=0x00000000 sent=0
+plain status rc=0x00000000 200
+plain length rc=0x00000000 14
+plain status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+plain header size rc=0x00000000 required=12
+plain header rc=0x00000000 X-Probe: one
+plain all headers rc=0x00000000 items=3 required=76
+plain header 0 X-Probe: one
+plain header 1 X-Probe-Two: two words
+plain header 2 Content-Length: 14
+plain reads 5/0x0 5/0x0 4/0x0 0/0x0 
+plain body (14) "hello, vitals\n"
+plain read after end rc=0x00000000 0
+plain destroy rc=0x00000000
+head create rc=0x00000000
+head send rc=0x00000000 sent=0
+head status rc=0x00000000 200
+head length rc=0x00000000 0
+head status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+head header size rc=0x00000000 required=12
+head header rc=0x00000000 X-Probe: one
+head all headers rc=0x00000000 items=3 required=75
+head header 0 X-Probe: one
+head header 1 X-Probe-Two: two words
+head header 2 Content-Length: 0
+head reads 0/0x0 
+head body (0) ""
+head read after end rc=0x00000000 0
+head destroy rc=0x00000000
+chunked create rc=0x00000000
+chunked send rc=0x00000000 sent=0
+chunked status rc=0x00000000 200
+chunked length rc=0x80710017 0
+chunked status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+chunked header size rc=0x80710016 required=8
+chunked header rc=0x80710016 -: -
+chunked all headers rc=0x00000000 items=1 required=34
+chunked header 0 Transfer-Encoding: chunked
+chunked reads 5/0x0 5/0x0 4/0x0 0/0x0 
+chunked body (14) "hello, vitals\n"
+chunked read after end rc=0x00000000 0
+chunked destroy rc=0x00000000
+close create rc=0x00000000
+close send rc=0x00000000 sent=0
+close status rc=0x00000000 200
+close length rc=0x80710017 0
+close status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+close header size rc=0x80710016 required=8
+close header rc=0x80710016 -: -
+close all headers rc=0x00000000 items=1 required=25
+close header 0 Connection: close
+close reads 5/0x0 5/0x0 4/0x0 0/0x0 
+close body (14) "hello, vitals\n"
+close read after end rc=0x00000000 0
+close destroy rc=0x00000000
+empty create rc=0x00000000
+empty send rc=0x00000000 sent=0
+empty status rc=0x00000000 204
+empty length rc=0x80710017 0
+empty status line rc=0x00000000 HTTP 1.1 204 "No Content" required=16
+empty header size rc=0x80710016 required=16
+empty header rc=0x80710016 -: -
+empty all headers rc=0x00000000 items=0 required=0
+empty reads 0/0x0 
+empty body (0) ""
+empty read after end rc=0x00000000 0
+empty destroy rc=0x00000000
+notfound create rc=0x00000000
+notfound send rc=0x00000000 sent=0
+notfound status rc=0x00000000 404
+notfound length rc=0x00000000 13
+notfound status line rc=0x00000000 HTTP 1.1 404 "Not Found" required=15
+notfound header size rc=0x80710016 required=15
+notfound header rc=0x80710016 -: -
+notfound all headers rc=0x00000000 items=1 required=26
+notfound header 0 Content-Length: 13
+notfound reads 5/0x0 5/0x0 3/0x0 0/0x0 
+notfound body (13) "no such page\n"
+notfound read after end rc=0x00000000 0
+notfound destroy rc=0x00000000
+redirect create rc=0x00000000
+redirect send rc=0x00000000 sent=0
+redirect status rc=0x00000000 200
+redirect length rc=0x00000000 14
+redirect status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+redirect header size rc=0x00000000 required=12
+redirect header rc=0x00000000 X-Probe: one
+redirect all headers rc=0x00000000 items=3 required=76
+redirect header 0 X-Probe: one
+redirect header 1 X-Probe-Two: two words
+redirect header 2 Content-Length: 14
+redirect reads 5/0x0 5/0x0 4/0x0 0/0x0 
+redirect body (14) "hello, vitals\n"
+redirect read after end rc=0x00000000 0
+redirect destroy rc=0x00000000
+post create rc=0x00000000
+post content length rc=0x00000000
+post send rc=0x00000000 sent=4
+post send rest rc=0x00000000 sent=5
+post status rc=0x00000000 200
+post length rc=0x00000000 163
+post status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+post header size rc=0x80710016 required=8
+post header rc=0x80710016 -: -
+post all headers rc=0x00000000 items=1 required=27
+post header 0 Content-Length: 163
+post reads 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 3/0x0 0/0x0 
+post body (163) "POST /echo\nHost: 127.0.0.1:18080\nUser-Agent: ProbeAgent/1.0\nConnection: Keep-Alive\nContent-Length: 9\nAccept-Encoding: identity\nX-Client: from the client\n"
+post read after end rc=0x00000000 0
+post destroy rc=0x00000000
+echo create rc=0x00000000
+echo send rc=0x00000000 sent=0
+echo status rc=0x00000000 200
+echo length rc=0x00000000 135
+echo status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+echo header size rc=0x80710016 required=8
+echo header rc=0x80710016 -: -
+echo all headers rc=0x00000000 items=1 required=27
+echo header 0 Content-Length: 135
+echo reads 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 0/0x0 
+echo body (135) "GET /echo\nHost: 127.0.0.1:18080\nUser-Agent: ProbeAgent/1.0\nConnection: Keep-Alive\nAccept-Encoding: identity\nX-Client: from the client\n\n"
+echo read after end rc=0x00000000 0
+echo destroy rc=0x00000000
+keepalive1 create rc=0x00000000
+keepalive1 send rc=0x00000000 sent=0
+keepalive1 status rc=0x00000000 200
+keepalive1 length rc=0x00000000 29
+keepalive1 status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+keepalive1 header size rc=0x80710016 required=8
+keepalive1 header rc=0x80710016 -: -
+keepalive1 all headers rc=0x00000000 items=1 required=26
+keepalive1 header 0 Content-Length: 29
+keepalive1 reads 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 4/0x0 0/0x0 
+keepalive1 body (29) "request 7 on this connection\n"
+keepalive1 read after end rc=0x00000000 0
+keepalive1 destroy rc=0x00000000
+keepalive2 create rc=0x00000000
+keepalive2 send rc=0x00000000 sent=0
+keepalive2 status rc=0x00000000 200
+keepalive2 length rc=0x00000000 29
+keepalive2 status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+keepalive2 header size rc=0x80710016 required=8
+keepalive2 header rc=0x80710016 -: -
+keepalive2 all headers rc=0x00000000 items=1 required=26
+keepalive2 header 0 Content-Length: 29
+keepalive2 reads 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 4/0x0 0/0x0 
+keepalive2 body (29) "request 8 on this connection\n"
+keepalive2 read after end rc=0x00000000 0
+keepalive2 destroy rc=0x00000000
+headers set rc=0x00000000
+headers add rc=0x00000000
+headers add other rc=0x00000000
+headers delete rc=0x00000000
+headers delete missing rc=0x80710016
+headers get rc=0x00000000 X-Request: first
+headers all rc=0x00000000 items=7
+headers 0 Host: 127.0.0.1:18080
+headers 1 User-Agent: ProbeAgent/1.0
+headers 2 Connection: Keep-Alive
+headers 3 Accept-Encoding: identity
+headers 4 X-Client: from the client
+headers 5 X-Request: first
+headers 6 X-Request: second
+headers send rc=0x00000000
+headers status rc=0x00000000 200
+headers length rc=0x00000000 170
+headers status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+headers header size rc=0x80710016 required=8
+headers header rc=0x80710016 -: -
+headers all headers rc=0x00000000 items=1 required=27
+headers header 0 Content-Length: 170
+headers reads 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 5/0x0 0/0x0 
+headers body (170) "GET /echo\nHost: 127.0.0.1:18080\nUser-Agent: ProbeAgent/1.0\nConnection: Keep-Alive\nAccept-Encoding: identity\nX-Client: from the client\nX-Request: first\nX-"
+headers read after end rc=0x00000000 0
+refused send rc=0x80710316
+unknown host send rc=0x80710101
+DestroyClient rc=0x00000000
+https before init create rc=0x80710007
+ca read
+HttpsInit rc=0x00000000
+HttpsInit again rc=0x80710001
+https create rc=0x00000000
+https send rc=0x00000000 sent=0
+https status rc=0x00000000 200
+https length rc=0x00000000 14
+https status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+https header size rc=0x00000000 required=12
+https header rc=0x00000000 X-Probe: one
+https all headers rc=0x00000000 items=3 required=76
+https header 0 X-Probe: one
+https header 1 X-Probe-Two: two words
+https header 2 Content-Length: 14
+https reads 5/0x0 5/0x0 4/0x0 0/0x0 
+https body (14) "hello, vitals\n"
+https read after end rc=0x00000000 0
+https cipher name rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384" required=26
+https cipher id rc=0x00000000 -1
+https cipher version rc=0x00000000 "TLSv1/SSLv3" required=12
+https cipher bits rc=0x00000000 256 256
+https cipher string rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384 TLSv13 Kx=any      Au=any  Enc=AESGCM(256) Mac=AEAD"
+https ssl version rc=0x00000000 0
+https ssl id rc=0x00000000 id
+https destroy rc=0x00000000
+https wrong host create rc=0x00000000
+https wrong host send rc=0x80710a06 sent=0
+https wrong host destroy rc=0x00000000
+https self-signed create rc=0x00000000
+https self-signed send rc=0x80710a06 sent=0
+https self-signed destroy rc=0x00000000
+https expired create rc=0x00000000
+https expired send rc=0x80710a06 sent=0
+https expired destroy rc=0x00000000
+set ssl callback rc=0x00000000
+https callback create rc=0x00000000
+https callback send rc=0x00000000 sent=0
+https callback status rc=0x00000000 200
+https callback length rc=0x80710017 0
+https callback status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+https callback header size rc=0x80710016 required=8
+https callback header rc=0x80710016 -: -
+https callback all headers rc=0x00000000 items=1 required=34
+https callback header 0 Transfer-Encoding: chunked
+https callback reads 5/0x0 5/0x0 4/0x0 0/0x0 
+https callback body (14) "hello, vitals\n"
+https callback read after end rc=0x00000000 0
+https callback cipher name rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384" required=26
+https callback cipher id rc=0x00000000 -1
+https callback cipher version rc=0x00000000 "TLSv1/SSLv3" required=12
+https callback cipher bits rc=0x00000000 256 256
+https callback cipher string rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384 TLSv13 Kx=any      Au=any  Enc=AESGCM(256) Mac=AEAD"
+https callback ssl version rc=0x00000000 0
+https callback ssl id rc=0x00000000 id
+https callback destroy rc=0x00000000
+https callback wrong host create rc=0x00000000
+ssl callback 1: flags 0x00000400, 1 certificates, host "127.0.0.1", argument ok -> 0
+https callback wrong host send rc=0x00000000 sent=0
+https callback wrong host status rc=0x00000000 200
+https callback wrong host length rc=0x00000000 14
+https callback wrong host status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+https callback wrong host header size rc=0x00000000 required=12
+https callback wrong host header rc=0x00000000 X-Probe: one
+https callback wrong host all headers rc=0x00000000 items=3 required=76
+https callback wrong host header 0 X-Probe: one
+https callback wrong host header 1 X-Probe-Two: two words
+https callback wrong host header 2 Content-Length: 14
+https callback wrong host reads 5/0x0 5/0x0 4/0x0 0/0x0 
+https callback wrong host body (14) "hello, vitals\n"
+https callback wrong host read after end rc=0x00000000 0
+https callback wrong host cipher name rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384" required=26
+https callback wrong host cipher id rc=0x00000000 -1
+https callback wrong host cipher version rc=0x00000000 "TLSv1/SSLv3" required=12
+https callback wrong host cipher bits rc=0x00000000 256 256
+https callback wrong host cipher string rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384 TLSv13 Kx=any      Au=any  Enc=AESGCM(256) Mac=AEAD"
+https callback wrong host ssl version rc=0x00000000 0
+https callback wrong host ssl id rc=0x00000000 id
+https callback wrong host destroy rc=0x00000000
+https callback self-signed create rc=0x00000000
+ssl callback 2: flags 0x00000008, 1 certificates, host "127.0.0.1", argument ok -> 0
+https callback self-signed send rc=0x00000000 sent=0
+https callback self-signed status rc=0x00000000 200
+https callback self-signed length rc=0x00000000 14
+https callback self-signed status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+https callback self-signed header size rc=0x00000000 required=12
+https callback self-signed header rc=0x00000000 X-Probe: one
+https callback self-signed all headers rc=0x00000000 items=3 required=76
+https callback self-signed header 0 X-Probe: one
+https callback self-signed header 1 X-Probe-Two: two words
+https callback self-signed header 2 Content-Length: 14
+https callback self-signed reads 5/0x0 5/0x0 4/0x0 0/0x0 
+https callback self-signed body (14) "hello, vitals\n"
+https callback self-signed read after end rc=0x00000000 0
+https callback self-signed cipher name rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384" required=26
+https callback self-signed cipher id rc=0x00000000 -1
+https callback self-signed cipher version rc=0x00000000 "TLSv1/SSLv3" required=12
+https callback self-signed cipher bits rc=0x00000000 256 256
+https callback self-signed cipher string rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384 TLSv13 Kx=any      Au=any  Enc=AESGCM(256) Mac=AEAD"
+https callback self-signed ssl version rc=0x00000000 0
+https callback self-signed ssl id rc=0x00000000 id
+https callback self-signed destroy rc=0x00000000
+https callback expired create rc=0x00000000
+ssl callback 3: flags 0x00000800, 1 certificates, host "127.0.0.1", argument ok -> 0
+https callback expired send rc=0x00000000 sent=0
+https callback expired status rc=0x00000000 200
+https callback expired length rc=0x00000000 14
+https callback expired status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+https callback expired header size rc=0x00000000 required=12
+https callback expired header rc=0x00000000 X-Probe: one
+https callback expired all headers rc=0x00000000 items=3 required=76
+https callback expired header 0 X-Probe: one
+https callback expired header 1 X-Probe-Two: two words
+https callback expired header 2 Content-Length: 14
+https callback expired reads 5/0x0 5/0x0 4/0x0 0/0x0 
+https callback expired body (14) "hello, vitals\n"
+https callback expired read after end rc=0x00000000 0
+https callback expired cipher name rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384" required=26
+https callback expired cipher id rc=0x00000000 -1
+https callback expired cipher version rc=0x00000000 "TLSv1/SSLv3" required=12
+https callback expired cipher bits rc=0x00000000 256 256
+https callback expired cipher string rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384 TLSv13 Kx=any      Au=any  Enc=AESGCM(256) Mac=AEAD"
+https callback expired ssl version rc=0x00000000 0
+https callback expired ssl id rc=0x00000000 id
+https callback expired destroy rc=0x00000000
+https callback valid create rc=0x00000000
+ssl callback 4: flags 0x00000000, 1 certificates, host "127.0.0.1", argument ok -> 0
+https callback valid send rc=0x00000000 sent=0
+https callback valid status rc=0x00000000 200
+https callback valid length rc=0x00000000 14
+https callback valid status line rc=0x00000000 HTTP 1.1 200 "OK" required=8
+https callback valid header size rc=0x00000000 required=12
+https callback valid header rc=0x00000000 X-Probe: one
+https callback valid all headers rc=0x00000000 items=3 required=76
+https callback valid header 0 X-Probe: one
+https callback valid header 1 X-Probe-Two: two words
+https callback valid header 2 Content-Length: 14
+https callback valid reads 5/0x0 5/0x0 4/0x0 0/0x0 
+https callback valid body (14) "hello, vitals\n"
+https callback valid read after end rc=0x00000000 0
+https callback valid cipher name rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384" required=26
+https callback valid cipher id rc=0x00000000 -1
+https callback valid cipher version rc=0x00000000 "TLSv1/SSLv3" required=12
+https callback valid cipher bits rc=0x00000000 256 256
+https callback valid cipher string rc=0x00000000 "TLS1-3-AES-256-GCM-SHA384 TLSv13 Kx=any      Au=any  Enc=AESGCM(256) Mac=AEAD"
+https callback valid ssl version rc=0x00000000 0
+https callback valid ssl id rc=0x00000000 id
+https callback valid destroy rc=0x00000000
+https refusing wrong host create rc=0x00000000
+ssl callback 5: flags 0x00000400, 1 certificates, host "127.0.0.1", argument ok -> -1
+https refusing wrong host send rc=0x80710a06 sent=0
+https refusing wrong host destroy rc=0x00000000
+https answering 1 create rc=0x00000000
+ssl callback 6: flags 0x00000008, 1 certificates, host "127.0.0.1", argument ok -> 1
+https answering 1 send rc=0x80710a06 sent=0
+https answering 1 destroy rc=0x00000000
+proxy client set rc=0x00000000
+proxied https GET https://127.0.0.1:18443/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied https | hello, vitals
+proxied https again GET https://127.0.0.1:18443/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied https again | hello, vitals
+proxied https wrong host GET https://127.0.0.1:18444/plain send rc=0x80710a06 rc=0x80710a06 HTTP 0
+proxy log | CONNECT 127.0.0.1:18443 HTTP/1.1
+proxy log | Host: 127.0.0.1:18443
+proxy log | Proxy-Connection: Keep-Alive
+proxy log | CONNECT 127.0.0.1:18444 HTTP/1.1
+proxy log | Host: 127.0.0.1:18444
+proxy log | Proxy-Connection: Keep-Alive
+proxy with user https GET https://127.0.0.1:18443/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+proxy log with user | CONNECT 127.0.0.1:18443 HTTP/1.1
+proxy log with user | Host: 127.0.0.1:18443
+proxy log with user | Proxy-Connection: Keep-Alive
+dead proxy https GET https://127.0.0.1:18443/plain send rc=0x80710316 rc=0x80710316 HTTP 0
+root CA count rc=0x00000000 1
+root CA count NULL rc=0x80710004
+root CA callback: certificate given, argument ok
+root CA 0 rc=0x00000000
+root CA callback: certificate NULL, argument ok
+root CA 1 rc=0x00000000
+root CA 99 rc=0x80710027
+additions redirected https uri rc=0x00000000 host old.vitals-probe.invalid
+additions redirected https send rc=0x80710101
+HttpsEnd rc=0x00000000
+HttpsEnd again rc=0x80710002
+GetProxy unset size rc=0x00000000 required=0
+GetProxy unset full rc=0x00000000 required=0 uri untouched
+GetProxy unset nothing rc=0x00000000
+SetProxy rc=0x00000000
+GetProxy set size rc=0x00000000 required=33
+GetProxy set full rc=0x00000000 required=33 scheme@0 "http" host@5 "proxy.example" user@21 "user" password@26 "secret" path@19 "/" port=8080
+GetProxy set short rc=0x80711001 required=2779096485
+GetProxy set exact no required rc=0x00000000
+GetProxy set nothing rc=0x80711002
+SetProxy bare rc=0x00000000
+GetProxy bare size rc=0x00000000 required=21
+GetProxy bare full rc=0x00000000 required=21 scheme@0 "http" host@5 "bare.example" user@19 "" password@20 "" path@18 "" port=0
+GetProxy bare short rc=0x80711001 required=2779096485
+GetProxy bare exact no required rc=0x00000000
+GetProxy bare nothing rc=0x80711002
+SetProxy no host rc=0x80710007
+GetProxy after no host size rc=0x00000000 required=21
+GetProxy after no host full rc=0x00000000 required=21 scheme@0 "http" host@5 "bare.example" user@19 "" password@20 "" path@18 "" port=0
+GetProxy after no host short rc=0x80711001 required=2779096485
+GetProxy after no host exact no required rc=0x00000000
+GetProxy after no host nothing rc=0x80711002
+proxy client rc=0x00000000
+ClientGetProxy inherited size rc=0x00000000 required=21
+ClientGetProxy inherited full rc=0x00000000 required=21 scheme@0 "http" host@5 "bare.example" user@19 "" password@20 "" path@18 "" port=0
+ClientGetProxy inherited short rc=0x80711001 required=2779096485
+ClientGetProxy inherited exact no required rc=0x00000000
+ClientGetProxy inherited nothing rc=0x80711002
+ClientSetProxy rc=0x00000000
+ClientGetProxy set size rc=0x00000000 required=33
+ClientGetProxy set full rc=0x00000000 required=33 scheme@0 "http" host@5 "proxy.example" user@21 "user" password@26 "secret" path@19 "/" port=8080
+ClientGetProxy set short rc=0x80711001 required=2779096485
+ClientGetProxy set exact no required rc=0x00000000
+ClientGetProxy set nothing rc=0x80711002
+ClientSetProxy NULL rc=0x00000000
+ClientGetProxy cleared size rc=0x00000000 required=0
+ClientGetProxy cleared full rc=0x00000000 required=0 uri untouched
+ClientGetProxy cleared nothing rc=0x00000000
+SetProxy NULL rc=0x00000000
+GetProxy cleared size rc=0x00000000 required=0
+GetProxy cleared full rc=0x00000000 required=0 uri untouched
+GetProxy cleared nothing rc=0x00000000
+proxy client 2 rc=0x00000000
+ClientGetProxy fresh size rc=0x00000000 required=0
+ClientGetProxy fresh full rc=0x00000000 required=0 uri untouched
+ClientGetProxy fresh nothing rc=0x00000000
+ClientGetProxy bad client rc=0x80710010
+ClientSetProxy bad client rc=0x80710010
+EndCookie before rc=0x80710002
+InitCookie NULL rc=0x80710004
+InitCookie size 0 rc=0x80710004
+InitCookie small rc=0x80710003
+InitCookie 576 rc=0x80710003
+InitCookie 584 rc=0x80710003
+InitCookie 592 rc=0x00000000
+InitCookie 600 rc=0x00000000
+InitCookie 608 rc=0x00000000
+InitCookie 616 rc=0x00000000
+InitCookie 624 rc=0x00000000
+InitCookie 632 rc=0x00000000
+InitCookie 640 rc=0x00000000
+InitCookie 4096 rc=0x00000000
+InitCookie rc=0x00000000
+InitCookie again rc=0x80710001
+EndCookie rc=0x00000000
+EndCookie again rc=0x80710002
+InitCookie after end rc=0x00000000
+EndCookie last rc=0x00000000
+EscapeUri "abc" rc=0x00000000 required=4 out="abc\x00\xa5"
+EscapeUri "a b" rc=0x00000000 required=6 out="a%20b\x00\xa5"
+EscapeUri "a/b?c=d&e=f#g" rc=0x00000000 required=26 out="a%2Fb%3Fc%3Dd%26e%3Df%23g\x00\xa5"
+EscapeUri "~-_.!*'()" rc=0x00000000 required=20 out="%7E-_.%21*%27%28%29\x00\xa5"
+EscapeUri "100%" rc=0x00000000 required=7 out="100%25\x00\xa5"
+EscapeUri "+:@;,$[]" rc=0x00000000 required=25 out="%2B%3A%40%3B%2C%24%5B%5D\x00\xa5"
+EscapeUri ""<>\x5c^`{|}" rc=0x00000000 required=28 out="%22%3C%3E%5C%5E%60%7B%7C%7D\x00\xa5"
+EscapeUri "caf\xc3\xa9" rc=0x00000000 required=10 out="caf%C3%A9\x00\xa5"
+FormUrlEncode "abc" rc=0x00000000 required=4 out="abc\x00\xa5"
+FormUrlEncode "a b" rc=0x00000000 required=4 out="a+b\x00\xa5"
+FormUrlEncode "a/b?c=d&e=f#g" rc=0x00000000 required=26 out="a%2Fb%3Fc%3Dd%26e%3Df%23g\x00\xa5"
+FormUrlEncode "~-_.!*'()" rc=0x00000000 required=20 out="%7E-_.%21*%27%28%29\x00\xa5"
+FormUrlEncode "100%" rc=0x00000000 required=7 out="100%25\x00\xa5"
+FormUrlEncode "+:@;,$[]" rc=0x00000000 required=25 out="%2B%3A%40%3B%2C%24%5B%5D\x00\xa5"
+FormUrlEncode ""<>\x5c^`{|}" rc=0x00000000 required=28 out="%22%3C%3E%5C%5E%60%7B%7C%7D\x00\xa5"
+FormUrlEncode "caf\xc3\xa9" rc=0x00000000 required=10 out="caf%C3%A9\x00\xa5"
+EscapeUri bytes 0-63 rc=0x00000000 required=167 out="%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F%20%21%22%23%24%25%26%27"
+FormUrlEncode bytes 0-63 rc=0x00000000 required=165 out="%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%10%11%12%13%14%15%16%17%18%19%1A%1B%1C%1D%1E%1F+%21%22%23%24%25%26%27%2"
+EscapeUri bytes 64-127 rc=0x00000000 required=87 out="%40ABCDEFGHIJKLMNOPQRSTUVWXYZ%5B%5C%5D%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D%7E%7F\x00"
+FormUrlEncode bytes 64-127 rc=0x00000000 required=87 out="%40ABCDEFGHIJKLMNOPQRSTUVWXYZ%5B%5C%5D%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D%7E%7F\x00"
+EscapeUri bytes 128-191 rc=0x00000000 required=193 out="%80%81%82%83%84%85%86%87%88%89%8A%8B%8C%8D%8E%8F%90%91%92%93%94%95%96%97%98%99%9A%9B%9C%9D%9E%9F%A0%A1%A2%A3%A4%A5%A6%A7"
+FormUrlEncode bytes 128-191 rc=0x00000000 required=193 out="%80%81%82%83%84%85%86%87%88%89%8A%8B%8C%8D%8E%8F%90%91%92%93%94%95%96%97%98%99%9A%9B%9C%9D%9E%9F%A0%A1%A2%A3%A4%A5%A6%A7"
+EscapeUri bytes 192-255 rc=0x00000000 required=193 out="%C0%C1%C2%C3%C4%C5%C6%C7%C8%C9%CA%CB%CC%CD%CE%CF%D0%D1%D2%D3%D4%D5%D6%D7%D8%D9%DA%DB%DC%DD%DE%DF%E0%E1%E2%E3%E4%E5%E6%E7"
+FormUrlEncode bytes 192-255 rc=0x00000000 required=193 out="%C0%C1%C2%C3%C4%C5%C6%C7%C8%C9%CA%CB%CC%CD%CE%CF%D0%D1%D2%D3%D4%D5%D6%D7%D8%D9%DA%DB%DC%DD%DE%DF%E0%E1%E2%E3%E4%E5%E6%E7"
+EscapeUri empty "" rc=0x80711003 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+EscapeUri with NUL "a\x00b" rc=0x00000000 required=6 out="a%00b\x00\xa5"
+EscapeUri "a b" size 1 rc=0x80711001 required=untouched out="a\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "a%20bc" size 1 rc=0x80711001 out="a\xa5\xa5\xa5\xa5\xa5\xa5"
+EscapeUri "a b" size 2 rc=0x80711001 required=untouched out="a\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "a%20bc" size 2 rc=0x80711001 out="a \xa5\xa5\xa5\xa5\xa5"
+EscapeUri "a b" size 3 rc=0x80711001 required=untouched out="a\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "a%20bc" size 3 rc=0x80711001 out="a b\xa5\xa5\xa5\xa5"
+EscapeUri "a b" size 4 rc=0x80711001 required=untouched out="a%20\xa5\xa5\xa5"
+UnescapeUri "a%20bc" size 4 rc=0x80711001 out="a bc\xa5\xa5\xa5"
+EscapeUri no out rc=0x00000000 required=10
+EscapeUri size 9 rc=0x80711001 required=untouched out="a%20b%26c\xa5\xa5\xa5"
+EscapeUri size 10 rc=0x00000000 required=10 out="a%20b%26c\x00\xa5\xa5"
+EscapeUri size 11 rc=0x00000000 required=10 out="a%20b%26c\x00\xa5\xa5"
+EscapeUri no required rc=0x00000000 out="a%20b%26c\x00\xa5\xa5"
+EscapeUri NULL in rc=0x80711003
+EscapeUri nothing rc=0x80711003 required=untouched
+FormUrlEncode no out rc=0x00000000 required=8
+FormUrlEncode size 7 rc=0x80711001 required=untouched out="a+b%26c\xa5\xa5\xa5"
+FormUrlEncode size 8 rc=0x00000000 required=8 out="a+b%26c\x00\xa5\xa5"
+FormUrlEncode size 9 rc=0x00000000 required=8 out="a+b%26c\x00\xa5\xa5"
+FormUrlEncode no required rc=0x00000000 out="a+b%26c\x00\xa5\xa5"
+FormUrlEncode NULL in rc=0x80711003
+FormUrlEncode nothing rc=0x80711003 required=untouched
+UnescapeUri "abc" rc=0x00000000 required=4 out="abc\x00\xa5"
+UnescapeUri "a%20b" rc=0x00000000 required=4 out="a b\x00\xa5"
+UnescapeUri "a+b" rc=0x00000000 required=4 out="a+b\x00\xa5"
+UnescapeUri "%41%4a%4A" rc=0x00000000 required=4 out="AJJ\x00\xa5"
+UnescapeUri "%zz" rc=0x80711005 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "%4" rc=0x80711005 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "%" rc=0x80711005 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "a%2" rc=0x80711005 required=untouched out="a\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+UnescapeUri "%00x" rc=0x00000000 required=3 out="\x00x\x00\xa5"
+UnescapeUri "%e2%82%ac" rc=0x00000000 required=4 out="\xe2\x82\xac\x00\xa5"
+UnescapeUri "100%25" rc=0x00000000 required=5 out="100%\x00\xa5"
+UnescapeUri "" rc=0x00000000 required=1 out="\x00\xa5"
+FormUrlDecode "abc" rc=0x00000000 required=4 out="abc\x00\xa5"
+FormUrlDecode "a%20b" rc=0x00000000 required=4 out="a b\x00\xa5"
+FormUrlDecode "a+b" rc=0x00000000 required=4 out="a b\x00\xa5"
+FormUrlDecode "%41%4a%4A" rc=0x00000000 required=4 out="AJJ\x00\xa5"
+FormUrlDecode "%zz" rc=0x80711005 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+FormUrlDecode "%4" rc=0x80711005 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+FormUrlDecode "%" rc=0x80711005 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+FormUrlDecode "a%2" rc=0x80711005 required=untouched out="a\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+FormUrlDecode "%00x" rc=0x00000000 required=3 out="\x00x\x00\xa5"
+FormUrlDecode "%e2%82%ac" rc=0x00000000 required=4 out="\xe2\x82\xac\x00\xa5"
+FormUrlDecode "100%25" rc=0x00000000 required=5 out="100%\x00\xa5"
+FormUrlDecode "" rc=0x00000000 required=1 out="\x00\xa5"
+UnescapeUri no out rc=0x00000000 required=6
+UnescapeUri size 5 rc=0x80711001 required=untouched out="a b+c\xa5\xa5\xa5"
+UnescapeUri size 6 rc=0x00000000 required=6 out="a b+c\x00\xa5\xa5"
+UnescapeUri size 7 rc=0x00000000 required=6 out="a b+c\x00\xa5\xa5"
+UnescapeUri no required rc=0x00000000 out="a b+c\x00\xa5\xa5"
+UnescapeUri NULL in rc=0x80711003
+FormUrlDecode no out rc=0x00000000 required=6
+FormUrlDecode size 5 rc=0x80711001 required=untouched out="a b c\xa5\xa5\xa5"
+FormUrlDecode size 6 rc=0x00000000 required=6 out="a b c\x00\xa5\xa5"
+FormUrlDecode size 7 rc=0x00000000 required=6 out="a b c\x00\xa5\xa5"
+FormUrlDecode no required rc=0x00000000 out="a b c\x00\xa5\xa5"
+FormUrlDecode NULL in rc=0x80711003
+Base64Encoder "" rc=0x80711003 out="\xa5\xa5"
+Base64Encoder "f" rc=0x00000004 out="Zg==\xa5\xa5"
+Base64Encoder "fo" rc=0x00000004 out="Zm8=\xa5\xa5"
+Base64Encoder "foo" rc=0x00000004 out="Zm9v\xa5\xa5"
+Base64Encoder "foob" rc=0x00000008 out="Zm9vYg==\xa5\xa5"
+Base64Encoder "fooba" rc=0x00000008 out="Zm9vYmE=\xa5\xa5"
+Base64Encoder "foobar" rc=0x00000008 out="Zm9vYmFy\xa5\xa5"
+Base64Encoder binary rc=0x00000008 out="AP/+gH8B\xa5\xa5"
+Base64Encoder NULL out rc=0x80711002
+Base64Encoder NULL in rc=0x80711003
+Base64Decoder "" rc=0x80711009 out="\xa5\xa5"
+Base64Decoder "Zg==" rc=0x00000001 out="f\x00\x00\xa5\xa5"
+Base64Decoder "Zm8=" rc=0x00000002 out="fo\x00\xa5\xa5"
+Base64Decoder "Zm9v" rc=0x00000003 out="foo\xa5\xa5"
+Base64Decoder "Zm9vYg==" rc=0x00000004 out="foob\x00\x00\xa5\xa5"
+Base64Decoder "Zm9vYmE=" rc=0x00000005 out="fooba\x00\xa5\xa5"
+Base64Decoder "Zm9vYmFy" rc=0x00000006 out="foobar\xa5\xa5"
+Base64Decoder "AP/+gH8B" rc=0x00000006 out="\x00\xff\xfe\x80\x7f\x01\xa5\xa5"
+Base64Decoder "Zm9" rc=0x80711009 out="\xa5\xa5"
+Base64Decoder "Zm9vY" rc=0x80711009 out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zg" rc=0x80711009 out="\xa5\xa5"
+Base64Decoder "Z===" rc=0x8071100a out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zm9v====" rc=0x8071100a out="foo\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zm*v" rc=0x8071100a out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zm 9v" rc=0x80711009 out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zm9v\x0a" rc=0x80711009 out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "=Zm9" rc=0x8071100a out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zm=v" rc=0x8071100a out="\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zg==Zm9v" rc=0x8071100a out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "Zm8=Zm9v" rc=0x8071100a out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder "zzzz" rc=0x00000003 out="\xcf<\xf3\xa5\xa5"
+Base64Decoder "Zm9v Zm9v" rc=0x80711009 out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+Base64Decoder NULL out rc=0x80711002
+Base64Decoder NULL in rc=0x80711003
+ParseUri "http://example.com/" size rc=0x00000000 required=21
+ParseUri "http://example.com/" rc=0x00000000 required=21 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/" port=80
+ParseUri "http://example.com/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com" size rc=0x00000000 required=20
+ParseUri "http://example.com" rc=0x00000000 required=20 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"" port=80
+ParseUri "http://example.com" short rc=0x80711001 required=untouched
+ParseUri "https://user:pass@example.com:8443/a/b?c=d#e" size rc=0x00000000 required=39
+ParseUri "https://user:pass@example.com:8443/a/b?c=d#e" rc=0x00000000 required=39 scheme=@0"https" host=@16"example.com" user=@6"user" password=@11"pass" path=@28"/a/b?c=d#e" port=8443
+ParseUri "https://user:pass@example.com:8443/a/b?c=d#e" short rc=0x80711001 required=untouched
+ParseUri "http://user@example.com/" size rc=0x00000000 required=25
+ParseUri "http://user@example.com/" rc=0x00000000 required=25 scheme=@0"http" host=@11"example.com" user=@5"user" password=@10"" path=@23"/" port=80
+ParseUri "http://user@example.com/" short rc=0x80711001 required=untouched
+ParseUri "http://:pass@example.com/" size rc=0x00000000 required=25
+ParseUri "http://:pass@example.com/" rc=0x00000000 required=25 scheme=@0"http" host=@11"example.com" user=@5"" password=@6"pass" path=@23"/" port=80
+ParseUri "http://:pass@example.com/" short rc=0x80711001 required=untouched
+ParseUri "HTTP://Example.COM/Path" size rc=0x00000000 required=25
+ParseUri "HTTP://Example.COM/Path" rc=0x00000000 required=25 scheme=@0"HTTP" host=@7"Example.COM" user=@5"" password=@6"" path=@19"/Path" port=80
+ParseUri "HTTP://Example.COM/Path" short rc=0x80711001 required=untouched
+ParseUri "ftp://example.com/file" size rc=0x00000000 required=24
+ParseUri "ftp://example.com/file" rc=0x00000000 required=24 scheme=@0"ftp" host=@6"example.com" user=@4"" password=@5"" path=@18"/file" port=21
+ParseUri "ftp://example.com/file" short rc=0x80711001 required=untouched
+ParseUri "example.com/path" size rc=0x00000000 required=21
+ParseUri "example.com/path" rc=0x00000000 required=21 scheme=@0"" host=@3"example.com" user=@1"" password=@2"" path=@15"/path" port=80
+ParseUri "example.com/path" short rc=0x80711001 required=untouched
+ParseUri "//example.com/path" size rc=0x00000000 required=23
+ParseUri "//example.com/path" rc=0x00000000 required=23 scheme=@0"" host=@3"" user=@1"" password=@2"" path=@4"//example.com/path" port=80
+ParseUri "//example.com/path" short rc=0x80711001 required=untouched
+ParseUri "/path/only" size rc=0x00000000 required=15
+ParseUri "/path/only" rc=0x00000000 required=15 scheme=@0"" host=@3"" user=@1"" password=@2"" path=@4"/path/only" port=80
+ParseUri "/path/only" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:/" size rc=0x00000000 required=21
+ParseUri "http://example.com:/" rc=0x00000000 required=21 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/" port=80
+ParseUri "http://example.com:/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:0/" size rc=0x00000000 required=21
+ParseUri "http://example.com:0/" rc=0x00000000 required=21 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/" port=0
+ParseUri "http://example.com:0/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:65535/" size rc=0x00000000 required=21
+ParseUri "http://example.com:65535/" rc=0x00000000 required=21 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/" port=65535
+ParseUri "http://example.com:65535/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:65536/" size rc=0x00000000 required=21
+ParseUri "http://example.com:65536/" rc=0x00000000 required=21 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/" port=65536
+ParseUri "http://example.com:65536/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:abc/" size rc=0x80711005 required=untouched
+ParseUri "http://example.com:abc/" rc=0x80711005 required=untouched
+ParseUri "http://[::1]:8080/" size rc=0x00000000 required=20
+ParseUri "http://[::1]:8080/" rc=0x00000000 required=20 scheme=@0"http" host=@7"" user=@5"" password=@6"" path=@8"[::1]:8080/" port=80
+ParseUri "http://[::1]:8080/" short rc=0x80711001 required=untouched
+ParseUri "http:///path" size rc=0x00000000 required=14
+ParseUri "http:///path" rc=0x00000000 required=14 scheme=@0"http" host=@7"" user=@5"" password=@6"" path=@8"/path" port=80
+ParseUri "http:///path" short rc=0x80711001 required=untouched
+ParseUri "http://example.com?q=1" size rc=0x00000000 required=24
+ParseUri "http://example.com?q=1" rc=0x00000000 required=24 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"?q=1" port=80
+ParseUri "http://example.com?q=1" short rc=0x80711001 required=untouched
+ParseUri "http://example.com#frag" size rc=0x00000000 required=25
+ParseUri "http://example.com#frag" rc=0x00000000 required=25 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"#frag" port=80
+ParseUri "http://example.com#frag" short rc=0x80711001 required=untouched
+ParseUri "http://exa mple.com/" size rc=0x00000000 required=22
+ParseUri "http://exa mple.com/" rc=0x00000000 required=22 scheme=@0"http" host=@7"exa" user=@5"" password=@6"" path=@11" mple.com/" port=80
+ParseUri "http://exa mple.com/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com/a b" size rc=0x00000000 required=24
+ParseUri "http://example.com/a b" rc=0x00000000 required=24 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/a b" port=80
+ParseUri "http://example.com/a b" short rc=0x80711001 required=untouched
+ParseUri "http://example.com/%20" size rc=0x00000000 required=24
+ParseUri "http://example.com/%20" rc=0x00000000 required=24 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/%20" port=80
+ParseUri "http://example.com/%20" short rc=0x80711001 required=untouched
+ParseUri "mailto:someone@example.com" size rc=0x00000000 required=29
+ParseUri "mailto:someone@example.com" rc=0x00000000 required=29 scheme=@0"mailto" host=@16"example.com" user=@7"someone" password=@15"" path=@28"" port=0
+ParseUri "mailto:someone@example.com" short rc=0x80711001 required=untouched
+ParseUri "http:" size rc=0x00000000 required=9
+ParseUri "http:" rc=0x00000000 required=9 scheme=@0"http" host=@7"" user=@5"" password=@6"" path=@8"" port=80
+ParseUri "http:" short rc=0x80711001 required=untouched
+ParseUri "" size rc=0x80711005 required=untouched
+ParseUri "" rc=0x80711005 required=untouched
+ParseUri "https://example.com/" size rc=0x00000000 required=22
+ParseUri "https://example.com/" rc=0x00000000 required=22 scheme=@0"https" host=@8"example.com" user=@6"" password=@7"" path=@20"/" port=443
+ParseUri "https://example.com/" short rc=0x80711001 required=untouched
+ParseUri "HTTPS://a/" size rc=0x00000000 required=12
+ParseUri "HTTPS://a/" rc=0x00000000 required=12 scheme=@0"HTTPS" host=@8"a" user=@6"" password=@7"" path=@10"/" port=443
+ParseUri "HTTPS://a/" short rc=0x80711001 required=untouched
+ParseUri "ws://a/" size rc=0x00000000 required=9
+ParseUri "ws://a/" rc=0x00000000 required=9 scheme=@0"ws" host=@5"a" user=@3"" password=@4"" path=@7"/" port=0
+ParseUri "ws://a/" short rc=0x80711001 required=untouched
+ParseUri "example.com:8080/path" size rc=0x00000000 required=25
+ParseUri "example.com:8080/path" rc=0x00000000 required=25 scheme=@0"example.com" host=@14"8080" user=@12"" password=@13"" path=@19"/path" port=0
+ParseUri "example.com:8080/path" short rc=0x80711001 required=untouched
+ParseUri "localhost:80" size rc=0x00000000 required=16
+ParseUri "localhost:80" rc=0x00000000 required=16 scheme=@0"localhost" host=@12"80" user=@10"" password=@11"" path=@15"" port=0
+ParseUri "localhost:80" short rc=0x80711001 required=untouched
+ParseUri "http://example.com/a@b" size rc=0x00000000 required=24
+ParseUri "http://example.com/a@b" rc=0x00000000 required=24 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/a@b" port=80
+ParseUri "http://example.com/a@b" short rc=0x80711001 required=untouched
+ParseUri "http://a:80x/" size rc=0x80711005 required=untouched
+ParseUri "http://a:80x/" rc=0x80711005 required=untouched
+ParseUri "http://a:80?q" size rc=0x80711005 required=untouched
+ParseUri "http://a:80?q" rc=0x80711005 required=untouched
+ParseUri "http://user:pa:ss@host/" size rc=0x00000000 required=23
+ParseUri "http://user:pa:ss@host/" rc=0x00000000 required=23 scheme=@0"http" host=@16"host" user=@5"user" password=@10"pa:ss" path=@21"/" port=80
+ParseUri "http://user:pa:ss@host/" short rc=0x80711001 required=untouched
+ParseUri "http://a@b@c/" size rc=0x00000000 required=14
+ParseUri "http://a@b@c/" rc=0x00000000 required=14 scheme=@0"http" host=@8"b" user=@5"a" password=@7"" path=@10"@c/" port=80
+ParseUri "http://a@b@c/" short rc=0x80711001 required=untouched
+ParseUri "http://a_b-c.d/" size rc=0x00000000 required=17
+ParseUri "http://a_b-c.d/" rc=0x00000000 required=17 scheme=@0"http" host=@7"a_b-c.d" user=@5"" password=@6"" path=@15"/" port=80
+ParseUri "http://a_b-c.d/" short rc=0x80711001 required=untouched
+ParseUri "http://exa%41mple/" size rc=0x00000000 required=20
+ParseUri "http://exa%41mple/" rc=0x00000000 required=20 scheme=@0"http" host=@7"exa" user=@5"" password=@6"" path=@11"%41mple/" port=80
+ParseUri "http://exa%41mple/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:8080" size rc=0x00000000 required=20
+ParseUri "http://example.com:8080" rc=0x00000000 required=20 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"" port=8080
+ParseUri "http://example.com:8080" short rc=0x80711001 required=untouched
+ParseUri "http:/path" size rc=0x00000000 required=14
+ParseUri "http:/path" rc=0x00000000 required=14 scheme=@0"http" host=@7"" user=@5"" password=@6"" path=@8"/path" port=80
+ParseUri "http:/path" short rc=0x80711001 required=untouched
+ParseUri "a:b" size rc=0x00000000 required=7
+ParseUri "a:b" rc=0x00000000 required=7 scheme=@0"a" host=@4"b" user=@2"" password=@3"" path=@6"" port=0
+ParseUri "a:b" short rc=0x80711001 required=untouched
+ParseUri "1http://a/" size rc=0x00000000 required=14
+ParseUri "1http://a/" rc=0x00000000 required=14 scheme=@0"" host=@3"1http" user=@1"" password=@2"" path=@9"//a/" port=80
+ParseUri "1http://a/" short rc=0x80711001 required=untouched
+ParseUri "h+t.p-s://a/" size rc=0x00000000 required=14
+ParseUri "h+t.p-s://a/" rc=0x00000000 required=14 scheme=@0"h+t.p-s" host=@10"a" user=@8"" password=@9"" path=@12"/" port=0
+ParseUri "h+t.p-s://a/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:080/" size rc=0x00000000 required=21
+ParseUri "http://example.com:080/" rc=0x00000000 required=21 scheme=@0"http" host=@7"example.com" user=@5"" password=@6"" path=@19"/" port=80
+ParseUri "http://example.com:080/" short rc=0x80711001 required=untouched
+ParseUri "http://example.com:99999999999/" size rc=0x80711005 required=untouched
+ParseUri "http://example.com:99999999999/" rc=0x80711005 required=untouched
+ParseUri "http://ex~ample/" size rc=0x00000000 required=18
+ParseUri "http://ex~ample/" rc=0x00000000 required=18 scheme=@0"http" host=@7"ex" user=@5"" password=@6"" path=@10"~ample/" port=80
+ParseUri "http://ex~ample/" short rc=0x80711001 required=untouched
+ParseUri "http://a:b/c" size rc=0x80711005 required=untouched
+ParseUri "http://a:b/c" rc=0x80711005 required=untouched
+ParseUri "http://user:@host/" size rc=0x00000000 required=18
+ParseUri "http://user:@host/" rc=0x00000000 required=18 scheme=@0"http" host=@11"host" user=@5"user" password=@10"" path=@16"/" port=80
+ParseUri "http://user:@host/" short rc=0x80711001 required=untouched
+ParseUri NULL string rc=0x80711003
+ParseUri nothing rc=0x80711002
+ParseUri no required rc=0x00000000
+ParseUri pool no uri rc=0x00000000
+ParseProxy "proxy.example:8080" size rc=0x00000000 required=18
+ParseProxy "proxy.example:8080" rc=0x00000000 required=18 scheme=(null) host=@3"proxy.example" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy "http://proxy.example:8080" size rc=0x00000000 required=9
+ParseProxy "http://proxy.example:8080" rc=0x00000000 required=9 scheme=(null) host=@3"http" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy "user:pw@proxy.example:3128" size rc=0x00000000 required=24
+ParseProxy "user:pw@proxy.example:3128" rc=0x00000000 required=24 scheme=(null) host=@9"proxy.example" user=@1"user" password=@6"pw" path=(null) port=3128
+ParseProxy "proxy.example" size rc=0x00000000 required=18
+ParseProxy "proxy.example" rc=0x00000000 required=18 scheme=(null) host=@3"proxy.example" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy "proxy.example:" size rc=0x00000000 required=18
+ParseProxy "proxy.example:" rc=0x00000000 required=18 scheme=(null) host=@3"proxy.example" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy "http://proxy.example/" size rc=0x00000000 required=9
+ParseProxy "http://proxy.example/" rc=0x00000000 required=9 scheme=(null) host=@3"http" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy ":8080" size rc=0x00000000 required=5
+ParseProxy ":8080" rc=0x00000000 required=5 scheme=(null) host=@3"" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy "" size rc=0x80711005 required=untouched
+ParseProxy "" rc=0x80711005 required=untouched
+ParseProxy "proxy:0" size rc=0x00000000 required=10
+ParseProxy "proxy:0" rc=0x00000000 required=10 scheme=(null) host=@3"proxy" user=@1"" password=@2"" path=(null) port=0
+ParseProxy "proxy:abc" size rc=0x80711005 required=untouched
+ParseProxy "proxy:abc" rc=0x80711005 required=untouched
+ParseProxy "proxy:80x" size rc=0x80711005 required=untouched
+ParseProxy "proxy:80x" rc=0x80711005 required=untouched
+ParseProxy "user@proxy" size rc=0x00000000 required=14
+ParseProxy "user@proxy" rc=0x00000000 required=14 scheme=(null) host=@7"proxy" user=@1"user" password=@6"" path=(null) port=8080
+ParseProxy "proxy/path:1" size rc=0x00000000 required=10
+ParseProxy "proxy/path:1" rc=0x00000000 required=10 scheme=(null) host=@3"proxy" user=@1"" password=@2"" path=(null) port=8080
+ParseProxy "a_b:1" size rc=0x00000000 required=8
+ParseProxy "a_b:1" rc=0x00000000 required=8 scheme=(null) host=@3"a_b" user=@1"" password=@2"" path=(null) port=1
+ParseProxy "user:@proxy:1" size rc=0x00000000 required=14
+ParseProxy "user:@proxy:1" rc=0x00000000 required=14 scheme=(null) host=@7"proxy" user=@1"user" password=@6"" path=(null) port=1
+ParseUriPath "/a/b?c=d#e" size rc=0x00000000 required=13
+ParseUriPath "/a/b?c=d#e" rc=0x00000000 required=13 path=@0"/a/b" query=@5"?c=d" fragment=@10"#e"
+ParseUriPath "/a/b?c=d#e" short rc=0x80711001 required=untouched
+ParseUriPath "/a/b" size rc=0x00000000 required=7
+ParseUriPath "/a/b" rc=0x00000000 required=7 path=@0"/a/b" query=@5"" fragment=@6""
+ParseUriPath "/a/b" short rc=0x80711001 required=untouched
+ParseUriPath "/a?q" size rc=0x00000000 required=7
+ParseUriPath "/a?q" rc=0x00000000 required=7 path=@0"/a" query=@3"?q" fragment=@6""
+ParseUriPath "/a?q" short rc=0x80711001 required=untouched
+ParseUriPath "/a#f" size rc=0x00000000 required=7
+ParseUriPath "/a#f" rc=0x00000000 required=7 path=@0"/a" query=@3"" fragment=@4"#f"
+ParseUriPath "/a#f" short rc=0x80711001 required=untouched
+ParseUriPath "?q" size rc=0x00000000 required=5
+ParseUriPath "?q" rc=0x00000000 required=5 path=@0"" query=@1"?q" fragment=@4""
+ParseUriPath "?q" short rc=0x80711001 required=untouched
+ParseUriPath "#f" size rc=0x00000000 required=5
+ParseUriPath "#f" rc=0x00000000 required=5 path=@0"" query=@1"" fragment=@2"#f"
+ParseUriPath "#f" short rc=0x80711001 required=untouched
+ParseUriPath "/a?q#f?g" size rc=0x00000000 required=11
+ParseUriPath "/a?q#f?g" rc=0x00000000 required=11 path=@0"/a" query=@3"?q" fragment=@6"#f?g"
+ParseUriPath "/a?q#f?g" short rc=0x80711001 required=untouched
+ParseUriPath "/a#f?q" size rc=0x00000000 required=9
+ParseUriPath "/a#f?q" rc=0x00000000 required=9 path=@0"/a" query=@3"" fragment=@4"#f?q"
+ParseUriPath "/a#f?q" short rc=0x80711001 required=untouched
+ParseUriPath "" size rc=0x80711005 required=untouched
+ParseUriPath "" rc=0x80711005 required=untouched
+BuildUri 0 flags 0 rc=0x00000000 required=41 out="https://user:pass@example.com:8443/a/b?c\x00\xa5"
+BuildUri 0 flags 1 rc=0x00000000 required=33 out="user:pass@example.com:8443/a/b?c\x00\xa5"
+BuildUri 0 flags 2 rc=0x00000000 required=31 out="https://example.com:8443/a/b?c\x00\xa5"
+BuildUri 0 flags 4 rc=0x00000000 required=36 out="https://user@example.com:8443/a/b?c\x00\xa5"
+BuildUri 0 flags 8 rc=0x00000000 required=35 out="https://user:pass@example.com:8443\x00\xa5"
+BuildUri 0 flags 15 rc=0x00000000 required=17 out="example.com:8443\x00\xa5"
+BuildUri 1 flags 0 rc=0x00000000 required=20 out="http://example.com/\x00\xa5"
+BuildUri 1 flags 1 rc=0x00000000 required=13 out="example.com/\x00\xa5"
+BuildUri 1 flags 2 rc=0x00000000 required=20 out="http://example.com/\x00\xa5"
+BuildUri 1 flags 4 rc=0x00000000 required=20 out="http://example.com/\x00\xa5"
+BuildUri 1 flags 8 rc=0x00000000 required=19 out="http://example.com\x00\xa5"
+BuildUri 1 flags 15 rc=0x00000000 required=12 out="example.com\x00\xa5"
+BuildUri 2 flags 0 rc=0x00000000 required=19 out="http://example.com\x00\xa5"
+BuildUri 2 flags 1 rc=0x00000000 required=12 out="example.com\x00\xa5"
+BuildUri 2 flags 2 rc=0x00000000 required=19 out="http://example.com\x00\xa5"
+BuildUri 2 flags 4 rc=0x00000000 required=19 out="http://example.com\x00\xa5"
+BuildUri 2 flags 8 rc=0x00000000 required=19 out="http://example.com\x00\xa5"
+BuildUri 2 flags 15 rc=0x00000000 required=12 out="example.com\x00\xa5"
+BuildUri 3 flags 0 rc=0x00000000 required=26 out="http://example.com:8080/x\x00\xa5"
+BuildUri 3 flags 1 rc=0x00000000 required=19 out="example.com:8080/x\x00\xa5"
+BuildUri 3 flags 2 rc=0x00000000 required=26 out="http://example.com:8080/x\x00\xa5"
+BuildUri 3 flags 4 rc=0x00000000 required=26 out="http://example.com:8080/x\x00\xa5"
+BuildUri 3 flags 8 rc=0x00000000 required=24 out="http://example.com:8080\x00\xa5"
+BuildUri 3 flags 15 rc=0x00000000 required=17 out="example.com:8080\x00\xa5"
+BuildUri 4 flags 0 rc=0x00000000 required=25 out="ftp://u@example.com:21/x\x00\xa5"
+BuildUri 4 flags 1 rc=0x00000000 required=19 out="u@example.com:21/x\x00\xa5"
+BuildUri 4 flags 2 rc=0x00000000 required=23 out="ftp://example.com:21/x\x00\xa5"
+BuildUri 4 flags 4 rc=0x00000000 required=25 out="ftp://u@example.com:21/x\x00\xa5"
+BuildUri 4 flags 8 rc=0x00000000 required=23 out="ftp://u@example.com:21\x00\xa5"
+BuildUri 4 flags 15 rc=0x00000000 required=15 out="example.com:21\x00\xa5"
+BuildUri 5 flags 0 rc=0x00000000 required=21 out="https://example.com/\x00\xa5"
+BuildUri 5 flags 1 rc=0x00000000 required=13 out="example.com/\x00\xa5"
+BuildUri 5 flags 2 rc=0x00000000 required=21 out="https://example.com/\x00\xa5"
+BuildUri 5 flags 4 rc=0x00000000 required=21 out="https://example.com/\x00\xa5"
+BuildUri 5 flags 8 rc=0x00000000 required=20 out="https://example.com\x00\xa5"
+BuildUri 5 flags 15 rc=0x00000000 required=12 out="example.com\x00\xa5"
+BuildUri 6 flags 0 rc=0x00000000 required=24 out="http://example.com:443/\x00\xa5"
+BuildUri 6 flags 1 rc=0x00000000 required=17 out="example.com:443/\x00\xa5"
+BuildUri 6 flags 2 rc=0x00000000 required=24 out="http://example.com:443/\x00\xa5"
+BuildUri 6 flags 4 rc=0x00000000 required=24 out="http://example.com:443/\x00\xa5"
+BuildUri 6 flags 8 rc=0x00000000 required=23 out="http://example.com:443\x00\xa5"
+BuildUri 6 flags 15 rc=0x00000000 required=16 out="example.com:443\x00\xa5"
+BuildUri 7 flags 0 rc=0x00000000 required=24 out="HTTPS://example.com:80x\x00\xa5"
+BuildUri 7 flags 1 rc=0x00000000 required=16 out="example.com:80x\x00\xa5"
+BuildUri 7 flags 2 rc=0x00000000 required=24 out="HTTPS://example.com:80x\x00\xa5"
+BuildUri 7 flags 4 rc=0x00000000 required=24 out="HTTPS://example.com:80x\x00\xa5"
+BuildUri 7 flags 8 rc=0x00000000 required=23 out="HTTPS://example.com:80\x00\xa5"
+BuildUri 7 flags 15 rc=0x00000000 required=15 out="example.com:80\x00\xa5"
+BuildUri 8 flags 0 rc=0x00000000 required=20 out="HTTP://example.com/\x00\xa5"
+BuildUri 8 flags 1 rc=0x00000000 required=13 out="example.com/\x00\xa5"
+BuildUri 8 flags 2 rc=0x00000000 required=20 out="HTTP://example.com/\x00\xa5"
+BuildUri 8 flags 4 rc=0x00000000 required=20 out="HTTP://example.com/\x00\xa5"
+BuildUri 8 flags 8 rc=0x00000000 required=19 out="HTTP://example.com\x00\xa5"
+BuildUri 8 flags 15 rc=0x00000000 required=12 out="example.com\x00\xa5"
+BuildUri size rc=0x00000000 required=41
+BuildUri size 40 rc=0x80711004 required=41 out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+BuildUri size 41 rc=0x00000000 required=41 out="https://user:pass@example.com:8443/a/b?c\x00\xa5\xa5"
+BuildUri size 42 rc=0x00000000 required=41 out="https://user:pass@example.com:8443/a/b?c\x00\xa5\xa5"
+BuildUri NULL uri rc=0x80711005
+BuildUri no host rc=0x80711005
+BuildUri no scheme rc=0x00000000 required=20 out="http://example.com/\x00\xa5\xa5\xa5\xa5"
+BuildUri nothing rc=0x00000000
+CopyUri size rc=0x00000000 required=35
+CopyUri rc=0x00000000 required=35 scheme=@0"https" host=@6"example.com" user=@25"user" password=@30"pass" path=@18"/a/b?c" port=8443
+CopyUri NULLs rc=0x00000000 required=20 scheme=@0"http" host=@5"example.com" user=@18"" password=@19"" path=@17"" port=0
+CopyUri NULL src rc=0x80711002
+CopyUri short rc=0x80711001 required=untouched
+CopyUri no pool rc=0x00000000 required=35
+CopyUri no dest rc=0x00000000 required=35
+MergeUriPath 0 "c" size rc=0x00000000 required=26
+MergeUriPath 0 "c" rc=0x00000000 required=26 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/c" port=8080
+MergeUriPath 0 "/c" size rc=0x00000000 required=24
+MergeUriPath 0 "/c" rc=0x00000000 required=24 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/c" port=8080
+MergeUriPath 0 "../c" size rc=0x00000000 required=29
+MergeUriPath 0 "../c" rc=0x00000000 required=29 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/c" port=8080
+MergeUriPath 0 "./c" size rc=0x00000000 required=28
+MergeUriPath 0 "./c" rc=0x00000000 required=28 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/c" port=8080
+MergeUriPath 0 "c/d" size rc=0x00000000 required=28
+MergeUriPath 0 "c/d" rc=0x00000000 required=28 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/c/d" port=8080
+MergeUriPath 0 "?q" size rc=0x00000000 required=27
+MergeUriPath 0 "?q" rc=0x00000000 required=27 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/?q" port=8080
+MergeUriPath 0 "#f" size rc=0x00000000 required=27
+MergeUriPath 0 "#f" rc=0x00000000 required=27 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/#f" port=8080
+MergeUriPath 0 "" size rc=0x00000000 required=25
+MergeUriPath 0 "" rc=0x00000000 required=25 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/" port=8080
+MergeUriPath 0 "../../../c" size rc=0x00000000 required=35
+MergeUriPath 0 "../../../c" rc=0x00000000 required=35 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/c" port=8080
+MergeUriPath 0 "http://other/x" size rc=0x00000000 required=39
+MergeUriPath 0 "http://other/x" rc=0x00000000 required=39 scheme=@0"http" host=@5"example.com" user=@17"u" password=@19"p" path=@21"/a/http://other/x" port=8080
+MergeUriPath 1 "c" size rc=0x00000000 required=26
+MergeUriPath 1 "c" rc=0x00000000 required=26 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/c" port=80
+MergeUriPath 1 "/c" size rc=0x00000000 required=22
+MergeUriPath 1 "/c" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 1 "../c" size rc=0x00000000 required=29
+MergeUriPath 1 "../c" rc=0x00000000 required=29 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/c" port=80
+MergeUriPath 1 "./c" size rc=0x00000000 required=28
+MergeUriPath 1 "./c" rc=0x00000000 required=28 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/c" port=80
+MergeUriPath 1 "c/d" size rc=0x00000000 required=28
+MergeUriPath 1 "c/d" rc=0x00000000 required=28 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/c/d" port=80
+MergeUriPath 1 "?q" size rc=0x00000000 required=27
+MergeUriPath 1 "?q" rc=0x00000000 required=27 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/?q" port=80
+MergeUriPath 1 "#f" size rc=0x00000000 required=27
+MergeUriPath 1 "#f" rc=0x00000000 required=27 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/#f" port=80
+MergeUriPath 1 "" size rc=0x00000000 required=25
+MergeUriPath 1 "" rc=0x00000000 required=25 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/" port=80
+MergeUriPath 1 "../../../c" size rc=0x00000000 required=35
+MergeUriPath 1 "../../../c" rc=0x00000000 required=35 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 1 "http://other/x" size rc=0x00000000 required=39
+MergeUriPath 1 "http://other/x" rc=0x00000000 required=39 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/b/http://other/x" port=80
+MergeUriPath 2 "c" size rc=0x00000000 required=22
+MergeUriPath 2 "c" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"c" port=80
+MergeUriPath 2 "/c" size rc=0x00000000 required=22
+MergeUriPath 2 "/c" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 2 "../c" size rc=0x00000000 required=25
+MergeUriPath 2 "../c" rc=0x00000000 required=25 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"../c" port=80
+MergeUriPath 2 "./c" size rc=0x00000000 required=24
+MergeUriPath 2 "./c" rc=0x00000000 required=24 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"./c" port=80
+MergeUriPath 2 "c/d" size rc=0x00000000 required=24
+MergeUriPath 2 "c/d" rc=0x00000000 required=24 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"c/d" port=80
+MergeUriPath 2 "?q" size rc=0x00000000 required=23
+MergeUriPath 2 "?q" rc=0x00000000 required=23 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"?q" port=80
+MergeUriPath 2 "#f" size rc=0x00000000 required=23
+MergeUriPath 2 "#f" rc=0x00000000 required=23 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"#f" port=80
+MergeUriPath 2 "" size rc=0x00000000 required=21
+MergeUriPath 2 "" rc=0x00000000 required=21 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"" port=80
+MergeUriPath 2 "../../../c" size rc=0x00000000 required=31
+MergeUriPath 2 "../../../c" rc=0x00000000 required=31 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"../../../c" port=80
+MergeUriPath 2 "http://other/x" size rc=0x00000000 required=35
+MergeUriPath 2 "http://other/x" rc=0x00000000 required=35 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"http://other/x" port=80
+MergeUriPath 3 "c" size rc=0x00000000 required=21
+MergeUriPath 3 "c" rc=0x00000000 required=21 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"c" port=80
+MergeUriPath 3 "/c" size rc=0x00000000 required=22
+MergeUriPath 3 "/c" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 3 "../c" size rc=0x00000000 required=24
+MergeUriPath 3 "../c" rc=0x00000000 required=24 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"../c" port=80
+MergeUriPath 3 "./c" size rc=0x00000000 required=23
+MergeUriPath 3 "./c" rc=0x00000000 required=23 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"./c" port=80
+MergeUriPath 3 "c/d" size rc=0x00000000 required=23
+MergeUriPath 3 "c/d" rc=0x00000000 required=23 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"c/d" port=80
+MergeUriPath 3 "?q" size rc=0x00000000 required=22
+MergeUriPath 3 "?q" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"?q" port=80
+MergeUriPath 3 "#f" size rc=0x00000000 required=22
+MergeUriPath 3 "#f" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"#f" port=80
+MergeUriPath 3 "" size rc=0x00000000 required=20
+MergeUriPath 3 "" rc=0x00000000 required=20 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"" port=80
+MergeUriPath 3 "../../../c" size rc=0x00000000 required=30
+MergeUriPath 3 "../../../c" rc=0x00000000 required=30 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"../../../c" port=80
+MergeUriPath 3 "http://other/x" size rc=0x00000000 required=34
+MergeUriPath 3 "http://other/x" rc=0x00000000 required=34 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"http://other/x" port=80
+MergeUriPath 4 "c" size rc=0x00000000 required=24
+MergeUriPath 4 "c" rc=0x00000000 required=24 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/c" port=80
+MergeUriPath 4 "/c" size rc=0x00000000 required=22
+MergeUriPath 4 "/c" rc=0x00000000 required=22 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 4 "../c" size rc=0x00000000 required=27
+MergeUriPath 4 "../c" rc=0x00000000 required=27 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 4 "./c" size rc=0x00000000 required=26
+MergeUriPath 4 "./c" rc=0x00000000 required=26 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/c" port=80
+MergeUriPath 4 "c/d" size rc=0x00000000 required=26
+MergeUriPath 4 "c/d" rc=0x00000000 required=26 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/c/d" port=80
+MergeUriPath 4 "?q" size rc=0x00000000 required=25
+MergeUriPath 4 "?q" rc=0x00000000 required=25 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/?q" port=80
+MergeUriPath 4 "#f" size rc=0x00000000 required=25
+MergeUriPath 4 "#f" rc=0x00000000 required=25 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/#f" port=80
+MergeUriPath 4 "" size rc=0x00000000 required=23
+MergeUriPath 4 "" rc=0x00000000 required=23 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/" port=80
+MergeUriPath 4 "../../../c" size rc=0x00000000 required=33
+MergeUriPath 4 "../../../c" rc=0x00000000 required=33 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/c" port=80
+MergeUriPath 4 "http://other/x" size rc=0x00000000 required=37
+MergeUriPath 4 "http://other/x" rc=0x00000000 required=37 scheme=@0"http" host=@5"example.com" user=@17"" password=@18"" path=@19"/a/http://other/x" port=80
+MergeUriPath NULL path rc=0x80711003
+MergeUriPath NULL src rc=0x80711002
+MergeUriPath short rc=0x80711001 required=untouched
+SweepPath "/a/./b/../c" rc=0x00000000 out="/a/\x00"
+SweepPath "/a/./b/../c" with NUL rc=0x00000000 out="/a/c\x00"
+SweepPath "/../a" rc=0x00000000 out="/\x00"
+SweepPath "/../a" with NUL rc=0x00000000 out="/a\x00"
+SweepPath "a//b" rc=0x00000000 out="a//\x00"
+SweepPath "a//b" with NUL rc=0x00000000 out="a//b\x00"
+SweepPath "/a/b/.." rc=0x00000000 out="/a/b/.\x00"
+SweepPath "/a/b/.." with NUL rc=0x00000000 out="/a/b/..\x00"
+SweepPath "/a/b/../" rc=0x00000000 out="/a/\x00"
+SweepPath "/a/b/../" with NUL rc=0x00000000 out="/a/\x00"
+SweepPath "/./" rc=0x00000000 out="/\x00"
+SweepPath "/./" with NUL rc=0x00000000 out="/\x00"
+SweepPath "/a/../../b" rc=0x00000000 out="/\x00"
+SweepPath "/a/../../b" with NUL rc=0x00000000 out="/b\x00"
+SweepPath "a/b/../../.." rc=0x00000000 out="a/b/../../.\x00"
+SweepPath "a/b/../../.." with NUL rc=0x00000000 out="a/b/../../..\x00"
+SweepPath "/a/b/c/./../../d" rc=0x00000000 out="/a/\x00"
+SweepPath "/a/b/c/./../../d" with NUL rc=0x00000000 out="/a/d\x00"
+SweepPath "/." rc=0x00000000 out="/\x00"
+SweepPath "/." with NUL rc=0x00000000 out="/.\x00"
+SweepPath "/.." rc=0x00000000 out="/.\x00"
+SweepPath "/.." with NUL rc=0x00000000 out="/..\x00"
+SweepPath "" rc=0x00000000 out="\xa5"
+SweepPath "" with NUL rc=0x00000000 out="\x00"
+SweepPath "/a/.b/..c/..." rc=0x00000000 out="/a/.b/..c/..\x00"
+SweepPath "/a/.b/..c/..." with NUL rc=0x00000000 out="/a/.b/..c/...\x00"
+SweepPath "/a?x=/../b" rc=0x00000000 out="/a?x=/../\x00"
+SweepPath "/a?x=/../b" with NUL rc=0x00000000 out="/a?x=/../b\x00"
+SweepPath "/a/b%2e%2e/c" rc=0x00000000 out="/a/b%2e%2e/\x00"
+SweepPath "/a/b%2e%2e/c" with NUL rc=0x00000000 out="/a/b%2e%2e/c\x00"
+SweepPath "/a#x/../b" rc=0x00000000 out="/a#x/../\x00"
+SweepPath "/a#x/../b" with NUL rc=0x00000000 out="/a#x/../b\x00"
+SweepPath "/a//b/../c" rc=0x00000000 out="/a//\x00"
+SweepPath "/a//b/../c" with NUL rc=0x00000000 out="/a//c\x00"
+SweepPath "//a/../b" rc=0x00000000 out="//\x00"
+SweepPath "//a/../b" with NUL rc=0x00000000 out="//b\x00"
+SweepPath "/a/b/./" rc=0x00000000 out="/a/b/\x00"
+SweepPath "/a/b/./" with NUL rc=0x00000000 out="/a/b/\x00"
+SweepPath "/a/b/.x/" rc=0x00000000 out="/a/b/.x\x00"
+SweepPath "/a/b/.x/" with NUL rc=0x00000000 out="/a/b/.x/\x00"
+SweepPath "/a/b/../../../../c/" rc=0x00000000 out="/c\x00"
+SweepPath "/a/b/../../../../c/" with NUL rc=0x00000000 out="/c/\x00"
+SweepPath size 4 rc=0x00000000 out="/a/\x00"
+SweepPath NULL dst rc=0x80711002
+SweepPath NULL src rc=0x80711002
+SweepPath size 0 rc=0x00000000 out="\xa5\xa5\xa5\xa5"
+ParseStatusLine "HTTP/1.1 200 OK\x0d\x0a" size rc=0x00000000 required=8 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=4 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK"
+ParseStatusLine "HTTP/1.1 200 OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.0 404 Not Found\x0d\x0aX-Next: 1\x0d\x0a" size rc=0x00000000 required=15 parsed=11
+ParseStatusLine "Not Found" rc=0x00000000 required=15 parsed=11 protocol=@0"HTTP" 1.0 code=404 reason=@5"Not Found"
+ParseStatusLine "HTTP/1.0 404 Not Found\x0d\x0aX-Next: 1\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200\x0d\x0a" size rc=0x00000000 required=6 parsed=1
+ParseStatusLine "" rc=0x00000000 required=6 parsed=1 protocol=@0"HTTP" 1.1 code=200 reason=@5""
+ParseStatusLine "HTTP/1.1 200\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 \x0d\x0a" size rc=0x00000000 required=6 parsed=2
+ParseStatusLine "" rc=0x00000000 required=6 parsed=2 protocol=@0"HTTP" 1.1 code=200 reason=@5""
+ParseStatusLine "HTTP/1.1 200 \x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK\x0a" size rc=0x00000000 required=8 parsed=3
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=3 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK"
+ParseStatusLine "HTTP/1.1 200 OK\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/2 200 OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/2 200 OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 99 Low\x0d\x0a" size rc=0x00000000 required=9 parsed=5
+ParseStatusLine "Low" rc=0x00000000 required=9 parsed=5 protocol=@0"HTTP" 1.1 code=99 reason=@5"Low"
+ParseStatusLine "HTTP/1.1 99 Low\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 1000 High\x0d\x0a" size rc=0x00000000 required=10 parsed=6
+ParseStatusLine "High" rc=0x00000000 required=10 parsed=6 protocol=@0"HTTP" 1.1 code=1000 reason=@5"High"
+ParseStatusLine "HTTP/1.1 1000 High\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 abc OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 abc OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "http/1.1 200 OK\x0d\x0a" size rc=0x00000000 required=8 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=4 protocol=@0"http" 1.1 code=200 reason=@5"OK"
+ParseStatusLine "http/1.1 200 OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "ICY 200 OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "ICY 200 OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1  200  OK  \x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1  200  OK  \x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/12.34 200 OK\x0d\x0a" size rc=0x00000000 required=8 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=4 protocol=@0"HTTP" 12.34 code=200 reason=@5"OK"
+ParseStatusLine "HTTP/12.34 200 OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "garbage\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "garbage\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "FOO/1.1 200 OK\x0d\x0a" size rc=0x00000000 required=7 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=7 parsed=4 protocol=@0"FOO" 1.1 code=200 reason=@4"OK"
+ParseStatusLine "FOO/1.1 200 OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK\x0dX\x0a" size rc=0x00000000 required=10 parsed=5
+ParseStatusLine "OK\x0dX" rc=0x00000000 required=10 parsed=5 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK\x0dX"
+ParseStatusLine "HTTP/1.1 200 OK\x0dX\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 O K\x0d\x0a" size rc=0x00000000 required=9 parsed=5
+ParseStatusLine "O K" rc=0x00000000 required=9 parsed=5 protocol=@0"HTTP" 1.1 code=200 reason=@5"O K"
+ParseStatusLine "HTTP/1.1 200 O K\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/a.b 200 OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/a.b 200 OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1. 200 OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1. 200 OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 -1 OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 -1 OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK \x0d\x0a" size rc=0x00000000 required=9 parsed=5
+ParseStatusLine "OK " rc=0x00000000 required=9 parsed=5 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK "
+ParseStatusLine "HTTP/1.1 200 OK \x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK\x0d" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK\x0d" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP1.1 200 OK\x0d\x0a" size rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP1.1 200 OK\x0d\x0a" rc=0x80711008 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200x OK\x0d\x0a" size rc=0x00000000 required=9 parsed=5
+ParseStatusLine "OK\x0d" rc=0x00000000 required=9 parsed=5 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK\x0d"
+ParseStatusLine "HTTP/1.1 200x OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine " HTTP/1.1 200 OK\x0d\x0a" size rc=0x00000000 required=8 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=4 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK"
+ParseStatusLine " HTTP/1.1 200 OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200\x09OK\x0d\x0a" size rc=0x00000000 required=8 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=4 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK"
+ParseStatusLine "HTTP/1.1 200\x09OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine "HTTP/1.1 200 OK\x0d\x0a" size rc=0x00000000 required=8 parsed=4
+ParseStatusLine "OK" rc=0x00000000 required=8 parsed=4 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK"
+ParseStatusLine "HTTP/1.1 200 OK\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseStatusLine NULL string rc=0x80711003
+ParseStatusLine no parsed rc=0x00000000
+ParseStatusLine no required rc=0x00000000
+ParseHeader "Name: value\x0d\x0a" size rc=0x00000000 required=11 parsed=7
+ParseHeader "value" rc=0x00000000 required=11 parsed=7 name=@0"Name" value=@5"value"
+ParseHeader "Name: value\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name:value\x0d\x0a" size rc=0x00000000 required=11 parsed=7
+ParseHeader "value" rc=0x00000000 required=11 parsed=7 name=@0"Name" value=@5"value"
+ParseHeader "Name:value\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name:  spaced out  \x0d\x0a" size rc=0x00000000 required=16 parsed=14
+ParseHeader "spaced out" rc=0x00000000 required=16 parsed=14 name=@0"Name" value=@5"spaced out"
+ParseHeader "Name:  spaced out  \x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a continued\x0d\x0a" size rc=0x00000000 required=17 parsed=15
+ParseHeader "v continued" rc=0x00000000 required=17 parsed=15 name=@0"Name" value=@5"v continued"
+ParseHeader "Name: v\x0d\x0a continued\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a\x09continued\x0d\x0aNext: x\x0d\x0a" size rc=0x00000000 required=17 parsed=15
+ParseHeader "v continued" rc=0x00000000 required=17 parsed=15 name=@0"Name" value=@5"v continued"
+ParseHeader "Name: v\x0d\x0a\x09continued\x0d\x0aNext: x\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0aNext: x\x0d\x0a" size rc=0x00000000 required=7 parsed=3
+ParseHeader "v" rc=0x00000000 required=7 parsed=3 name=@0"Name" value=@5"v"
+ParseHeader "Name: v\x0d\x0aNext: x\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name:\x0d\x0a" size rc=0x00000000 required=6 parsed=0
+ParseHeader "" rc=0x00000000 required=6 parsed=0 name=@0"Name" value=@5""
+ParseHeader "Name:\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: \x0d\x0a" size rc=0x00000000 required=6 parsed=0
+ParseHeader "" rc=0x00000000 required=6 parsed=0 name=@0"Name" value=@5""
+ParseHeader "Name: \x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "NoColon\x0d\x0a" size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "NoColon\x0d\x0a" rc=0x80711006 required=untouched parsed=untouched
+ParseHeader ": novalue\x0d\x0a" size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader ": novalue\x0d\x0a" rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name : v\x0d\x0a" size rc=0x00000000 required=8 parsed=3
+ParseHeader "v" rc=0x00000000 required=8 parsed=3 name=@0"Name " value=@6"v"
+ParseHeader "Name : v\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0a" size rc=0x00000000 required=7 parsed=2
+ParseHeader "v" rc=0x00000000 required=7 parsed=2 name=@0"Name" value=@5"v"
+ParseHeader "Name: v\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v" size rc=0x00000000 required=7 parsed=1
+ParseHeader "v" rc=0x00000000 required=7 parsed=1 name=@0"Name" value=@5"v"
+ParseHeader "Name: v" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: a:b:c\x0d\x0a" size rc=0x00000000 required=11 parsed=7
+ParseHeader "a:b:c" rc=0x00000000 required=11 parsed=7 name=@0"Name" value=@5"a:b:c"
+ParseHeader "Name: a:b:c\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "\x0d\x0a" size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "\x0d\x0a" rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "" size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "" rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name:\x09v\x0d\x0a" size rc=0x00000000 required=7 parsed=3
+ParseHeader "v" rc=0x00000000 required=7 parsed=3 name=@0"Name" value=@5"v"
+ParseHeader "Name:\x09v\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: a  b\x0d\x0a" size rc=0x00000000 required=10 parsed=6
+ParseHeader "a  b" rc=0x00000000 required=10 parsed=6 name=@0"Name" value=@5"a  b"
+ParseHeader "Name: a  b\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a \x0d\x0a" size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a \x0d\x0a" rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a continued" size rc=0x00000000 required=17 parsed=13
+ParseHeader "v continued" rc=0x00000000 required=17 parsed=13 name=@0"Name" value=@5"v continued"
+ParseHeader "Name: v\x0d\x0a continued" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d" size rc=0x00000000 required=7 parsed=2
+ParseHeader "v" rc=0x00000000 required=7 parsed=2 name=@0"Name" value=@5"v"
+ParseHeader "Name: v\x0d" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "N\x09ame: v\x0d\x0a" size rc=0x00000000 required=8 parsed=3
+ParseHeader "v" rc=0x00000000 required=8 parsed=3 name=@0"N\x09ame" value=@6"v"
+ParseHeader "N\x09ame: v\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a\x0d\x0a" size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a\x0d\x0a" rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name: v\x0d\x0a  a  \x0d\x0a\x09b\x0d\x0a" size rc=0x00000000 required=11 parsed=14
+ParseHeader "v a b" rc=0x00000000 required=11 parsed=14 name=@0"Name" value=@5"v a b"
+ParseHeader "Name: v\x0d\x0a  a  \x0d\x0a\x09b\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader " Name: v\x0d\x0a" size rc=0x00000000 required=7 parsed=3
+ParseHeader "v" rc=0x00000000 required=7 parsed=3 name=@0"Name" value=@5"v"
+ParseHeader " Name: v\x0d\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name:v\x0a continued\x0a" size rc=0x00000000 required=17 parsed=13
+ParseHeader "v continued" rc=0x00000000 required=17 parsed=13 name=@0"Name" value=@5"v continued"
+ParseHeader "Name:v\x0a continued\x0a" short rc=0x80711001 required=untouched parsed=untouched
+ParseHeader "Name: " size rc=0x80711006 required=untouched parsed=untouched
+ParseHeader "Name: " rc=0x80711006 required=untouched parsed=untouched
+ParseHeader NULL string rc=0x80711003
+ParseHeader no parsed rc=0x00000000
+BuildRequestLine 0 rc=0x00000000 required=19 out="GET /a?b HTTP/1.1\x0d\x0a\xa5"
+BuildRequestLine 1 rc=0x00000000 required=17 out="POST / HTTP/1.0\x0d\x0a\xa5"
+BuildRequestLine 2 rc=0x00000000 required=20 out="OPTIONS * RTSP/2.0\x0d\x0a\xa5"
+BuildRequestLine 3 rc=0x00000000 required=16 out="GET / HTTP/1.1\x0d\x0a\xa5"
+BuildRequestLine 4 rc=0x80711007 required=untouched out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+BuildRequestLine size rc=0x00000000 required=19
+BuildRequestLine size 18 rc=0x80711004 required=19 out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+BuildRequestLine size 19 rc=0x00000000 required=19 out="GET /a?b HTTP/1.1\x0d\x0a\xa5\xa5"
+BuildRequestLine size 20 rc=0x00000000 required=19 out="GET /a?b HTTP/1.1\x0d\x0a\xa5\xa5"
+BuildRequestLine NULL rc=0x80711007
+BuildRequestLine no method rc=0x80711007
+BuildRequestLine no path rc=0x80711007
+BuildRequestLine nothing rc=0x00000000
+BuildHeader 0 rc=0x00000000 required=13 out="Name: value\x0d\x0a\xa5"
+BuildHeader 1 rc=0x00000000 required=9 out="Empty: \x0d\x0a\xa5"
+BuildHeader 2 rc=0x00000000 required=8 out="X: a b\x0d\x0a\xa5"
+BuildHeader size rc=0x00000000 required=13
+BuildHeader size 12 rc=0x80711004 required=13 out="\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5\xa5"
+BuildHeader size 13 rc=0x00000000 required=13 out="Name: value\x0d\x0a\xa5\xa5"
+BuildHeader size 14 rc=0x00000000 required=13 out="Name: value\x0d\x0a\xa5\xa5"
+BuildHeader NULL rc=0x80711006
+BuildHeader no name rc=0x80711006
+BuildHeader no value rc=0x00000000
+BuildHeader nothing rc=0x00000000
+CopyHeader size rc=0x00000000 required=11
+CopyHeader rc=0x00000000 required=11 name=@0"Name" value=@5"value"
+CopyHeader short rc=0x80711001 required=untouched
+CopyHeader no value rc=0x00000000 required=3 name=@0"N" value=@2""
+CopyHeader NULL src rc=0x80711002
+AppendHeaderValue 0 "more" size rc=0x00000000 required=16
+AppendHeaderValue 0 "more" rc=0x00000000 required=16 name=@0"Name" value=@5"value more"
+AppendHeaderValue 1 "more" size rc=0x00000000 required=11
+AppendHeaderValue 1 "more" rc=0x00000000 required=11 name=@0"Empty" value=@6"more"
+AppendHeaderValue 0 "" size rc=0x00000000 required=11
+AppendHeaderValue 0 "" rc=0x00000000 required=11 name=@0"Name" value=@5"value"
+AppendHeaderValue 1 "" size rc=0x00000000 required=7
+AppendHeaderValue 1 "" rc=0x00000000 required=7 name=@0"Empty" value=@6""
+AppendHeaderValue 0 "(null)" size rc=0x00000000 required=11
+AppendHeaderValue 0 "(null)" rc=0x00000000 required=11 name=@0"Name" value=@5"value"
+AppendHeaderValue 1 "(null)" size rc=0x00000000 required=7
+AppendHeaderValue 1 "(null)" rc=0x00000000 required=7 name=@0"Empty" value=@6""
+AppendHeaderValue short rc=0x80711001 required=untouched
+CopyStatusLine size rc=0x00000000 required=8
+CopyStatusLine rc=0x00000000 required=8 protocol=@0"HTTP" 1.1 code=200 reason=@5"OK"
+CopyStatusLine short rc=0x80711001 required=untouched
+CopyStatusLine no reason rc=0x00000000 required=6 protocol=@0"HTTP" reason=@5""
+CopyStatusLine NULL src rc=0x80711002
+cookies InitCookie rc=0x00000000
+cookies default status rc=0x00000000 0
+cookies set status rc=0x00000000
+off /setcookie/session rc=0x00000000 HTTP 200 
+off /echo rc=0x00000000 HTTP 200 no cookie
+off /setcookie/echo rc=0x00000000 HTTP 200 no cookie
+off GetCookie /setcookie/ size rc=0x80710041 required=2779096485
+off GetCookie /setcookie/ rc=0x80710041 required=2779096485 "-" then "-"
+cookies send callback rc=0x00000000
+cookies recv callback rc=0x00000000
+cookie recv callback 1: 127.0.0.1 /setcookie/session "a=1" argument ok -> 0
+on /setcookie/session rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+on /cookie/echo rc=0x00000000 HTTP 200 no cookie
+on /cookie/sub/echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 1: 127.0.0.1 /setcookie/echo "a=1" argument ok -> 0
+cookie send callback 2: 127.0.0.1 /setcookie/echo "a=1" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1
+cookie send callback 3: 127.0.0.1 /setcookie/path "a=1" argument ok -> 0
+cookie send callback 4: 127.0.0.1 /setcookie/path "a=1" argument ok -> 0
+cookie recv callback 2: 127.0.0.1 /setcookie/path "b=2; Path=/cookie" argument ok -> 0
+on /setcookie/path rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 5: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 6: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 7: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 8: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 9: 127.0.0.1 /setcookie/echo "a=1" argument ok -> 0
+cookie send callback 10: 127.0.0.1 /setcookie/echo "a=1" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1
+cookie send callback 11: 127.0.0.1 /setcookie/expires "a=1" argument ok -> 0
+cookie send callback 12: 127.0.0.1 /setcookie/expires "a=1" argument ok -> 0
+cookie recv callback 3: 127.0.0.1 /setcookie/expires "c=3; Expires=Wed, 01 Jan 2099 00:00:00 GMT" argument ok -> 0
+on /setcookie/expires rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 13: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 14: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 15: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 16: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 17: 127.0.0.1 /setcookie/echo "a=1; c=3" argument ok -> 0
+cookie send callback 18: 127.0.0.1 /setcookie/echo "a=1; c=3" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3
+cookie send callback 19: 127.0.0.1 /setcookie/domain "a=1; c=3" argument ok -> 0
+cookie send callback 20: 127.0.0.1 /setcookie/domain "a=1; c=3" argument ok -> 0
+on /setcookie/domain rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 21: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 22: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 23: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 24: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 25: 127.0.0.1 /setcookie/echo "a=1; c=3" argument ok -> 0
+cookie send callback 26: 127.0.0.1 /setcookie/echo "a=1; c=3" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3
+cookie send callback 27: 127.0.0.1 /setcookie/domainok "a=1; c=3" argument ok -> 0
+cookie send callback 28: 127.0.0.1 /setcookie/domainok "a=1; c=3" argument ok -> 0
+cookie recv callback 4: 127.0.0.1 /setcookie/domainok "f=6; Domain=127.0.0.1" argument ok -> 0
+on /setcookie/domainok rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 29: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 30: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 31: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 32: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 33: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6" argument ok -> 0
+cookie send callback 34: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6
+cookie send callback 35: 127.0.0.1 /setcookie/secure "a=1; c=3; f=6" argument ok -> 0
+cookie send callback 36: 127.0.0.1 /setcookie/secure "a=1; c=3; f=6" argument ok -> 0
+cookie recv callback 5: 127.0.0.1 /setcookie/secure "s=7; Secure" argument ok -> 0
+on /setcookie/secure rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 37: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 38: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 39: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 40: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 41: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6" argument ok -> 0
+cookie send callback 42: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6
+cookie send callback 43: 127.0.0.1 /setcookie/httponly "a=1; c=3; f=6" argument ok -> 0
+cookie send callback 44: 127.0.0.1 /setcookie/httponly "a=1; c=3; f=6" argument ok -> 0
+cookie recv callback 6: 127.0.0.1 /setcookie/httponly "h=8; HttpOnly" argument ok -> 0
+on /setcookie/httponly rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 45: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 46: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 47: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 48: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 49: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8" argument ok -> 0
+cookie send callback 50: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6; h=8
+cookie send callback 51: 127.0.0.1 /setcookie/two "a=1; c=3; f=6; h=8" argument ok -> 0
+cookie send callback 52: 127.0.0.1 /setcookie/two "a=1; c=3; f=6; h=8" argument ok -> 0
+cookie recv callback 7: 127.0.0.1 /setcookie/two "x=1" argument ok -> 0
+cookie recv callback 8: 127.0.0.1 /setcookie/two "y=2" argument ok -> 0
+on /setcookie/two rc=0x00000000 HTTP 200 
+on /echo rc=0x00000000 HTTP 200 no cookie
+cookie send callback 53: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+cookie send callback 54: 127.0.0.1 /cookie/echo "b=2" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 55: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+cookie send callback 56: 127.0.0.1 /cookie/sub/echo "b=2" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2
+cookie send callback 57: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; x=1; y=2" argument ok -> 0
+cookie send callback 58: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6; h=8; x=1; y=2
+cookie send callback 59: 127.0.0.1 /setcookie/spaces "a=1; c=3; f=6; h=8; x=1; y=2" argument ok -> 0
+cookie send callback 60: 127.0.0.1 /setcookie/spaces "a=1; c=3; f=6; h=8; x=1; y=2" argument ok -> 0
+cookie recv callback 9: 127.0.0.1 /setcookie/spaces "sp = v w ; Path=/" argument ok -> 0
+on /setcookie/spaces rc=0x00000000 HTTP 200 
+cookie send callback 61: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+cookie send callback 62: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+on /echo rc=0x00000000 HTTP 200 Cookie: sp=v w
+cookie send callback 63: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 64: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 65: 127.0.0.1 /cookie/sub/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 66: 127.0.0.1 /cookie/sub/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 67: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 68: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; sp=v w; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6; h=8; sp=v w; x=1; y=2
+cookie send callback 69: 127.0.0.1 /setcookie/noequal "a=1; c=3; f=6; h=8; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 70: 127.0.0.1 /setcookie/noequal "a=1; c=3; f=6; h=8; sp=v w; x=1; y=2" argument ok -> 0
+cookie recv callback 10: 127.0.0.1 /setcookie/noequal "novalue" argument ok -> 0
+on /setcookie/noequal rc=0x00000000 HTTP 200 
+cookie send callback 71: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+cookie send callback 72: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+on /echo rc=0x00000000 HTTP 200 Cookie: sp=v w
+cookie send callback 73: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 74: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 75: 127.0.0.1 /cookie/sub/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 76: 127.0.0.1 /cookie/sub/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 77: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; novalue; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 78: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; novalue; sp=v w; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6; h=8; novalue; sp=v w; x=1; y=2
+cookie send callback 79: 127.0.0.1 /setcookie/quoted "a=1; c=3; f=6; h=8; novalue; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 80: 127.0.0.1 /setcookie/quoted "a=1; c=3; f=6; h=8; novalue; sp=v w; x=1; y=2" argument ok -> 0
+cookie recv callback 11: 127.0.0.1 /setcookie/quoted "q="a b"" argument ok -> 0
+on /setcookie/quoted rc=0x00000000 HTTP 200 
+cookie send callback 81: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+cookie send callback 82: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+on /echo rc=0x00000000 HTTP 200 Cookie: sp=v w
+cookie send callback 83: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 84: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 85: 127.0.0.1 /cookie/sub/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 86: 127.0.0.1 /cookie/sub/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 87: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 88: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2
+cookie send callback 89: 127.0.0.1 /setcookie/subpath "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 90: 127.0.0.1 /setcookie/subpath "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie recv callback 12: 127.0.0.1 /setcookie/subpath "p=1; Path=/cookie/sub" argument ok -> 0
+on /setcookie/subpath rc=0x00000000 HTTP 200 
+cookie send callback 91: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+cookie send callback 92: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+on /echo rc=0x00000000 HTTP 200 Cookie: sp=v w
+cookie send callback 93: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 94: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 95: 127.0.0.1 /cookie/sub/echo "b=2; p=1; sp=v w" argument ok -> 0
+cookie send callback 96: 127.0.0.1 /cookie/sub/echo "b=2; p=1; sp=v w" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; p=1; sp=v w
+cookie send callback 97: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 98: 127.0.0.1 /setcookie/echo "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2
+cookie send callback 99: 127.0.0.1 /setcookie/replace "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 100: 127.0.0.1 /setcookie/replace "a=1; c=3; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie recv callback 13: 127.0.0.1 /setcookie/replace "c=33; Expires=Wed, 01 Jan 2099 00:00:00 GMT" argument ok -> 0
+on /setcookie/replace rc=0x00000000 HTTP 200 
+cookie send callback 101: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+cookie send callback 102: 127.0.0.1 /echo "sp=v w" argument ok -> 0
+on /echo rc=0x00000000 HTTP 200 Cookie: sp=v w
+cookie send callback 103: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+cookie send callback 104: 127.0.0.1 /cookie/echo "b=2; sp=v w" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w
+cookie send callback 105: 127.0.0.1 /cookie/sub/echo "b=2; p=1; sp=v w" argument ok -> 0
+cookie send callback 106: 127.0.0.1 /cookie/sub/echo "b=2; p=1; sp=v w" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; p=1; sp=v w
+cookie send callback 107: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 108: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2
+cookie send callback 109: 127.0.0.1 /setcookie/attributes "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie send callback 110: 127.0.0.1 /setcookie/attributes "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; x=1; y=2" argument ok -> 0
+cookie recv callback 14: 127.0.0.1 /setcookie/attributes "t=1; path=/; EXPIRES=Wed, 01 Jan 2099 00:00:00 GMT; version=1; comment=x" argument ok -> 0
+on /setcookie/attributes rc=0x00000000 HTTP 200 
+cookie send callback 111: 127.0.0.1 /echo "sp=v w; t=1" argument ok -> 0
+cookie send callback 112: 127.0.0.1 /echo "sp=v w; t=1" argument ok -> 0
+on /echo rc=0x00000000 HTTP 200 Cookie: sp=v w; t=1
+cookie send callback 113: 127.0.0.1 /cookie/echo "b=2; sp=v w; t=1" argument ok -> 0
+cookie send callback 114: 127.0.0.1 /cookie/echo "b=2; sp=v w; t=1" argument ok -> 0
+on /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; sp=v w; t=1
+cookie send callback 115: 127.0.0.1 /cookie/sub/echo "b=2; p=1; sp=v w; t=1" argument ok -> 0
+cookie send callback 116: 127.0.0.1 /cookie/sub/echo "b=2; p=1; sp=v w; t=1" argument ok -> 0
+on /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; p=1; sp=v w; t=1
+cookie send callback 117: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie send callback 118: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+on /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2
+other /echo rc=0x00000000 HTTP 200 Cookie: sp=v w; t=1
+off /echo rc=0x00000000 HTTP 200 no cookie
+on GetCookie / size rc=0x00000000 required=14
+on GetCookie / rc=0x00000000 required=14 "sp=v w; t=1" then "\x00 \x00\xa5"
+on GetCookie / short rc=0x80710006 required=2779096485
+on GetCookie /cookie/ size rc=0x00000000 required=19
+on GetCookie /cookie/ rc=0x00000000 required=19 "b=2; sp=v w; t=1" then "\x00 \x00\xa5"
+on GetCookie /cookie/ short rc=0x80710006 required=2779096485
+on GetCookie /cookie/sub/x size rc=0x00000000 required=24
+on GetCookie /cookie/sub/x rc=0x00000000 required=24 "b=2; p=1; sp=v w; t=1" then "\x00 \x00\xa5"
+on GetCookie /cookie/sub/x short rc=0x80710006 required=2779096485
+on GetCookie /nothing size rc=0x00000000 required=14
+on GetCookie /nothing rc=0x00000000 required=14 "sp=v w; t=1" then "\x00 \x00\xa5"
+on GetCookie /nothing short rc=0x80710006 required=2779096485
+on GetCookie /setcookie/ size rc=0x00000000 required=63
+on GetCookie /setcookie/ rc=0x00000000 required=63 "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" then "\x00 \x00\xa5"
+on GetCookie /setcookie/ short rc=0x80710006 required=2779096485
+other /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2
+cookie send callback 119: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie send callback 120: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+on header order rc=0x00000000 Host,User-Agent,Connection,Cookie,Accept-Encoding,X-Request,
+off header order rc=0x00000000 Host,User-Agent,Connection,Accept-Encoding,X-Request,
+on GetCookie https /setcookie/ rc=0x00000000 "a=1; c=33; f=6; h=8; novalue; q="a b"; s=7; sp=v w; t=1; x=1; y=2"
+cookie send callback 121: 127.0.0.1 /setcookie/persist "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie send callback 122: 127.0.0.1 /setcookie/persist "a=1; c=33; f=6; h=8; novalue; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie recv callback 15: 127.0.0.1 /setcookie/persist "k1=v1; Expires=Wed, 01 Jan 2099 00:00:00 GMT; Secure" argument ok -> 0
+cookie recv callback 16: 127.0.0.1 /setcookie/persist "k2=v2; Expires=Wed, 01 Jan 2099 00:00:00 GMT; HttpOnly" argument ok -> 0
+cookie recv callback 17: 127.0.0.1 /setcookie/persist "k3=v3; Expires=Wed, 01 Jan 2099 00:00:00 GMT; Domain=127.0.0.1" argument ok -> 0
+cookie recv callback 18: 127.0.0.1 /setcookie/persist "k4=v4; Expires=Wed, 01 Jan 2099 00:00:00 GMT; Path=/cookie/sub" argument ok -> 0
+cookie recv callback 19: 127.0.0.1 /setcookie/persist "k5; Expires=Wed, 01 Jan 2099 00:00:00 GMT" argument ok -> 0
+cookie recv callback 20: 127.0.0.1 /setcookie/persist "k6=; Expires=Thu, 01 Jan 2099 00:00:01 GMT; Path=/" argument ok -> 0
+cookie recv callback 21: 127.0.0.1 /setcookie/persist "k7=v7; Expires=Sat, 01 Jan 2000 00:00:00 GMT" argument ok -> 0
+persist /setcookie/persist rc=0x00000000 HTTP 200 
+cookie send callback 123: 127.0.0.1 /setcookie/prefix "a=1; c=33; f=6; h=8; k2=v2; k3=v3; k5; k6=; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie send callback 124: 127.0.0.1 /setcookie/prefix "a=1; c=33; f=6; h=8; k2=v2; k3=v3; k5; k6=; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie recv callback 22: 127.0.0.1 /setcookie/prefix "pre=1; Path=/cookie/su" argument ok -> 0
+persist /setcookie/prefix rc=0x00000000 HTTP 200 
+cookie send callback 125: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; k2=v2; k3=v3; k5; k6=; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+cookie send callback 126: 127.0.0.1 /setcookie/echo "a=1; c=33; f=6; h=8; k2=v2; k3=v3; k5; k6=; q="a b"; sp=v w; t=1; x=1; y=2" argument ok -> 0
+persist /setcookie/echo rc=0x00000000 HTTP 200 Cookie: a=1; c=33; f=6; h=8; k2=v2; k3=v3; k5; k6=; q="a b"; sp=v w; t=1; x=1; y=2
+cookie send callback 127: 127.0.0.1 /cookie/echo "b=2; k6=; sp=v w; t=1" argument ok -> 0
+cookie send callback 128: 127.0.0.1 /cookie/echo "b=2; k6=; sp=v w; t=1" argument ok -> 0
+persist /cookie/echo rc=0x00000000 HTTP 200 Cookie: b=2; k6=; sp=v w; t=1
+cookie send callback 129: 127.0.0.1 /cookie/sub/echo "b=2; k4=v4; k6=; p=1; pre=1; sp=v w; t=1" argument ok -> 0
+cookie send callback 130: 127.0.0.1 /cookie/sub/echo "b=2; k4=v4; k6=; p=1; pre=1; sp=v w; t=1" argument ok -> 0
+persist /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: b=2; k4=v4; k6=; p=1; pre=1; sp=v w; t=1
+cookie send callback 131: 127.0.0.1 /echo "k6=; sp=v w; t=1" argument ok -> 0
+cookie send callback 132: 127.0.0.1 /echo "k6=; sp=v w; t=1" argument ok -> 0
+persist /echo rc=0x00000000 HTTP 200 Cookie: k6=; sp=v w; t=1
+on GetCookie https rc=0x00000000 required=19
+GetCookie NULL uri rc=0x80710004
+GetCookie nothing rc=0x80711002
+Export size rc=0x00000000 exported=390
+Export short rc=0x00000000 exported=390 last bytes "/\xff\x00"
+Export rc=0x00000000 exported=390
+Export 0: "\x00\x00\x01rw\xa9\xff\xe9\xfc\x87\xfc\x0a3\x87\xe0\x06y\x06\x83;\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x01c\x04\x00\x0233\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x01t\x04\x00\x011"
+Export 100: "\x05\x00\x01/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k1\x04\x00\x02v1\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k2\x04\x00\x02v2\x05\x00\x0b/setcoo"
+Export 200: "kie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k3\x04\x00\x02v3\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k4\x04\x00\x02v4\x05\x00\x0b/cookie"
+Export 300: "/sub\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k5\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP*\xe2@\x02\x00\x09127.0.0.1\x03\x00\x02k6\x04\x00\x00\x05\x00\x01/\xff\x00\x00"
+ExportWithClientId on size rc=0x00000000 exported=390
+ExportWithClientId on short rc=0x00000000 exported=390 last bytes "/\xff\x00"
+ExportWithClientId on rc=0x00000000 exported=390
+ExportWithClientId on 0: "\x00\x00\x01rw\xa9\xff\xe9\xfc\x87\xfc\x0a3\x87\xe0\x06y\x06\x83;\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x01c\x04\x00\x0233\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x01t\x04\x00\x011"
+ExportWithClientId on 100: "\x05\x00\x01/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k1\x04\x00\x02v1\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k2\x04\x00\x02v2\x05\x00\x0b/setcoo"
+ExportWithClientId on 200: "kie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k3\x04\x00\x02v3\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k4\x04\x00\x02v4\x05\x00\x0b/cookie"
+ExportWithClientId on 300: "/sub\xff\x00\x00\x01\x00\x08\x00\xeb6wP\x1b\xa0\x00\x02\x00\x09127.0.0.1\x03\x00\x02k5\x05\x00\x0b/setcookie/\xff\x00\x00\x01\x00\x08\x00\xeb6wP*\xe2@\x02\x00\x09127.0.0.1\x03\x00\x02k6\x04\x00\x00\x05\x00\x01/\xff\x00\x00"
+ExportWithClientId off size rc=0x00000000 exported=20
+ExportWithClientId off short rc=0x80710006 exported=2779096485 last bytes "\xa5\xa5\xa5"
+ExportWithClientId off rc=0x00000000 exported=20
+ExportWithClientId off 0: "\x00\x00\x00\x00\xd4\x1d\x8c\xd9\x8f\x00\xb2\x04\xe9\x80\x09\x98\xec\xf8B~"
+ExportWithClientId other size rc=0x00000000 exported=20
+ExportWithClientId other short rc=0x80710006 exported=2779096485 last bytes "\xa5\xa5\xa5"
+ExportWithClientId other rc=0x00000000 exported=20
+ExportWithClientId other 0: "\x00\x00\x00\x00\xd4\x1d\x8c\xd9\x8f\x00\xb2\x04\xe9\x80\x09\x98\xec\xf8B~"
+Export NULL size rc=0x00000000
+Export tiny rc=0x80710006
+ExportWithClientId bad client rc=0x00000000
+SessionCookieFlush rc=0x00000000
+cookie send callback 133: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+cookie send callback 134: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+after session flush /echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+cookie send callback 135: 127.0.0.1 /cookie/echo "k6=; t=1" argument ok -> 0
+cookie send callback 136: 127.0.0.1 /cookie/echo "k6=; t=1" argument ok -> 0
+after session flush /cookie/echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+cookie send callback 137: 127.0.0.1 /setcookie/echo "c=33; k2=v2; k3=v3; k5; k6=; t=1" argument ok -> 0
+cookie send callback 138: 127.0.0.1 /setcookie/echo "c=33; k2=v2; k3=v3; k5; k6=; t=1" argument ok -> 0
+after session flush /setcookie/echo rc=0x00000000 HTTP 200 Cookie: c=33; k2=v2; k3=v3; k5; k6=; t=1
+SessionCookieFlush bad client rc=0x00000000
+CookieFlush rc=0x00000000
+after flush /echo rc=0x00000000 HTTP 200 no cookie
+after flush /cookie/echo rc=0x00000000 HTTP 200 no cookie
+after flush /setcookie/echo rc=0x00000000 HTTP 200 no cookie
+Import rc=0x00000000
+cookie send callback 139: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+cookie send callback 140: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+after import /echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+cookie send callback 141: 127.0.0.1 /cookie/echo "k6=; t=1" argument ok -> 0
+cookie send callback 142: 127.0.0.1 /cookie/echo "k6=; t=1" argument ok -> 0
+after import /cookie/echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+cookie send callback 143: 127.0.0.1 /cookie/sub/echo "k4=v4; k6=; t=1" argument ok -> 0
+cookie send callback 144: 127.0.0.1 /cookie/sub/echo "k4=v4; k6=; t=1" argument ok -> 0
+after import /cookie/sub/echo rc=0x00000000 HTTP 200 Cookie: k4=v4; k6=; t=1
+cookie send callback 145: 127.0.0.1 /setcookie/echo "c=33; k1=v1; k2=v2; k3=v3; k5; k6=; t=1" argument ok -> 0
+cookie send callback 146: 127.0.0.1 /setcookie/echo "c=33; k1=v1; k2=v2; k3=v3; k5; k6=; t=1" argument ok -> 0
+after import /setcookie/echo rc=0x00000000 HTTP 200 Cookie: c=33; k1=v1; k2=v2; k3=v3; k5; k6=; t=1
+ImportWithClientId rc=0x00000000
+cookie send callback 147: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+cookie send callback 148: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+after client import /echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+after client import /echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+cookie send callback 149: 127.0.0.1 /setcookie/echo "c=33; k1=v1; k2=v2; k3=v3; k5; k6=; t=1" argument ok -> 0
+cookie send callback 150: 127.0.0.1 /setcookie/echo "c=33; k1=v1; k2=v2; k3=v3; k5; k6=; t=1" argument ok -> 0
+after client import /setcookie/echo rc=0x00000000 HTTP 200 Cookie: c=33; k1=v1; k2=v2; k3=v3; k5; k6=; t=1
+Import garbage rc=0x00000000
+after import garbage /echo rc=0x00000000 HTTP 200 no cookie
+Import NULL rc=0x00000000
+after import null /echo rc=0x00000000 HTTP 200 no cookie
+Import empty rc=0x00000000
+after import empty /echo rc=0x00000000 HTTP 200 no cookie
+ImportWithClientId bad client rc=0x00000000
+cookie send callback 151: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+cookie send callback 152: 127.0.0.1 /echo "k6=; t=1" argument ok -> 0
+after bad imports /echo rc=0x00000000 HTTP 200 Cookie: k6=; t=1
+AddCookie rc=0x00000000
+AddCookie path rc=0x00000000
+AddCookie other client rc=0x00000000
+AddCookie no client rc=0x00000000
+AddCookie other host rc=0x00000000
+AddCookie wrong domain rc=0x80710042
+AddCookie NULL uri rc=0x80710004
+AddCookie NULL cookie rc=0x80710005
+AddCookie empty cookie rc=0x80710004
+AddCookie bad client rc=0x00000000
+cookie send callback 153: 127.0.0.1 /echo "u=21; v=22; w=23" argument ok -> 0
+cookie send callback 154: 127.0.0.1 /echo "u=21; v=22; w=23" argument ok -> 0
+after add /echo rc=0x00000000 HTTP 200 Cookie: u=21; v=22; w=23
+cookie send callback 155: 127.0.0.1 /cookie/echo "u=21; v=22; w=23; z=1" argument ok -> 0
+cookie send callback 156: 127.0.0.1 /cookie/echo "u=21; v=22; w=23; z=1" argument ok -> 0
+after add /cookie/echo rc=0x00000000 HTTP 200 Cookie: u=21; v=22; w=23; z=1
+after add /cookie/echo rc=0x00000000 HTTP 200 Cookie: u=21; v=22; w=23; z=1
+after add GetCookie /cookie/ size rc=0x00000000 required=24
+after add GetCookie /cookie/ rc=0x00000000 required=24 "u=21; v=22; w=23; z=1" then "\x00 \x00\xa5"
+after add GetCookie /cookie/ short rc=0x80710006 required=2779096485
+cookie recv callback 23: 127.0.0.1 /setcookie/two "x=1" argument ok -> -1
+cookie recv callback 24: 127.0.0.1 /setcookie/two "y=2" argument ok -> -1
+recv refusing /setcookie/two rc=0x00000000 HTTP 200 
+recv refusing /setcookie/echo rc=0x00000000 HTTP 200 no cookie
+cookie recv callback 25: 127.0.0.1 /setcookie/session "a=1" argument ok -> 1
+recv 1 /setcookie/session rc=0x00000000 HTTP 200 
+recv 1 /setcookie/echo rc=0x00000000 HTTP 200 no cookie
+cookie recv callback 26: 127.0.0.1 /setcookie/two "x=1" argument ok -> 0
+cookie recv callback 27: 127.0.0.1 /setcookie/two "y=2" argument ok -> 0
+recv 0 /setcookie/two rc=0x00000000 HTTP 200 
+cookie send callback 157: 127.0.0.1 /setcookie/echo "x=1; y=2" argument ok -> -1
+send refusing /setcookie/echo rc=0xffffffff HTTP 0 no cookie
+cookie send callback 158: 127.0.0.1 /setcookie/echo "x=1; y=2" argument ok -> 1
+cookie send callback 159: 127.0.0.1 /setcookie/echo "x=1; y=2" argument ok -> 1
+send 1 /setcookie/echo rc=0x00000000 HTTP 200 Cookie: x=1; y=2
+cookies clear callbacks rc=0x00000000 rc=0x00000000
+maxage /setcookie/maxage rc=0x00000000 HTTP 200 
+maxage /setcookie/echo rc=0x00000000 HTTP 200 Cookie: d=4; x=1; y=2
+delete /setcookie/session rc=0x00000000 HTTP 200 
+delete /setcookie/delete rc=0x00000000 HTTP 200 
+delete /setcookie/echo rc=0x00000000 HTTP 200 Cookie: d=4; x=1; y=2
+status off /setcookie/echo rc=0x00000000 HTTP 200 no cookie
+cookies EndCookie rc=0x00000000
+ended /setcookie/session rc=0x80710003 HTTP 0 
+ended /setcookie/echo rc=0x00000000 HTTP 200 no cookie
+ended GetCookie rc=0x80710041
+ended Export rc=0x80710002
+ended Import rc=0x80710002
+ended CookieFlush rc=0x80710002
+ended SessionCookieFlush rc=0x00000000
+ended AddCookie rc=0x80710003
+again InitCookie rc=0x00000000
+again /setcookie/noequal rc=0x00000000 HTTP 200 
+again AddCookie k5 rc=0x00000000
+again valueless GetCookie /setcookie/ size rc=0x00000000 required=5
+again valueless GetCookie /setcookie/ rc=0x00000000 required=5 "k5" then "\x00 \x00\xa5"
+again valueless GetCookie /setcookie/ short rc=0x80710006 required=2779096485
+again AddCookie =v rc=0x00000000
+again empty name GetCookie /setcookie/ size rc=0x00000000 required=8
+again empty name GetCookie /setcookie/ rc=0x00000000 required=8 "k5; v" then "\x00 \x00\xa5"
+again empty name GetCookie /setcookie/ short rc=0x80710006 required=2779096485
+again forty GetCookie / size rc=0x00000000 required=311
+again forty GetCookie / rc=0x00000000 required=311 "n00=0; n01=1; n02=2; n03=3; n04=4; n05=5; n06=6; n07=7; n08=8; n09=9; n10=10; n11=11; n12=12; n13=13; n14=14; n15=15; n16=16; n17=17; n18=18; n19=19; n20=20; n21=21; n22=22; n23=23; n24=24; n25=25; n26=26; n27=27; n28=28; n29=29; n30=30; n31=31; n32=32; n33=33; n34=34; n35=35; n36=36; n37=37; n38=38; n39=39" then "\x00 \x00\xa5"
+again forty GetCookie / short rc=0x80710006 required=2779096485
+again forty after second host GetCookie / size rc=0x00000000 required=311
+again forty after second host GetCookie / rc=0x00000000 required=311 "n00=0; n01=1; n02=2; n03=3; n04=4; n05=5; n06=6; n07=7; n08=8; n09=9; n10=10; n11=11; n12=12; n13=13; n14=14; n15=15; n16=16; n17=17; n18=18; n19=19; n20=20; n21=21; n22=22; n23=23; n24=24; n25=25; n26=26; n27=27; n28=28; n29=29; n30=30; n31=31; n32=32; n33=33; n34=34; n35=35; n36=36; n37=37; n38=38; n39=39" then "\x00 \x00\xa5"
+again forty after second host GetCookie / short rc=0x80710006 required=2779096485
+again /cookie/echo rc=0x00000000 HTTP 200 Cookie: Aa=1; aa=2; case=1; pb=1; pc=1; same=2
+again /cookiex/echo rc=0x00000000 HTTP 200 Cookie: Aa=1; aa=2; case=1; pb=1; same=2
+again /echo rc=0x00000000 HTTP 200 Cookie: Aa=1; aa=2
+uri create rc=0x00000000
+created GetUri size rc=0x00000000 required=37
+created GetUri rc=0x00000000 required=37 scheme=@0"http" host=@5"127.0.0.1" user=@25"user" password=@30"secret" path=@15"/echo?q=1" port=18080
+created GetUri short rc=0x80711001 required=2779096485
+GetUri nothing rc=0x80711002
+GetUri bad rc=0x80710011
+SetUri rc=0x00000000
+set GetUri size rc=0x00000000 required=24
+set GetUri rc=0x00000000 required=24 scheme=@0"http" host=@5"127.0.0.1" user=@22"" password=@23"" path=@15"/plain" port=18080
+set GetUri short rc=0x80711001 required=2779096485
+set Host rc=0x00000000
+set Host value 127.0.0.1:18080
+SetUri other host rc=0x00000000
+other Host rc=0x00000000
+other Host value localhost:18081
+SetUri no host rc=0x80710007
+SetUri NULL rc=0x80710007
+SetUri bad rc=0x80710011
+SetUri https rc=0x80710007
+after bad sets GetUri size rc=0x00000000 required=23
+after bad sets GetUri rc=0x00000000 required=23 scheme=@0"http" host=@5"localhost" user=@21"" password=@22"" path=@15"/echo" port=18081
+after bad sets GetUri short rc=0x80711001 required=2779096485
+SetUri back rc=0x00000000
+set send rc=0x00000000 sent=0
+set status rc=0x00000000 200
+set rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+SetUri after send rc=0x80710015
+after send GetUri size rc=0x00000000 required=24
+after send GetUri rc=0x00000000 required=24 scheme=@0"http" host=@5"127.0.0.1" user=@22"" password=@23"" path=@15"/plain" port=18080
+after send GetUri short rc=0x80711001 required=2779096485
+redirected send rc=0x00000000 sent=0
+redirected status rc=0x00000000 200
+redirected rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+redirected GetUri size rc=0x00000000 required=24
+redirected GetUri rc=0x00000000 required=24 scheme=@0"http" host=@5"127.0.0.1" user=@22"" password=@23"" path=@15"/plain" port=18080
+redirected GetUri short rc=0x80711001 required=2779096485
+chunked default rc=0x00000000 0
+chunked set rc=0x00000000
+chunked get rc=0x00000000 1
+chunked NULL rc=0x80710004
+chunked bad rc=0x80710011
+chunked headers rc=0x00000000 Host,User-Agent,Connection,Transfer-Encoding,Accept-Encoding,
+chunked send 1 rc=0x00000000 sent=6
+chunked send 2 rc=0x00000000 sent=7
+chunked set after send rc=0x80710015
+chunked end send rc=0x00000000 sent=0
+chunked end status rc=0x00000000 200
+chunked end rc=0x00000000 HTTP 200 body "hello chunked"
+chunked with length send rc=0x00000000 sent=5
+chunked with length status rc=0x80710013 0
+chunked with length rc=0x80710013 HTTP 0 body ""
+length then chunked rc=0x80710026
+length then chunked send rc=0x00000000 sent=5
+length then chunked status rc=0x00000000 200
+length then chunked rc=0x00000000 HTTP 200 body "abcde"
+chunked empty send rc=0x00000000 sent=0
+chunked empty status rc=0x00000000 200
+chunked empty rc=0x00000000 HTTP 200 body ""
+kept 1 send rc=0x00000000 sent=0
+kept 1 status rc=0x00000000 200
+kept 1 rc=0x00000000 HTTP 200 body "request 1 on this connection\x0a"
+release rc=0x00000000 sid a socket
+release again rc=0x80710054
+recv after release rc=0x00000000
+after release send rc=0x00000000 sent=0
+after release status rc=0x00000000 200
+after release rc=0x00000000 HTTP 200 body "request 1 on this connection\x0a"
+release before send rc=0x80710020
+release NULL rc=0x80710004
+release bad rc=0x80710011
+kept 2 send rc=0x00000000 sent=0
+kept 2 status rc=0x00000000 200
+kept 2 rc=0x00000000 HTTP 200 body "request 2 on this connection\x0a"
+close other host rc=0x00000000
+after closing other host send rc=0x00000000 sent=0
+after closing other host status rc=0x00000000 200
+after closing other host rc=0x00000000 HTTP 200 body "request 3 on this connection\x0a"
+close host rc=0x00000000
+after closing host send rc=0x00000000 sent=0
+after closing host status rc=0x00000000 200
+after closing host rc=0x00000000 HTTP 200 body "request 1 on this connection\x0a"
+close NULL rc=0x00000000
+after closing NULL send rc=0x00000000 sent=0
+after closing NULL status rc=0x00000000 200
+after closing NULL rc=0x00000000 HTTP 200 body "request 2 on this connection\x0a"
+close bad rc=0x80710010
+poll idle rc=0x80710012 untouched
+poll sent rc=0x00000000 this one
+poll NULL rc=0x80710004
+poll bad rc=0x80710010
+memory rc=0x00000000 free most of the pool first info's old word info written all
+memory NULLs rc=0x00000000
+memory free only rc=0x00000000 written
+state callback set rc=0x00000000
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states plain send rc=0x00000000 sent=0
+states plain status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states plain rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states kept send rc=0x00000000 sent=0
+states kept status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states kept rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 4 argument ok -> 0
+states post send rc=0x00000000 sent=2
+states post status rc=0x80710013 0
+states post rc=0x80710013 HTTP 0 body ""
+state callback 4 argument ok -> 0
+state callback 5 argument ok -> 0
+states post rest send rc=0x00000000 sent=2
+states post rest status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states post rest rc=0x00000000 HTTP 200 body "abcd"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+state callback 7 argument ok -> 0
+state callback 1 argument ok -> 0
+state callback 6 argument ok -> 0
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states redirect send rc=0x00000000 sent=0
+states redirect status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states redirect rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+states refused send rc=0x80710316 sent=0
+state callback 1 argument ok -> -1
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states -1 at 1 send rc=0x00000000 sent=0
+states -1 at 1 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states -1 at 1 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> -1
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states -1 at 2 send rc=0x00000000 sent=0
+states -1 at 2 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states -1 at 2 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> -1
+state callback 5 argument ok -> 0
+states -1 at 3 send rc=0x00000000 sent=0
+states -1 at 3 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states -1 at 3 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states -1 at 4 send rc=0x00000000 sent=0
+states -1 at 4 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states -1 at 4 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> -1
+states -1 at 5 send rc=0x00000000 sent=0
+states -1 at 5 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states -1 at 5 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states -1 at 6 send rc=0x00000000 sent=0
+states -1 at 6 status rc=0x00000000 200
+state callback 6 argument ok -> -1
+state callback 6 argument ok -> -1
+states -1 at 6 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+state callback 7 argument ok -> -1
+state callback 1 argument ok -> 0
+state callback 6 argument ok -> 0
+state callback 1 argument ok -> 0
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states -1 at 7 send rc=0x00000000 sent=0
+states -1 at 7 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states -1 at 7 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+state callback 1 argument ok -> 1
+state callback 2 argument ok -> 0
+state callback 3 argument ok -> 0
+state callback 5 argument ok -> 0
+states 1 at 1 send rc=0x00000000 sent=0
+states 1 at 1 status rc=0x00000000 200
+state callback 6 argument ok -> 0
+state callback 6 argument ok -> 0
+states 1 at 1 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+redirect callback set rc=0x00000000
+redirect callback: HTTP 1.1 302 "Found" from http://127.0.0.1:18080/redirect to http://127.0.0.1:18080/plain argument ok -> 0
+redirect 0 send rc=0x00000000 sent=0
+redirect 0 status rc=0x00000000 200
+redirect 0 rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+redirect callback: HTTP 1.1 302 "Found" from http://127.0.0.1:18080/redirect to http://127.0.0.1:18080/plain argument ok -> -1
+redirect -1 send rc=0x80710021 sent=0
+redirect callback: HTTP 1.1 302 "Found" from http://127.0.0.1:18080/redirect to http://127.0.0.1:18080/plain argument ok -> 1
+redirect 1 send rc=0x80710021 sent=0
+redirect off send rc=0x00000000 sent=0
+redirect off status rc=0x00000000 302
+redirect off rc=0x00000000 HTTP 302 body ""
+connection callback set rc=0x00000000
+connection callback bad rc=0x80710010
+connection step open
+connection callback 1: connection pointer, transaction, state 0, argument
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection step kept
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection step server closes
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection callback 2: connection one opened, transaction, state 1, argument
+connection step after close
+connection callback 3: connection pointer, transaction, state 0, argument
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection step release
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection release rc=0x00000000
+connection destroy transaction
+connection step close connection
+connection callback 4: connection pointer, transaction, state 0, argument
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection callback 5: connection one opened, transaction, state 1, argument
+connection close rc=0x00000000
+connection destroy transaction
+connection step close host
+connection callback 6: connection pointer, transaction, state 0, argument
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection callback 7: connection one opened, 0, state 1, argument
+connection close host rc=0x00000000
+connection step close all
+connection callback 8: connection pointer, transaction, state 0, argument
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection close all rc=0x00000000
+connection step destroy client
+connection callback 9: connection pointer, transaction, state 0, argument
+connection send rc=0x00000000 sent=0
+connection status rc=0x00000000 200
+connection rc=0x00000000 HTTP 200 body "hello, vitals\x0a"
+connection destroy transaction
+connection client destroyed
+connection callback calls: 9
+auth entry max rc=0x00000000 4
+auth entry max NULL rc=0x80710004
+auth defaults auto 1
+auth defaults cache 1
+no callback /basic send rc=0x80710021 rc=0x80710021 HTTP 0 ""
+uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+after uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+uri wrong /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+uri digest /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digest qop=auth nc=0000"
+uri digest no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digestnoqop cnonce none"
+auth callback set rc=0x00000000
+auth state 8
+auth callback 1: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+callback /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+callback again /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+callback uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+callback saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+after saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+after saved sub /basic/sub send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+after saved other realm /basic2 send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+auth state 8
+auth callback 2: realm "probe digest" http://127.0.0.1:18080/digest user "user" password "pass" save 0 argument ok -> 0
+after saved digest /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digest qop=auth nc=0000"
+after saved digest again /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 0 refusals, first with: username=user realm=probe digest uri=/digest qop=auth nc=0000"
+auth state 8
+auth callback 3: realm "probe digest" http://127.0.0.1:18080/digestnoqop user "user" password "pass" save 1 argument ok -> 0
+after saved digest no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digestnoqop cnonce none"
+other client after saved /basic send rc=0x80710021 rc=0x80710021 HTTP 0 ""
+auth export size rc=0x00000000 exported=1931
+auth export short rc=0x80710006 exported=2779096485
+auth export rc=0x00000000 exported=1931
+auth export 0: "\x01\x00\x00\x00\x04\x00\x00\x00\x04\x02\x0d\x07\xdf\xb1\x9d\x0aX}<`\xa4\xc8\xdbU:\xfd\x03user\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export 100: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export 200: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04pass\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export 300: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export 400: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export 500: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x00\x00\x04\x00\x00\x00"\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00probe digestauthdcd98b7102dd2f"
+auth export 600: "0e8b11d0f600bfb0c093MD5\x06http://127.0.0.1:18080/\x00\xff\x02\x0d\x07\xdf\xb1\x9d\x0aX}<`\xa4\xc8\xdbU:\xfd\x03user\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export 700: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+auth export NULL size rc=0x00000000
+auth export tiny rc=0x80710006
+auth flush rc=0x00000000
+auth state 8
+auth callback 4: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+after flush /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auth import rc=0x80710006
+after import /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+auth import garbage rc=0x80710059
+after garbage import /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+auth import NULL rc=0x80710004
+auth entry max set 1 rc=0x00000000
+auth entry max get rc=0x00000000 1
+auth state 8
+auth callback 5: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+max 1 first /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auth state 8
+auth callback 6: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+max 1 second /basic2 send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auth state 8
+auth callback 7: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+max 1 first again /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auth state 8
+auth callback 8: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+max 1 second again /basic2 send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auth entry max set 0 rc=0x00000000
+auth entry max get rc=0x00000000 0
+auth entry max set 1000 rc=0x00000000
+auth entry max get rc=0x00000000 1000
+auth state 8
+auth callback 9: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> -1
+callback -1 /basic send rc=0x80710021 rc=0x80710021 HTTP 0 ""
+auth state 8
+auth callback 10: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 1
+callback 1 /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+callback wrong /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+auth state 8
+auth callback 11: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+auth state 8
+auth callback 12: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+auth state 8
+auth callback 13: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+auth state 8
+auth callback 14: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+auth state 8
+auth callback 15: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+auth state 8
+auth callback 16: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+always refused /basicfail send rc=0x80710019 rc=0x80710019 HTTP 0 ""
+auth state 8
+auth callback 17: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+cache off saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auth state 8
+auth callback 18: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+cache off after /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+auto off /basic send rc=0x00000000 rc=0x00000000 HTTP 401 "basic refused without Authorization after 0 refusals, first without (-)"
+auto off uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 401 "basic refused without Authorization after 1 refusals, first without (-)"
+auth state 8
+auth callback 19: realm "probe digest" http://127.0.0.1:18080/digest user "user" password "pass" save 1 argument ok -> 0
+digest callback /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 3 refusals, first without: username=user realm=probe digest uri=/digest qop=auth nc=0"
+auth state 8
+auth callback 20: realm "probe digest" http://127.0.0.1:18080/digestnoqop user "user" password "pass" save 0 argument ok -> 0
+digest callback no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digestnoqop cnonce none"
+auth callback clear rc=0x00000000
+auth calls 20
+proxy set rc=0x00000000
+proxied GET http://proxied.example:80/a/b?c=d send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied | proxied GET http://proxied.example/a/b?c=d HTTP/1.1
+proxied | Host: proxied.example
+proxied | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+proxied | Proxy-Connection: Keep-Alive
+proxied | Accept-Encoding: identity
+proxied port GET http://proxied.example:8080/x send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied port | proxied GET http://proxied.example:8080/x HTTP/1.1
+proxied port | Host: proxied.example:8080
+proxied port | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+proxied port | Proxy-Connection: Keep-Alive
+proxied port | Accept-Encoding: identity
+proxied post POST http://proxied.example:80/form send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied post | proxied POST http://proxied.example/form HTTP/1.1
+proxied post | Host: proxied.example
+proxied post | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+proxied post | Proxy-Connection: Keep-Alive
+proxied post | Content-Length: 3
+proxied post | Accept-Encoding: identity
+proxied post | body a=1
+proxied head HEAD http://proxied.example:80/h send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied no keep-alive GET http://proxied.example:80/k send rc=0x00000000 rc=0x00000000 HTTP 200
+proxied no keep-alive | proxied GET http://proxied.example/k HTTP/1.1
+proxied no keep-alive | Host: proxied.example
+proxied no keep-alive | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+proxied no keep-alive | Proxy-Connection: close
+proxied no keep-alive | Accept-Encoding: identity
+proxy with user GET http://proxied.example:80/u send rc=0x00000000 rc=0x00000000 HTTP 200
+proxy with user | proxied GET http://proxied.example/u HTTP/1.1
+proxy with user | Host: proxied.example
+proxy with user | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+proxy with user | Proxy-Connection: Keep-Alive
+proxy with user | Accept-Encoding: identity
+dead proxy GET http://proxied.example:80/d send rc=0x80710316 rc=0x80710316 HTTP 0
+proxy cleared GET http://127.0.0.1:18080/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+proxy cleared | hello, vitals
+before init cache info rc=0x80710044 2779096485 untouched third untouched
+cache flush before init rc=0x80710044
+cache end before init rc=0x80710044
+cache end external before init rc=0x80710044
+cache init rc=0x00000000
+cache init again rc=0x80710043
+after init cache info rc=0x00000000 65536 0 used third untouched
+cache info NULL rc=0x00000000
+cache default 1 GET http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache default 1 | full 1
+cache default 2 GET http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache default 2 | full 2
+cache status rc=0x00000000
+cache status bad rc=0x80710010
+cache full 1 GET http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache full 1 | full 3
+cache full 2 GET http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache full 2 | full 4 if-modified-since a date ending +0000
+cache full 3 GET http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache full 3 | full 5 if-modified-since a date ending +0000
+full cache info rc=0x00000000 65536 some used third untouched
+cache lm 1 GET http://127.0.0.1:18080/cache/lm send rc=0x00000000 rc=0x00000000 HTTP 200
+cache lm 1 | lm 6
+cache lm 2 GET http://127.0.0.1:18080/cache/lm send rc=0x00000000 rc=0x00000000 HTTP 200
+cache lm 2 | lm 7 if-modified-since a date ending +0000
+cache lm 3 GET http://127.0.0.1:18080/cache/lm send rc=0x00000000 rc=0x00000000 HTTP 200
+cache lm 3 | lm 8 if-modified-since a date ending +0000
+lm cache info rc=0x00000000 65536 some used third untouched
+cache maxage 1 GET http://127.0.0.1:18080/cache/maxage send rc=0x00000000 rc=0x00000000 HTTP 200
+cache maxage 1 | maxage 9
+cache maxage 2 GET http://127.0.0.1:18080/cache/maxage send rc=0x00000000 rc=0x00000000 HTTP 200
+cache maxage 2 | maxage 10 if-modified-since a date ending +0000
+cache maxage 3 GET http://127.0.0.1:18080/cache/maxage send rc=0x00000000 rc=0x00000000 HTTP 200
+cache maxage 3 | maxage 11 if-modified-since a date ending +0000
+maxage cache info rc=0x00000000 65536 some used third untouched
+cache plain 1 GET http://127.0.0.1:18080/cache/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+cache plain 1 | plain 12
+cache plain 2 GET http://127.0.0.1:18080/cache/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+cache plain 2 | plain 13 if-modified-since a date ending +0000
+cache plain 3 GET http://127.0.0.1:18080/cache/plain send rc=0x00000000 rc=0x00000000 HTTP 200
+cache plain 3 | plain 14 if-modified-since a date ending +0000
+plain cache info rc=0x00000000 65536 some used third untouched
+cache etag 1 GET http://127.0.0.1:18080/cache/etag send rc=0x00000000 rc=0x00000000 HTTP 200
+cache etag 1 | etag 15
+cache etag 2 GET http://127.0.0.1:18080/cache/etag send rc=0x00000000 rc=0x00000000 HTTP 200
+cache etag 2 | etag 16 if-modified-since a date ending +0000
+cache etag 3 GET http://127.0.0.1:18080/cache/etag send rc=0x00000000 rc=0x00000000 HTTP 200
+cache etag 3 | etag 17 if-modified-since a date ending +0000
+etag cache info rc=0x00000000 65536 some used third untouched
+cache nocache 1 GET http://127.0.0.1:18080/cache/nocache send rc=0x00000000 rc=0x00000000 HTTP 200
+cache nocache 1 | nocache 18
+cache nocache 2 GET http://127.0.0.1:18080/cache/nocache send rc=0x00000000 rc=0x00000000 HTTP 200
+cache nocache 2 | nocache 19
+cache nocache 3 GET http://127.0.0.1:18080/cache/nocache send rc=0x00000000 rc=0x00000000 HTTP 200
+cache nocache 3 | nocache 20
+nocache cache info rc=0x00000000 65536 some used third untouched
+cache nostore 1 GET http://127.0.0.1:18080/cache/nostore send rc=0x00000000 rc=0x00000000 HTTP 200
+cache nostore 1 | nostore 21
+cache nostore 2 GET http://127.0.0.1:18080/cache/nostore send rc=0x00000000 rc=0x00000000 HTTP 200
+cache nostore 2 | nostore 22
+cache nostore 3 GET http://127.0.0.1:18080/cache/nostore send rc=0x00000000 rc=0x00000000 HTTP 200
+cache nostore 3 | nostore 23
+nostore cache info rc=0x00000000 65536 some used third untouched
+cache private 1 GET http://127.0.0.1:18080/cache/private send rc=0x00000000 rc=0x00000000 HTTP 200
+cache private 1 | private 24
+cache private 2 GET http://127.0.0.1:18080/cache/private send rc=0x00000000 rc=0x00000000 HTTP 200
+cache private 2 | private 25
+cache private 3 GET http://127.0.0.1:18080/cache/private send rc=0x00000000 rc=0x00000000 HTTP 200
+cache private 3 | private 26
+private cache info rc=0x00000000 65536 some used third untouched
+cache pragma 1 GET http://127.0.0.1:18080/cache/pragma send rc=0x00000000 rc=0x00000000 HTTP 200
+cache pragma 1 | pragma 27
+cache pragma 2 GET http://127.0.0.1:18080/cache/pragma send rc=0x00000000 rc=0x00000000 HTTP 200
+cache pragma 2 | pragma 28 if-modified-since a date ending +0000
+cache pragma 3 GET http://127.0.0.1:18080/cache/pragma send rc=0x00000000 rc=0x00000000 HTTP 200
+cache pragma 3 | pragma 29 if-modified-since a date ending +0000
+pragma cache info rc=0x00000000 65536 some used third untouched
+cache expires 1 GET http://127.0.0.1:18080/cache/expires send rc=0x00000000 rc=0x00000000 HTTP 200
+cache expires 1 | expires 30
+cache expires 2 GET http://127.0.0.1:18080/cache/expires send rc=0x00000000 rc=0x00000000 HTTP 200
+cache expires 2 | expires 31 if-modified-since a date ending +0000
+cache expires 3 GET http://127.0.0.1:18080/cache/expires send rc=0x00000000 rc=0x00000000 HTTP 200
+cache expires 3 | expires 32 if-modified-since a date ending +0000
+expires cache info rc=0x00000000 65536 some used third untouched
+cache s304 1 GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache s304 1 | s304 33
+cache s304 2 GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache s304 2 | s304 33
+cache s304 3 GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache s304 3 | s304 33
+s304 cache info rc=0x00000000 65536 some used third untouched
+cache e304 1 GET http://127.0.0.1:18080/cache/e304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache e304 1 | e304 36
+cache e304 2 GET http://127.0.0.1:18080/cache/e304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache e304 2 | e304 37 if-modified-since a date ending +0000
+cache e304 3 GET http://127.0.0.1:18080/cache/e304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache e304 3 | e304 38 if-modified-since a date ending +0000
+e304 cache info rc=0x00000000 65536 some used third untouched
+cache full head HEAD http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache full post POST http://127.0.0.1:18080/cache/full send rc=0x00000000 rc=0x00000000 HTTP 200
+cache full post | full 40
+cache flush rc=0x00000000
+after flush cache info rc=0x00000000 65536 0 used third untouched
+cache after flush GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache after flush | s304 41
+cache other client GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache other client | s304 41
+cache off GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache off | s304 43
+cache big 1 GET http://127.0.0.1:18080/cache/big send rc=0x00000000 rc=0x00000000 HTTP 200
+big cache info rc=0x00000000 65536 some used third untouched
+cache big 2 GET http://127.0.0.1:18080/cache/big send rc=0x00000000 rc=0x00000000 HTTP 200
+cache end rc=0x00000000
+cache end again rc=0x80710044
+after end cache info rc=0x80710044 2779096485 untouched third untouched
+cache ended GET http://127.0.0.1:18080/cache/s304 send rc=0x80010002 rc=0x80010002 HTTP 0
+cache init small rc=0x00000000
+small cache info rc=0x00000000 16 0 used third untouched
+cache small 1 GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache small 1 | s304 46
+cache small 2 GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+cache small 2 | s304 47
+cache init 0 rc=0x00000000
+flag 5 default rc=0x00000000 1
+flag 5 on rc=0x00000000 get rc=0x00000000 1
+flag 5 off rc=0x00000000 get rc=0x00000000 0
+flag 5 NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+flag 6 default rc=0x00000000 0
+flag 6 on rc=0x00000000 get rc=0x00000000 1
+flag 6 off rc=0x00000000 get rc=0x00000000 0
+flag 6 NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+flag 8 default rc=0x00000000 0
+flag 8 on rc=0x80710044 get rc=0x00000000 0
+flag 8 off rc=0x00000000 get rc=0x00000000 0
+flag 8 NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+flag 9 default rc=0x00000000 0
+flag 9 on rc=0x80710062 get rc=0x00000000 0
+flag 9 off rc=0x00000000 get rc=0x00000000 0
+flag 9 NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+gzip default rc=0x00000000 0
+gzip on rc=0x00000000 get rc=0x00000000 1
+gzip off rc=0x00000000 get rc=0x00000000 0
+gzip NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+cache status default rc=0x00000000 0
+cache status on rc=0x80710044 get rc=0x00000000 0
+cache status off rc=0x00000000 get rc=0x00000000 0
+cache status NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+wait 0 default rc=0x00000000 0
+wait 0 on rc=0x00000000 get rc=0x00000000 1
+wait 0 off rc=0x00000000 get rc=0x00000000 0
+wait 0 NULL rc=0x80710004 bad set rc=0x80710010 bad get rc=0x80710010
+size 4 default rc=0x00000000 5
+size 4 set 0 rc=0x00000000 get rc=0x00000000 0
+size 4 set 1 rc=0x00000000 get rc=0x00000000 1
+size 4 set 7 rc=0x00000000 get rc=0x00000000 7
+size 4 set 100 rc=0x80710027 get rc=0x00000000 7
+size 4 set 65536 rc=0x80710027 get rc=0x00000000 7
+size 4 set 2147483647 rc=0x80710027 get rc=0x00000000 7
+size 4 NULL rc=0x80710004 bad get rc=0x80710010
+size 4 bad set rc=0x80710010
+size 5 default rc=0x00000000 4
+size 5 set 0 rc=0x00000000 get rc=0x00000000 0
+size 5 set 1 rc=0x00000000 get rc=0x00000000 1
+size 5 set 7 rc=0x00000000 get rc=0x00000000 7
+size 5 set 100 rc=0x80710027 get rc=0x00000000 7
+size 5 set 65536 rc=0x80710027 get rc=0x00000000 7
+size 5 set 2147483647 rc=0x80710027 get rc=0x00000000 7
+size 5 NULL rc=0x80710004 bad get rc=0x80710010
+size 5 bad set rc=0x80710010
+size 6 default rc=0x00000000 2
+size 6 set 0 rc=0x00000000 get rc=0x00000000 0
+size 6 set 1 rc=0x00000000 get rc=0x00000000 1
+size 6 set 7 rc=0x80710027 get rc=0x00000000 1
+size 6 set 100 rc=0x80710027 get rc=0x00000000 1
+size 6 set 65536 rc=0x80710027 get rc=0x00000000 1
+size 6 set 2147483647 rc=0x80710027 get rc=0x00000000 1
+size 6 NULL rc=0x80710004 bad get rc=0x80710010
+size 6 bad set rc=0x80710010
+size 7 default rc=0x00000000 4
+size 7 set 0 rc=0x00000000 get rc=0x00000000 0
+size 7 set 1 rc=0x00000000 get rc=0x00000000 1
+size 7 set 7 rc=0x00000000 get rc=0x00000000 7
+size 7 set 100 rc=0x80710027 get rc=0x00000000 7
+size 7 set 65536 rc=0x80710027 get rc=0x00000000 7
+size 7 set 2147483647 rc=0x80710027 get rc=0x00000000 7
+size 7 NULL rc=0x80710004 bad get rc=0x80710010
+size 7 bad set rc=0x80710010
+size 10 default rc=0x00000000 1024
+size 10 set 0 rc=0x00000000 get rc=0x00000000 0
+size 10 set 1 rc=0x00000000 get rc=0x00000000 1
+size 10 set 7 rc=0x00000000 get rc=0x00000000 7
+size 10 set 100 rc=0x00000000 get rc=0x00000000 100
+size 10 set 65536 rc=0x00000000 get rc=0x00000000 65536
+size 10 set 2147483647 rc=0x00000000 get rc=0x00000000 2147483647
+size 10 NULL rc=0x80710004 bad get rc=0x80710010
+size 10 bad set rc=0x80710010
+buffer 1 default rc=0x00000000 5
+buffer 1 set 0 rc=0x00000000 get rc=0x00000000 0
+buffer 1 set 1 rc=0x00000000 get rc=0x00000000 1
+buffer 1 set 7 rc=0x00000000 get rc=0x00000000 7
+buffer 1 set 100 rc=0x00000000 get rc=0x00000000 100
+buffer 1 set 65536 rc=0x00000000 get rc=0x00000000 65536
+buffer 1 set 2147483647 rc=0x00000000 get rc=0x00000000 2147483647
+buffer 1 NULL rc=0x80710004 bad get rc=0x80710010
+buffer 1 bad set rc=0x80710010
+buffer 2 default rc=0x00000000 0
+buffer 2 set 0 rc=0x00000000 get rc=0x00000000 0
+buffer 2 set 1 rc=0x00000000 get rc=0x00000000 1
+buffer 2 set 7 rc=0x00000000 get rc=0x00000000 7
+buffer 2 set 100 rc=0x00000000 get rc=0x00000000 100
+buffer 2 set 65536 rc=0x00000000 get rc=0x00000000 65536
+buffer 2 set 2147483647 rc=0x00000000 get rc=0x00000000 2147483647
+buffer 2 NULL rc=0x80710004 bad get rc=0x80710010
+buffer 2 bad set rc=0x80710010
+buffer 3 default rc=0x00000000 0
+buffer 3 set 0 rc=0x00000000 get rc=0x00000000 0
+buffer 3 set 1 rc=0x00000000 get rc=0x00000000 1
+buffer 3 set 7 rc=0x00000000 get rc=0x00000000 7
+buffer 3 set 100 rc=0x00000000 get rc=0x00000000 100
+buffer 3 set 65536 rc=0x00000000 get rc=0x00000000 65536
+buffer 3 set 2147483647 rc=0x00000000 get rc=0x00000000 2147483647
+buffer 3 NULL rc=0x80710004 bad get rc=0x80710010
+buffer 3 bad set rc=0x80710010
+method size rc=0x00000000 required=9
+method rc=0x00000000 required=9 "PROPFIND"
+method short rc=0x80710006 required=9
+method no required rc=0x00000000
+method nothing rc=0x80710004
+method bad rc=0x80710011
+no credentials credentials rc=0x80710028 "-" "-"
+uri credentials credentials rc=0x00000000 "uuser" "upass"
+credentials NULL rc=0x80710004 rc=0x80710004
+credentials bad rc=0x80710011
+after basic credentials rc=0x00000000 "user" "pass"
+gzip Accept-Encoding rc=0x00000000 gzip
+gzip sent Accept-Encoding: gzip
+gzip response length rc=0x80710017 0
+gzip response encoding rc=0x00000000 gzip
+gzip response body (14) "hello, vitals\x0a"
+TotalPoolSize highest taken 64, last 64
+PerHostPoolSize highest taken 16, last 16
+PerHostKeepAliveMax highest taken 8, last 8
+PerPipelineMax highest taken 8, last 8
+size 4 highest taken 16, last 16
+size 5 highest taken 8, last 8
+size 6 highest taken 4, last 4
+size 7 highest taken 8, last 8
+PerHostKeepAliveMax over PerHostPoolSize 3 rc=0x00000000 rc=0x00000000
+PerHostPoolSize over TotalPoolSize rc=0x80710027
+external init rc=0x00000000
+external init again rc=0x80710043
+flag 8 with external rc=0x00000000
+external info rc=0x00000000 65536 0
+external walk rc=0x00000000 calls 0
+external flush rc=0x00000000
+external end rc=0x00000000
+external end again rc=0x80710044
+E0CAF386 before send rc=0x80710013 165
+8633468C before send rc=0x80710020 untouched
+E0CAF386 NULL rc=0x80710004 bad rc=0x80710011
+8633468C NULL rc=0x80710004 bad rc=0x80710011
+313D80D5 existing rc=0x00000000
+313D80D5 new rc=0x00000000
+313D80D5 NULL rc=0x80710004
+313D80D5 headers X-Twice=second,X-Fresh=new,
+E0CAF386 after send rc=0x00000000 0
+8633468C after send rc=0x00000000 nonzero
+E0CAF386 after body rc=0x00000000 0
+close variant first "request 2 on this connection"
+3E30440C rc=0x00000000
+3E30440C again rc=0x80710054 bad rc=0x80710011
+after close variant "request 1 on this connection"
+DCD9D484 first rc=0x00000000 sent=2
+DCD9D484 rest rc=0x00000000 sent=2
+DCD9D484 status rc=0x00000000 200 body "abcd"
+DCD9D484 bad rc=0x80710011
+global default rc=0x00000000 1024
+global set rc=0x00000000
+global get rc=0x00000000 1234
+global set 0 rc=0x00000000
+global NULL rc=0x80710004
+cache walk before init rc=0x80710044
+cache walk rc=0x00000000 calls 1
+external walk before init rc=0x80710044
+external info before init rc=0x80710044
+external flush before rc=0x80710044
+external end before rc=0x80710044
+disk cache flush before rc=0x80710062
+disk cache end before rc=0x80710062
+disk cache info before rc=0x80710062
+disk cache walk before rc=0x80710062
+disk cache E9BE8A88 before rc=0x80010006
+subsystem end rc=0x80710062
+subsystem 419C41D2 rc=0x80710062
+subsystem 4558639F rc=0x80710062
+subsystem ABC0EB57 rc=0x80710062
+subsystem E55FE254 rc=0x80710062
+disk cache init rc=0x00000000
+disk cache init again rc=0x80710061
+disk cache E9BE8A88 after init rc=0x80710061
+disk cache ABC0EB57 rc=0x00000000
+disk cache 419C41D2 rc=0x00000000
+disk cache 4558639F rc=0x00000000
+disk cache E55FE254 rc=0x00000000
+disk cache info rc=0x00000000 00000000 00000000 00000000 00000000 00040000 (free, under the size) 00000021 00000000 00000000 00000000 00000000 00000000 00160000 000b0000 00000000 00000000
+disk cache walk rc=0x00000000 calls 0
+disk cache flush rc=0x00000000
+disk cache status on rc=0x00000000
+disk cache close rc=0x80710081
+disk cache end rc=0x00000000
+disk cache end again rc=0x80710062
+additions default agent rc=0x00000000 "PS3Application libhttp/4.9.3-000 (CellOS)"
+additions redirected uri rc=0x00000000 host old.vitals-probe.invalid
+additions redirected send rc=0x80710101
+additions redirected again uri rc=0x00000000 host old.vitals-probe.invalid
+additions redirected again send rc=0x80710101
+additions close old host rc=0x00000000
+additions own agent uri rc=0x00000000 host old.vitals-probe.invalid
+additions own agent send rc=0x80710101
+End rc=0x00000000
+End again rc=0x80710002
+after end AuthCacheFlush rc=0x80710002
+done

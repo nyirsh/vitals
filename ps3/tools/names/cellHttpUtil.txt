@@ -1,0 +1,21 @@
+# cellHttpUtil: function names as RPCS3's module table lists them (rpcs3/Emu/Cell/Modules/cellHttpUtil.cpp)
+cellHttpUtilAppendHeaderValue
+cellHttpUtilBase64Decoder
+cellHttpUtilBase64Encoder
+cellHttpUtilBuildHeader
+cellHttpUtilBuildRequestLine
+cellHttpUtilBuildUri
+cellHttpUtilCopyHeader
+cellHttpUtilCopyStatusLine
+cellHttpUtilCopyUri
+cellHttpUtilEscapeUri
+cellHttpUtilFormUrlDecode
+cellHttpUtilFormUrlEncode
+cellHttpUtilMergeUriPath
+cellHttpUtilParseHeader
+cellHttpUtilParseProxy
+cellHttpUtilParseStatusLine
+cellHttpUtilParseUri
+cellHttpUtilParseUriPath
+cellHttpUtilSweepPath
+cellHttpUtilUnescapeUri

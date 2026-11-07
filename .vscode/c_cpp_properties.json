@@ -3,25 +3,25 @@
         {
             "name": "vitals",
             "compileCommands": [
-                "${workspaceFolder}/build/vitals-plugin/compile_commands.json",
-                "${workspaceFolder}/build/tls13-vita/compile_commands.json",
-                "${workspaceFolder}/build/vitals-http/compile_commands.json",
-                "${workspaceFolder}/build/vitals-app/compile_commands.json",
-                "${workspaceFolder}/build/vitals-plugin-tests/compile_commands.json",
-                "${workspaceFolder}/build/tls13-vita-tests/compile_commands.json",
-                "${workspaceFolder}/build/vitals-http-tests/compile_commands.json",
-                "${workspaceFolder}/build/vitals-app-tests/compile_commands.json"
+                "${workspaceFolder}/vita/build/vitals-plugin/compile_commands.json",
+                "${workspaceFolder}/vita/build/tls13-vita/compile_commands.json",
+                "${workspaceFolder}/vita/build/vitals-http/compile_commands.json",
+                "${workspaceFolder}/vita/build/vitals-app/compile_commands.json",
+                "${workspaceFolder}/vita/build/vitals-plugin-tests/compile_commands.json",
+                "${workspaceFolder}/vita/build/tls13-vita-tests/compile_commands.json",
+                "${workspaceFolder}/vita/build/vitals-http-tests/compile_commands.json",
+                "${workspaceFolder}/vita/build/vitals-app-tests/compile_commands.json"
             ],
             "compilerPath": "/usr/local/vitasdk/bin/arm-vita-eabi-gcc",
             "intelliSenseMode": "gcc-arm",
             "includePath": [
-                "${workspaceFolder}/tls13-vita/include",
-                "${workspaceFolder}/tls13-vita/provider",
-                "${workspaceFolder}/tls13-vita/browser",
-                "${workspaceFolder}/tls13-vita/crypto",
-                "${workspaceFolder}/build/tls13-vita/_deps/vitals_mbedtls-src/include",
-                "${workspaceFolder}/vitals-plugin",
-                "${workspaceFolder}/vitals-app"
+                "${workspaceFolder}/vita/tls13-vita/include",
+                "${workspaceFolder}/vita/tls13-vita/provider",
+                "${workspaceFolder}/vita/tls13-vita/browser",
+                "${workspaceFolder}/vita/tls13-vita/crypto",
+                "${workspaceFolder}/vita/build/tls13-vita/_deps/vitals_mbedtls-src/include",
+                "${workspaceFolder}/vita/vitals-plugin",
+                "${workspaceFolder}/vita/vitals-app"
             ],
             "cStandard": "gnu11"
         }

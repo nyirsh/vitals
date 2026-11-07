@@ -1,7 +1,5 @@
-/build/
-__pycache__/
-*.o
-
+# Each project ignores its own build output (vita/.gitignore, ps3/.gitignore); this is for the root
 .*
 !.gitignore
 !.vscode
+__pycache__/
