@@ -78,29 +78,6 @@ failed:
 /* The user's certificates: every block that parses as a certificate, CA or not (a self-signed
  * server certificate is trusted as itself), up to the store's limit; anything else in the file
  * is skipped, so a mistake there never costs the system its roots */
-static STACK_OF(X509) *parse_custom(const unsigned char *data, size_t size) {
-    static const char begin[] = "-----BEGIN CERTIFICATE-----";
-    static const char end[] = "-----END CERTIFICATE-----";
-    STACK_OF(X509) *chain = sk_X509_new_null();
-    const char *cursor = (const char *)data;
-    /* read_file ends the data with a NUL, so the search stops at the end (or at a stray NUL) */
-    if (chain == NULL || data == NULL || size == 0) return chain;
-    while (sk_X509_num(chain) < CERTIFICATE_LIMIT) {
-        const char *first = strstr(cursor, begin);
-        if (first == NULL) break;
-        const char *last = strstr(first + sizeof(begin) - 1, end);
-        if (last == NULL) break;
-        size_t length = (size_t)(last - first) + sizeof(end) - 1;
-        cursor = last + sizeof(end) - 1;
-        BIO *bio = BIO_new_mem_buf(first, (int)length);
-        X509 *certificate = bio != NULL ? PEM_read_bio_X509(bio, NULL, NULL, NULL) : NULL;
-        BIO_free(bio);
-        if (certificate != NULL && !sk_X509_push(chain, certificate)) X509_free(certificate);
-    }
-    ERR_clear_error();
-    return chain;
-}
-
 /* The latest bundle, through the app's shared download (../../shared/app/download.c), trusting only
  * the Mozilla certificates the app carries: none of curl's or OpenSSL's own, nor Sony's */
 static STACK_OF(X509) *fetch_bundle(const char *url, const unsigned char *mozilla, size_t mozilla_size,
@@ -121,9 +98,8 @@ static STACK_OF(X509) *fetch_bundle(const char *url, const unsigned char *mozill
     return chain;
 }
 
-/* Adds source's certificates that combined lacks; with skip_beyond_limit, those past the limit
- * are left out instead of failing */
-static int append_unique(STACK_OF(X509) *combined, STACK_OF(X509) *source, int skip_beyond_limit) {
+/* Adds source's certificates that combined lacks */
+static int append_unique(STACK_OF(X509) *combined, STACK_OF(X509) *source) {
     for (int i = 0; i < sk_X509_num(source); ++i) {
         X509 *certificate = sk_X509_value(source, i);
         int duplicate = 0;
@@ -131,7 +107,6 @@ static int append_unique(STACK_OF(X509) *combined, STACK_OF(X509) *source, int s
             if (X509_cmp(certificate, sk_X509_value(combined, j)) == 0) { duplicate = 1; break; }
         }
         if (duplicate) continue;
-        if (sk_X509_num(combined) >= CERTIFICATE_LIMIT && skip_beyond_limit) break;
         if (sk_X509_num(combined) >= CERTIFICATE_LIMIT || !X509_up_ref(certificate)) return -1;
         if (!sk_X509_push(combined, certificate)) { X509_free(certificate); return -1; }
     }
@@ -139,10 +114,10 @@ static int append_unique(STACK_OF(X509) *combined, STACK_OF(X509) *source, int s
 }
 
 int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,
-    const char *custom_path, const char *url, long timeout_seconds, VitalsCertificateBundle *bundle) {
-    unsigned char *sony_data = NULL, *mozilla_data = NULL, *custom_data = NULL;
-    size_t sony_size = 0, mozilla_size = 0, custom_size = 0;
-    STACK_OF(X509) *sony = NULL, *embedded = NULL, *downloaded = NULL, *custom = NULL, *combined = NULL;
+    const char *url, long timeout_seconds, VitalsCertificateBundle *bundle) {
+    unsigned char *sony_data = NULL, *mozilla_data = NULL;
+    size_t sony_size = 0, mozilla_size = 0;
+    STACK_OF(X509) *sony = NULL, *embedded = NULL, *downloaded = NULL, *combined = NULL;
     BIO *output = NULL;
     int result = -1;
     const char *failure_stage;
@@ -170,39 +145,26 @@ int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,
     bundle->mozilla_count = (size_t)sk_X509_num(selected);
     ERR_clear_error();
     errno = 0;
-    /* A missing, empty or unreadable custom file simply adds nothing */
-    if (custom_path != NULL && read_file(custom_path, &custom_data, &custom_size) != 0) custom_size = 0;
-    bundle->failure_stage = "parsing custom certificates";
-    custom = parse_custom(custom_data, custom_size);
-    if (custom == NULL) goto done;
-    ERR_clear_error();
-    errno = 0;
     bundle->failure_stage = "combining certificate identities";
     combined = sk_X509_new_null();
-    if (combined == NULL || append_unique(combined, sony, 0) != 0) goto done;
+    if (combined == NULL || append_unique(combined, sony) != 0) goto done;
     int sony_unique_count = sk_X509_num(combined);
-    if (append_unique(combined, selected, 0) != 0) goto done;
-    int mozilla_end = sk_X509_num(combined);
-    if (append_unique(combined, custom, 1) != 0) goto done;
-    bundle->custom_count = (size_t)(sk_X509_num(combined) - mozilla_end);
-    bundle->failure_stage = "creating combined PEM buffer";
+    if (append_unique(combined, selected) != 0) goto done;
+    bundle->added_count = (size_t)(sk_X509_num(combined) - sony_unique_count);
+    /* Sony's list is its own part of the store, as Sony ships it (Sony's code finds its CA
+     * certificates at fixed byte offsets in it): only Mozilla's that it lacks are written here */
+    bundle->failure_stage = "creating Mozilla PEM buffer";
     output = BIO_new(BIO_s_mem());
-    /* Sony's code finds its CA certificates at fixed byte offsets in this file, so it is copied
-     * unchanged, comments and CRLFs included, and new roots are only appended after it */
-    if (output == NULL || BIO_write(output, sony_data, (int)sony_size) != (int)sony_size) goto done;
-    if (sony_data[sony_size - 1] != '\n' && BIO_puts(output, "\n") <= 0) goto done;
-    if (BIO_puts(output, "# vitals: additional curl/Mozilla CA certificates\n") <= 0) goto done;
-    bundle->failure_stage = "encoding combined certificates";
+    if (output == NULL || BIO_puts(output, "# vitals: curl/Mozilla CA certificates Sony's list lacks\n") <= 0) goto done;
+    bundle->failure_stage = "encoding Mozilla certificates";
     for (int i = sony_unique_count; i < sk_X509_num(combined); ++i) {
-        if (i == mozilla_end && BIO_puts(output, "# vitals: custom certificates (" VITALS_CUSTOM_CERTIFICATES_PATH ")\n") <= 0)
-            goto done;
         if (!PEM_write_bio_X509(output, sk_X509_value(combined, i))) goto done;
     }
     char *bytes = NULL;
-    bundle->failure_stage = "reading combined PEM buffer";
+    bundle->failure_stage = "reading Mozilla PEM buffer";
     long size = BIO_get_mem_data(output, &bytes);
     if (size <= 0 || (unsigned long)size > VITALS_CA_BUNDLE_LIMIT) goto done;
-    bundle->failure_stage = "allocating combined certificate output";
+    bundle->failure_stage = "allocating Mozilla certificate output";
     bundle->data = malloc((size_t)size + 1);
     if (bundle->data == NULL) goto done;
     memcpy(bundle->data, bytes, (size_t)size);
@@ -217,13 +179,11 @@ done:
     failure_crypto_error = ERR_peek_last_error();
     BIO_free(output);
     free_chain(combined);
-    free_chain(custom);
     free_chain(downloaded);
     free_chain(embedded);
     free_chain(sony);
     free(sony_data);
     free(mozilla_data);
-    free(custom_data);
     if (result != 0) {
         vitals_free_certificates(bundle);
         bundle->failure_stage = failure_stage;

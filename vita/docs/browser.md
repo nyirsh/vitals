@@ -29,7 +29,7 @@ Everything lives until the process exits.
 | `ux0:data/vitals/system/ScePsp2Compat.suprx` | `app0:compat.suprx` ([vitals-app/assets/compat.suprx](../vitals-app/assets/compat.suprx)) | `install_compat` in [install.c](../vitals-app/install.c) |
 | `ux0:data/vitals/system/vitals.suprx`            | the browser provider, built from [tls13-vita/browser/](../tls13-vita/browser/)            | same function                                                   |
 | `ux0:data/vitals/system/libssl.suprx`        | vitals-ssl, the system's libssl, which also does the provider's TLS                       | `install_http_modules`                                          |
-| `ux0:data/vitals/system/CA_LIST.cer`            | the certificate store libssl trusts                                                       | `install_certificates`                                          |
+| `ux0:data/vitals/system/sony-certs.pem`, `mozilla-certs.pem` | the certificate store libssl trusts, with `ux0:data/vitals/custom-certs.pem` ([libssl.md](libssl.md)) | `install_certificates`                                          |
 
 - **One copy of the provider**, in `ux0:data/vitals/system` with vitals' other modules
   (`VITALS_BROWSER_PROVIDER_BOOT_PATH`, [path.h](../tls13-vita/include/vitals/path.h)). Earlier

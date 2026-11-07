@@ -57,6 +57,14 @@ def store(directory, name, *members):
     return path
 
 
+def kernel_store(directory, name, sony, mozilla, custom):
+    """The store as the kernel plugin reads it (vitals/ca_store.h): Sony's part, Mozilla's and the
+    user's custom-certs.pem as written, each followed by a line break"""
+    path = directory / (name + ".store")
+    path.write_bytes(b"".join(part + b"\n" for part in (sony, mozilla, custom) if part))
+    return path
+
+
 def flags(binary, directory, store_path, certificate, host="localhost", mode="exact"):
     result = subprocess.run([str(binary), str(store_path), str(directory / (certificate + ".pem")), host, mode],
                             capture_output=True, text=True, timeout=30)
@@ -90,6 +98,24 @@ def main():
             # openssl's default self-signed certificate is a CA, and is trusted either way
             ("CA default", store(directory, "default", "default"), "default", "localhost", "plain", 0),
             ("CA default, with the rule", store(directory, "default", "default"), "default", "localhost", "exact", 0),
+        ]
+        # The user's own file is read as they wrote it: what isn't a certificate in it (a broken
+        # block, a private key, a block that never ends) is skipped, and the rest is trusted
+        root = (directory / "root.pem").read_bytes()
+        mistakes = (b"# my certificates\r\n" +
+                    b"-----BEGIN CERTIFICATE-----\nbroken\n-----END CERTIFICATE-----\n" +
+                    b"-----BEGIN PRIVATE KEY-----\nnot a certificate\n-----END PRIVATE KEY-----\n" +
+                    (directory / "server.pem").read_bytes() +
+                    b"-----BEGIN CERTIFICATE-----\nnever ends")
+        cases += [
+            ("custom, among mistakes", kernel_store(directory, "custom", root, root, mistakes),
+             "server", "localhost", "exact", 0),
+            ("custom, without it", kernel_store(directory, "no-custom", root, root, b""),
+             "server", "localhost", "exact", NOT_TRUSTED),
+            # Sony's and Mozilla's parts still count when the user's file is all mistakes
+            ("issued, by a root in Mozilla's part", kernel_store(directory, "mozilla-part",
+             (directory / "default.pem").read_bytes(), root, b"-----BEGIN CERTIFICATE-----\nnever ends"),
+             "issued", "localhost", "plain", 0),
         ]
         failures = []
         for name, store_path, certificate, host, mode, expected in cases:

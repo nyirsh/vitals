@@ -40,8 +40,10 @@ INSTALLED = [
     VITALS + "/system/libssl.suprx",
     VITALS + "/system/ScePsp2Compat.suprx",
     VITALS + "/system/vitals.suprx",
-    # vitals' certificate store (the system's own on vs0 is left as it was)
-    VITALS + "/system/CA_LIST.cer",
+    # vitals' certificate store, with the user's custom-certs.pem (the system's own on vs0 is left
+    # as it was)
+    VITALS + "/system/sony-certs.pem",
+    VITALS + "/system/mozilla-certs.pem",
 ]
 # The user's lists and certificates
 LISTS = [VITALS + "/" + name for name in ("redirects.txt", "dns.txt", "custom-certs.pem")]

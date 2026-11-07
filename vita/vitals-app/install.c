@@ -1004,20 +1004,30 @@ static int restore_system_certificates(void)
     return had_current ? remove_if_exists(rollback_path) : 0;
 }
 
+/* vitals' certificate store (vitals/ca_store.h): Sony's list as the app carries it, then Mozilla's
+ * certificates it lacks, which a certificate update rewrites; the kernel reads the user's
+ * custom-certs.pem after them as it is, so it's never written here */
 static int install_certificates(int requested_state)
 {
-    static const char temporary_path[] = VITALS_CA_STORE_PATH ".prepared";
+    static const char temporary_path[] = VITALS_CA_MOZILLA_PATH ".prepared";
     int result;
     int removing = requested_state == 1;
 
     result = restore_system_certificates();
     if (result < 0)
         return result;
+    /* Where an earlier build kept the store in one file */
+    (void)remove_if_exists(VITALS_CA_COMBINED_PATH ".prepared");
+    result = remove_if_exists(VITALS_CA_COMBINED_PATH);
+    if (result < 0)
+        return result;
     if (removing)
     {
         printf("Removing vitals CA certs... \n");
         (void)remove_if_exists(temporary_path);
-        result = remove_if_exists(VITALS_CA_STORE_PATH);
+        result = remove_if_exists(VITALS_CA_MOZILLA_PATH);
+        if (result >= 0)
+            result = remove_if_exists(VITALS_CA_SONY_PATH);
         /* The modules went first, so the folder is empty now */
         if (result >= 0 && path_exists(VITALS_SYSTEM_DIRECTORY))
             (void)sceIoRmdir(VITALS_SYSTEM_DIRECTORY);
@@ -1028,7 +1038,6 @@ static int install_certificates(int requested_state)
     printf("Fetching latest curl/Mozilla certificates...\n");
     int online = vitals_install_network_ready();
     result = vitals_prepare_certificates("app0:sony-certs.pem", "app0:mozilla-certs.pem",
-                                         VITALS_CUSTOM_CERTIFICATES_PATH,
                                          online ? VITALS_CA_UPDATE_URL : NULL, 30, &bundle);
     if (result < 0)
     {
@@ -1037,10 +1046,13 @@ static int install_certificates(int requested_state)
         return result;
     }
     printf(bundle.downloaded ? "Using downloaded Mozilla certificates.\n" : "Download unavailable; using embedded Mozilla certificates.\n");
-    printf("Sony: %u, Mozilla: %u, combined: %u certificates.\n",
+    printf("Sony: %u, Mozilla: %u (%u Sony's list lacks), combined: %u certificates.\n",
            (unsigned int)bundle.sony_count, (unsigned int)bundle.mozilla_count,
-           (unsigned int)bundle.combined_count);
+           (unsigned int)bundle.added_count, (unsigned int)bundle.combined_count);
     result = make_system_directory();
+    /* Sony's, as the app carries it */
+    if (result >= 0)
+        result = replace_file("app0:sony-certs.pem", VITALS_CA_SONY_PATH);
     SceUID descriptor = -1;
     if (result >= 0)
     {
@@ -1055,9 +1067,9 @@ static int install_certificates(int requested_state)
             result = close_result;
     }
     vitals_free_certificates(&bundle);
-    /* The store is replaced whole: the old one stays until the new one is complete */
+    /* Mozilla's is replaced whole: the old one stays until the new one is complete */
     if (result >= 0)
-        result = replace_file(temporary_path, VITALS_CA_STORE_PATH);
+        result = replace_file(temporary_path, VITALS_CA_MOZILLA_PATH);
     (void)remove_if_exists(temporary_path);
     return result;
 }
@@ -1085,8 +1097,9 @@ int vitals_install_old_layout(void)
     for (size_t i = 0; i < sizeof(old_layout) / sizeof(old_layout[0]); ++i)
         if (path_exists(old_layout[i]))
             return 1;
-    /* The system's certificate store still vitals' bundle, its own kept aside */
-    return path_exists(SYSTEM_CERTIFICATE_BACKUP);
+    /* The system's certificate store still vitals' bundle, its own kept aside; or vitals' store in
+     * one file, as an earlier build kept it */
+    return path_exists(SYSTEM_CERTIFICATE_BACKUP) || path_exists(VITALS_CA_COMBINED_PATH);
 }
 
 int vitals_install_complete(void)
@@ -1098,7 +1111,8 @@ int vitals_install_complete(void)
            path_exists(new_modules[MODULE_COMPAT]) && path_exists(new_modules[MODULE_BROWSER_PROVIDER]) &&
            path_exists(new_modules[MODULE_LIBHTTP]) && !vitals_install_old_layout() &&
            path_exists(new_modules[MODULE_LIBSSL]) && !path_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]) &&
-           !path_exists(new_modules[MODULE_OLD_REAUTH]) && path_exists(VITALS_CA_STORE_PATH);
+           !path_exists(new_modules[MODULE_OLD_REAUTH]) && path_exists(VITALS_CA_SONY_PATH) &&
+           path_exists(VITALS_CA_MOZILLA_PATH);
 }
 
 /* 1 when the two files hold the same bytes, 0 when they differ, negative when either cannot be

@@ -93,8 +93,9 @@ of its functions, and the NetCheck dialog one more.
   certificates in the order the server sent them, and whatever Mbed TLS found is dropped. libhttp's
   does the whole check itself with the certificate functions (below), so `sceHttpsDisableOption`
   and `sceHttpsSetSslCallback` work as on Sony's. Without one, Mbed TLS checks the server against
-  the CA bundle (`ux0:data/vitals/system/CA_LIST.cer`, read through the kernel plugin's
-  `vitals_ca_read` and indexed on the first connection that needs it), with SHA-1 signatures allowed and a self-signed certificate in the bundle trusted, as
+  the CA bundle (`sony-certs.pem` and `mozilla-certs.pem` in `ux0:data/vitals/system`, then
+  `ux0:data/vitals/custom-certs.pem`, read as one through the kernel plugin's `vitals_ca_read` and
+  indexed on the first connection that needs it), with SHA-1 signatures allowed and a self-signed certificate in the bundle trusted, as
   vitals-http does.
 - **The CA store**: Sony's libssl has its roots built in, served as PEM text by number
   (`064DFC99`) and by name (`3746501F`); here they are the CA bundle's. Where Sony's has one root

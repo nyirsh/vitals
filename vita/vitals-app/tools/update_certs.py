@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Refresh the installer's bundled Mozilla CA snapshot and the merged bundle built from it.
+"""Refresh the installer's bundled Mozilla CA snapshot and the store built from it.
 
 Downloads curl's Mozilla bundle, checks it against the SHA-256 that curl publishes next to it,
-rebuilds certs.cer with the installer's own merge code (compiled for the host) and updates
-certificate-sources.json. Nothing changes when the bundle is already current.
+rebuilds certs.cer (the store as the kernel plugin reads it, without the user's own: Sony's list,
+then the Mozilla certificates it lacks, from the installer's own merge code compiled for the host)
+and updates certificate-sources.json. Nothing changes when the bundle is already current.
 """
 import argparse
 import base64
@@ -67,14 +68,16 @@ def update(assets, mozilla):
     with tempfile.TemporaryDirectory(prefix="vitals-certs-") as temporary:
         directory = Path(temporary)
         (directory / "mozilla-certs.pem").write_bytes(mozilla)
-        merged = directory / "certs.cer"
-        # Offline mode: merge the given bundle exactly as the installer's fallback path does
+        added = directory / "mozilla-added.pem"
+        # Offline mode: the Mozilla part exactly as the installer's fallback path writes it
         result = subprocess.run([str(build_merge_tool(directory)), str(assets / "sony-certs.pem"),
-                                 str(directory / "mozilla-certs.pem"), "offline", str(merged)],
+                                 str(directory / "mozilla-certs.pem"), "offline", str(added)],
                                 capture_output=True, text=True)
         if result.returncode != 0:
             raise SystemExit("Merging failed: " + (result.stderr or result.stdout).strip())
-        combined = merged.read_bytes()
+        # The store as the kernel plugin reads it without the user's own: Sony's file as it is, then
+        # Mozilla's part, each followed by a line break (vitals/ca_store.h)
+        combined = (assets / "sony-certs.pem").read_bytes() + b"\n" + added.read_bytes() + b"\n"
     manifest["mozilla"].update(source_date=mozilla_date(mozilla),
                                fetched_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                                **describe(mozilla))

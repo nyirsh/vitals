@@ -11,8 +11,8 @@
  * The code comes from the vitals installer; progress messages are reported one line at a
  * time through a callback (console.h's VitalsNote) */
 
-/* vitals' certificate store, which a certificate update rewrites: VITALS_CA_STORE_PATH
- * (vitals/ca_store.h), in ux0:data/vitals/system */
+/* vitals' certificate store (vitals/ca_store.h), in ux0:data/vitals/system: Sony's list, then
+ * Mozilla's certificates it lacks, which a certificate update rewrites, then the user's own */
 #include "vitals/ca_store.h"
 
 /* 1 on firmware 3.60 or 3.65; otherwise 0, with the detected firmware described in description */

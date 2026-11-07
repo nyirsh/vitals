@@ -125,7 +125,6 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          assets/sony-certs.pem sony-certs.pem
          assets/mozilla-certs.pem mozilla-certs.pem
          assets/certificate-sources.json certificate-sources.json
-         assets/certs.cer certs.cer
          assets/redirects.txt redirects.txt
          assets/dns.txt dns.txt
 )

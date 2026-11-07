@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 
-typedef struct { uint64_t size; } SceIoStat;
+typedef struct { uint64_t size; int64_t st_size; } SceIoStat;
 typedef struct { unsigned int kind; } SceSha256Context;
 #define SCE_SHA256_DIGEST_SIZE 32
 #define SCE_KERNEL_MEMBLOCK_TYPE_KERNEL_RW 0x1020D006

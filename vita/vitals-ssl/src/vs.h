@@ -224,7 +224,7 @@ int vs_platform_parse_ipv4(const char *host, unsigned char address[4]);
  * curves), waiting for it; on the caller's thread when one can't be made */
 void vs_platform_run_on_large_stack(void (*function)(void *), void *argument);
 /* The certificate store (a VitalsCaRead, context unused): on the Vita, the kernel plugin's
- * vitals_ca_read, ux0:data/vitals/system/CA_LIST.cer, which no app can open itself */
+ * vitals_ca_read: vitals' three files as one (vitals/ca_store.h), which no app can open itself */
 int vs_platform_ca_read(void *context, uint32_t offset, void *buffer, uint32_t size);
 unsigned int vs_platform_thread_id(void);
 

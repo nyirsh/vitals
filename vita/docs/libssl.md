@@ -55,11 +55,21 @@ Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-plugin/ma
    process that uses it, each process with its own data.
 4. **Nothing queued**: no injection follows a libssl load.
 
-Its memory is the pool the process gives `sceSslInit`, as Sony's is, and the CA bundle it trusts is
-`ux0:data/vitals/system/CA_LIST.cer`, the store vitals installs. No app or game may open
-`ux0:data` itself, so vitals-ssl reads the store through the kernel plugin's system call
-`vitals_ca_read` ([redirects.c](../vitals-plugin/redirects.c), [ca_store.h](../tls13-vita/include/vitals/ca_store.h)),
-which copies a piece of it from an offset into the caller's memory, at most 64 KiB at a time. The
+Its memory is the pool the process gives `sceSslInit`, as Sony's is, and the CA store it trusts is
+three files read as one, in this order, each followed by a line break
+([ca_store.h](../tls13-vita/include/vitals/ca_store.h)):
+
+| File                                        | What                                                      | Written by                                 |
+| ------------------------------------------- | --------------------------------------------------------- | ------------------------------------------ |
+| `ux0:data/vitals/system/sony-certs.pem`     | Sony's list from firmware 3.74, byte for byte              | the installer, from the app's copy         |
+| `ux0:data/vitals/system/mozilla-certs.pem`  | the Mozilla certificates Sony's list lacks                 | the installer and **Update certificates** |
+| `ux0:data/vitals/custom-certs.pem`          | the user's own, optional                                   | the user                                   |
+
+No app or game may open `ux0:data` itself, so vitals-ssl reads the store through the kernel
+plugin's system call `vitals_ca_read` ([redirects.c](../vitals-plugin/redirects.c)), which copies a
+piece of it from an offset into the caller's memory, at most 64 KiB at a time. It takes each file's
+size at every call: Sony's must be there; the others add nothing when missing or empty. The store's
+index skips what isn't a certificate, so a mistake in the user's file costs only that block. The
 system's own `vs0:/data/external/cert/CA_LIST.cer` is left as it was.
 
 ## 4. Never hooked

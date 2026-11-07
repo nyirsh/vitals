@@ -19,9 +19,9 @@
   },
   "combined": {
     "path": "certs.cer",
-    "policy": "Preserve the original Sony file byte-for-byte; append unique selected Mozilla certificates; no system-store input",
-    "bytes": 262062,
-    "sha256": "ac4bc839f5c7e5aa0fa1455280f5c75ca13347339135c4ce726e7b602517f748",
+    "policy": "The store as the kernel plugin reads it without the user's own: the original Sony file byte-for-byte, then the selected Mozilla certificates it lacks (installed as two files), each followed by a line break; no system-store input",
+    "bytes": 262071,
+    "sha256": "7ca7ca416cbb4f796a80b860d3594be530d79bc2005d8301c5e791ab0ddbcfd6",
     "certificate_blocks": 176,
     "unique_certificates": 176
   }

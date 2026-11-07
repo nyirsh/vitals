@@ -135,7 +135,7 @@ void vitals_certificates_date(char *text, size_t size, int *stale)
     if (size == 0)
         return;
     text[0] = '\0';
-    if (sceIoGetstat(VITALS_CA_STORE_PATH, &status) < 0)
+    if (sceIoGetstat(VITALS_CA_MOZILLA_PATH, &status) < 0)
         return;
     /* Files keep their times in UTC; shown in the console's */
     SceDateTime when = status.st_mtime;

@@ -17,7 +17,10 @@
  * when they wrote their bundle there; vitals' store is its own */
 #define CA "vs0:/data/external/cert/CA_LIST.cer"
 #define CA_BACKUP "vs0:/data/external/cert/CA_LIST.cer_old"
-#define STORE "ux0:data/vitals/system/CA_LIST.cer"
+#define SONY_STORE "ux0:data/vitals/system/sony-certs.pem"
+#define STORE "ux0:data/vitals/system/mozilla-certs.pem"
+/* Where an earlier build kept vitals' store in one file */
+#define COMBINED_STORE "ux0:data/vitals/system/CA_LIST.cer"
 #define EARLIER_BUNDLE "AN EARLIER VERSION'S BUNDLE\n"
 #define REDIRECTS "ux0:data/vitals/redirects.txt"
 #define DNS_RULES "ux0:data/vitals/dns.txt"
@@ -28,12 +31,10 @@
 
 /* ---- Stand-ins for the network and the (separately tested) certificate merge ---- */
 int vitals_install_network_ready(void) { return 0; }
-int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path, const char *custom_path,
-                                const char *url, long timeout_seconds, VitalsCertificateBundle *bundle)
+int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path, const char *url,
+                                long timeout_seconds, VitalsCertificateBundle *bundle)
 {
     assert(strcmp(sony_path, "app0:sony-certs.pem") == 0 && strcmp(mozilla_path, "app0:mozilla-certs.pem") == 0);
-    /* The user's own certificates are always offered to the merge */
-    assert(custom_path != NULL && strcmp(custom_path, "ux0:data/vitals/custom-certs.pem") == 0);
     assert(url == NULL && timeout_seconds > 0);
     memset(bundle, 0, sizeof(*bundle));
     bundle->size = strlen(BUNDLE);
@@ -45,6 +46,18 @@ int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,
 void vitals_free_certificates(VitalsCertificateBundle *bundle) { free(bundle->data); bundle->data = NULL; }
 
 static void note(const char *line) { (void)line; }
+
+static int is(const char *vita_path, const char *expected);
+static int exists(const char *vita_path);
+/* vitals' store: Sony's list as the app carries it, and the Mozilla certificates it lacks */
+static int store_installed(void)
+{
+    return is(SONY_STORE, "contents of sony-certs.pem\n") && is(STORE, BUNDLE) && !exists(COMBINED_STORE);
+}
+static int store_absent(void)
+{
+    return !exists(SONY_STORE) && !exists(STORE) && !exists(COMBINED_STORE);
+}
 
 /* ---- Files on the mapped console ---- */
 static char root[512];
@@ -176,12 +189,13 @@ static void expect_installed(void)
         snprintf(expected, sizeof(expected), "contents of %s\n", installed[i][1] + 5);
         assert(is(installed[i][0], expected));
     }
-    assert(is(STORE, BUNDLE) && is(CA, SONY_CA) && !exists(CA_BACKUP));
+    assert(store_installed() && is(CA, SONY_CA) && !exists(CA_BACKUP));
     assert(exists(REDIRECTS) && exists(DNS_RULES));
     assert(vitals_install_complete() == 1 && vitals_install_old_layout() == 0);
     /* Nothing temporary is left behind */
     assert(!exists("ur0:tai/config_vitals.tmp") && !exists(STORE ".prepared") && !exists(STORE ".tmp") &&
-           !exists(STORE ".vitals-old") && !exists(CA ".prepared") && !exists(CA ".vitals-remove"));
+           !exists(STORE ".vitals-old") && !exists(SONY_STORE ".tmp") && !exists(SONY_STORE ".vitals-old") &&
+           !exists(CA ".prepared") && !exists(CA ".vitals-remove"));
 }
 
 static void expect_uninstalled(void)
@@ -189,7 +203,7 @@ static void expect_uninstalled(void)
     assert(is(CONFIG, ORIGINAL_CONFIG));
     for (size_t i = 0; i < INSTALLED_COUNT; ++i)
         assert(!exists(installed[i][0]));
-    assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && !exists(STORE));
+    assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && store_absent());
     assert(vitals_install_complete() == 0);
 }
 
@@ -242,7 +256,7 @@ static void test_old_layout_moves(void)
     assert(vitals_install_old_layout() == 1 && vitals_install_complete() == 0);
     assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
     assert(is(CA, "SONY CERTIFICATES, AS THE USER EDITED THEM\n") && !exists(CA_BACKUP));
-    assert(is(STORE, BUNDLE) && vitals_install_old_layout() == 0 && vitals_install_complete() == 1);
+    assert(store_installed() && vitals_install_old_layout() == 0 && vitals_install_complete() == 1);
     /* And so does an uninstall */
     put(CA, EARLIER_BUNDLE);
     put(CA_BACKUP, SONY_CA);
@@ -252,9 +266,25 @@ static void test_old_layout_moves(void)
     fresh_console();
     put(CA, EARLIER_BUNDLE);
     assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
-    assert(is(CA, EARLIER_BUNDLE) && is(STORE, BUNDLE));
+    assert(is(CA, EARLIER_BUNDLE) && store_installed());
     assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
-    assert(is(CA, EARLIER_BUNDLE) && !exists(STORE));
+    assert(is(CA, EARLIER_BUNDLE) && store_absent());
+
+    /* An earlier build's store in one file: the old layout, which an update takes out */
+    fresh_console();
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    put(COMBINED_STORE, "SONY'S, MOZILLA'S AND CUSTOM IN ONE\n");
+    put(COMBINED_STORE ".prepared", "half of it\n");
+    assert(vitals_install_old_layout() == 1 && vitals_install_complete() == 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_installed();
+    assert(!exists(COMBINED_STORE ".prepared"));
+    /* The user's own certificates are the kernel's to read: never written or removed */
+    put("ux0:data/vitals/custom-certs.pem", "MY CERTIFICATES\n");
+    assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
+    expect_uninstalled();
+    assert(is("ux0:data/vitals/custom-certs.pem", "MY CERTIFICATES\n"));
 }
 
 static void test_install_reinstall_uninstall(void)
@@ -386,10 +416,10 @@ static void test_conflicting_installs_are_removed(void)
     assert(!exists("ur0:data/reAuth") && !exists("vs0:/data/external/itls") && !exists("vs0:/data/external/tls_fixer"));
     /* Their entries are gone; the rest of the config is kept exactly, CRLF included */
     assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\r\n"));
-    assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && is(STORE, BUNDLE));
+    assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && store_installed());
 
     assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
-    assert(is(CA, SONY_CA) && !exists(STORE) && is(CONFIG, ORIGINAL_CONFIG "*KERNEL\r\n"));
+    assert(is(CA, SONY_CA) && store_absent() && is(CONFIG, ORIGINAL_CONFIG "*KERNEL\r\n"));
 }
 
 /* The plugin's line, wherever the user keeps it under *KERNEL, counts as vitals' entry */
@@ -538,13 +568,15 @@ static void test_failed_renames(int removing, int migrating)
         const char *ca = get(CA);
         assert(ca != NULL && (strcmp(ca, SONY_CA) == 0 || (migrating && strcmp(ca, EARLIER_BUNDLE) == 0)));
         assert(is(CA, SONY_CA) || is(CA_BACKUP, SONY_CA));
-        /* vitals' store is whole, or not there */
+        /* vitals' two files are each whole, or not there */
         const char *store = get(STORE);
         assert(store == NULL || strcmp(store, BUNDLE) == 0);
+        const char *sony = get(SONY_STORE);
+        assert(sony == NULL || strcmp(sony, "contents of sony-certs.pem\n") == 0);
         if (result >= 0)
         {
             assert(config_new && is(CA, SONY_CA) && !exists(CA_BACKUP));
-            assert(removing ? store == NULL : store != NULL);
+            assert(removing ? store_absent() : store_installed());
         }
     }
 }

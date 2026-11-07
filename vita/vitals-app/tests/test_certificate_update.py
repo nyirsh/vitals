@@ -120,12 +120,12 @@ class CertificateUpdateTests(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
 
-    def prepare(self, url='offline', sony=None, mozilla=None, environment=None, timeout=2, custom=None):
+    def prepare(self, url='offline', sony=None, mozilla=None, environment=None, timeout=2):
+        """The Mozilla part of the store: the selected bundle's certificates Sony's list lacks"""
         output = self.directory / 'output.pem'
         output.write_bytes(b'previous output must survive failure')
         result = subprocess.run([str(self.executable), str(sony or self.roots['sony']),
-                                 str(mozilla or self.roots['mozilla']), url, str(output), str(timeout),
-                                 *([str(custom)] if custom is not None else [])],
+                                 str(mozilla or self.roots['mozilla']), url, str(output), str(timeout)],
                                 capture_output=True, text=True, timeout=10,
                                 env=dict(os.environ, **(environment or {})))
         return result, output.read_bytes()
@@ -133,9 +133,7 @@ class CertificateUpdateTests(unittest.TestCase):
     def require_fallback(self, result, data):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('downloaded=0', result.stdout)
-        self.assertTrue(data.startswith(self.roots['sony'].read_bytes()))
-        self.assertEqual(certificates(data), certificates(self.roots['sony'].read_bytes()) |
-                         certificates(self.roots['mozilla'].read_bytes()))
+        self.assertEqual(certificates(data), certificates(self.roots['mozilla'].read_bytes()))
 
     def test_offline_uses_only_embedded_sources(self):
         self.require_fallback(*self.prepare())
@@ -146,23 +144,33 @@ class CertificateUpdateTests(unittest.TestCase):
             result, data = self.prepare(url, environment={'https_proxy': 'http://127.0.0.1:1'})
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('downloaded=1', result.stdout)
-        self.assertIn('combined=2', result.stdout)
-        self.assertEqual(certificates(data), certificates(body))
+        # Sony's, in the download too, is left to Sony's own part
+        self.assertIn('added=1 combined=2', result.stdout)
+        self.assertEqual(certificates(data), certificates(self.roots['new'].read_bytes()))
         self.assertNotIn(next(iter(certificates(self.roots['mozilla'].read_bytes()))), certificates(data))
 
-    def test_sony_file_layout_survives_download_and_crlf_encoding(self):
+    def test_only_what_sonys_list_lacks_is_written(self):
+        """Sony's list, with comments and CRLFs, is its own part; none of its roots are repeated"""
         sony = self.directory / 'sony-native-layout.pem'
         original = (b'# Sony certificate position is part of the native ABI\r\n' +
                     self.roots['sony'].read_bytes().replace(b'\n', b'\r\n') +
                     b'\r\n# A second embedded Sony authority\r\n' +
                     self.roots['mozilla'].read_bytes().replace(b'\n', b'\r\n'))
         sony.write_bytes(original)
-        with self.endpoint(self.roots['new'].read_bytes() + self.roots['sony'].read_bytes()) as url:
+        with self.endpoint(self.roots['new'].read_bytes() + self.roots['sony'].read_bytes() +
+                           self.roots['mozilla'].read_bytes()) as url:
             result, data = self.prepare(url, sony=sony)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(data.startswith(original), 'Sony comments, offsets and CRLFs must remain exact')
-        self.assertEqual(certificates(data), certificates(original) | certificates(self.roots['new'].read_bytes()))
-        self.assertEqual(data.count(b'-----BEGIN CERTIFICATE-----'), 3)
+        self.assertIn('sony=2 mozilla=3 added=1 combined=3', result.stdout)
+        self.assertEqual(certificates(data), certificates(self.roots['new'].read_bytes()))
+        self.assertEqual(data.count(b'-----BEGIN CERTIFICATE-----'), 1)
+        self.assertTrue(data.startswith(b"# vitals: curl/Mozilla CA certificates Sony's list lacks\n"))
+
+    def test_nothing_to_add_is_a_heading_alone(self):
+        result, data = self.prepare(mozilla=self.roots['sony'])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('added=0', result.stdout)
+        self.assertEqual(certificates(data), set())
 
     def test_connection_failure_uses_embedded(self):
         with socket.socket() as listener:
@@ -214,66 +222,17 @@ class CertificateUpdateTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(data, b'previous output must survive failure')
 
-    def self_signed_server(self, name):
-        """A self-signed server certificate, not a CA, as someone running their own server makes"""
-        key, certificate = self.directory / (name + '.key'), self.directory / (name + '.crt')
-        self.openssl('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '1',
-                     '-keyout', key, '-out', certificate, '-subj', '/CN=' + name,
-                     '-addext', 'subjectAltName=DNS:' + name, '-addext', 'basicConstraints=critical,CA:FALSE')
-        return certificate.read_bytes()
-
-    def test_custom_certificates_are_merged_after_ours(self):
-        server = self.self_signed_server('my.server.example')
-        custom = self.directory / 'custom-certs.pem'
-        # Duplicates of Sony's and Mozilla's roots are kept once
-        custom.write_bytes(server + self.roots['new'].read_bytes() + self.roots['sony'].read_bytes() +
-                           self.roots['mozilla'].read_bytes())
-        result, data = self.prepare(custom=custom)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('custom=2 combined=4', result.stdout)
-        self.assertTrue(data.startswith(self.roots['sony'].read_bytes()), 'Sony\'s layout must stay first')
-        self.assertEqual(certificates(data), certificates(self.roots['sony'].read_bytes()) |
-                         certificates(self.roots['mozilla'].read_bytes()) | certificates(custom.read_bytes()))
-        self.assertEqual(data.count(b'-----BEGIN CERTIFICATE-----'), 4)
-        # They come after Mozilla's, under their own heading
-        heading = data.index(b'# vitals: custom certificates')
-        self.assertLess(data.index(b'# vitals: additional curl/Mozilla'), heading)
-        self.assertEqual(certificates(data[heading:]), certificates(server + self.roots['new'].read_bytes()))
-
-    def test_custom_mistakes_are_skipped_not_fatal(self):
-        server = self.self_signed_server('kept.example')
-        custom = self.directory / 'custom-mistakes.pem'
-        custom.write_bytes(b'# my certificates\n' +
-                           b'-----BEGIN CERTIFICATE-----\nbroken\n-----END CERTIFICATE-----\n' +
-                           b'-----BEGIN PRIVATE KEY-----\nnot a certificate\n-----END PRIVATE KEY-----\n' +
-                           server + b'-----BEGIN CERTIFICATE-----\nnever ends')
-        result, data = self.prepare(custom=custom)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('custom=1', result.stdout)
-        self.assertEqual(certificates(data), certificates(self.roots['sony'].read_bytes()) |
-                         certificates(self.roots['mozilla'].read_bytes()) | certificates(server))
-
-    def test_missing_empty_or_useless_custom_file_changes_nothing(self):
-        _, without = self.prepare()
-        empty = self.directory / 'custom-empty.pem'
-        empty.write_bytes(b'')
-        notes = self.directory / 'custom-notes.pem'
-        notes.write_bytes(b'# nothing here yet\n')
-        for custom in (self.directory / 'custom-missing.pem', empty, notes):
-            with self.subTest(custom=custom.name):
-                result, data = self.prepare(custom=custom)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn('custom=0', result.stdout)
-                self.assertEqual(data, without)
-                self.assertNotIn(b'# vitals: custom certificates', data)
-
     def test_packaged_fallback_matches_authoritative_inputs(self):
-        result, data = self.prepare(sony=ROOT / 'vitals-app/assets/sony-certs.pem', mozilla=ROOT / 'vitals-app/assets/mozilla-certs.pem')
+        sony = (ROOT / 'vitals-app/assets/sony-certs.pem').read_bytes()
+        mozilla = (ROOT / 'vitals-app/assets/mozilla-certs.pem').read_bytes()
+        result, added = self.prepare(sony=ROOT / 'vitals-app/assets/sony-certs.pem',
+                                     mozilla=ROOT / 'vitals-app/assets/mozilla-certs.pem')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        expected = certificates((ROOT / 'vitals-app/assets/sony-certs.pem').read_bytes())
-        expected.update(certificates((ROOT / 'vitals-app/assets/mozilla-certs.pem').read_bytes()))
-        self.assertEqual(certificates(data), expected)
-        self.assertTrue(data.startswith((ROOT / 'vitals-app/assets/sony-certs.pem').read_bytes()))
+        self.assertEqual(certificates(added), certificates(mozilla) - certificates(sony))
+        # The store as the kernel reads it without the user's own: Sony's file as it is, then these,
+        # each followed by a line break (vitals/ca_store.h)
+        data = sony + b'\n' + added + b'\n'
+        self.assertEqual(certificates(data), certificates(sony) | certificates(mozilla))
         # Fixed DNAS PEM ranges and hashes from the native 3.60 SceSsl loader
         # Preserving DER identities while rewriting these bytes is insufficient
         native = [

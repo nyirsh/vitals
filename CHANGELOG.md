@@ -4,6 +4,8 @@
 
 - (PS3) Brought vitals to PS3 too with the same functionalities, except that the XMB is not yet supported
 - (vitals-app) Improved app UI, added DNS redirection tests too
+- (Vita) vitals' modules and certificate store moved to ux0:data/vitals/system: the system's own certificate store is put back as it was before vitals and never written again
+- (Vita) Sony's and Mozilla's certificates are kept in two files, and custom-certs.pem is read directly: edits to it apply to the next app you open, without updating the certificates
 
 ## 2.0
 

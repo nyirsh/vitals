@@ -1786,7 +1786,8 @@ VXyNWQKV3WKdwrnuWih0hKWbt5DHDAff9Yk2dDLWKMGwsAvgnEzDHNb842m1R0aB
 L6KCq9NjRHDEjf8tM7qtj3u1cIiuPhnPQCjY/MiQu12ZIvVS5ljFH4gxQ+6IHdfG
 jjxDah2nGN59PRbxYvnKkKj9
 -----END CERTIFICATE-----
-# vitals: additional curl/Mozilla CA certificates
+
+# vitals: curl/Mozilla CA certificates Sony's list lacks
 -----BEGIN CERTIFICATE-----
 MIICiTCCAg+gAwIBAgIQH0evqmIAcFBUTAGem2OZKjAKBggqhkjOPQQDAzCBhTEL
 MAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4GA1UE
@@ -4397,3 +4398,4 @@ us8K3hRT1BSpigzMIRzSxtAOrqPN6j//QSmW9f8Jcncri4j2ihSpVrFU0NdNkMhZ
 eAKidTFPsxCVFuW4Aniz7jqiw5sWtjbQrlW035izIEU4sYwQoC1Nx0Svy+mMTRai
 50LqFQ+A1/Hq6xHHDNx7CI83d23Erw==
 -----END CERTIFICATE-----
+

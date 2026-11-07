@@ -33,7 +33,7 @@ You need a hacked PS Vita on **firmware 3.60 or 3.65** with taiHEN. Supporting o
   _This installs everything: the browser plugin, the system plugin and the certificates. The certificates are also downloaded from the internet, so there's no need to update them -- yet_
 - When it's done, press **START** to reboot the Vita (or **Circle** to reboot later): `vitals` starts at the next boot
 
-`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins. Its kernel plugin is `ur0:tai/vitals.skprx`; its other modules and its certificate store are in `ux0:data/vitals/system/`, next to your lists. The system's own certificate store on `vs0:` is left as it is. Updating from a version that kept the modules on `vs0:` moves them, and puts back the system's certificate store as it was before `vitals` (`CA_LIST.cer_old`), even if you had edited it.
+`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins. Its kernel plugin is `ur0:tai/vitals.skprx`; its other modules and its certificate store are in `ux0:data/vitals/system/`, next to your lists: Sony's list from firmware 3.74 as Sony ships it (`sony-certs.pem`), and the Mozilla certificates that list lacks (`mozilla-certs.pem`, which **Update certificates** rewrites). The system's own certificate store on `vs0:` is left as it is. Updating from a version that kept the modules on `vs0:` moves them, and puts back the system's certificate store as it was before `vitals` (`CA_LIST.cer_old`), even if you had edited it.
 
 Once `vitals` is installed, from the same application you'll be able to:
 
@@ -118,7 +118,7 @@ The first line that isn't empty or a `#` comment is used, trimmed, up to 127 pri
 
 To trust your own servers, for example a community server with a self-signed certificate, put their certificates in `ux0:data/vitals/custom-certs.pem`, one or more PEM blocks (`-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`). Comments and anything that isn't a certificate are ignored.
 
-The file is optional. Its certificates are added to Sony's and Mozilla's whenever the app installs, updates, reinstalls or updates certificates, so after editing it run **Update certificates**. Duplicates are added only once, a mistake in the file never stops an update, and uninstalling leaves the file in place.
+The file is optional. `vitals` reads it as it is, after Sony's and Mozilla's certificates, each time an app or the browser starts, so an edit applies to the next app you open: there's nothing to update. A mistake in the file is skipped without affecting the rest of the store, and uninstalling leaves the file in place.
 
 A server's self-signed certificate is trusted as itself, exactly as it appears in the file, whether or not it's marked as a certificate authority. For a server whose certificate was issued by a certificate authority of your own, add that authority's certificate instead. To make a self-signed certificate:
 
@@ -228,7 +228,7 @@ The installer downloads the latest certificates and checks them against this bun
 make update-certs
 ```
 
-This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` with the app's own merge code and updates `certificate-sources.json`, all in `vitals-app/assets/`. It needs `pkg-config` with `libcurl` and `OpenSSL development files` on the host.
+This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` (the store as `vitals` reads it, without your own certificates) with the app's own merge code and updates `certificate-sources.json`, all in `vitals-app/assets/`. It needs `pkg-config` with `libcurl` and `OpenSSL development files` on the host.
 
 ### Tests
 
