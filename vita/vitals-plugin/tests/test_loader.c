@@ -292,9 +292,7 @@ SceUID ksceKernelLoadStartModuleForPid(SceUID pid, const char *path, SceSize siz
     assert(argument_live && data == argument_memory);
     assert(flags == 0);
     assert(args->compat_modid == 188 && args->reserved == 0);
-    assert(args->version == 2 && strcmp(path, VITALS_BROWSER_PROVIDER_BOOT_PATH) == 0);
-    /* The certificate store as the process names it, as the load hook worked it out */
-    assert(strcmp(args->ca_path, expected_path) == 0);
+    assert(args->version == 1 && strcmp(path, VITALS_BROWSER_PROVIDER_BOOT_PATH) == 0);
     assert(args->magic == VITALS_BROWSER_START_MAGIC);
     ++loads;
     if (reenter) {
@@ -336,7 +334,7 @@ static void reset(void) {
     target_wrong_name = 0;
     target_user_id = 188;
     browser_file = 1;
-    expected_path = "wb0:/cert/CA_LIST.cer";
+    expected_path = VITALS_BROWSER_PROVIDER_BOOT_PATH;
     expected_module_path = "wb0:/vitals/ScePsp2Compat.suprx";
     runtime_namespace_required = namespace_provider_error = namespace_hash_error = 0;
     namespace_stat_error = namespace_close_error = 0;

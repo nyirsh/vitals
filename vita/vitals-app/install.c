@@ -20,6 +20,7 @@
 #include "config_edit.h"
 #include "install.h"
 #include "module_version.h"
+#include "vitals/ca_store.h"
 #include "vitals/path.h"
 
 /* Progress messages go to the app's screen through install_note (see vitals_install_apply) */
@@ -724,8 +725,8 @@ int vitals_install_firmware_supported(char *description, size_t size)
 }
 
 /* SKGleba's iTLS-Enso, which vitals grew out of
- * Its certificate backup (CA_LIST.cer_old) is kept: it holds Sony's original file, which
- * vitals keeps as its own uninstall backup */
+ * Its certificate backup (CA_LIST.cer_old) is kept: it holds what the system had before, which the
+ * install puts back */
 static const char itls_config_block[] = "# ITLS\n*KERNEL\nur0:tai/itls.skprx\n\n";
 static const char *const itls_files[] = {
     "ur0:tai/itls.skprx",
@@ -964,49 +965,63 @@ static int install_http_modules(int requested_state)
     return result;
 }
 
+/* The system's own store. Earlier versions wrote vitals' bundle over it, keeping what was there before
+ * as CA_LIST.cer_old (as iTLS-Enso did); vitals' store is its own now, and the system's is never
+ * written again */
+#define SYSTEM_CERTIFICATE_STORE "vs0:/data/external/cert/CA_LIST.cer"
+#define SYSTEM_CERTIFICATE_BACKUP SYSTEM_CERTIFICATE_STORE "_old"
+
+/* What was on the system before is put back from CA_LIST.cer_old, as it is (Sony's or the user's
+ * own), on every install, update and uninstall: 0 when there is no backup or it is back */
+static int restore_system_certificates(void)
+{
+    static const char rollback_path[] = SYSTEM_CERTIFICATE_STORE ".vitals-remove";
+    int had_current;
+    int result;
+
+    /* What earlier versions left half written */
+    (void)remove_if_exists(SYSTEM_CERTIFICATE_STORE ".prepared");
+    if (!path_exists(SYSTEM_CERTIFICATE_BACKUP))
+        return 0;
+    printf("Restoring the system's own CA certs... \n");
+    result = remove_if_exists(rollback_path);
+    if (result < 0)
+        return result;
+    had_current = path_exists(SYSTEM_CERTIFICATE_STORE);
+    if (had_current)
+    {
+        result = sceIoRename(SYSTEM_CERTIFICATE_STORE, rollback_path);
+        if (result < 0)
+            return result;
+    }
+    result = sceIoRename(SYSTEM_CERTIFICATE_BACKUP, SYSTEM_CERTIFICATE_STORE);
+    if (result < 0)
+    {
+        if (had_current)
+            (void)sceIoRename(rollback_path, SYSTEM_CERTIFICATE_STORE);
+        return result;
+    }
+    return had_current ? remove_if_exists(rollback_path) : 0;
+}
+
 static int install_certificates(int requested_state)
 {
-    static const char certificate_path[] = VITALS_CERTIFICATE_STORE;
-    static const char backup_path[] = "vs0:/data/external/cert/CA_LIST.cer_old";
-    static const char temporary_path[] = "vs0:/data/external/cert/CA_LIST.cer.prepared";
-    static const char rollback_path[] = "vs0:/data/external/cert/CA_LIST.cer.vitals-remove";
+    static const char temporary_path[] = VITALS_CA_STORE_PATH ".prepared";
     int result;
     int removing = requested_state == 1;
 
+    result = restore_system_certificates();
+    if (result < 0)
+        return result;
     if (removing)
     {
-        int had_current;
-
         printf("Removing vitals CA certs... \n");
-        if (!path_exists(backup_path))
-        {
-            printf("No CA backup; leaving the current certificate file unchanged.\n");
-            return 0;
-        }
-        result = remove_if_exists(rollback_path);
-        if (result < 0)
-        {
-            return result;
-        }
-        had_current = path_exists(certificate_path);
-        if (had_current)
-        {
-            result = sceIoRename(certificate_path, rollback_path);
-            if (result < 0)
-            {
-                return result;
-            }
-        }
-        result = sceIoRename(backup_path, certificate_path);
-        if (result < 0)
-        {
-            if (had_current)
-            {
-                (void)sceIoRename(rollback_path, certificate_path);
-            }
-            return result;
-        }
-        return had_current ? remove_if_exists(rollback_path) : 0;
+        (void)remove_if_exists(temporary_path);
+        result = remove_if_exists(VITALS_CA_STORE_PATH);
+        /* The modules went first, so the folder is empty now */
+        if (result >= 0 && path_exists(VITALS_SYSTEM_DIRECTORY))
+            (void)sceIoRmdir(VITALS_SYSTEM_DIRECTORY);
+        return result;
     }
 
     VitalsCertificateBundle bundle;
@@ -1025,9 +1040,14 @@ static int install_certificates(int requested_state)
     printf("Sony: %u, Mozilla: %u, combined: %u certificates.\n",
            (unsigned int)bundle.sony_count, (unsigned int)bundle.mozilla_count,
            (unsigned int)bundle.combined_count);
-    (void)remove_if_exists(temporary_path);
-    SceUID descriptor = sceIoOpen(temporary_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
-    result = descriptor < 0 ? descriptor : write_all(descriptor, bundle.data, (SceSize)bundle.size);
+    result = make_system_directory();
+    SceUID descriptor = -1;
+    if (result >= 0)
+    {
+        (void)remove_if_exists(temporary_path);
+        descriptor = sceIoOpen(temporary_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+        result = descriptor < 0 ? descriptor : write_all(descriptor, bundle.data, (SceSize)bundle.size);
+    }
     if (descriptor >= 0)
     {
         int close_result = sceIoClose(descriptor);
@@ -1035,36 +1055,10 @@ static int install_certificates(int requested_state)
             result = close_result;
     }
     vitals_free_certificates(&bundle);
+    /* The store is replaced whole: the old one stays until the new one is complete */
     if (result >= 0)
-        result = sceIoSync("vs0:", 0);
-    if (result < 0)
-    {
-        (void)remove_if_exists(temporary_path);
-        return result;
-    }
-    if (path_exists(backup_path))
-    {
-        result = replace_file(temporary_path, certificate_path);
-        (void)remove_if_exists(temporary_path);
-        return result;
-    }
-    result = remove_if_exists(backup_path);
-    if (result >= 0)
-    {
-        result = sceIoRename(certificate_path, backup_path);
-    }
-    if (result >= 0)
-    {
-        result = sceIoRename(temporary_path, certificate_path);
-    }
-    if (result < 0)
-    {
-        if (!path_exists(certificate_path) && path_exists(backup_path))
-        {
-            (void)sceIoRename(backup_path, certificate_path);
-        }
-        (void)remove_if_exists(temporary_path);
-    }
+        result = replace_file(temporary_path, VITALS_CA_STORE_PATH);
+    (void)remove_if_exists(temporary_path);
     return result;
 }
 
@@ -1091,7 +1085,8 @@ int vitals_install_old_layout(void)
     for (size_t i = 0; i < sizeof(old_layout) / sizeof(old_layout[0]); ++i)
         if (path_exists(old_layout[i]))
             return 1;
-    return 0;
+    /* The system's certificate store still vitals' bundle, its own kept aside */
+    return path_exists(SYSTEM_CERTIFICATE_BACKUP);
 }
 
 int vitals_install_complete(void)
@@ -1103,8 +1098,7 @@ int vitals_install_complete(void)
            path_exists(new_modules[MODULE_COMPAT]) && path_exists(new_modules[MODULE_BROWSER_PROVIDER]) &&
            path_exists(new_modules[MODULE_LIBHTTP]) && !vitals_install_old_layout() &&
            path_exists(new_modules[MODULE_LIBSSL]) && !path_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]) &&
-           !path_exists(new_modules[MODULE_OLD_REAUTH]) &&
-           path_exists("vs0:/data/external/cert/CA_LIST.cer_old");
+           !path_exists(new_modules[MODULE_OLD_REAUTH]) && path_exists(VITALS_CA_STORE_PATH);
 }
 
 /* 1 when the two files hold the same bytes, 0 when they differ, negative when either cannot be

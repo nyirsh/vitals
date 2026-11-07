@@ -21,7 +21,6 @@ static int hook_ids[BROWSER_HOOK_COUNT];
  * link keeps it) */
 char vitals_browser_module_data[] = "vitals browser provider";
 static uint32_t starting;
-static char ca_path[256];
 
 static int reject_identity(const char *check, uint32_t detail) {
     VITALS_LOG("browser module identity rejected: check=%s detail=0x%08X", check, detail);
@@ -130,20 +129,12 @@ int module_start(SceSize size, const void *data) {
         return SCE_KERNEL_START_FAILED;
     if (args.reserved != 0)
         return SCE_KERNEL_START_FAILED;
-    /* The certificate store as this process names it, from the kernel: whole, and the store */
-    if (memchr(args.ca_path, '\0', sizeof(args.ca_path)) == NULL ||
-        !vitals_path_has_suffix(args.ca_path, "cert/CA_LIST.cer", sizeof(args.ca_path))) {
-        VITALS_LOG("browser certificate store path rejected");
-        return SCE_KERNEL_START_FAILED;
-    }
-    memcpy(ca_path, args.ca_path, sizeof(args.ca_path));
     result = validate_module(args.compat_modid, &text);
     if (result != 0) return SCE_KERNEL_START_FAILED;
     ops.timeleft = (int (*)(void *, void *, int))(text + VITALS_BROWSER_TIMELEFT_OFFSET + 1);
     ops.socket_wait = (int (*)(int, int, int, int))(text + VITALS_BROWSER_WAIT_OFFSET + 1);
     ops.is_default_ctx_callback = vitals_webkit_is_default_ctx_callback;
     ops.default_ciphers = VITALS_BROWSER_DEFAULT_CIPHERS;
-    ops.default_ca_path = ca_path;
     /* The engine's own OpenSSL, for the certificates a refused connection reports to WebKit (the
      * kernel checked the module's hash, so these are where they should be) */
     ops.d2i_x509 = (void *(*)(void **, const unsigned char **, long))(text + VITALS_BROWSER_D2I_X509_OFFSET + 1);

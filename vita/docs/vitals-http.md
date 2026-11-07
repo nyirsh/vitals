@@ -31,12 +31,18 @@ plugin, since games can't open `ux0:data` themselves.
 | ----------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
 | `ux0:data/vitals/system/libhttp.suprx` | built from [vitals-http/](../vitals-http/)                        | `install_http_modules` in [install.c](../vitals-app/install.c) |
 | `ux0:data/vitals/system/libssl.suprx`  | built from [vitals-ssl/](../vitals-ssl/), see [libssl.md](libssl.md) | same function                                                  |
-| `vs0:/data/external/cert/CA_LIST.cer`     | the certificate store: Sony's, Mozilla's and `custom-certs.pem`'s | `install_certificates`                                         |
+| `ux0:data/vitals/system/CA_LIST.cer`      | the certificate store: Sony's, Mozilla's and `custom-certs.pem`'s | `install_certificates`                                         |
 | `ux0:data/vitals/redirects.txt`           | the host redirect list, created once with examples                | the installer; never overwritten                               |
 | `ux0:data/vitals/useragent.txt`           | the User-Agent suffix, optional                                   | you                                                            |
 
 Sony's own `vs0:sys/external/libhttp.suprx` is never modified. Installing also removes what earlier
 versions used in its place: the old HTTP provider and reAuth's module.
+
+The certificate store is vitals' own: libssl reads it through the kernel plugin (`vitals_ca_read`),
+as no app may open `ux0:data`. Earlier versions wrote it over the system's
+`vs0:/data/external/cert/CA_LIST.cer`, keeping what was there as `CA_LIST.cer_old`; installing,
+updating the certificates and uninstalling put that file back as it is, and the system's store is
+never written again.
 
 ## 2. Boot
 

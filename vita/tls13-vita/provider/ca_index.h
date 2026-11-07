@@ -8,11 +8,15 @@
 /* The CA bundle is not kept parsed in memory
  * Only a small index (subject hash plus file position of each PEM block) is built
  * at start-up; a root is parsed on demand from the file while a handshake verifies
- * a certificate chain */
+ * a certificate chain. The file is read through a function: on the Vita, the kernel plugin's
+ * vitals_ca_read, as games can't open the store's folder themselves */
 
 #define VITALS_CA_INDEX_MAX_ENTRIES 512u
 #define VITALS_CA_INDEX_MAX_BLOCK 8192u
-#define VITALS_CA_INDEX_PATH_SIZE 0x124u
+
+/* Up to size bytes of the bundle from offset into buffer: how many (0 past its end), or a negative
+ * error */
+typedef int (*VitalsCaRead)(void *context, uint32_t offset, void *buffer, uint32_t size);
 
 typedef struct VitalsCaEntry {
     uint32_t name_hash;
@@ -23,10 +27,15 @@ typedef struct VitalsCaEntry {
 typedef struct VitalsCaIndex {
     VitalsCaEntry *entries;
     size_t count;
-    char path[VITALS_CA_INDEX_PATH_SIZE];
+    VitalsCaRead read;
+    void *context;
 } VitalsCaIndex;
 
-int vitals_ca_index_build(VitalsCaIndex *index, const char *path);
+int vitals_ca_index_build(VitalsCaIndex *index, VitalsCaRead read, void *context);
+/* Reads a block of the bundle through the index's function: 0, or -1 when it isn't all there */
+int vitals_ca_index_read(const VitalsCaIndex *index, uint32_t offset, void *buffer, uint32_t size);
+/* A VitalsCaRead for a file the process can open itself, context its path (the host tests) */
+int vitals_ca_file_read(void *path, uint32_t offset, void *buffer, uint32_t size);
 void vitals_ca_index_free(VitalsCaIndex *index);
 
 /* An mbedtls_x509_crt_ca_cb_t: returns a newly allocated chain of candidate issuers, which

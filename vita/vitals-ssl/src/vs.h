@@ -223,7 +223,9 @@ int vs_platform_parse_ipv4(const char *host, unsigned char address[4]);
 /* Runs function on a thread with a stack large enough for a handshake (TLS 1.3 with elliptic
  * curves), waiting for it; on the caller's thread when one can't be made */
 void vs_platform_run_on_large_stack(void (*function)(void *), void *argument);
-int vs_platform_ca_path(char *path, size_t size);
+/* The certificate store (a VitalsCaRead, context unused): on the Vita, the kernel plugin's
+ * vitals_ca_read, ux0:data/vitals/system/CA_LIST.cer, which no app can open itself */
+int vs_platform_ca_read(void *context, uint32_t offset, void *buffer, uint32_t size);
 unsigned int vs_platform_thread_id(void);
 
 /* The SceSslInternal exports written so far (core.c, connection.c, certificate.c), with the

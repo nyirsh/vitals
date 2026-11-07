@@ -1,3 +1,4 @@
+#include "vitals/ca_store.h"
 #include "vitals/redirects.h"
 #include "vitals/useragent.h"
 #include <kernel_mock.h>
@@ -117,11 +118,39 @@ static void test_useragent(void) {
     file_path = "ux0:data/vitals/redirects.txt";
 }
 
+/* The certificate store: in ux0:data/vitals/system, a whole request copied in one call with one open
+ * (a chunk at a time), cut at VITALS_CA_READ_MAX, from any offset, the end as 0 */
+static void test_certificate_store(void) {
+    static char text[3000], buffer[3000];
+    file_path = "ux0:data/vitals/system/CA_LIST.cer";
+    for (size_t i = 0; i + 1 < sizeof(text); ++i) text[i] = (char)('A' + i % 26);
+    text[sizeof(text) - 1] = '\0';
+    reset(text);
+    assert(vitals_ca_read(0, buffer, sizeof(buffer)) == (int)strlen(text));
+    assert(memcmp(buffer, text, strlen(text)) == 0 && opens == 1 && closes == 1);
+    assert(largest_read <= VITALS_REDIRECTS_CHUNK);
+    reset(text);
+    assert(vitals_ca_read(1000, buffer, 600) == 600 && memcmp(buffer, text + 1000, 600) == 0 && opens == 1);
+    assert(vitals_ca_read((unsigned int)strlen(text), buffer, 10) == 0);
+    reset(NULL);
+    assert(vitals_ca_read(0, buffer, sizeof(buffer)) == NOT_FOUND && closes == 0);
+    reset(text);
+    read_error = (int)0x80010005;
+    assert(vitals_ca_read(0, buffer, sizeof(buffer)) == (int)0x80010005 && closes == 1);
+    reset(text);
+    copy_error = -1;
+    assert(vitals_ca_read(0, buffer, sizeof(buffer)) == INVALID && closes == 1);
+    assert(vitals_ca_read(0, NULL, 16) == INVALID && vitals_ca_read(0, buffer, 0) == INVALID);
+    check_state_restored();
+    file_path = "ux0:data/vitals/redirects.txt";
+}
+
 int main(void) {
     test_reads_in_pieces();
     test_large_requests_are_cut();
     test_errors();
     test_useragent();
-    puts("kernel redirect list reads PASS");
+    test_certificate_store();
+    puts("kernel redirect list, User-Agent and certificate store reads PASS");
     return 0;
 }

@@ -74,8 +74,8 @@ connection gets TLS 1.2 to 1.3 with Mbed TLS's default suites. Both are vitals-s
 
 ## Trust
 
-Servers are checked against `vs0:/data/external/cert/CA_LIST.cer`, the bundle the vitals app
-installs, plus the CA certificates an app loads with `sceHttpsLoadCert`. As with the provider:
+Servers are checked against `ux0:data/vitals/system/CA_LIST.cer`, the bundle the vitals app
+installs (vitals-ssl reads it through the kernel plugin), plus the CA certificates an app loads with `sceHttpsLoadCert`. As with the provider:
 
 - a self-signed server certificate that is itself trusted counts as trusted
 - SHA-1 signatures are allowed

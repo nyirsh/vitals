@@ -13,13 +13,15 @@
 static int ca_calls;
 static int ca_failure;
 
-/* The bundle is looked for on the first connection that needs it (libssl reads it itself); without
- * one the browser keeps its own TLS */
-int __real_sceIoOpen(const char *path, int flags, int mode);
-int __wrap_sceIoOpen(const char *path, int flags, int mode) {
-    if (strcmp(path, "wb0:/cert/CA_LIST.cer") != 0) return __real_sceIoOpen(path, flags, mode);
+/* vitals' store is looked for on the first connection that needs it (libssl reads it itself,
+ * through the kernel plugin); without one the browser keeps its own TLS */
+int __wrap_vitals_ca_read(unsigned int offset, void *buffer, unsigned int size);
+int __wrap_vitals_ca_read(unsigned int offset, void *buffer, unsigned int size) {
+    assert(offset == 0 && buffer != NULL && size == 1);
     ++ca_calls;
-    return ca_failure ? (int)0x80010002 : __real_sceIoOpen("/dev/null", flags, mode);
+    if (ca_failure) return (int)0x80010002;
+    *(unsigned char *)buffer = '-';
+    return 1;
 }
 
 static int timeleft(void *easy, void *now, int connecting) {
@@ -42,8 +44,7 @@ int main(int argc, char **argv) {
         .timeleft = timeleft,
         .socket_wait = socket_wait,
         .is_default_ctx_callback = NULL,
-        .default_ciphers = "known default",
-        .default_ca_path = "wb0:/cert/CA_LIST.cer"
+        .default_ciphers = "known default"
     };
     unsigned char *arena;
     unsigned char *connection;

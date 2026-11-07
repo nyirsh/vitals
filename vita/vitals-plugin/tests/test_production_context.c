@@ -40,7 +40,7 @@ int main(void) {
     assert(vitals_kernel_loader_init() == 0);
     assert(vitals_kernel_browser_loader_ready());
     runtime_namespace_required = 1;
-    expected_path = "sd062e8855c978:/cert/CA_LIST.cer";
+    expected_path = VITALS_BROWSER_PROVIDER_BOOT_PATH;
     unsigned int before_loads = (unsigned int)loads, before_stack = stack_calls;
     unsigned int before_queries = target_queries;
     /* Injected once, on the native stack, after one narrow lookup of the target */

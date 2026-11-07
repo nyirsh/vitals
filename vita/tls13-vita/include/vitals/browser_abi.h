@@ -5,9 +5,7 @@
 #include <stdint.h>
 
 #define VITALS_BROWSER_START_MAGIC UINT32_C(0x42544c53)
-#define VITALS_BROWSER_START_VERSION UINT32_C(2)
-/* The certificate store's path in the start arguments, NUL-terminated */
-#define VITALS_BROWSER_CA_PATH_SIZE 128
+#define VITALS_BROWSER_START_VERSION UINT32_C(1)
 #define VITALS_BROWSER_CONNECT_OFFSET ((size_t)0xa5ece)
 #define VITALS_BROWSER_CLOSE_OFFSET ((size_t)0xa36ba)
 #define VITALS_BROWSER_PENDING_OFFSET ((size_t)0xa6240)
@@ -59,9 +57,6 @@ typedef struct VitalsBrowserStartArgs {
     uint32_t version;
     int32_t compat_modid;
     uint32_t reserved;
-    /* The certificate store as the browser's process names it (version 2): the kernel works it out
-     * from the process's request for Sony's engine, as vitals' engine loads from ux0 */
-    char ca_path[VITALS_BROWSER_CA_PATH_SIZE];
 } VitalsBrowserStartArgs;
 
 typedef struct VitalsBrowserOptions {

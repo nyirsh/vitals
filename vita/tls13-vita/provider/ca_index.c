@@ -8,7 +8,8 @@
 
 #define MAX_FILE_SIZE (4 * 1024 * 1024)
 #define LINE_CAPACITY 160u
-#define CHUNK_SIZE 512u
+/* A read of the bundle at a time: through the kernel, each is a system call, so few */
+#define CHUNK_SIZE 4096u
 
 static const char k_begin[] = "-----BEGIN CERTIFICATE-----";
 static const char k_end[] = "-----END CERTIFICATE-----";
@@ -32,7 +33,8 @@ static uint32_t hash_name(const mbedtls_x509_name *name) {
 }
 
 typedef struct Reader {
-    SceUID fd;
+    VitalsCaRead read;
+    void *context;
     unsigned char buffer[CHUNK_SIZE];
     size_t position;
     size_t length;
@@ -43,10 +45,12 @@ typedef struct Reader {
 /* 1 = byte read, 0 = end of file, -1 = I/O error */
 static int reader_next(Reader *reader, unsigned char *out) {
     if (reader->position == reader->length) {
-        int count = sceIoRead(reader->fd, reader->buffer, sizeof(reader->buffer));
+        uint32_t next = reader->base + (uint32_t)reader->length;
+        if (next >= MAX_FILE_SIZE) return -1;
+        int count = reader->read(reader->context, next, reader->buffer, sizeof(reader->buffer));
         if (count < 0) return -1;
         if (count == 0) return 0;
-        reader->base += (uint32_t)reader->length;
+        reader->base = next;
         reader->length = (size_t)count;
         reader->position = 0;
     }
@@ -77,18 +81,42 @@ static void add_entry(VitalsCaIndex *index, unsigned char *block, size_t block_l
     mbedtls_x509_crt_free(&crt);
 }
 
-int vitals_ca_index_build(VitalsCaIndex *index, const char *path) {
+int vitals_ca_file_read(void *path, uint32_t offset, void *buffer, uint32_t size) {
+    SceUID fd = sceIoOpen((const char *)path, SCE_O_RDONLY, 0);
+    int result;
+    uint32_t done = 0;
+    if (fd < 0) return fd;
+    result = sceIoLseek(fd, offset, SCE_SEEK_SET) < 0 ? -1 : 0;
+    while (result == 0 && done < size) {
+        int count = sceIoRead(fd, (unsigned char *)buffer + done, (SceSize)(size - done));
+        if (count < 0) result = count;
+        if (count <= 0) break;
+        done += (uint32_t)count;
+    }
+    (void)sceIoClose(fd);
+    return result < 0 ? result : (int)done;
+}
+
+int vitals_ca_index_read(const VitalsCaIndex *index, uint32_t offset, void *buffer, uint32_t size) {
+    uint32_t done = 0;
+    while (done < size) {
+        int count = index->read(index->context, offset + done, (unsigned char *)buffer + done, size - done);
+        if (count <= 0) return -1;
+        done += (uint32_t)count;
+    }
+    return 0;
+}
+
+int vitals_ca_index_build(VitalsCaIndex *index, VitalsCaRead read, void *context) {
     Reader *reader = NULL;
     unsigned char *block = NULL;
     unsigned char line[LINE_CAPACITY];
     size_t block_length = 0;
     uint32_t block_start = 0;
     int in_block = 0;
-    int64_t file_size;
     int result = MBEDTLS_ERR_X509_FILE_IO_ERROR;
 
-    if (index == NULL || path == NULL || *path == '\0' ||
-        strlen(path) >= sizeof(index->path)) return result;
+    if (index == NULL || read == NULL) return result;
     memset(index, 0, sizeof(*index));
 
     reader = calloc(1, sizeof(*reader));
@@ -98,13 +126,8 @@ int vitals_ca_index_build(VitalsCaIndex *index, const char *path) {
         result = MBEDTLS_ERR_X509_ALLOC_FAILED;
         goto cleanup;
     }
-    reader->fd = sceIoOpen(path, SCE_O_RDONLY, 0);
-    VITALS_VERBOSE("event=ca.open path=%s fd=%08X", path, reader->fd);
-    if (reader->fd < 0) goto cleanup;
-    file_size = sceIoLseek(reader->fd, 0, SCE_SEEK_END);
-    VITALS_VERBOSE("event=ca.size bytes=%lld", (long long)file_size);
-    if (file_size <= 0 || file_size > MAX_FILE_SIZE ||
-        sceIoLseek(reader->fd, 0, SCE_SEEK_SET) < 0) goto cleanup;
+    reader->read = read;
+    reader->context = context;
 
     for (;;) {
         size_t line_length = 0;
@@ -148,13 +171,11 @@ int vitals_ca_index_build(VitalsCaIndex *index, const char *path) {
         result = MBEDTLS_ERR_X509_INVALID_FORMAT;
         goto cleanup;
     }
-    memcpy(index->path, path, strlen(path) + 1u);
+    index->read = read;
+    index->context = context;
     result = 0;
 
 cleanup:
-    if (reader != NULL && reader->fd >= 0 && sceIoClose(reader->fd) < 0 && result == 0) {
-        result = MBEDTLS_ERR_X509_FILE_IO_ERROR;
-    }
     free(reader);
     free(block);
     if (result != 0) vitals_ca_index_free(index);
@@ -172,18 +193,17 @@ int vitals_ca_index_find(void *context, const mbedtls_x509_crt *child,
     const VitalsCaIndex *index = context;
     mbedtls_x509_crt *head = NULL;
     unsigned char *block = NULL;
-    SceUID fd = -1;
     uint32_t hash;
     int result = 0;
 
     if (candidates == NULL) return MBEDTLS_ERR_X509_BAD_INPUT_DATA;
     *candidates = NULL;
-    if (index == NULL || index->entries == NULL || child == NULL) return 0;
+    if (index == NULL || index->entries == NULL || index->read == NULL || child == NULL) return 0;
 
     hash = hash_name(&child->issuer);
     for (size_t i = 0; i < index->count; ++i) {
         const VitalsCaEntry *entry = &index->entries[i];
-        size_t consumed = 0;
+        size_t consumed = entry->length;
         if (entry->name_hash != hash || entry->length >= VITALS_CA_INDEX_MAX_BLOCK) continue;
         if (head == NULL) {
             head = mbedtls_calloc(1, sizeof(*head));
@@ -193,23 +213,14 @@ int vitals_ca_index_find(void *context, const mbedtls_x509_crt *child,
                 goto cleanup;
             }
             mbedtls_x509_crt_init(head);
-            fd = sceIoOpen(index->path, SCE_O_RDONLY, 0);
-            if (fd < 0) goto cleanup;
         }
-        if (sceIoLseek(fd, entry->offset, SCE_SEEK_SET) < 0) continue;
-        while (consumed < entry->length) {
-            int count = sceIoRead(fd, block + consumed, (SceSize)(entry->length - consumed));
-            if (count <= 0) break;
-            consumed += (size_t)count;
-        }
-        if (consumed != entry->length) continue;
+        if (vitals_ca_index_read(index, entry->offset, block, entry->length) != 0) continue;
         block[consumed++] = '\n';
         block[consumed++] = '\0';
         (void)mbedtls_x509_crt_parse(head, block, consumed);
     }
 
 cleanup:
-    if (fd >= 0) (void)sceIoClose(fd);
     free(block);
     if (result != 0 || head == NULL || head->raw.p == NULL) {
         if (head != NULL) {

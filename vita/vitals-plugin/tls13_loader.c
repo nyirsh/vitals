@@ -284,7 +284,7 @@ int vitals_kernel_browser_loader_ready(void)
     return ready;
 }
 
-static int inject_target(SceUID pid, SceUID module_id, const char *ca_path)
+static int inject_target(SceUID pid, SceUID module_id, const char *provider_path)
 {
     const LoaderTarget *target = &g_browser_target;
     const char *file_path = target->provider_path;
@@ -301,8 +301,9 @@ static int inject_target(SceUID pid, SceUID module_id, const char *ca_path)
     int result;
     size_t slot = sizeof(in_flight) / sizeof(in_flight[0]);
 
-    if (!ready || g_injection_mutex < 0 || pid <= 0 || module_id < 0 || ca_path == NULL ||
-        memchr(ca_path, '\0', sizeof(arguments.ca_path)) == NULL)
+    /* Only vitals' own provider, from ux0:data/vitals/system */
+    if (!ready || g_injection_mutex < 0 || pid <= 0 || module_id < 0 || provider_path == NULL ||
+        strcmp(provider_path, file_path) != 0)
     {
         return -1;
     }
@@ -380,7 +381,6 @@ static int inject_target(SceUID pid, SceUID module_id, const char *ca_path)
     arguments.version = target->start_version;
     arguments.compat_modid = target_info->modid;
     arguments.reserved = 0;
-    memcpy(arguments.ca_path, ca_path, strlen(ca_path) + 1);
 
     /* The native entry-thread path copies from the current process's user address space */
     if (ksceKernelGetProcessId() != pid)
@@ -473,7 +473,7 @@ typedef struct PreparationCall
 {
     SceUID pid;
     SceUID module_id;
-    const char *ca_path;
+    const char *provider_path;
     int result;
     int called;
 } PreparationCall;
@@ -482,21 +482,21 @@ static int prepare_on_native_stack(void *opaque)
 {
     PreparationCall *call = opaque;
     call->called = 1;
-    call->result = inject_target(call->pid, call->module_id, call->ca_path);
+    call->result = inject_target(call->pid, call->module_id, call->provider_path);
     ksceDebugPrintf("vitals: inject browser provider pid=0x%X rc=0x%08X\n", call->pid, call->result);
     return 0;
 }
 
-static int dispatch_preparation(SceUID pid, SceUID module_id, const char *ca_path)
+static int dispatch_preparation(SceUID pid, SceUID module_id, const char *provider_path)
 {
-    PreparationCall call = {pid, module_id, ca_path, -1, 0};
+    PreparationCall call = {pid, module_id, provider_path, -1, 0};
     int result = ksceKernelRunWithStack(16384, prepare_on_native_stack, &call);
     if (result < 0)
         return result;
     return call.called ? call.result : -1;
 }
 
-int vitals_kernel_inject_browser_for_pid(SceUID pid, SceUID compat_modid, const char *ca_path)
+int vitals_kernel_inject_browser_for_pid(SceUID pid, SceUID compat_modid, const char *provider_path)
 {
-    return dispatch_preparation(pid, compat_modid, ca_path);
+    return dispatch_preparation(pid, compat_modid, provider_path);
 }

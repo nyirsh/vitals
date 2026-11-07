@@ -47,25 +47,17 @@ int vitals_path_has_suffix(const char *path, const char *suffix, size_t maximum)
     return bytes_equal(path + path_length - suffix_length, suffix, suffix_length);
 }
 
-static int replace_suffix(const char *path, const char *suffix, size_t suffix_size,
-    const char *replacement, size_t replacement_size, char *output, size_t capacity) {
-    size_t length = bounded_length(path, 1024);
+int vitals_browser_engine_request(const char *request) {
+    static const char suffix[] = "webcore/ScePsp2Compat.suprx";
+    const size_t suffix_size = sizeof(suffix) - 1;
+    size_t length = bounded_length(request, 1024);
     size_t prefix;
     size_t colon;
 
-    if (length == SIZE_MAX || length < suffix_size || output == NULL ||
-        !bytes_equal(path + length - suffix_size, suffix, suffix_size)) return 0;
+    if (length == SIZE_MAX || length < suffix_size ||
+        !bytes_equal(request + length - suffix_size, suffix, suffix_size)) return 0;
     prefix = length - suffix_size;
-    if (prefix == 0 || (path[prefix - 1] != '/' && path[prefix - 1] != ':')) return 0;
-    for (colon = 0; colon < prefix && path[colon] != ':'; ++colon) {}
-    if (colon == 0 || colon == prefix || prefix > capacity || replacement_size > capacity - prefix) return 0;
-    for (size_t i = 0; i < prefix; ++i) output[i] = path[i];
-    for (size_t i = 0; i < replacement_size; ++i) output[prefix + i] = replacement[i];
-    return 1;
-}
-
-int vitals_browser_engine_ca_path(const char *request, char *output, size_t capacity) {
-    static const char suffix[] = "webcore/ScePsp2Compat.suprx";
-    static const char ca[] = "cert/CA_LIST.cer";
-    return replace_suffix(request, suffix, sizeof(suffix) - 1, ca, sizeof(ca), output, capacity);
+    if (prefix == 0 || (request[prefix - 1] != '/' && request[prefix - 1] != ':')) return 0;
+    for (colon = 0; colon < prefix && request[colon] != ':'; ++colon) {}
+    return colon != 0 && colon != prefix;
 }

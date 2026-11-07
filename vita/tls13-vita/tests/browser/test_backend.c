@@ -105,7 +105,6 @@ int main(int argc, char **argv) {
         .socket_wait = socket_wait,
         .is_default_ctx_callback = validate_default_callback,
         .default_ciphers = "known browser default",
-        .default_ca_path = NULL,
         .d2i_x509 = fake_d2i_x509,
         .x509_free = fake_x509_free,
         .record_calloc = arena_calloc,

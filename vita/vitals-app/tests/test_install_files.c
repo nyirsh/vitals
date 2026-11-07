@@ -13,8 +13,12 @@
 #include <unistd.h>
 
 #define CONFIG "ur0:tai/config.txt"
+/* The system's own store, which vitals leaves as it was, and the backup earlier versions kept of it
+ * when they wrote their bundle there; vitals' store is its own */
 #define CA "vs0:/data/external/cert/CA_LIST.cer"
 #define CA_BACKUP "vs0:/data/external/cert/CA_LIST.cer_old"
+#define STORE "ux0:data/vitals/system/CA_LIST.cer"
+#define EARLIER_BUNDLE "AN EARLIER VERSION'S BUNDLE\n"
 #define REDIRECTS "ux0:data/vitals/redirects.txt"
 #define DNS_RULES "ux0:data/vitals/dns.txt"
 #define VITALS_BLOCK "# VITALS\n*KERNEL\nur0:tai/vitals.skprx\n\n"
@@ -172,11 +176,12 @@ static void expect_installed(void)
         snprintf(expected, sizeof(expected), "contents of %s\n", installed[i][1] + 5);
         assert(is(installed[i][0], expected));
     }
-    assert(is(CA, BUNDLE) && is(CA_BACKUP, SONY_CA));
+    assert(is(STORE, BUNDLE) && is(CA, SONY_CA) && !exists(CA_BACKUP));
     assert(exists(REDIRECTS) && exists(DNS_RULES));
-    assert(vitals_install_complete() == 1);
+    assert(vitals_install_complete() == 1 && vitals_install_old_layout() == 0);
     /* Nothing temporary is left behind */
-    assert(!exists("ur0:tai/config_vitals.tmp") && !exists("vs0:/data/external/cert/CA_LIST.cer.prepared"));
+    assert(!exists("ur0:tai/config_vitals.tmp") && !exists(STORE ".prepared") && !exists(STORE ".tmp") &&
+           !exists(STORE ".vitals-old") && !exists(CA ".prepared") && !exists(CA ".vitals-remove"));
 }
 
 static void expect_uninstalled(void)
@@ -184,17 +189,21 @@ static void expect_uninstalled(void)
     assert(is(CONFIG, ORIGINAL_CONFIG));
     for (size_t i = 0; i < INSTALLED_COUNT; ++i)
         assert(!exists(installed[i][0]));
-    assert(is(CA, SONY_CA) && !exists(CA_BACKUP));
+    assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && !exists(STORE));
     assert(vitals_install_complete() == 0);
 }
 
-/* An earlier version's layout: its modules on vs0 and in ur0:tai/vitals-native */
+/* An earlier version's layout: its modules on vs0 and in ur0:tai/vitals-native, its bundle the
+ * system's store and the system's own kept aside */
 static void put_old_layout(void)
 {
     make_directories("vs0:/data/external/vitals/native");
     make_directories("ur0:tai/vitals-native");
     for (size_t i = 0; i < OLD_LAYOUT_COUNT; ++i)
         put(old_layout[i], "an earlier version's module\n");
+    put(CA, EARLIER_BUNDLE);
+    put(CA_BACKUP, SONY_CA);
+    put(CA ".prepared", "half of an earlier version's bundle\n");
 }
 
 static void expect_no_old_layout(void)
@@ -223,6 +232,29 @@ static void test_old_layout_moves(void)
     expect_uninstalled();
     expect_no_old_layout();
     assert(!exists("ux0:data/vitals/system"));
+
+    /* The bundle alone on the system counts as the old layout; a certificate update puts the
+     * system's own back too, whatever it holds (here the user's edit of Sony's), as it was */
+    fresh_console();
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    put(CA, EARLIER_BUNDLE);
+    put(CA_BACKUP, "SONY CERTIFICATES, AS THE USER EDITED THEM\n");
+    assert(vitals_install_old_layout() == 1 && vitals_install_complete() == 0);
+    assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
+    assert(is(CA, "SONY CERTIFICATES, AS THE USER EDITED THEM\n") && !exists(CA_BACKUP));
+    assert(is(STORE, BUNDLE) && vitals_install_old_layout() == 0 && vitals_install_complete() == 1);
+    /* And so does an uninstall */
+    put(CA, EARLIER_BUNDLE);
+    put(CA_BACKUP, SONY_CA);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
+    expect_uninstalled();
+    /* Without a backup, the system's store is left as it is */
+    fresh_console();
+    put(CA, EARLIER_BUNDLE);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CA, EARLIER_BUNDLE) && is(STORE, BUNDLE));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CA, EARLIER_BUNDLE) && !exists(STORE));
 }
 
 static void test_install_reinstall_uninstall(void)
@@ -266,8 +298,8 @@ static void test_install_reinstall_uninstall(void)
     expect_installed();
     assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
 
-    /* Updating certificates replaces the store and touches nothing else */
-    put(CA, "OLDER VITALS BUNDLE\n");
+    /* Updating certificates replaces vitals' store and touches nothing else */
+    put(STORE, "OLDER VITALS BUNDLE\n");
     assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
     expect_installed();
 
@@ -331,7 +363,8 @@ static void test_debug_levels(void)
 static void test_conflicting_installs_are_removed(void)
 {
     fresh_console();
-    /* iTLS-Enso (its CA backup is Sony's original, which vitals reuses), tls_fixer and reAuth */
+    /* iTLS-Enso (its CA backup is what the system had before, which vitals puts back), tls_fixer
+     * and reAuth */
     put(CONFIG, "# ITLS\n*KERNEL\nur0:tai/itls.skprx\n\n"
                 "# TLS_FIXER\n*KERNEL\nur0:tai/tls_fixer.skprx\n\n"
                 ORIGINAL_CONFIG
@@ -353,10 +386,10 @@ static void test_conflicting_installs_are_removed(void)
     assert(!exists("ur0:data/reAuth") && !exists("vs0:/data/external/itls") && !exists("vs0:/data/external/tls_fixer"));
     /* Their entries are gone; the rest of the config is kept exactly, CRLF included */
     assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\r\n"));
-    assert(is(CA, BUNDLE) && is(CA_BACKUP, SONY_CA));
+    assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && is(STORE, BUNDLE));
 
     assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
-    assert(is(CA, SONY_CA) && is(CONFIG, ORIGINAL_CONFIG "*KERNEL\r\n"));
+    assert(is(CA, SONY_CA) && !exists(STORE) && is(CONFIG, ORIGINAL_CONFIG "*KERNEL\r\n"));
 }
 
 /* The plugin's line, wherever the user keeps it under *KERNEL, counts as vitals' entry */
@@ -463,13 +496,25 @@ static void test_missing_config(void)
     assert(!exists("ur0:tai/vitals.skprx") && !exists(CONFIG));
 }
 
-/* Every rename an operation makes is made to fail in turn; config.txt and the certificate store
- * must always be either their old or their new version, never missing or partial */
-static void test_failed_renames(int removing)
+/* A console for test_failed_renames: vitals installed when removing; when migrating, an earlier
+ * version's bundle over the system's store, the system's own beside it */
+static void failed_renames_console(int removing, int migrating)
 {
     fresh_console();
     if (removing)
         assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    if (migrating)
+    {
+        put(CA, EARLIER_BUNDLE);
+        put(CA_BACKUP, SONY_CA);
+    }
+}
+
+/* Every rename an operation makes is made to fail in turn; config.txt and both certificate stores
+ * must always be either their old or their new version, never missing or partial */
+static void test_failed_renames(int removing, int migrating)
+{
+    failed_renames_console(removing, migrating);
     vita_files_renames = 0;
     assert(vitals_install_apply(VITALS_OPTION_FULL, removing, note) >= 0);
     int total = vita_files_renames;
@@ -477,9 +522,7 @@ static void test_failed_renames(int removing)
 
     for (int failing = 1; failing <= total; ++failing)
     {
-        fresh_console();
-        if (removing)
-            assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+        failed_renames_console(removing, migrating);
         vita_files_renames = 0;
         vita_files_fail_rename = failing;
         int result = vitals_install_apply(VITALS_OPTION_FULL, removing, note);
@@ -490,12 +533,19 @@ static void test_failed_renames(int removing)
         int config_old = strcmp(config, removing ? VITALS_BLOCK ORIGINAL_CONFIG : ORIGINAL_CONFIG) == 0;
         int config_new = strcmp(config, removing ? ORIGINAL_CONFIG : VITALS_BLOCK ORIGINAL_CONFIG) == 0;
         assert(config_old || config_new);
+        /* The system's store is what it was, or the backup put back; what it had before is never
+         * lost: it is the store or the backup */
         const char *ca = get(CA);
-        assert(ca != NULL && (strcmp(ca, SONY_CA) == 0 || strcmp(ca, BUNDLE) == 0));
-        /* Sony's original is never lost: it is the store or its backup */
+        assert(ca != NULL && (strcmp(ca, SONY_CA) == 0 || (migrating && strcmp(ca, EARLIER_BUNDLE) == 0)));
         assert(is(CA, SONY_CA) || is(CA_BACKUP, SONY_CA));
+        /* vitals' store is whole, or not there */
+        const char *store = get(STORE);
+        assert(store == NULL || strcmp(store, BUNDLE) == 0);
         if (result >= 0)
-            assert(config_new);
+        {
+            assert(config_new && is(CA, SONY_CA) && !exists(CA_BACKUP));
+            assert(removing ? store == NULL : store != NULL);
+        }
     }
 }
 
@@ -528,8 +578,9 @@ int main(void)
     test_moved_plugin_line();
     test_placements();
     test_missing_config();
-    test_failed_renames(0);
-    test_failed_renames(1);
+    for (int removing = 0; removing <= 1; ++removing)
+        for (int migrating = 0; migrating <= 1; ++migrating)
+            test_failed_renames(removing, migrating);
 
     char command[600];
     snprintf(command, sizeof(command), "rm -rf '%s'", root);

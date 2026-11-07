@@ -425,9 +425,6 @@ int vh_platform_system_proxy(char *host, size_t capacity, unsigned short *port);
 int vh_platform_redirects_read(unsigned int offset, void *buffer, unsigned int size);
 /* Sets up TLS's heap, on first use; 0 or negative */
 int vh_platform_tls_init(void);
-/* Where the trusted CA bundle (PEM) is read from, as this process opens it: 0, or negative when
- * there is none */
-int vh_platform_ca_path(char *path, size_t capacity);
 /* The socket under the transport, for TLS: the bytes moved, or a libhttp error */
 int vh_transport_raw_send(VhTransport *transport, const void *data, size_t size);
 int vh_transport_raw_recv(VhTransport *transport, void *data, size_t size);

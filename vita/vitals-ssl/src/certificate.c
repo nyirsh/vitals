@@ -1224,20 +1224,13 @@ int sceSslInternalGetCertificateAuthorityByName(const void *name_handle, char **
 }
 
 /* Reads root i's PEM block from the bundle into text, NUL-terminated */
-static int read_block(const VitalsCaIndex *index, SceUID fd, size_t i, char *text)
+static int read_block(const VitalsCaIndex *index, size_t i, char *text)
 {
     const VitalsCaEntry *entry = &index->entries[i];
-    size_t consumed = 0;
-    if (sceIoLseek(fd, entry->offset, SCE_SEEK_SET) < 0)
+    if (vitals_ca_index_read(index, entry->offset, text, entry->length) != 0)
         return VS_ERROR_INTERNAL;
-    while (consumed < entry->length) {
-        int count = sceIoRead(fd, text + consumed, (SceSize)(entry->length - consumed));
-        if (count <= 0)
-            return VS_ERROR_INTERNAL;
-        consumed += (size_t)count;
-    }
-    text[consumed++] = '\n';
-    text[consumed] = '\0';
+    text[entry->length] = '\n';
+    text[entry->length + 1] = '\0';
     return 0;
 }
 
@@ -1276,20 +1269,14 @@ int sceSslInternalGetCertificateAuthority(unsigned int group, unsigned int mask,
     int result = place_answers(entries, buffer, size, count, text_size, &texts, &text);
     if (result != 0)
         return result;
-    SceUID fd = sceIoOpen(index->path, SCE_O_RDONLY, 0);
-    if (fd < 0) {
-        *entries = NULL;
-        return VS_ERROR_INTERNAL;
-    }
     size_t written = 0;
     for (size_t i = first; i < last && result == 0; ++i) {
         if (group != 0 && (mask & (1u << (i - first))) == 0)
             continue;
-        result = read_block(index, fd, i, text);
+        result = read_block(index, i, text);
         texts[written++] = text;
         text += index->entries[i].length + 2;
     }
-    (void)sceIoClose(fd);
     if (result != 0) {
         *entries = NULL;
         return result;

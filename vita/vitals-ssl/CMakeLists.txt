@@ -8,8 +8,6 @@ set(VITALS_DEBUG 0 CACHE STRING "Debug output on the console: 0, 1 or 2")
 if(NOT VITALS_DEBUG MATCHES "^[012]$")
     message(FATAL_ERROR "VITALS_DEBUG must be 0, 1 or 2")
 endif()
-# The bundle the vitals app installs, which servers are checked against
-set(VITALS_SSL_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trusted CA bundle (PEM)")
 
 # TLS is Mbed TLS 4.2 with TF-PSA-Crypto (tls13-vita/crypto), with tls13-vita's CA index and
 # runtime
@@ -36,7 +34,6 @@ target_include_directories(vitals_libssl PRIVATE src include ${TLS13_DIR}/provid
 target_compile_definitions(vitals_libssl PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-ssl"
-    VITALS_SSL_CA_PATH="${VITALS_SSL_CA_PATH}"
 )
 target_compile_options(vitals_libssl PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -Os)
@@ -58,13 +55,18 @@ foreach(line ${export_lines})
     string(REGEX REPLACE "^ +- ((sceSsl|vitalsSsl)[A-Za-z0-9]+):.*$" "\\1" function "${line}")
     target_link_options(vitals_libssl PRIVATE "-Wl,--undefined=${function}")
 endforeach()
+# vitals' certificate store is read through the kernel plugin's system call, from the stub its
+# build generates (no process but the kernel can open ux0:data/vitals/system)
+set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-plugin/stubs/libvitals_kernel_stub.a")
+if(NOT EXISTS "${VITALS_KERNEL_STUB}")
+    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-plugin first (make does this)")
+endif()
 target_link_libraries(vitals_libssl PRIVATE
+    ${VITALS_KERNEL_STUB}
     mbedtls
     mbedx509
     tfpsacrypto
     gcc
-    # Weak: the browser engine's process has no path conversion, and gives the bundle's path itself
-    SceAppMgr_stub_weak
     SceLibKernel_stub
     SceKernelThreadMgr_stub
     SceSysmem_stub

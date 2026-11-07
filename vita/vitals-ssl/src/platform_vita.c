@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "user_runtime.h"
+#include "vitals/ca_store.h"
 
 #include <string.h>
 
@@ -19,9 +20,6 @@
 #define VS_HANDSHAKE_STACK 0x10000
 #define VS_HANDSHAKE_PRIORITY 0x10000100
 
-/* vitals-ssl's paths, as the app sees them (vs0: through _sceAppMgrConvertVs0UserDrivePath) */
-int _sceAppMgrConvertVs0UserDrivePath(const char *path, char *converted_path, SceSize capacity,
-                                      const void *options);
 
 static SceKernelLwMutexWork g_mutex;
 
@@ -134,14 +132,8 @@ unsigned int vs_platform_thread_id(void)
     return (unsigned int)sceKernelGetThreadId();
 }
 
-int vs_platform_ca_path(char *path, size_t size)
+int vs_platform_ca_read(void *context, uint32_t offset, void *buffer, uint32_t size)
 {
-    const uint32_t options[4] = {0};
-    if (size < 0x124u)
-        return -1;
-    memset(path, 0, size);
-    if (_sceAppMgrConvertVs0UserDrivePath(VITALS_SSL_CA_PATH, path, 0x124u, options) < 0 ||
-        memchr(path, '\0', 0x124u) == NULL || path[0] == '\0')
-        return -1;
-    return 0;
+    (void)context;
+    return vitals_ca_read(offset, buffer, size);
 }

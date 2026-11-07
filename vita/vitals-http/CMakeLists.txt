@@ -25,8 +25,6 @@ if(VITALS_HTTP_USER_AGENT_LENGTH EQUAL 0 OR VITALS_HTTP_USER_AGENT_LENGTH GREATE
    OR NOT VITALS_HTTP_USER_AGENT MATCHES "^[ -~]+$" OR VITALS_HTTP_USER_AGENT MATCHES "[\"\\#$;`']")
     message(FATAL_ERROR "VITALS_HTTP_USER_AGENT must be 1..127 printable ASCII characters, without \" \\ # $ ; ` '")
 endif()
-# The bundle the vitals app installs, which the HTTP provider trusts too
-set(VITALS_HTTP_CA_PATH "vs0:/data/external/cert/CA_LIST.cer" CACHE STRING "Trusted CA bundle (PEM)")
 
 # From tls13-vita: the heap and C library runtime, the error and certificate mapping, the redirect list
 set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
@@ -61,7 +59,6 @@ target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-http"
     VITALS_HTTP_HEAP_BYTES=${VITALS_HTTP_TLS_HEAP_BYTES}u
-    VITALS_HTTP_CA_PATH="${VITALS_HTTP_CA_PATH}"
     VH_DEFAULT_SUFFIX="${VITALS_HTTP_USER_AGENT}"
 )
 target_compile_options(vitals_libhttp PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
@@ -99,7 +96,6 @@ target_link_libraries(vitals_libhttp PRIVATE
     ${VITALS_SSL_STUB}
     z
     gcc
-    SceAppMgr_stub
     SceLibKernel_stub
     SceKernelThreadMgr_stub
     SceSysmem_stub

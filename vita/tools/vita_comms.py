@@ -40,9 +40,8 @@ INSTALLED = [
     VITALS + "/system/libssl.suprx",
     VITALS + "/system/ScePsp2Compat.suprx",
     VITALS + "/system/vitals.suprx",
-    # Sony's certificate store, which the app rewrites, and its copy of Sony's original
-    "/vs0:/data/external/cert/CA_LIST.cer",
-    "/vs0:/data/external/cert/CA_LIST.cer_old",
+    # vitals' certificate store (the system's own on vs0 is left as it was)
+    VITALS + "/system/CA_LIST.cer",
 ]
 # The user's lists and certificates
 LISTS = [VITALS + "/" + name for name in ("redirects.txt", "dns.txt", "custom-certs.pem")]

@@ -119,14 +119,6 @@ void vh_platform_free(void *pointer)
     free(pointer);
 }
 
-int vh_platform_ca_path(char *path, size_t capacity)
-{
-    if (vh_test_ca_path == NULL || strlen(vh_test_ca_path) >= capacity)
-        return -1;
-    strcpy(path, vh_test_ca_path);
-    return 0;
-}
-
 int vh_platform_tls_init(void)
 {
     return 0;

@@ -15,7 +15,7 @@ The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current
 > **Use `vitals` at your own risk.** It is provided as is, without any warranty, and I am not responsible for any damage, data loss or bricked console that may result from using it. While I personally tested this on two different systems of mine, I simply can't promise it will work on every single possible configuration out there.  
 > You alone are responsible for your system, its maintenance and what's installed on it.
 >
-> `vitals` is a kernel plugin: it modifies files on your Vita's system partition (`vs0:`), your taiHEN configuration (`ur0:tai/config.txt`) and the system certificate store, and it changes how the system and your games connect to the internet. A bug, an interrupted installation or a conflict with another plugin could keep apps, the browser or the whole system from working properly.
+> `vitals` is a kernel plugin: it modifies files on your Vita's system partition (`vs0:`) and your taiHEN configuration (`ur0:tai/config.txt`), and it changes how the system and your games connect to the internet. A bug, an interrupted installation or a conflict with another plugin could keep apps, the browser or the whole system from working properly.
 >
 > Before installing:
 >
@@ -33,7 +33,7 @@ You need a hacked PS Vita on **firmware 3.60 or 3.65** with taiHEN. Supporting o
   _This installs everything: the browser plugin, the system plugin and the certificates. The certificates are also downloaded from the internet, so there's no need to update them -- yet_
 - When it's done, press **START** to reboot the Vita (or **Circle** to reboot later): `vitals` starts at the next boot
 
-`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins. Its kernel plugin is `ur0:tai/vitals.skprx`; its other modules are in `ux0:data/vitals/system/`, next to your lists. Only the certificate store is still on `vs0:`. Updating from a version that kept the modules on `vs0:` moves them.
+`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins. Its kernel plugin is `ur0:tai/vitals.skprx`; its other modules and its certificate store are in `ux0:data/vitals/system/`, next to your lists. The system's own certificate store on `vs0:` is left as it is. Updating from a version that kept the modules on `vs0:` moves them, and puts back the system's certificate store as it was before `vitals` (`CA_LIST.cer_old`), even if you had edited it.
 
 Once `vitals` is installed, from the same application you'll be able to:
 
@@ -213,7 +213,7 @@ Every build includes all three levels; choose one on the console in the app's **
 - `make fetch`: brings the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, and deletes them from the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed
 - `make status`: `config.txt`, vitals' plugin and modules, the certificate store and your lists, as they are on the Vita
 
-Installing, uninstalling and switching the debug output stay the app's, with the reboot they need: installing and uninstalling also write `vs0:` (the certificate store), which the app mounts for writing.
+Installing, uninstalling and switching the debug output stay the app's, with the reboot they need: installing and uninstalling also write `vs0:` (removing what earlier versions put there, and putting the system's certificate store back), which the app mounts for writing.
 
 ### Updating `Mbed TLS` or `curl`
 

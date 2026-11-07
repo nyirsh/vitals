@@ -66,7 +66,7 @@ add_executable(vitals_browser_lazy_ca_tests test_lazy_ca.c ../../browser/backend
 target_include_directories(vitals_browser_lazy_ca_tests PRIVATE ../../browser ../../provider)
 target_link_libraries(vitals_browser_lazy_ca_tests PRIVATE vitals_ssl_host)
 target_compile_options(vitals_browser_lazy_ca_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG -fno-pie)
-target_link_options(vitals_browser_lazy_ca_tests PRIVATE -no-pie -Wl,--wrap=sceIoOpen)
+target_link_options(vitals_browser_lazy_ca_tests PRIVATE -no-pie -Wl,--wrap=vitals_ca_read)
 foreach(scenario IN ITEMS init legacy failure)
     add_test(NAME vitals_browser_lazy_ca_${scenario} COMMAND vitals_browser_lazy_ca_tests ${scenario})
 endforeach()
@@ -78,7 +78,7 @@ target_include_directories(vitals_browser_module_tests PRIVATE ../../browser ../
 target_link_libraries(vitals_browser_module_tests PRIVATE vitals_core)
 target_compile_definitions(vitals_browser_module_tests PRIVATE VITALS_HOST_MODULE_TEST=1)
 target_compile_options(vitals_browser_module_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
-foreach(scenario valid bad-args bad-id bad-name bad-size bad-path bad-ca-store bad-site-0 bad-site-1 bad-site-2 bad-site-3 bad-site-4 bad-site-5 hook-0 hook-1 hook-2 hook-3
+foreach(scenario valid bad-args bad-id bad-name bad-size bad-site-0 bad-site-1 bad-site-2 bad-site-3 bad-site-4 bad-site-5 hook-0 hook-1 hook-2 hook-3
     bad-buffer bad-arg-size bad-version bad-reserved bad-negative-id bad-address bad-text-memsz bad-data-filesz bad-data-memsz init-fail)
     add_test(NAME vitals_browser_module_${scenario} COMMAND vitals_browser_module_tests ${scenario})
 endforeach()

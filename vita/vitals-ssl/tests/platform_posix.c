@@ -1,4 +1,6 @@
 #include "vs.h"
+#include "ca_index.h"
+#include "vitals/ca_store.h"
 
 #include <arpa/inet.h>
 #include <pthread.h>
@@ -94,10 +96,16 @@ void vs_platform_run_on_large_stack(void (*function)(void *), void *argument)
     function(argument);
 }
 
-int vs_platform_ca_path(char *path, size_t size)
+/* The kernel plugin's call, as the console makes it: the tests' store is a file of their own */
+int vitals_ca_read(unsigned int offset, void *buffer, unsigned int size)
 {
-    if (vs_test_ca_path[0] == '\0' || strlen(vs_test_ca_path) >= size)
-        return -1;
-    strcpy(path, vs_test_ca_path);
-    return 0;
+    if (vs_test_ca_path[0] == '\0')
+        return (int)0x80010002;
+    return vitals_ca_file_read(vs_test_ca_path, offset, buffer, size);
+}
+
+int vs_platform_ca_read(void *context, uint32_t offset, void *buffer, uint32_t size)
+{
+    (void)context;
+    return vitals_ca_read(offset, buffer, size);
 }

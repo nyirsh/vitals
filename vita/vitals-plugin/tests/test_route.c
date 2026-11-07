@@ -207,15 +207,14 @@ static void test_routes(void) {
     assert(installed_load(0, libhttp_paths[0], 0, NULL) == -5);
     assert(finish_start(0) == 0 && injections == 0);
 
-    /* The browser engine from ux0:data/vitals/system; the provider is given the certificate store as
-     * the process names it */
+    /* The browser engine from ux0:data/vitals/system, then vitals' provider from there too */
     reset();
     assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
     assert(strcmp(selected_path, g_replacement_modules[MODULE_COMPAT]) == 0 && seen_flags == 0x8001);
     assert(injections == 0);
     assert(finish_start(0) == 0);
     assert(injections == 1 && injected_pid == 99);
-    assert(strcmp(provider_path, "wb0:/cert/CA_LIST.cer") == 0);
+    assert(strcmp(provider_path, VITALS_BROWSER_PROVIDER_BOOT_PATH) == 0);
     /* Not there at this load: Sony's, nothing injected */
     reset();
     stat_result = -1;

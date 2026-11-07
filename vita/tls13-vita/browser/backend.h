@@ -11,7 +11,6 @@ typedef struct VitalsBrowserOps {
     int (*socket_wait)(int read_fd, int read_fd2, int write_fd, int timeout_ms);
     VitalsBrowserContextCallbackValidator is_default_ctx_callback;
     const char *default_ciphers;
-    const char *default_ca_path;
     /* The engine's own d2i_X509 and X509_free, for the certificates a refused connection reports
      * to WebKit (NULL: nothing is reported) */
     void *(*d2i_x509)(void **certificate, const unsigned char **der, long size);

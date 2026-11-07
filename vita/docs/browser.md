@@ -29,16 +29,17 @@ Everything lives until the process exits.
 | `ux0:data/vitals/system/ScePsp2Compat.suprx` | `app0:compat.suprx` ([vitals-app/assets/compat.suprx](../vitals-app/assets/compat.suprx)) | `install_compat` in [install.c](../vitals-app/install.c) |
 | `ux0:data/vitals/system/vitals.suprx`            | the browser provider, built from [tls13-vita/browser/](../tls13-vita/browser/)            | same function                                                   |
 | `ux0:data/vitals/system/libssl.suprx`        | vitals-ssl, the system's libssl, which also does the provider's TLS                       | `install_http_modules`                                          |
-| `vs0:/data/external/cert/CA_LIST.cer`           | the certificate bundle libssl trusts                                                      | `install_certificates`                                          |
+| `ux0:data/vitals/system/CA_LIST.cer`            | the certificate store libssl trusts                                                       | `install_certificates`                                          |
 
 - **One copy of the provider**, in `ux0:data/vitals/system` with vitals' other modules
   (`VITALS_BROWSER_PROVIDER_BOOT_PATH`, [path.h](../tls13-vita/include/vitals/path.h)). Earlier
   versions kept it in `ur0:tai/vitals-native/` with an unused second copy on `vs0:`; installing
   removes both.
-- **Everything in `ux0:data/vitals/system`**: the engine, the provider and libssl. Earlier versions
-  kept the engine on `vs0:`, next to Sony's, so the provider could find the certificate store from
-  the engine's own path; the kernel now hands the provider that path (step 5.6). Installing removes
-  the old copy.
+- **Everything in `ux0:data/vitals/system`**: the engine, the provider, libssl and the certificate
+  store. Earlier versions kept the engine on `vs0:`, next to Sony's, so the provider could find the
+  certificate store from the engine's own path; the store is vitals' own now, which libssl reads
+  through the kernel plugin (section 6, step 5), so no process needs a path to it. Installing
+  removes the old copy.
 - **Sony's own** `ScePsp2Compat.suprx` in the `webcore` folder is never modified. A leftover
   `vs0:/data/external/webcore/ScePsp2Compat.supr0` from older tools is removed
   ([install.c:834](../vitals-app/install.c#L834)), and while it exists vitals doesn't count as
@@ -68,12 +69,10 @@ The kernel plugin's `module_start` ([vitals-plugin/main.c](../vitals-plugin/main
 `load_for_pid_patched` ([main.c](../vitals-plugin/main.c)) sees every load:
 
 1. **Path swap** ([main.c](../vitals-plugin/main.c)) —
-   `vitals_browser_engine_ca_path` ([path.c](../tls13-vita/src/path.c)) matches any path ending in
-   `webcore/ScePsp2Compat.suprx` right after a `/` or `:`, and from it works out the certificate
-   store as that process names it: the same start, then `cert/CA_LIST.cer`. A process may see
-   `vs0:data/external` under a device of its own (`sd062e8855c978:/webcore/…` gives
-   `sd062e8855c978:/cert/CA_LIST.cer`). When `ux0:data/vitals/system/ScePsp2Compat.suprx` is there,
-   the load is swapped to it.
+   `vitals_browser_engine_request` ([path.c](../tls13-vita/src/path.c)) matches any path ending in
+   `webcore/ScePsp2Compat.suprx` right after a `/` or `:`, on a device: a process may see
+   `vs0:data/external` under a device of its own (`sd062e8855c978:/webcore/…`). When
+   `ux0:data/vitals/system/ScePsp2Compat.suprx` is there, the load is swapped to it.
 2. **Flags left alone** — the load is shared or private as the process asked; there is no HTTP
    policy for the browser engine.
 3. **The real load** — `TAI_CONTINUE` ([main.c](../vitals-plugin/main.c)), as the process asked. The
@@ -87,8 +86,9 @@ The kernel plugin's `module_start` ([vitals-plugin/main.c](../vitals-plugin/main
    browser runs with. If that fails too, Sony's engine is loaded and nothing is injected, so the
    browser still opens with its own TLS (`vitals: browser engine from … failed`).
 4. **Queue the injection** ([main.c](../vitals-plugin/main.c)): when the loader is ready,
-   `vitals_post_start_defer(pid, module, ca_path)` ([post_start.c](../vitals-plugin/post_start.c))
-   records the certificate store's path, which the provider is given (step 5.6).
+   `vitals_post_start_defer(pid, module, VITALS_BROWSER_PROVIDER_BOOT_PATH)`
+   ([post_start.c](../vitals-plugin/post_start.c)) records the provider to inject once the engine
+   has started.
 
 ## 4. Which processes
 
@@ -112,8 +112,7 @@ for the queued module, through `inject_target`
 4. **The module's hash** — `ux0:data/vitals/system/ScePsp2Compat.suprx`, the file the process loaded,
    hashed in the system's view (`target_matches`, [tls13_loader.c](../vitals-plugin/tls13_loader.c)).
 5. **Still the right module** — the module ID handed over must be `ScePsp2Compat`.
-6. **Start arguments** — `VitalsBrowserStartArgs` (magic `0x42544C53`, version 2, the module's ID and
-   the certificate store's path as the process names it;
+6. **Start arguments** — `VitalsBrowserStartArgs` (magic `0x42544C53`, version 1, the module's ID;
    [browser_abi.h](../tls13-vita/include/vitals/browser_abi.h)) in a user memory block of that
    process.
 7. **libssl first** — the browser engine's process doesn't load libssl, and the provider's TLS is
@@ -135,8 +134,7 @@ for the queued module, through `inject_target`
 browser's process:
 
 1. **Once per process** — a second start is refused.
-2. **Start arguments** checked, the certificate store's path among them: whole, and ending in
-   `cert/CA_LIST.cer`.
+2. **Start arguments** checked: magic, version, a module ID, nothing reserved set.
 3. **The module it was given** — `validate_module` ([module.c:69](../tls13-vita/browser/module.c#L69)):
    named `ScePsp2Compat`; code `0x39f508`/`0x39f630` bytes and data `0x9c28`/`0xd234`
    ([module_descriptor.h:25-28](../tls13-vita/browser/module_descriptor.h#L25-L28)); the code bytes
@@ -148,9 +146,10 @@ browser's process:
    respect the browser's timeouts.
 5. **State** — `vitals_browser_init` ([backend.c](../tls13-vita/browser/backend.c)): mutexes and
    the connection registry. The TLS is libssl's, imported through vitals-ssl's stub: on the first
-   connection the provider checks the certificate bundle is there (`ensure_default_ca`) and sets
-   libssl up with a 1 MiB pool (`sceSslInit`, `ensure_library`), which every connection's memory
-   comes from; libssl reads the bundle itself, through an index, as for apps. The provider's own
+   connection the provider checks the certificate store is there (`ensure_default_ca`, one byte
+   read through the kernel plugin's `vitals_ca_read`) and sets libssl up with a 1 MiB pool
+   (`sceSslInit`, `ensure_library`), which every connection's memory comes from; libssl reads the
+   store itself, through an index, as for apps. Without a store the browser keeps its own TLS. The provider's own
    few allocations come from the process's C library (it links `SceLibc`).
 6. **The four hooks** — by offset in `ScePsp2Compat` (`taiHookFunctionOffset`, Thumb;
    [module.c:147-161](../tls13-vita/browser/module.c#L147-L161)), on libcurl's TLS layer:

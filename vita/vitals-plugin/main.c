@@ -83,7 +83,6 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
 {
     const SceUID target_pid = pid == 0 ? ksceKernelGetProcessId() : pid;
     const char *requested = path;
-    char browser_ca[VITALS_PENDING_BROWSER_PATH_SIZE];
     int module = -1;
 
     if ((path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
@@ -100,10 +99,8 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
         module = MODULE_LIBSSL;
         path = g_replacement_modules[module];
     }
-    /* The browser engine: from ux0:data/vitals/system too, looked for at each load as libhttp is;
-     * the process names the certificate store by the start of its request, which the provider is
-     * given */
-    else if (vitals_browser_engine_ca_path(path, browser_ca, sizeof(browser_ca)) && module_present(MODULE_COMPAT))
+    /* The browser engine: from ux0:data/vitals/system too, looked for at each load as libhttp is */
+    else if (vitals_browser_engine_request(path) && module_present(MODULE_COMPAT))
     {
         module = MODULE_COMPAT;
         path = g_replacement_modules[module];
@@ -127,7 +124,7 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
 
     /* Injection waits until the native start hook reports that linking finished */
     if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready())
-        (void)vitals_post_start_defer(target_pid, res, browser_ca);
+        (void)vitals_post_start_defer(target_pid, res, VITALS_BROWSER_PROVIDER_BOOT_PATH);
     return res;
 }
 

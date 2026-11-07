@@ -1,5 +1,6 @@
 #include "backend.h"
 #include "diagnostics.h"
+#include "vitals/ca_store.h"
 #include "vitals/error_map.h"
 #include "vitals/registry.h"
 #include "vitals/sony_abi.h"
@@ -25,9 +26,6 @@
  * connection's memory comes from it */
 #ifndef VITALS_BROWSER_SSL_POOL_BYTES
 #define VITALS_BROWSER_SSL_POOL_BYTES (1024u * 1024u)
-#endif
-#ifndef VITALS_DEFAULT_CA_PATH
-#define VITALS_DEFAULT_CA_PATH "vs0:/data/external/cert/CA_LIST.cer"
 #endif
 /* A page's own CA file, read whole */
 #define BROWSER_CA_FILE_MAX (512u * 1024u)
@@ -120,33 +118,28 @@ static void free_connection(void *unused, void *payload) {
     free(connection);
 }
 
-/* libssl reads the bundle itself; without one, the browser keeps its own TLS, as when the bundle
- * couldn't be read before */
+/* libssl reads vitals' store itself, through the kernel plugin (this process can't open it);
+ * without one, the browser keeps its own TLS */
 static int ensure_default_ca(void) {
-    int fd;
+    unsigned char first;
+    int result;
     if (browser.default_ca_state == DEFAULT_CA_READY) return 0;
     if (browser.default_ca_state == DEFAULT_CA_FAILED) return browser.default_ca_error;
-    fd = sceIoOpen(browser.ops.default_ca_path != NULL ? browser.ops.default_ca_path : VITALS_DEFAULT_CA_PATH,
-        SCE_O_RDONLY, 0);
-    if (fd >= 0) {
-        (void)sceIoClose(fd);
+    result = vitals_ca_read(0, &first, 1);
+    if (result > 0) {
         browser.default_ca_state = DEFAULT_CA_READY;
         return 0;
     }
-    browser.default_ca_error = fd;
+    /* An empty store is no store */
+    browser.default_ca_error = result < 0 ? result : (int)0x80010002;
     browser.default_ca_state = DEFAULT_CA_FAILED;
-    return fd;
+    return browser.default_ca_error;
 }
 
 /* libssl set up in this process, with its pool, unless something already did: 0 or its error */
 static int ensure_library(void) {
     int result = sceSslInternalIsInitalized();
     if (result == 0) return 0;
-    /* libssl can't work the bundle's path out in this process: it is the one the engine's module
-     * path gives */
-    result = vitalsSslSetBundlePath(browser.ops.default_ca_path != NULL ? browser.ops.default_ca_path
-                                                                       : VITALS_DEFAULT_CA_PATH);
-    if (result != 0) return result;
     result = sceSslInit(VITALS_BROWSER_SSL_POOL_BYTES);
     VITALS_LOG("browser libssl pool=%u rc=0x%08X", VITALS_BROWSER_SSL_POOL_BYTES, (unsigned int)result);
     return result;

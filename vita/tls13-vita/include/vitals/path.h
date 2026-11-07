@@ -22,11 +22,10 @@ extern "C" {
 
 int vitals_path_equals(const char *path, const char *expected, size_t maximum);
 int vitals_path_has_suffix(const char *path, const char *suffix, size_t maximum);
-/* A process's request for Sony's browser engine (a path ending in webcore/ScePsp2Compat.suprx, right
- * after a ':' or '/'): 1, with the certificate store as that process names it in output (the same
- * start, then cert/CA_LIST.cer), as it may see vs0:data/external under a device of its own; 0 for
- * any other path */
-int vitals_browser_engine_ca_path(const char *request, char *output, size_t capacity);
+/* A process's request for Sony's browser engine: a path ending in webcore/ScePsp2Compat.suprx,
+ * right after a ':' or '/', on a device (the process may see vs0:data/external under a device of its
+ * own): 1, or 0 for any other path */
+int vitals_browser_engine_request(const char *request);
 
 #ifdef __cplusplus
 }

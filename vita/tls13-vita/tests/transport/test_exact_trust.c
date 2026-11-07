@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     assert(argc == 5);
     assert(vitals_crypto_platform_init() == 0 && psa_crypto_init() == PSA_SUCCESS);
     memset(&index, 0, sizeof(index));
-    assert(vitals_ca_index_build(&index, argv[1]) == 0);
+    assert(vitals_ca_index_build(&index, vitals_ca_file_read, argv[1]) == 0);
     mbedtls_x509_crt_init(&certificate);
     parse_certificate(&certificate, argv[2]);
     /* The providers' profile: the default one, plus SHA-1 signatures */

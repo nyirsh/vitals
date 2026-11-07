@@ -32,15 +32,6 @@
 /* Seconds from 0001-01-01, where the RTC counts from, to 1970-01-01 */
 #define VH_RTC_EPOCH 62135596800ll
 
-#ifndef VITALS_HTTP_CA_PATH
-#define VITALS_HTTP_CA_PATH "vs0:/data/external/cert/CA_LIST.cer"
-#endif
-
-/* VitaSDK has the stub but not the prototype; on 3.60 the options are 16 reserved bytes and the
- * output at most 0x124 bytes */
-int _sceAppMgrConvertVs0UserDrivePath(const char *path, char *converted_path, SceSize capacity,
-                                      const void *options);
-
 static SceKernelLwMutexWork g_mutex;
 static SceUID g_pool_block = -1;
 static SceClibMspace g_pool;
@@ -136,18 +127,6 @@ void vh_platform_free(void *pointer)
 {
     if (g_pool != NULL && pointer != NULL)
         sceClibMspaceFree(g_pool, pointer);
-}
-
-int vh_platform_ca_path(char *path, size_t capacity)
-{
-    const uint32_t options[4] = {0};
-    if (capacity < 0x124u)
-        return -1;
-    memset(path, 0, capacity);
-    if (_sceAppMgrConvertVs0UserDrivePath(VITALS_HTTP_CA_PATH, path, 0x124u, options) < 0 ||
-        memchr(path, '\0', 0x124u) == NULL || path[0] == '\0')
-        return -1;
-    return 0;
 }
 
 /* Every process loads this library, most never use https: the heap waits for the first one */

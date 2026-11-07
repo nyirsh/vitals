@@ -11,13 +11,15 @@
  * The code comes from the vitals installer; progress messages are reported one line at a
  * time through a callback (console.h's VitalsNote) */
 
-/* The certificate store the system's TLS and vitals use, which a certificate update rewrites */
-#define VITALS_CERTIFICATE_STORE "vs0:/data/external/cert/CA_LIST.cer"
+/* vitals' certificate store, which a certificate update rewrites: VITALS_CA_STORE_PATH
+ * (vitals/ca_store.h), in ux0:data/vitals/system */
+#include "vitals/ca_store.h"
 
 /* 1 on firmware 3.60 or 3.65; otherwise 0, with the detected firmware described in description */
 int vitals_install_firmware_supported(char *description, size_t size);
 /* 1 when an earlier version's modules are where it kept them (vs0, ur0:tai/vitals-native) rather than
- * in ux0:data/vitals/system: an update moves them */
+ * in ux0:data/vitals/system, or its bundle is still the system's certificate store (CA_LIST.cer_old
+ * beside it): an update moves them and puts the system's own store back */
 int vitals_install_old_layout(void);
 /* 1 when the plugin, every module and the certificates are installed */
 int vitals_install_complete(void);

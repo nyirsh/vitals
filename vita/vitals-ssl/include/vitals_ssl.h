@@ -75,9 +75,6 @@ int vitalsSslCheckPending(void *ssl);
  * the ALPN names (NULL-terminated, at most 4, kept by the caller as long as the context) */
 int vitalsSslCtxSetCiphersuites(void *context, const int *suites);
 int vitalsSslCtxSetAlpn(void *context, const char *const *protocols);
-/* The bundle's path as this process names it, where vitals-ssl's own lookup can't serve (the
- * browser engine's process): 0, or an SCE error */
-int vitalsSslSetBundlePath(const char *path);
 /* Whether the bundle is trusted besides the store (1, the default), or only the store (0) */
 int vitalsSslCtxSetTrustBundle(void *context, int trusted);
 

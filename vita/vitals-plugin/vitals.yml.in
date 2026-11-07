@@ -15,3 +15,7 @@ vitals_kernel:
       syscall: true
       functions:
         - vitals_useragent_read
+    vitals_certificates:
+      syscall: true
+      functions:
+        - vitals_ca_read

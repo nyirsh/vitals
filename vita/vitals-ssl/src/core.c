@@ -46,37 +46,13 @@ int vs_take_out_of_memory(void)
     return out_of_memory;
 }
 
-/* The bundle's path as the process names it, when the caller gave one (vitalsSslSetBundlePath) */
-static char g_bundle_path[VITALS_CA_INDEX_PATH_SIZE];
-
-/* NID 0x65D6DCBE: the bundle's path as this process names it, for a process the platform's
- * conversion doesn't serve (the browser engine's): 0, or VS_ERROR_INVALID_VALUE; the index is
- * built again from it */
-int vitalsSslSetBundlePath(const char *path)
-{
-    if (path == NULL || path[0] == '\0' || strlen(path) >= sizeof(g_bundle_path))
-        return VS_ERROR_INVALID_VALUE;
-    vs_lock();
-    if (g_ca_index_state > 0)
-        vitals_ca_index_free(&g_ca_index);
-    g_ca_index_state = 0;
-    memcpy(g_bundle_path, path, strlen(path) + 1);
-    vs_unlock();
-    return 0;
-}
-
-/* The CA bundle's index, once; a missing bundle leaves nothing trusted */
+/* The CA bundle's index, once, read through the platform (the kernel plugin, on the Vita, in every
+ * process alike); a missing bundle leaves nothing trusted */
 static int ca_index_ready(void)
 {
     vs_lock();
     if (g_ca_index_state == 0) {
-        char path[VITALS_CA_INDEX_PATH_SIZE];
-        if (g_bundle_path[0] != '\0')
-            memcpy(path, g_bundle_path, strlen(g_bundle_path) + 1);
-        g_ca_index_state = (g_bundle_path[0] != '\0' || vs_platform_ca_path(path, sizeof(path)) == 0) &&
-                                   vitals_ca_index_build(&g_ca_index, path) == 0
-                               ? 1
-                               : -1;
+        g_ca_index_state = vitals_ca_index_build(&g_ca_index, vs_platform_ca_read, NULL) == 0 ? 1 : -1;
         VITALS_LOG("roots=%u", g_ca_index_state > 0 ? (unsigned int)g_ca_index.count : 0u);
     }
     int ready = g_ca_index_state > 0;

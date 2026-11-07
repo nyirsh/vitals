@@ -2,6 +2,9 @@
 
 #include "diagnostics.h"
 #include "vs.h"
+#include "ca_index.h"
+
+extern const char *vh_test_ca_path;
 
 /* The host tests build vitals-ssl into vitals-http, as a host can't import the libssl module:
  * its platform is the tests' vitals-http platform. Its lock is vitals-http's (recursive), its pool
@@ -99,9 +102,13 @@ void vs_platform_run_on_large_stack(void (*function)(void *), void *argument)
     }
 }
 
-int vs_platform_ca_path(char *path, size_t size)
+/* The tests' store is a file of their own, where the console's kernel plugin reads vitals' */
+int vs_platform_ca_read(void *context, uint32_t offset, void *buffer, uint32_t size)
 {
-    return vh_platform_ca_path(path, size);
+    (void)context;
+    if (vh_test_ca_path == NULL)
+        return -1;
+    return vitals_ca_file_read((void *)vh_test_ca_path, offset, buffer, size);
 }
 
 /* Only the CA store's lookups by name use it (Sony's libhttp's verify callback), which vitals-http
