@@ -6,7 +6,7 @@
 #include "app_log.h"
 #include "boot_plugins.h"
 #include "sony_cas.h"
-#include "store_certs.h"
+#include "vitals/store_certs.h"
 #include "dates.h"
 #include "download.h"
 
@@ -444,11 +444,12 @@ static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date
 	char *sony = read_sony_cas(&sony_length);
 	if (sony == NULL)
 		note("Sony's certificates can't be read: Mozilla's are kept whole");
-	char *out = malloc(bundle_length + 2);
+	char *out = malloc(bundle_length + 1);
 	VitalsStoreFilter filter;
-	size_t length = out != NULL ? vitals_store_mozilla(bundle, bundle_length, sony, sony_length, out, bundle_length + 2, &filter) : 0;
+	size_t length = 0;
+	int filtered = out != NULL ? vitals_store_mozilla(bundle, bundle_length, sony, sony_length, out, bundle_length + 1, &length, &filter) : -1;
 	free(sony);
-	if (length == 0) {
+	if (filtered < 0) {
 		free(out);
 		note("Mozilla's certificates weren't written: out of memory");
 		return -1;

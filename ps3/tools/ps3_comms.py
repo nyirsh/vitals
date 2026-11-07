@@ -62,7 +62,7 @@ USER_AGENT = VITALS + "/useragent.txt"
 # The user's own certificates, which libssl reads as they are after Sony's and Mozilla's
 CUSTOM_CERTS = VITALS + "/custom-certs.pem"
 # What earlier versions put before the user's certificates they merged into the bundle
-# (vitals-app/src/store_certs.h): the bundle is cut there
+# (shared/include/vitals/store_certs.h): the bundle is cut there
 EARLIER_CUSTOM_MARKER = b"# vitals: custom certificates"
 LIBSSL = SYSTEM + "/libssl.sprx"
 LIBHTTP = SYSTEM + "/libhttp.sprx"
@@ -243,7 +243,7 @@ def find_line(data, needle, start=0):
 
 
 def pem_blocks(data):
-    """Each certificate block in data, as the app's store_certs.c reads them: (whole, start, end, base64)
+    """Each certificate block in data, as the apps' shared store_certs.c reads them: (whole, start, end, base64)
     for a whole one, its base64 without spaces; base64 None for a broken one (no END, another block
     before it, anything but base64 inside, text after END, or empty)"""
     at = 0
@@ -289,7 +289,7 @@ def sony_text(read_file):
 
 
 def store_mozilla(bundle, sony):
-    """Mozilla's part of the store, as the vitals app writes it (vitals-app/src/store_certs.c): bundle
+    """Mozilla's part of the store, as the vitals app writes it (shared/src/store_certs.c): bundle
     up to an earlier merge's marker line, without the whole certificates sony (bytes, or None) holds,
     everything else as it is. Returns (data, kept, left out as Sony's, earlier merge cut)"""
     own = bundle[:find_line(bundle, EARLIER_CUSTOM_MARKER)]

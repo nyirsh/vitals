@@ -234,4 +234,5 @@ app's **Debug output** option.
 | [vitals-http/src/async.c](../vitals-http/src/async.c)                                                      | non-blocking calls and the epoll                           |
 | [vitals-http/src/redirect.c](../vitals-http/src/redirect.c), [useragent.c](../vitals-http/src/useragent.c) | the two lists from `ux0:data/vitals/`                      |
 | [tls13-vita/provider/ca_index.c](../tls13-vita/provider/ca_index.c)                                        | the certificate store's index                              |
+| [shared/src/ca_scan.c](../../shared/src/ca_scan.c)                                                          | the store's certificate blocks, for the index (the PS3's too) |
 | [tls13-vita/src/error_map.c](../tls13-vita/src/error_map.c)                                                | TLS outcomes to Sony's error codes                         |

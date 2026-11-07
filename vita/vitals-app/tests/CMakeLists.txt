@@ -41,6 +41,13 @@ target_compile_definitions(vitals_app_changelog_tests PRIVATE
     VITALS_CHANGELOG_FILE="${APP_DIR}/../../CHANGELOG.md")
 add_test(NAME vitals_app_changelog COMMAND vitals_app_changelog_tests)
 
+# Mozilla's part of the certificate store without Sony's, as both consoles' apps write it (shared with
+# the PS3's tests)
+add_executable(vitals_app_store_certs_tests ${APP_DIR}/../../shared/tests/test_store_certs.c
+    ${APP_DIR}/../../shared/src/store_certs.c)
+target_include_directories(vitals_app_store_certs_tests PRIVATE ${APP_DIR}/../../shared/include)
+add_test(NAME vitals_app_store_certs COMMAND vitals_app_store_certs_tests)
+
 add_executable(vitals_app_config_edit_tests test_config_edit.c ${APP_DIR}/config_edit.c)
 target_include_directories(vitals_app_config_edit_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_config_edit COMMAND vitals_app_config_edit_tests)

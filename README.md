@@ -34,8 +34,10 @@ Both consoles share one version and one changelog, at the root: [VERSION](VERSIO
 only starts with its name, `- (Vita) ...` or `- (PS3) ...`.
 
 Code both consoles use is in `shared/`, once: Mbed TLS's version pin, patches and TLS options
-(`mbedtls/`), the redirect list's parser (`include/`, `src/`), DNS messages (`dns/`), the apps'
-changelog and input code (`app/`) and the test TLS server (`tests/`).
+(`mbedtls/`), the redirect list's parser, the CA store's scanner both libssls index with and the
+Mozilla part of the store without Sony's certificates both apps write (`include/`, `src/`), DNS
+messages (`dns/`), the apps' changelog and input code (`app/`), and the test TLS server and the
+shared code's tests (`tests/`).
 
 ## License
 

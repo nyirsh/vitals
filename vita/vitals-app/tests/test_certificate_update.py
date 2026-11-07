@@ -45,6 +45,7 @@ class CertificateUpdateTests(unittest.TestCase):
         cls.executable = cls.directory / 'certificates'
         command = [os.environ.get('CC', 'cc'), '-std=c11', '-Wall', '-Wextra', '-Werror', '-O1', '-g',
                    '-I', str(ROOT.parent / 'shared/app'), str(ROOT.parent / 'shared/app/download.c'),
+                   '-I', str(ROOT.parent / 'shared/include'), str(ROOT.parent / 'shared/src/store_certs.c'),
                    str(ROOT / 'vitals-app/certificates.c'), str(ROOT / 'vitals-app/certificates_cli.c'),
                    *shlex.split(flags), '-o', str(cls.executable)]
         if os.environ.get('VITALS_CERTIFICATE_SANITIZERS') == '1':
@@ -164,7 +165,16 @@ class CertificateUpdateTests(unittest.TestCase):
         self.assertIn('sony=2 mozilla=3 added=1 combined=3', result.stdout)
         self.assertEqual(certificates(data), certificates(self.roots['new'].read_bytes()))
         self.assertEqual(data.count(b'-----BEGIN CERTIFICATE-----'), 1)
-        self.assertTrue(data.startswith(b"# vitals: curl/Mozilla CA certificates Sony's list lacks\n"))
+
+    def test_mozillas_text_kept_as_curl_publishes_it(self):
+        """Only Sony's blocks go: the header and each root's title stay, as on the PS3"""
+        body = (b'##\n## Bundle of CA Root Certificates\n##\n\nNew root\n========\n' + self.roots['new'].read_bytes() +
+                b'\nSony root\n=========\n' + self.roots['sony'].read_bytes())
+        with self.endpoint(body) as url:
+            result, data = self.prepare(url)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(data, b'##\n## Bundle of CA Root Certificates\n##\n\nNew root\n========\n' +
+                         self.roots['new'].read_bytes() + b'\nSony root\n=========\n')
 
     def test_nothing_to_add_is_a_heading_alone(self):
         result, data = self.prepare(mozilla=self.roots['sony'])

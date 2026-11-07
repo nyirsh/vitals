@@ -28,9 +28,11 @@ add_executable(vitals_libssl
     src/platform_vita.c
     ${TLS13_DIR}/provider/platform_shims.c
     ${TLS13_DIR}/provider/ca_index.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/ca_scan.c
     ${TLS13_DIR}/provider/user_runtime.c
 )
-target_include_directories(vitals_libssl PRIVATE src include ${TLS13_DIR}/provider ${TLS13_DIR}/include)
+target_include_directories(vitals_libssl PRIVATE src include ${TLS13_DIR}/provider ${TLS13_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libssl PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-ssl"

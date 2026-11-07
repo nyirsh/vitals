@@ -44,7 +44,7 @@ add_executable(vitals-app
 	../../shared/app/model.c
 	src/http.c
 	src/install.c
-	src/store_certs.c
+	../../shared/src/store_certs.c
 	src/boot_plugins.c
 	# Mbed TLS's mutexes, entropy and time on the PS3, as vitals' libssl has them
 	../vitals-ssl/src/platform/crypto_platform.c

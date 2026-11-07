@@ -35,7 +35,7 @@
 #define VITALS_LIBHTTP_XMB VITALS_SYSTEM_DIRECTORY "/libhttp-xmb.sprx"
 #define VITALS_DNS_PLUGIN VITALS_SYSTEM_DIRECTORY "/vitals_dns.bin"
 /* Mozilla's certificates that Sony's lack, which the app writes and its certificate update rewrites
- * (vitals-app/src/store_certs.h) */
+ * (shared/include/vitals/store_certs.h) */
 #define VITALS_BUNDLE VITALS_SYSTEM_DIRECTORY "/mozilla-certs.pem"
 /* Where earlier versions kept Mozilla's whole bundle, the user's certificates merged in: the app's
  * install takes it from there */

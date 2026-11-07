@@ -30,9 +30,10 @@ add_library(vitals_ssl_host STATIC
     ${VITALS_SSL_ROOT}/src/internal.c
     ${VITALS_SSL_ROOT}/tests/platform_posix.c
     ../../provider/platform_shims.c
-    ../../provider/ca_index.c)
+    ../../provider/ca_index.c
+    ../../../../shared/src/ca_scan.c)
 target_include_directories(vitals_ssl_host BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sdk)
-target_include_directories(vitals_ssl_host PRIVATE ${VITALS_SSL_ROOT}/src ../../provider
+target_include_directories(vitals_ssl_host PRIVATE ${VITALS_SSL_ROOT}/src ../../provider ../../../../shared/include
     PUBLIC ${VITALS_SSL_ROOT}/include)
 target_compile_definitions(vitals_ssl_host PRIVATE VITALS_DEBUG=0 VITALS_LOG_PREFIX="vitals-ssl")
 target_compile_options(vitals_ssl_host PRIVATE -std=gnu11 -fno-pie)

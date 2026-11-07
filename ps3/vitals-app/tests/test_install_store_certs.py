@@ -22,7 +22,7 @@ SONY = b"Sony's CA_LIST.cer\r\n-----BEGIN CERTIFICATE-----\r\nQkJC\r\nQg==\r\n--
 
 class InstallStoreCertsTests(unittest.TestCase):
     def test_marker_matches_the_apps(self):
-        header = (ROOT / "vitals-app" / "src" / "store_certs.h").read_text()
+        header = (ROOT.parent / "shared" / "include" / "vitals" / "store_certs.h").read_text()
         self.assertIn('#define VITALS_EARLIER_CUSTOM_MARKER "# vitals: custom certificates"', header)
         self.assertEqual(ps3_comms.EARLIER_CUSTOM_MARKER, b"# vitals: custom certificates")
 

@@ -1,8 +1,8 @@
-/* Mozilla's part of the CA store (src/store_certs.c), as the Vita's merge writes its own: Mozilla's
+/* Mozilla's part of the CA store (shared/src/store_certs.c), as both consoles' apps write it: Mozilla's
  * certificates without Sony's, wherever their lines break, everything else as it is, and an earlier
  * version's merged custom certificates cut off */
 
-#include "store_certs.h"
+#include "vitals/store_certs.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -18,7 +18,8 @@ static char out[8192];
 
 static size_t store(const char *bundle, const char *sony, VitalsStoreFilter *f)
 {
-	size_t length = vitals_store_mozilla(bundle, strlen(bundle), sony, sony ? strlen(sony) : 0, out, sizeof(out) - 1, f);
+	size_t length = 99;
+	assert(vitals_store_mozilla(bundle, strlen(bundle), sony, sony ? strlen(sony) : 0, out, sizeof(out) - 1, &length, f) == 0);
 	out[length] = '\0';
 	return length;
 }
@@ -59,8 +60,15 @@ int main(void)
 	store(cut, NULL, &f);
 	assert(strcmp(out, "Root A\n-----BEGIN CERTIFICATE-----\nQUFBQQ==\n-----END CERTIFICATE-----\n") == 0 && f.kept == 1);
 
-	/* Too small an output: 0, never past it */
-	assert(vitals_store_mozilla(mozilla, strlen(mozilla), NULL, 0, out, strlen(mozilla) - 1, &f) == 0);
+	/* Too small an output: -1, never past it; the bundle's length and one more is always enough */
+	size_t length = 99;
+	assert(vitals_store_mozilla(mozilla, strlen(mozilla), NULL, 0, out, strlen(mozilla) - 1, &length, &f) < 0 && length == 0);
+	const char unended[] = "x\n-----BEGIN CERTIFICATE-----\nQUFBQQ==\n-----END CERTIFICATE-----";
+	assert(vitals_store_mozilla(unended, strlen(unended), NULL, 0, out, strlen(unended) + 1, &length, &f) == 0);
+
+	/* Nothing left but Sony's: empty, a part that adds nothing */
+	assert(store(CERT("QkJCQg=="), sony, &f) == 0 && f.sony == 1 && f.kept == 0);
+	assert(store("", NULL, &f) == 0);
 
 	/* A marker only counts at a line's start */
 	const char quoted[] = "text # vitals: custom certificates\n" CERT("QUFBQQ==");

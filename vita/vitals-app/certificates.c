@@ -1,5 +1,6 @@
 #include "certificates.h"
 #include "download.h"
+#include "vitals/store_certs.h"
 
 #include <curl/curl.h>
 #include <openssl/err.h>
@@ -75,14 +76,13 @@ failed:
     return NULL;
 }
 
-/* The user's certificates: every block that parses as a certificate, CA or not (a self-signed
- * server certificate is trusted as itself), up to the store's limit; anything else in the file
- * is skipped, so a mistake there never costs the system its roots */
 /* The latest bundle, through the app's shared download (../../shared/app/download.c), trusting only
- * the Mozilla certificates the app carries: none of curl's or OpenSSL's own, nor Sony's */
-static STACK_OF(X509) *fetch_bundle(const char *url, const unsigned char *mozilla, size_t mozilla_size,
-    long timeout, VitalsCertificateBundle *result) {
-    STACK_OF(X509) *chain = NULL;
+ * the Mozilla certificates the app carries: none of curl's or OpenSSL's own, nor Sony's. Its text
+ * (NUL-terminated, the caller's to free) when it's a whole bundle of CA certificates, else NULL */
+static unsigned char *fetch_bundle(const char *url, const unsigned char *mozilla, size_t mozilla_size,
+    long timeout, VitalsCertificateBundle *result, size_t *size, size_t *count) {
+    unsigned char *text = NULL;
+    *size = 0;
     if (url == NULL) { result->download_error = CURLE_COULDNT_CONNECT; return NULL; }
     VitalsDownload request = {url, (const char *)mozilla, mozilla_size, "vitals-certificate-updater", NULL,
         timeout, VITALS_CA_BUNDLE_LIMIT, NULL, NULL};
@@ -91,34 +91,26 @@ static STACK_OF(X509) *fetch_bundle(const char *url, const unsigned char *mozill
     result->download_error = download.error;
     result->http_status = download.status;
     if (!failed) {
-        chain = parse_bundle((const unsigned char *)download.data, download.size);
-        if (chain == NULL) result->download_error = CURLE_SSL_CACERT_BADFILE;
+        STACK_OF(X509) *chain = parse_bundle((const unsigned char *)download.data, download.size);
+        if (chain == NULL) {
+            result->download_error = CURLE_SSL_CACERT_BADFILE;
+        } else if ((text = malloc(download.size + 1)) != NULL) {
+            memcpy(text, download.data, download.size);
+            text[download.size] = 0;
+            *size = download.size;
+            *count = (size_t)sk_X509_num(chain);
+        }
+        free_chain(chain);
     }
     vitals_download_free(&download);
-    return chain;
-}
-
-/* Adds source's certificates that combined lacks */
-static int append_unique(STACK_OF(X509) *combined, STACK_OF(X509) *source) {
-    for (int i = 0; i < sk_X509_num(source); ++i) {
-        X509 *certificate = sk_X509_value(source, i);
-        int duplicate = 0;
-        for (int j = 0; j < sk_X509_num(combined); ++j) {
-            if (X509_cmp(certificate, sk_X509_value(combined, j)) == 0) { duplicate = 1; break; }
-        }
-        if (duplicate) continue;
-        if (sk_X509_num(combined) >= CERTIFICATE_LIMIT || !X509_up_ref(certificate)) return -1;
-        if (!sk_X509_push(combined, certificate)) { X509_free(certificate); return -1; }
-    }
-    return 0;
+    return text;
 }
 
 int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,
     const char *url, long timeout_seconds, VitalsCertificateBundle *bundle) {
-    unsigned char *sony_data = NULL, *mozilla_data = NULL;
-    size_t sony_size = 0, mozilla_size = 0;
-    STACK_OF(X509) *sony = NULL, *embedded = NULL, *downloaded = NULL, *combined = NULL;
-    BIO *output = NULL;
+    unsigned char *sony_data = NULL, *mozilla_data = NULL, *downloaded = NULL;
+    size_t sony_size = 0, mozilla_size = 0, downloaded_size = 0, downloaded_count = 0;
+    STACK_OF(X509) *sony = NULL, *embedded = NULL;
     int result = -1;
     const char *failure_stage;
     int failure_errno;
@@ -139,49 +131,36 @@ int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,
     embedded = parse_bundle(mozilla_data, mozilla_size);
     if (embedded == NULL) goto done;
     bundle->sony_count = (size_t)sk_X509_num(sony);
-    downloaded = fetch_bundle(url, mozilla_data, mozilla_size, timeout_seconds, bundle);
-    STACK_OF(X509) *selected = downloaded == NULL ? embedded : downloaded;
+    downloaded = fetch_bundle(url, mozilla_data, mozilla_size, timeout_seconds, bundle, &downloaded_size,
+        &downloaded_count);
+    const unsigned char *selected = downloaded != NULL ? downloaded : mozilla_data;
+    size_t selected_size = downloaded != NULL ? downloaded_size : mozilla_size;
     bundle->downloaded = downloaded != NULL;
-    bundle->mozilla_count = (size_t)sk_X509_num(selected);
+    bundle->mozilla_count = downloaded != NULL ? downloaded_count : (size_t)sk_X509_num(embedded);
     ERR_clear_error();
     errno = 0;
-    bundle->failure_stage = "combining certificate identities";
-    combined = sk_X509_new_null();
-    if (combined == NULL || append_unique(combined, sony) != 0) goto done;
-    int sony_unique_count = sk_X509_num(combined);
-    if (append_unique(combined, selected) != 0) goto done;
-    bundle->added_count = (size_t)(sk_X509_num(combined) - sony_unique_count);
     /* Sony's list is its own part of the store, as Sony ships it (Sony's code finds its CA
-     * certificates at fixed byte offsets in it): only Mozilla's that it lacks are written here */
-    bundle->failure_stage = "creating Mozilla PEM buffer";
-    output = BIO_new(BIO_s_mem());
-    if (output == NULL || BIO_puts(output, "# vitals: curl/Mozilla CA certificates Sony's list lacks\n") <= 0) goto done;
-    bundle->failure_stage = "encoding Mozilla certificates";
-    for (int i = sony_unique_count; i < sk_X509_num(combined); ++i) {
-        if (!PEM_write_bio_X509(output, sk_X509_value(combined, i))) goto done;
-    }
-    char *bytes = NULL;
-    bundle->failure_stage = "reading Mozilla PEM buffer";
-    long size = BIO_get_mem_data(output, &bytes);
-    if (size <= 0 || (unsigned long)size > VITALS_CA_BUNDLE_LIMIT) goto done;
+     * certificates at fixed byte offsets in it): Mozilla's bundle, as curl publishes it, without
+     * what Sony's list already has, as the PS3's app writes its own (../../shared/src/store_certs.c) */
     bundle->failure_stage = "allocating Mozilla certificate output";
-    bundle->data = malloc((size_t)size + 1);
+    bundle->data = malloc(selected_size + 1);
     if (bundle->data == NULL) goto done;
-    memcpy(bundle->data, bytes, (size_t)size);
-    bundle->data[size] = 0;
-    bundle->size = (size_t)size;
-    bundle->combined_count = (size_t)sk_X509_num(combined);
+    VitalsStoreFilter filter;
+    bundle->failure_stage = "leaving Sony's certificates out of Mozilla's";
+    if (vitals_store_mozilla((const char *)selected, selected_size, (const char *)sony_data, sony_size,
+            (char *)bundle->data, selected_size + 1, &bundle->size, &filter) != 0) goto done;
+    bundle->data[bundle->size] = 0;
+    bundle->added_count = filter.kept;
+    bundle->combined_count = bundle->sony_count + filter.kept;
     bundle->failure_stage = NULL;
     result = 0;
 done:
     failure_stage = bundle->failure_stage;
     failure_errno = errno;
     failure_crypto_error = ERR_peek_last_error();
-    BIO_free(output);
-    free_chain(combined);
-    free_chain(downloaded);
     free_chain(embedded);
     free_chain(sony);
+    free(downloaded);
     free(sony_data);
     free(mozilla_data);
     if (result != 0) {

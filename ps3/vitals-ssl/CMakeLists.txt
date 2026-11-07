@@ -24,6 +24,7 @@ option(VITALS_SSL_UNVERIFIED "Connect without checking the server's certificate 
 add_executable(libssl
 	src/core.c
 	src/ca_store.c
+	../../shared/src/ca_scan.c
 	src/sha1.c
 	src/certificate.c
 	src/connection.c
@@ -40,7 +41,7 @@ if(VITALS_SSL_UNVERIFIED)
 	target_compile_definitions(libssl PRIVATE VITALS_SSL_UNVERIFIED=1)
 	message(WARNING "VITALS_SSL_UNVERIFIED: servers' certificates aren't checked")
 endif()
-target_include_directories(libssl PRIVATE src src/platform ../common)
+target_include_directories(libssl PRIVATE src src/platform ../common ../../shared/include)
 target_compile_options(libssl PRIVATE -Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections)
 # No libc of its own: what Mbed TLS needs from one is liblv2's (src/platform/libc.c), as Sony's
 # libssl, so anything else it reaches for fails the link

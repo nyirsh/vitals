@@ -19,9 +19,9 @@
   },
   "combined": {
     "path": "certs.cer",
-    "policy": "The store as the kernel plugin reads it without the user's own: the original Sony file byte-for-byte, then the selected Mozilla certificates it lacks (installed as two files), each followed by a line break; no system-store input",
-    "bytes": 262071,
-    "sha256": "7ca7ca416cbb4f796a80b860d3594be530d79bc2005d8301c5e791ab0ddbcfd6",
+    "policy": "The store as the kernel plugin reads it without the user's own: the original Sony file byte-for-byte, then the selected Mozilla bundle as curl publishes it without the certificates Sony's has (installed as two files), each followed by a line break; no system-store input",
+    "bytes": 269365,
+    "sha256": "d01d1b6bad3a26f343b3d10d8a42018f281f85c6553bdb7b7c5c37fe96868c0b",
     "certificate_blocks": 176,
     "unique_certificates": 176
   }

@@ -10,6 +10,7 @@
 
 #include "ca_store.h"
 #include "sony_cas.h"
+#include "vitals/ca_scan.h"
 
 #include "certificate.h"
 #include "core.h"
@@ -260,8 +261,8 @@ int cellSsl_CC6A0CB5(uint64_t *mask)
 
 /* ---- Mozilla's bundle ---- */
 
-#define VS_BUNDLE_LINE 160u
-#define VS_BUNDLE_BLOCK 8192u
+#define VS_BUNDLE_BLOCK VITALS_CA_SCAN_BLOCK
+/* A read of a file at a time, from the game's pool */
 #define VS_BUNDLE_CHUNK 512u
 #define VS_BUNDLE_GROWTH 64u
 
@@ -278,38 +279,12 @@ static int g_bundle_state;
 static BundleRoot *g_roots;
 static size_t g_root_count, g_root_capacity;
 
-typedef struct Reader {
-	int fd;
-	unsigned char data[VS_BUNDLE_CHUNK];
-	size_t at, length;
-	uint32_t base;
-} Reader;
-
-/* 1 for a byte, 0 at the end, -1 when it can't be read */
-static int next_byte(Reader *reader, unsigned char *byte)
+/* A block of the part being indexed (vitals/ca_scan.h): a root when it's a certificate. 0, or -1
+ * when the index can't grow */
+static int add_root(void *context, const unsigned char *block, size_t length, uint32_t offset, uint32_t end)
 {
-	if (reader->at == reader->length) {
-		int count = vs_platform_file_read(reader->fd, reader->data, sizeof(reader->data));
-		if (count < 0)
-			return -1;
-		if (count == 0)
-			return 0;
-		reader->base += (uint32_t)reader->length;
-		reader->length = (size_t)count;
-		reader->at = 0;
-	}
-	*byte = reader->data[reader->at++];
-	return 1;
-}
-
-static int starts_with(const unsigned char *line, size_t length, const char *prefix)
-{
-	size_t prefix_length = strlen(prefix);
-	return length >= prefix_length && memcmp(line, prefix, prefix_length) == 0;
-}
-
-static int add_root(unsigned part, const unsigned char *block, size_t length, uint32_t offset, uint32_t end)
-{
+	unsigned part = *(const unsigned *)context;
+	++length; /* with its NUL, as Mbed TLS takes PEM */
 	mbedtls_x509_crt crt;
 	mbedtls_x509_crt_init(&crt);
 	int result = 0;
@@ -338,65 +313,23 @@ static int add_root(unsigned part, const unsigned char *block, size_t length, ui
 	return result;
 }
 
-/* A part's roots: each PEM block from its BEGIN line to its END line's newline, parsed one at a
- * time for its subject; what isn't a whole certificate is skipped. 0 (also for a part that isn't
- * there), or -1 when it can't be read or the index can't grow */
-static int index_part(unsigned part, Reader *reader, unsigned char *block)
+/* The part's file, read in order from its start (vitals/ca_scan.h's read) */
+static int read_part(void *context, uint32_t offset, void *buffer, uint32_t size)
 {
-	memset(reader, 0, sizeof(*reader));
-	reader->fd = vs_platform_file_open(vs_platform_store_path(part));
-	if (reader->fd < 0)
+	(void)offset;
+	return vs_platform_file_read(*(const int *)context, buffer, size);
+}
+
+/* A part's roots, through the scanner both consoles' libssl use (../../shared/src/ca_scan.c): what
+ * isn't a whole certificate is skipped. 0 (also for a part that isn't there), or -1 when it can't be
+ * read or the index can't grow */
+static int index_part(unsigned part, VitalsCaScanner *scanner)
+{
+	int fd = vs_platform_file_open(vs_platform_store_path(part));
+	if (fd < 0)
 		return 0;
-	int result = -1;
-	unsigned char line[VS_BUNDLE_LINE];
-	size_t block_length = 0;
-	uint32_t block_start = 0;
-	int in_block = 0;
-	for (;;) {
-		size_t length = 0;
-		int overflow = 0, status;
-		uint32_t line_start = reader->base + (uint32_t)reader->at;
-		unsigned char byte;
-		while ((status = next_byte(reader, &byte)) == 1 && byte != '\n') {
-			if (length < sizeof(line))
-				line[length++] = byte;
-			else
-				overflow = 1;
-		}
-		if (status < 0)
-			break;
-		if (status == 0 && length == 0 && !overflow) {
-			result = 0;
-			break;
-		}
-		if (length > 0 && line[length - 1] == '\r')
-			--length;
-		if (!in_block && !overflow && starts_with(line, length, "-----BEGIN CERTIFICATE-----")) {
-			in_block = 1;
-			block_start = line_start;
-			block_length = 0;
-		}
-		if (in_block) {
-			if (overflow || block_length + length + 1 > VS_BUNDLE_BLOCK) {
-				in_block = 0;
-			} else {
-				memcpy(block + block_length, line, length);
-				block_length += length;
-				block[block_length++] = '\n';
-				if (starts_with(line, length, "-----END CERTIFICATE-----")) {
-					in_block = 0;
-					block[block_length] = '\0';
-					if (add_root(part, block, block_length + 1, block_start, reader->base + (uint32_t)reader->at) != 0)
-						break;
-				}
-			}
-		}
-		if (status == 0) {
-			result = 0;
-			break;
-		}
-	}
-	vs_platform_file_close(reader->fd);
+	int result = vitals_ca_scan(scanner, UINT32_MAX, read_part, &fd, add_root, &part) == 0 ? 0 : -1;
+	vs_platform_file_close(fd);
 	return result;
 }
 
@@ -404,18 +337,17 @@ static int index_part(unsigned part, Reader *reader, unsigned char *block)
  * may be missing. 0, or -1 when a part can't be read or there's no root in them */
 static int index_bundle(void)
 {
-	Reader *reader = VS_CALLOC(1, sizeof(*reader));
-	unsigned char *block = VS_CALLOC(1, VS_BUNDLE_BLOCK + 1);
+	VitalsCaScanner *scanner = VS_CALLOC(1, VITALS_CA_SCANNER_SIZE(VS_BUNDLE_CHUNK));
 	int result = -1;
-	if (reader != NULL && block != NULL) {
+	if (scanner != NULL) {
+		scanner->chunk_size = VS_BUNDLE_CHUNK;
 		result = 0;
 		for (unsigned part = 0; result == 0 && vs_platform_store_path(part) != NULL; ++part)
-			result = index_part(part, reader, block);
+			result = index_part(part, scanner);
 		if (result == 0 && g_root_count == 0)
 			result = -1;
 	}
-	VS_FREE(reader);
-	VS_FREE(block);
+	VS_FREE(scanner);
 	return result;
 }
 

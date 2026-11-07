@@ -53,7 +53,9 @@ def build_merge_tool(directory):
     flags = subprocess.check_output(["pkg-config", "--cflags", "--libs", "libcurl", "openssl"], text=True)
     tool = directory / "certificates"
     shared = APP.parent.parent / "shared" / "app"
-    subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-O1", "-I", str(shared), str(shared / "download.c"),
+    common = APP.parent.parent / "shared"
+    subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-O1", "-I", str(shared), "-I", str(common / "include"),
+                    str(shared / "download.c"), str(common / "src" / "store_certs.c"),
                     str(APP / "certificates.c"), str(APP / "certificates_cli.c"), *shlex.split(flags), "-o", str(tool)],
                    check=True)
     return tool

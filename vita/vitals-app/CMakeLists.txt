@@ -67,6 +67,7 @@ add_executable(vitals-app
     options.c
     config_edit.c
     certificates.c
+    ../../shared/src/store_certs.c
     crypto_lock_vita.c
     module_version.c
     # The host redirect list is read as vitals' provider reads it

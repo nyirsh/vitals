@@ -19,6 +19,7 @@ enable_testing()
 add_executable(vitals_ssl_tests
 	${SSL}/src/core.c
 	${SSL}/src/ca_store.c
+	${SSL}/../../shared/src/ca_scan.c
 	${SSL}/src/sha1.c
 	${SSL}/src/certificate.c
 	${SSL}/src/connection.c
@@ -30,7 +31,7 @@ add_executable(vitals_ssl_tests
 	test_main.c)
 # include/ first: its vitals_log.h in place of the console's
 target_include_directories(vitals_ssl_tests BEFORE PRIVATE include)
-target_include_directories(vitals_ssl_tests PRIVATE ${SSL}/src ${SSL}/src/platform ${SSL}/../common)
+target_include_directories(vitals_ssl_tests PRIVATE ${SSL}/src ${SSL}/src/platform ${SSL}/../common ${SSL}/../../shared/include)
 # With the debug log compiled in, so its lines run too
 target_compile_definitions(vitals_ssl_tests PRIVATE VITALS_DEBUG=2)
 target_compile_options(vitals_ssl_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
@@ -80,6 +81,7 @@ if(EXISTS ${VITALS_PS3DK_INCLUDE}/cell/http.h)
 		http/probe_host.c
 		${SSL}/src/core.c
 		${SSL}/src/ca_store.c
+		${SSL}/../../shared/src/ca_scan.c
 		${SSL}/src/sha1.c
 		${SSL}/src/certificate.c
 		${SSL}/src/connection.c
@@ -103,9 +105,9 @@ if(EXISTS ${VITALS_PS3DK_INCLUDE}/cell/http.h)
 		${SHARED}/src/host_map.c ${SHARED}/src/redirect_list.c http/platform_http_posix.c
 		PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include;${HTTP}/src;${HTTP}/../common;${SHARED}/include;${CMAKE_CURRENT_SOURCE_DIR}/http/include;${VITALS_PS3DK_INCLUDE}")
 	set_source_files_properties(
-		${SSL}/src/core.c ${SSL}/src/ca_store.c ${SSL}/src/sha1.c ${SSL}/src/certificate.c ${SSL}/src/connection.c
+		${SSL}/src/core.c ${SSL}/src/ca_store.c ${SSL}/../../shared/src/ca_scan.c ${SSL}/src/sha1.c ${SSL}/src/certificate.c ${SSL}/src/connection.c
 		${SSL}/src/public.c ${SSL}/src/platform/gmtime.c platform_posix.c pool_posix.c crypto_platform_posix.c
-		PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include;${SSL}/src;${SSL}/src/platform;${SSL}/../common")
+		PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include;${SSL}/src;${SSL}/src/platform;${SSL}/../common;${SSL}/../../shared/include")
 	target_compile_definitions(vitals_http_probe PRIVATE VITALS_DEBUG=2)
 	target_compile_options(vitals_http_probe PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
 		-fsanitize=address,undefined -fno-omit-frame-pointer)
@@ -133,3 +135,12 @@ target_compile_options(vitals_dns_rules_tests PRIVATE -std=gnu11 -g -Wall -Wextr
 	-fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(vitals_dns_rules_tests PRIVATE -fsanitize=address,undefined)
 add_test(NAME vitals_dns_rules COMMAND vitals_dns_rules_tests)
+
+# The CA store's scanner both consoles' libssl index with (../../../shared/src/ca_scan.c), with the
+# sanitizers
+add_executable(vitals_ca_scan_tests ${SHARED}/tests/test_ca_scan.c ${SHARED}/src/ca_scan.c)
+target_include_directories(vitals_ca_scan_tests PRIVATE ${SHARED}/include)
+target_compile_options(vitals_ca_scan_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror -UNDEBUG
+	-fsanitize=address,undefined -fno-omit-frame-pointer)
+target_link_options(vitals_ca_scan_tests PRIVATE -fsanitize=address,undefined)
+add_test(NAME vitals_ca_scan COMMAND vitals_ca_scan_tests)

@@ -20,8 +20,9 @@ typedef struct VitalsCertificateBundle {
     unsigned long failure_crypto_error;
 } VitalsCertificateBundle;
 
-/* The second part of vitals' certificate store (vitals/ca_store.h): Mozilla's certificates that
- * Sony's list lacks, as PEM, in bundle->data. Mozilla's are the latest bundle downloaded from url,
+/* The second part of vitals' certificate store (vitals/ca_store.h): Mozilla's bundle without the
+ * certificates Sony's list has, its text otherwise as curl publishes it (vitals/store_certs.h), in
+ * bundle->data (empty when Sony's has them all). Mozilla's are the latest bundle downloaded from url,
  * or, when that fails or url is NULL (networking unavailable), the VPK's own; Sony's always come
  * from the VPK, and are written by the installer as they are */
 int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,

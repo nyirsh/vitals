@@ -5,7 +5,7 @@
 
 /* Sony's CA certificates, as Sony's libssl knows them (dumps/ps3/4.93-cex/libssl.prx, its table at
  * 0x54f18): read from /dev_flash/data/cert/ by vitals' libssl (vitals-ssl/src/ca_store.c), and by
- * the app, which leaves them out of Mozilla's file (vitals-app/src/store_certs.h). Only plain C */
+ * the app, which leaves them out of Mozilla's file (shared/include/vitals/store_certs.h). Only plain C */
 
 /* One of Sony's table's 48-byte entries: the file (CAnn.cer, whose mask bit is nn - 1, or 0 for
  * a part of CA_LIST.cer, mask 0), its flag, the part (offset and length, 0 for the whole file),

@@ -47,6 +47,7 @@ add_executable(vitals_http_tests
     ${VITALS_SSL_DIR}/src/vitals.c
     ${TLS13_DIR}/provider/platform_shims.c
     ${TLS13_DIR}/provider/ca_index.c
+    ${ROOT}/../../shared/src/ca_scan.c
     ${TLS13_DIR}/src/error_map.c
     ${ROOT}/../../shared/src/host_map.c
     ${ROOT}/../../shared/src/redirect_list.c

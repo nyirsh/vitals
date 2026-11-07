@@ -1,7 +1,7 @@
-/* Mozilla's part of the CA store, without Sony's (store_certs.h): plain C on the PEM text, so the host
- * tests run it as it is */
+/* Mozilla's part of the CA store, without Sony's (vitals/store_certs.h): plain C on the PEM text, for
+ * both consoles' apps and the host tests alike */
 
-#include "store_certs.h"
+#include "vitals/store_certs.h"
 
 #include <string.h>
 
@@ -115,10 +115,11 @@ static int put(char *out, size_t capacity, size_t *used, const char *data, size_
 	return 1;
 }
 
-size_t vitals_store_mozilla(const char *bundle, size_t bundle_length, const char *sony, size_t sony_length,
-                            char *out, size_t capacity, VitalsStoreFilter *filter)
+int vitals_store_mozilla(const char *bundle, size_t bundle_length, const char *sony, size_t sony_length,
+                         char *out, size_t capacity, size_t *length, VitalsStoreFilter *filter)
 {
 	memset(filter, 0, sizeof(*filter));
+	*length = 0;
 	size_t own = find_line(bundle, bundle_length, 0, k_marker_start), used = 0, at = 0;
 	filter->cut_custom = own != bundle_length;
 	Block block;
@@ -126,19 +127,20 @@ size_t vitals_store_mozilla(const char *bundle, size_t bundle_length, const char
 	while ((status = next_block(bundle, own, at, &block)) >= 0) {
 		/* What's before the block, then the block unless it's Sony's */
 		if (!put(out, capacity, &used, bundle + at, block.start - at))
-			return 0;
+			return -1;
 		if (status == 1 && sony != NULL && holds(sony, sony_length, bundle, &block)) {
 			++filter->sony;
 		} else {
 			if (!put(out, capacity, &used, bundle + block.start, block.end - block.start))
-				return 0;
+				return -1;
 			filter->kept += status == 1;
 		}
 		at = block.end;
 	}
 	if (!put(out, capacity, &used, bundle + at, own - at))
-		return 0;
+		return -1;
 	if (used != 0 && out[used - 1] != '\n' && !put(out, capacity, &used, "\n", 1))
-		return 0;
-	return used;
+		return -1;
+	*length = used;
+	return 0;
 }

@@ -12,8 +12,9 @@ set_tests_properties(vitals_crypto_platform PROPERTIES TIMEOUT 20)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 # A self-signed server certificate trusted by exact match (ca_index.c), with real certificates
-add_executable(vitals_exact_trust_tests test_exact_trust.c ../../provider/ca_index.c ../../provider/platform_shims.c)
-target_include_directories(vitals_exact_trust_tests PRIVATE ../../provider ../../include)
+add_executable(vitals_exact_trust_tests test_exact_trust.c ../../provider/ca_index.c ../../provider/platform_shims.c
+    ../../../../shared/src/ca_scan.c)
+target_include_directories(vitals_exact_trust_tests PRIVATE ../../provider ../../include ../../../../shared/include)
 target_link_libraries(vitals_exact_trust_tests PRIVATE mbedtls vitals_vita_mock)
 target_compile_options(vitals_exact_trust_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME vitals_exact_trust

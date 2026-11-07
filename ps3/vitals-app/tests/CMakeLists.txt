@@ -55,8 +55,9 @@ add_executable(vitals_app_release_version_tests ${SHARED}/app/tests/test_release
 add_test(NAME vitals_app_release_version COMMAND vitals_app_release_version_tests)
 
 # Mozilla's certificates without Sony's, which install.c writes into system/mozilla-certs.pem
-add_executable(vitals_app_store_certs_tests test_store_certs.c ${APP_DIR}/src/store_certs.c)
-target_include_directories(vitals_app_store_certs_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
+# (shared with the Vita's app: ../../../shared/src/store_certs.c)
+add_executable(vitals_app_store_certs_tests ${SHARED}/tests/test_store_certs.c ${SHARED}/src/store_certs.c)
+target_include_directories(vitals_app_store_certs_tests PRIVATE ${SHARED}/include)
 add_test(NAME vitals_app_store_certs COMMAND vitals_app_store_certs_tests)
 
 # The shared download (../../../shared/app/download.c) and the release check's fetch on curl's Mbed
