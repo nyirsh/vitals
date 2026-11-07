@@ -1,4 +1,4 @@
-#include "model.h"
+#include "check_model.h"
 #include <assert.h>
 #include <string.h>
 

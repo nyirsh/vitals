@@ -31,17 +31,32 @@ void app_set_circle_confirms(int circle)
 	circle_confirms = circle;
 }
 
-/* Layout pixels into the canvas's, rounded (the same factor across and down: the canvas is only
- * bigger when the screen has the layout's shape) */
+/* The canvas's size over the layout's, as canvas / layout: the same factor across and down, the one
+ * that fits both ways. The PS3's screens have the layout's shape (1280x720, 1920x1080), so it's the
+ * height's; the Vita's 960x544 is a little taller, so it's the width's (3/4), and the layout ends 4
+ * pixels above the bottom, where the background goes on (rect) */
+static long scale_canvas(void)
+{
+	long w = check_canvas_width(), h = check_canvas_height();
+	return w * CHECK_HEIGHT < h * CHECK_WIDTH ? w : h;
+}
+
+static long scale_layout(void)
+{
+	long w = check_canvas_width(), h = check_canvas_height();
+	return w * CHECK_HEIGHT < h * CHECK_WIDTH ? CHECK_WIDTH : CHECK_HEIGHT;
+}
+
+/* Layout pixels into the canvas's, rounded */
 static int S(int v)
 {
-	long scaled = (long)v * check_canvas_height() * 2;
-	return (int)((scaled >= 0 ? scaled + CHECK_HEIGHT : scaled - CHECK_HEIGHT) / (2 * CHECK_HEIGHT));
+	long scaled = (long)v * scale_canvas() * 2, layout = scale_layout();
+	return (int)((scaled >= 0 ? scaled + layout : scaled - layout) / (2 * layout));
 }
 
 static float SF(float v)
 {
-	return v * (float)check_canvas_height() / (float)CHECK_HEIGHT;
+	return v * (float)scale_canvas() / (float)scale_layout();
 }
 
 /* Canvas pixels [x0, x1) x [y0, y1) in c */
@@ -57,10 +72,13 @@ static void fill(uint32_t *p, int x0, int y0, int x1, int y1, uint32_t c)
 	}
 }
 
-/* A rectangle in layout pixels: its edges scaled, so rectangles side by side still meet */
+/* A rectangle in layout pixels: its edges scaled, so rectangles side by side still meet. One that
+ * reaches the layout's right or bottom edge reaches the canvas's, where the canvas is bigger */
 static void rect(uint32_t *p, int x, int y, int w, int h, uint32_t c)
 {
-	fill(p, S(x), S(y), S(x + w), S(y + h), c);
+	int x1 = x + w >= CHECK_WIDTH ? check_canvas_width() : S(x + w);
+	int y1 = y + h >= CHECK_HEIGHT ? check_canvas_height() : S(y + h);
+	fill(p, S(x), S(y), x1, y1, c);
 }
 
 /* c over the canvas pixel at (x, y) by coverage, 0 (none) to 16 (all of it) */
@@ -127,8 +145,8 @@ static void draw_text(uint32_t *p, int x, int y, const char *s, unsigned px, uin
  * rounded up: text set against the edge it's clipped at must not cross it, or its last glyph goes */
 static int text_width(const char *s, unsigned px)
 {
-	int canvas = check_font_width(s, (unsigned)S((int)px)), height = check_canvas_height();
-	return (canvas * CHECK_HEIGHT + height - 1) / height;
+	long canvas = check_font_width(s, (unsigned)S((int)px)), scale = scale_canvas();
+	return (int)((canvas * scale_layout() + scale - 1) / scale);
 }
 
 int app_text_width(const char *s, unsigned px)
@@ -535,9 +553,9 @@ void app_draw_task(uint32_t *p, const AppTask *task)
 	 * end 28 pixels below where the line is drawn (measured in the preview) */
 	mark(p, X(30), Y(460) + 28 - mark_bottom(task->state), task->state);
 	text(p, X(60), Y(460), task->status_line, tone(task->state), 21);
-	static const AppHint waiting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "Please wait and keep your PS3 turned on."};
+	static const AppHint waiting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "Please wait."};
 	static const AppHint back = {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"};
-	if (task->state == CHECK_RUNNING)
+	if (task->state == CHECK_RUNNING && task->hints == NULL)
 		footer(p, &waiting, 1);
 	else if (task->hints != NULL)
 		footer(p, task->hints, task->hint_count);
@@ -589,14 +607,6 @@ void app_draw_changelog(uint32_t *p, const AppChangelog *changelog)
 }
 
 /* libhttp's certificate flags (CELL_HTTPS_VERIFY_ERROR_*) for the request details */
-static void verify_flags(uint32_t flags, char *text_out, size_t capacity)
-{
-	if (flags == 0)
-		snprintf(text_out, capacity, "-");
-	else
-		snprintf(text_out, capacity, "flags 0x%04X", (unsigned)flags);
-}
-
 void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, int busy, const char *notice)
 {
 	char line[256];
@@ -698,17 +708,13 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 			snprintf(line, sizeof(line), "TLS 1.%u", 3 - i);
 			text(p, X(30), y, line, white, 18);
 			CheckProtocolDisplay display = check_protocol_display(3 - i, r, s->vitals_enabled);
-			check_protocol_detail(r, line, sizeof(line));
+			check_protocol_detail(3 - i, r, line, sizeof(line));
 			text_clipped(p, X(150), y, line, tone(display.detail_style), 18, X(590));
-			if (r->error || r->verify_error) {
-				char flags[32];
-				verify_flags(r->verify_error, flags, sizeof(flags));
-				snprintf(line, sizeof(line), "0x%08X / %s", (unsigned)r->error, flags);
-			} else
-				snprintf(line, sizeof(line), "%s", r->state == CHECK_PASS ? "OK" : "-");
+			check_request_codes(r, line, sizeof(line));
 			text(p, X(608), y + 2, line, muted, 16);
-			if (r->elapsed_ms)
-				snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
+			unsigned ms = check_request_ms(r);
+			if (ms)
+				snprintf(line, sizeof(line), "%u ms", ms);
 			else
 				snprintf(line, sizeof(line), "-");
 			text(p, X(856), y + 2, line, muted, 16);
@@ -810,7 +816,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 	snprintf(line, sizeof(line), "Details %d/%d", page + 1, CHECK_PAGE_COUNT);
 	/* A finished run that wasn't cancelled can have its report saved, once */
 	const int saveable = !busy && s->started && s->complete && !s->interrupted;
-	const char *save_label = s->report_saved > 0   ? "Saved to /dev_hdd0/vitals/reports/"
+	const char *save_label = s->report_saved > 0   ? "Saved to " VITALS_REPORTS_DIRECTORY "/"
 	                         : s->report_saved < 0 ? "Save failed, retry"
 	                                               : "Save report";
 	const AppHint hints[] = {

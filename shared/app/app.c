@@ -104,6 +104,18 @@ static char task_lines[TASK_MAX_LINES][160];
 static const char *task_line_pointers[TASK_MAX_LINES];
 static AppTask task;
 
+/* While an operation runs: the console must stay on */
+static AppHint waiting_hint;
+
+static void wait_hint(void)
+{
+	static char text[64];
+	snprintf(text, sizeof(text), "Please wait and keep your %s turned on.", console_words()->name);
+	waiting_hint = (AppHint){APP_GLYPH_NONE, APP_GLYPH_NONE, text};
+	task.hints = &waiting_hint;
+	task.hint_count = 1;
+}
+
 static void draw_task(void)
 {
 	task.status = status();
@@ -133,6 +145,7 @@ static int run_operation(enum Action action)
 	for (unsigned i = 0; i < TASK_MAX_LINES; ++i)
 		task_line_pointers[i] = task_lines[i];
 	task = (AppTask){.title = titles[action], .lines = task_line_pointers, .state = CHECK_RUNNING, .status_line = "Working..."};
+	wait_hint();
 	draw_task();
 	/* The test's thread and libraries are done with first, so nothing of vitals' is in use */
 	vitals_check_stop();
@@ -146,6 +159,8 @@ static int run_operation(enum Action action)
 	int reboot = result >= 0 && action != ACTION_CERTIFICATES;
 	/* START reboots, as on the Options screen */
 	static const AppHint reboot_hints[] = {{APP_GLYPH_START, APP_GLYPH_NONE, "Reboot now"}, {APP_GLYPH_BACK, APP_GLYPH_NONE, "Later"}};
+	task.hints = NULL;
+	task.hint_count = 0;
 	if (result >= 0) {
 		task.state = CHECK_PASS;
 		task.status_line = reboot ? (action == ACTION_UNINSTALL ? "Done. Reboot the console to stop vitals."
@@ -194,6 +209,7 @@ static int run_apply_options(unsigned switch_count, const int *off, const int *s
 	for (unsigned i = 0; i < TASK_MAX_LINES; ++i)
 		task_line_pointers[i] = task_lines[i];
 	task = (AppTask){.title = "Applying options", .lines = task_line_pointers, .state = CHECK_RUNNING, .status_line = "Working..."};
+	wait_hint();
 	draw_task();
 	vitals_check_stop();
 	int result = 0, changed = 0;
@@ -219,6 +235,8 @@ static int run_apply_options(unsigned switch_count, const int *off, const int *s
 	if (!changed)
 		task_note("Nothing changed");
 	refresh_state();
+	task.hints = NULL;
+	task.hint_count = 0;
 	if (result != 0) {
 		static char failed[120];
 		snprintf(failed, sizeof(failed), "Failed (0x%08X). No reboot was requested.", (unsigned)result);

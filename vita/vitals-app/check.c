@@ -1,4 +1,6 @@
 #include "check.h"
+#include "check_vita.h"
+#include "network.h"
 #include "probe.h"
 #include "vitals/redirect_list.h"
 #include <psp2/io/fcntl.h>
@@ -16,8 +18,8 @@
 
 /* The connection test from Vital Signs: BrowserLeaks TLS 1.0-1.3, the BrowserLeaks TLS report,
  * the badssl.com battery and each host redirect, each over a fresh sceHttp connection on a worker
- * thread */
-#define REPORT_DIR "ux0:/data/vitals"
+ * thread, which first starts the network and the HTTP libraries */
+#define REPORT_DIR VITALS_REPORTS_DIRECTORY
 static CheckService service = {.vitals_enabled = -1};
 static SceUID guard = -1, worker = -1;
 static int busy, active_request = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
@@ -287,7 +289,7 @@ static int read_redirects(unsigned int offset, void *buffer, unsigned int size)
 typedef struct
 {
     CheckRedirect *list;
-    unsigned count;
+    unsigned count, max;
 } RedirectCollection;
 static int keep_redirect(void *context, const VitalsHostRule *rule)
 {
@@ -296,14 +298,15 @@ static int keep_redirect(void *context, const VitalsHostRule *rule)
     memset(redirect, 0, sizeof(*redirect));
     memcpy(redirect->from, rule->from, rule->from_length);
     memcpy(redirect->to, rule->to, rule->to_length);
-    return collection->count == CHECK_REDIRECT_MAX;
+    return collection->count == collection->max;
 }
-/* The rules in list, as many as vitals applies; none when the file is missing or unreadable */
-static unsigned load_redirects(CheckRedirect *list)
+/* The rules in the list at path (the redirects, or the DNS rules, which are written the same way), at
+ * most max; none when the file is missing or unreadable */
+static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned max)
 {
-    RedirectCollection collection = {list, 0};
+    RedirectCollection collection = {list, 0, max};
     char *work = malloc(VITALS_REDIRECT_LIST_WORK_SIZE);
-    redirect_file = fopen(VITALS_REDIRECTS_PATH, "rb");
+    redirect_file = fopen(path, "rb");
     if (work != NULL && redirect_file != NULL &&
         vitals_redirect_list_read(read_redirects, work, keep_redirect, &collection) < 0)
         collection.count = 0;
@@ -378,7 +381,7 @@ static int save_report(const CheckService *s)
             char detail[128];
             check_protocol_detail(i, r, detail, sizeof(detail));
             fprintf(f, "classification=%s\ndetail=%s\n",
-                    check_protocol_display(i, r).label, detail);
+                    check_protocol_display(i, r, s->vitals_enabled).label, detail);
             fprintf(f, "expected_vitals_policy_block=%d\n",
                     check_expected_legacy_block(i, r));
         }
@@ -467,6 +470,52 @@ int vitals_check_save_report(void)
     free(snapshot);
     return result;
 }
+/* Loads HTTPS and starts sceSsl and sceHttp, once: 0, or the failing call's result, with what was
+ * set up released again. Only the worker calls it */
+static void close_libraries(void)
+{
+    if (http_ready)
+        sceHttpTerm();
+    if (ssl_ready)
+        sceSslTerm();
+    if (https_loaded)
+        sceSysmoduleUnloadModule(SCE_SYSMODULE_HTTPS);
+    http_ready = ssl_ready = https_loaded = 0;
+}
+static int open_libraries(void)
+{
+    int rc = 0;
+    /* Loading HTTPS brings in libhttp, which vitals (when installed) replaces for this app */
+    if (!https_loaded)
+    {
+        rc = sceSysmoduleLoadModule(SCE_SYSMODULE_HTTPS);
+        if (rc < 0)
+            goto failed;
+        https_loaded = 1;
+    }
+    if (!ssl_ready)
+    {
+        rc = sceSslInit(1024 * 1024);
+        if (rc < 0)
+            goto failed;
+        ssl_ready = 1;
+    }
+    if (!http_ready)
+    {
+        rc = sceHttpInit(1024 * 1024);
+        if (rc < 0)
+            goto failed;
+        http_ready = 1;
+    }
+    rc = sceHttpsEnableOption(VERIFY_FLAGS);
+    if (rc < 0)
+        goto failed;
+    return 0;
+failed:
+    close_libraries();
+    return rc;
+}
+
 static int run_checks(SceSize argc, void *argv)
 {
     (void)argc;
@@ -483,14 +532,51 @@ static int run_checks(SceSize argc, void *argv)
         free(h);
         return 0;
     }
+    /* The network and the HTTP libraries, the first time; a failure ends the run there, shown on
+     * the TLS report's row */
+    int rc = network_start(stopped);
+    int network_failed = rc < 0;
+    if (rc == 0)
+        rc = open_libraries();
+    if (rc < 0)
+    {
+        lock();
+        if (cancelled)
+            snprintf(notice, sizeof(notice), "Cancelled / not tested");
+        else if (network_failed)
+            snprintf(notice, sizeof(notice), "No network connection (0x%08X)", (unsigned)rc);
+        else
+            snprintf(notice, sizeof(notice), "Sony network initialization failed: 0x%08X", (unsigned)rc);
+        service.connection.state = cancelled ? CHECK_INFO : CHECK_FAIL;
+        snprintf(service.connection.message, sizeof(service.connection.message), "%s", notice);
+        service.complete = 1;
+        service.interrupted = cancelled;
+        busy = 0;
+        unlock();
+        free(body);
+        free(h);
+        return 0;
+    }
+    int enabled = detect_vitals();
+    lock();
+    service.vitals_enabled = enabled;
+    unlock();
     /* The redirect rules are listed first, so their page fills in as they are tested */
     CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
-    unsigned redirect_count = redirects != NULL ? load_redirects(redirects) : 0;
+    unsigned redirect_count = redirects != NULL ? load_redirects(CHECK_REDIRECTS_PATH, redirects, CHECK_REDIRECT_MAX) : 0;
+    /* So are the DNS rules, which the Vita's test doesn't look up yet: they're marked as not tested
+     * once the run gets to them, last */
+    CheckRedirect *dns = calloc(CHECK_DNS_MAX, sizeof(*dns));
+    unsigned dns_count = dns != NULL ? load_redirects(CHECK_DNS_PATH, dns, CHECK_DNS_MAX) : 0;
     lock();
     for (unsigned i = 0; i < redirect_count; ++i)
         service.redirects[i] = redirects[i];
     service.redirect_count = redirect_count;
+    for (unsigned i = 0; i < dns_count; ++i)
+        service.dns[i] = dns[i];
+    service.dns_count = dns_count;
     unlock();
+    free(dns);
     /* Every check is independent
      * The optional report is last, so its request and parser cannot gate the
      * protocol tiles */
@@ -604,6 +690,14 @@ static int run_checks(SceSize argc, void *argv)
         }
         publish_redirect(i, &r);
     }
+    lock();
+    for (unsigned i = 0; i < dns_count; ++i)
+    {
+        CheckResult *r = &service.dns[i].result;
+        r->state = CHECK_INFO;
+        snprintf(r->message, sizeof(r->message), "%s", cancelled ? "Cancelled / not tested" : "Not tested on the Vita yet");
+    }
+    unlock();
     free(redirects);
     free(body);
     free(h);
@@ -626,50 +720,6 @@ static void join_worker(void)
     }
 }
 
-int vitals_check_open(void)
-{
-    int rc = 0;
-    if (guard < 0)
-    {
-        guard = sceKernelCreateMutex("vitals test state", 0, 0, NULL);
-        if (guard < 0)
-            return guard;
-    }
-    memset(&service, 0, sizeof(service));
-    service.vitals_enabled = -1;
-    notice[0] = 0;
-    /* Loading HTTPS brings in libhttp, which vitals (when installed) replaces for this app */
-    if (!https_loaded)
-    {
-        rc = sceSysmoduleLoadModule(SCE_SYSMODULE_HTTPS);
-        if (rc < 0)
-            goto failed;
-        https_loaded = 1;
-    }
-    service.vitals_enabled = detect_vitals();
-    if (!ssl_ready)
-    {
-        rc = sceSslInit(1024 * 1024);
-        if (rc < 0)
-            goto failed;
-        ssl_ready = 1;
-    }
-    if (!http_ready)
-    {
-        rc = sceHttpInit(1024 * 1024);
-        if (rc < 0)
-            goto failed;
-        http_ready = 1;
-    }
-    rc = sceHttpsEnableOption(VERIFY_FLAGS);
-    if (rc < 0)
-        goto failed;
-    return 0;
-failed:
-    vitals_check_close();
-    return rc;
-}
-
 void vitals_check_stop(void)
 {
     if (guard >= 0)
@@ -681,22 +731,26 @@ void vitals_check_stop(void)
 void vitals_check_close(void)
 {
     vitals_check_stop();
-    if (http_ready)
-        sceHttpTerm();
-    if (ssl_ready)
-        sceSslTerm();
-    if (https_loaded)
-        sceSysmoduleUnloadModule(SCE_SYSMODULE_HTTPS);
-    http_ready = ssl_ready = https_loaded = 0;
+    close_libraries();
 }
 
 void vitals_check_start(void)
 {
+    if (guard < 0)
+    {
+        guard = sceKernelCreateMutex("vitals test state", 0, 0, NULL);
+        if (guard < 0)
+            return;
+    }
+    lock();
+    int running = busy;
+    unlock();
+    if (running)
+        return;
     join_worker();
     lock();
-    int enabled = service.vitals_enabled;
     memset(&service, 0, sizeof(service));
-    service.vitals_enabled = enabled;
+    service.vitals_enabled = service.libhttp_active = -1;
     service.started = 1;
     busy = 1;
     cancelled = 0;
@@ -721,6 +775,13 @@ void vitals_check_cancel(void) { abort_current(1); }
 
 int vitals_check_poll(CheckService *view, char *message, size_t size)
 {
+    if (guard < 0)
+    {
+        memset(view, 0, sizeof(*view));
+        view->vitals_enabled = view->libhttp_active = -1;
+        snprintf(message, size, "%s", "The test couldn't start");
+        return 0;
+    }
     lock();
     int is_busy = busy;
     uint64_t started = request_begin;

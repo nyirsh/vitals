@@ -6,6 +6,7 @@
 #include "app_log.h"
 #include "boot_plugins.h"
 #include "custom_certs.h"
+#include "dates.h"
 #include "http.h"
 
 #include <cell/cell_fs.h>
@@ -496,21 +497,6 @@ static int download_certificates(VitalsNote note)
 	return rc;
 }
 
-/* Whether a date (year, month 1 to 12, day) is more than three calendar months before another */
-static int older_than_three_months(int year, int month, int day, int now_year, int now_month, int now_day)
-{
-	int limit_year = now_year, limit_month = now_month - 3;
-	if (limit_month < 1) {
-		limit_month += 12;
-		--limit_year;
-	}
-	if (year != limit_year)
-		return year < limit_year;
-	if (month != limit_month)
-		return month < limit_month;
-	return day < now_day;
-}
-
 void vitals_certificates_date(char *text, size_t size, int *stale)
 {
 	CellFsStat status;
@@ -534,7 +520,7 @@ void vitals_certificates_date(char *text, size_t size, int *stale)
 	time_t now = (time_t)seconds;
 	struct tm *today = p1 == 0 && seconds > 0 ? gmtime(&now) : NULL;
 	if (today != NULL)
-		*stale = older_than_three_months(written.tm_year, written.tm_mon + 1, written.tm_mday, today->tm_year,
+		*stale = vitals_older_than_three_months(written.tm_year, written.tm_mon + 1, written.tm_mday, today->tm_year,
 		                                 today->tm_mon + 1, today->tm_mday);
 }
 

@@ -164,7 +164,7 @@ static void expect_installed(void)
     }
     assert(is(CA, BUNDLE) && is(CA_BACKUP, SONY_CA));
     assert(exists(REDIRECTS) && exists(DNS_RULES));
-    assert(vitals_install_detect() == 1);
+    assert(vitals_install_complete() == 1);
     /* Nothing temporary is left behind */
     assert(!exists("ur0:tai/config_vitals.tmp") && !exists("vs0:/data/external/cert/CA_LIST.cer.prepared"));
 }
@@ -175,29 +175,29 @@ static void expect_uninstalled(void)
     for (size_t i = 0; i < INSTALLED_COUNT; ++i)
         assert(!exists(installed[i][0]));
     assert(is(CA, SONY_CA) && !exists(CA_BACKUP));
-    assert(vitals_install_detect() == 0);
+    assert(vitals_install_complete() == 0);
 }
 
 static void test_install_reinstall_uninstall(void)
 {
     fresh_console();
-    assert(vitals_install_detect() == 0);
+    assert(vitals_install_complete() == 0);
     /* An earlier version's HTTP provider and PSN redirect, which vitals-http replaces, go on
      * install */
     make_directories("vs0:/data/external/vitals/native");
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
     put(OLD_REAUTH, "an earlier version's redirect\n");
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     assert(!exists(OLD_HTTP_PROVIDER) && !exists(OLD_REAUTH));
     assert(is(REDIRECTS, "contents of redirects.txt\n") && is(DNS_RULES, "contents of dns.txt\n"));
     /* While it is there, vitals doesn't count as installed */
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
-    assert(vitals_install_detect() == 0);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_complete() == 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     put(OLD_REAUTH, "an earlier version's redirect\n");
-    assert(vitals_install_detect() == 0);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_complete() == 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     /* The installed plugin is the one the app carries; another version's is told apart, also
      * when only its length differs, and an update puts the app's back */
@@ -209,23 +209,23 @@ static void test_install_reinstall_uninstall(void)
     assert(vitals_install_plugin_current() == 0);
     put("ur0:tai/vitals.skprx", "contents of vitals.skprx\nand more\n");
     assert(vitals_install_plugin_current() == 0);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     assert(vitals_install_plugin_current() == 1);
 
     /* Reinstalling keeps one config entry, the user's redirect list and Sony's original backup */
     put(REDIRECTS, "my.old.host my.new.host\n");
     put(DNS_RULES, "my.blocked.host block\n");
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
 
     /* Updating certificates replaces the store and touches nothing else */
     put(CA, "OLDER VITALS BUNDLE\n");
-    assert(vitals_install_run(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
     expect_installed();
 
     /* Uninstalling restores taiHEN's config and Sony's certificates, and keeps the user's list */
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
     expect_uninstalled();
     assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
     /* Without an installed plugin there is nothing to compare */
@@ -262,19 +262,19 @@ static void test_debug_levels(void)
 {
     fresh_console();
     assert(vitals_install_debug_level() < 0);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_debug_level(0);
     for (int level = 2; level >= 0; --level)
     {
-        assert(vitals_install_set_debug_level(level, note) >= 0);
+        assert(vitals_install_debug_modules(level, note) >= 0);
         expect_debug_level(level);
         assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG));
     }
-    assert(vitals_install_set_debug_level(3, note) < 0 && vitals_install_set_debug_level(-1, note) < 0);
+    assert(vitals_install_debug_modules(3, note) < 0 && vitals_install_debug_modules(-1, note) < 0);
     expect_debug_level(0);
-    assert(vitals_install_set_debug_level(1, note) >= 0);
+    assert(vitals_install_debug_modules(1, note) >= 0);
     expect_debug_level(1);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     expect_debug_level(0);
     /* A libhttp that matches none of the app's builds (another version's) has no level */
@@ -301,7 +301,7 @@ static void test_conflicting_installs_are_removed(void)
     for (size_t i = 0; i < sizeof(others) / sizeof(others[0]); ++i)
         put(others[i], "old plugin\n");
 
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     for (size_t i = 0; i < sizeof(others) / sizeof(others[0]); ++i)
         assert(!exists(others[i]));
     assert(!exists("ur0:data/reAuth") && !exists("vs0:/data/external/itls") && !exists("vs0:/data/external/tls_fixer"));
@@ -309,7 +309,7 @@ static void test_conflicting_installs_are_removed(void)
     assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\r\n"));
     assert(is(CA, BUNDLE) && is(CA_BACKUP, SONY_CA));
 
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
     assert(is(CA, SONY_CA) && is(CONFIG, ORIGINAL_CONFIG "*KERNEL\r\n"));
 }
 
@@ -323,28 +323,28 @@ static void test_moved_plugin_line(void)
      * counts as installed; uninstalling removes just that line */
     fresh_console();
     put(CONFIG, moved);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
-    assert(is(CONFIG, moved) && vitals_install_detect() == 1);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
-    assert(is(CONFIG, moved) && vitals_install_detect() == 1);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
-    assert(is(CONFIG, without) && vitals_install_detect() == 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, moved) && vitals_install_complete() == 1);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, moved) && vitals_install_complete() == 1);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CONFIG, without) && vitals_install_complete() == 0);
 
     /* Commented out, it doesn't count: the block is added, and uninstalling leaves the comment */
     fresh_console();
     put(CONFIG, "*KERNEL\n# ur0:tai/vitals.skprx\n");
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
-    assert(is(CONFIG, VITALS_BLOCK "*KERNEL\n# ur0:tai/vitals.skprx\n") && vitals_install_detect() == 1);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, VITALS_BLOCK "*KERNEL\n# ur0:tai/vitals.skprx\n") && vitals_install_complete() == 1);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
     assert(is(CONFIG, "*KERNEL\n# ur0:tai/vitals.skprx\n"));
 
     /* vitals' block and a copy of the line elsewhere: uninstalling removes both */
     fresh_console();
     put(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\nur0:tai/vitals.skprx\n");
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG "*KERNEL\nur0:tai/vitals.skprx\n"));
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
-    assert(is(CONFIG, ORIGINAL_CONFIG "*KERNEL\n") && vitals_install_detect() == 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(is(CONFIG, ORIGINAL_CONFIG "*KERNEL\n") && vitals_install_complete() == 0);
 }
 
 /* Where vitals is listed is chosen at install, and changing it moves the one line there */
@@ -358,30 +358,30 @@ static void test_placements(void)
     fresh_console();
     assert(vitals_install_placement() < 0);
     vitals_install_set_placement(VITALS_PLACEMENT_FIRST);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
-    assert(is(CONFIG, first) && vitals_install_placement() == VITALS_PLACEMENT_FIRST && vitals_install_detect() == 1);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(is(CONFIG, first) && vitals_install_placement() == VITALS_PLACEMENT_FIRST && vitals_install_complete() == 1);
     /* The old config is kept as the backup, as before */
     assert(is("ur0:tai/config_previtals.txt", ORIGINAL_CONFIG));
     /* Kept where it is, or asked for where it already is: nothing changes */
     vitals_install_set_placement(VITALS_PLACEMENT_KEEP);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
     vitals_install_set_placement(VITALS_PLACEMENT_FIRST);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
     /* Moved between all three places, never listed twice */
     vitals_install_set_placement(VITALS_PLACEMENT_LAST);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     assert(is(CONFIG, last) && vitals_install_placement() == VITALS_PLACEMENT_LAST);
     vitals_install_set_placement(VITALS_PLACEMENT_BLOCK);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     assert(is(CONFIG, VITALS_BLOCK ORIGINAL_CONFIG) && vitals_install_placement() == VITALS_PLACEMENT_BLOCK);
     vitals_install_set_placement(VITALS_PLACEMENT_FIRST);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, first));
     /* Uninstalling removes it from any of them */
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
     assert(is(CONFIG, ORIGINAL_CONFIG) && vitals_install_placement() < 0);
     vitals_install_set_placement(VITALS_PLACEMENT_LAST);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, last));
-    assert(vitals_install_run(VITALS_OPTION_FULL, 1, note) >= 0 && is(CONFIG, ORIGINAL_CONFIG));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, last));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0 && is(CONFIG, ORIGINAL_CONFIG));
 
     /* Without a *KERNEL section of the user's, first and last fall back to vitals' own block */
     static const char no_kernel[] = "*main\nur0:tai/henkaku.suprx\n";
@@ -390,7 +390,7 @@ static void test_placements(void)
         fresh_console();
         put(CONFIG, no_kernel);
         vitals_install_set_placement((VitalsPlacement)placement);
-        assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+        assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
         assert(is(CONFIG, VITALS_BLOCK "*main\nur0:tai/henkaku.suprx\n"));
         assert(vitals_install_placement() == VITALS_PLACEMENT_BLOCK);
     }
@@ -401,9 +401,9 @@ static void test_placements(void)
     put(CONFIG, between);
     assert(vitals_install_placement() == VITALS_PLACEMENT_KEEP);
     vitals_install_set_placement(VITALS_PLACEMENT_KEEP);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, between));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0 && is(CONFIG, between));
     vitals_install_set_placement(VITALS_PLACEMENT_LAST);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     assert(is(CONFIG, "*KERNEL\nur0:tai/a.skprx\nur0:tai/b.skprx\nur0:tai/vitals.skprx\n"));
     vitals_install_set_placement(VITALS_PLACEMENT_KEEP);
 }
@@ -413,7 +413,7 @@ static void test_missing_config(void)
     /* Without a config.txt, vitals cannot be enabled, and its plugin is not left behind */
     fresh_console();
     assert(unlink(vita_files_path(CONFIG)) == 0);
-    assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) < 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) < 0);
     assert(!exists("ur0:tai/vitals.skprx") && !exists(CONFIG));
 }
 
@@ -423,9 +423,9 @@ static void test_failed_renames(int removing)
 {
     fresh_console();
     if (removing)
-        assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+        assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     vita_files_renames = 0;
-    assert(vitals_install_run(VITALS_OPTION_FULL, removing, note) >= 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, removing, note) >= 0);
     int total = vita_files_renames;
     assert(total > 0);
 
@@ -433,10 +433,10 @@ static void test_failed_renames(int removing)
     {
         fresh_console();
         if (removing)
-            assert(vitals_install_run(VITALS_OPTION_FULL, 0, note) >= 0);
+            assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
         vita_files_renames = 0;
         vita_files_fail_rename = failing;
-        int result = vitals_install_run(VITALS_OPTION_FULL, removing, note);
+        int result = vitals_install_apply(VITALS_OPTION_FULL, removing, note);
         vita_files_fail_rename = 0;
 
         const char *config = get(CONFIG);

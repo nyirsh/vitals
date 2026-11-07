@@ -1,10 +1,11 @@
 /* Draws each of the app's screens with made-up data into BMPs, on a Mac (font_host.c), to look at
- * the layout without a console: preview <folder> [1080], the second drawing them at 1920x1080, as a
- * 1080 console does (names ending in -1080) */
+ * the layout without a console: preview <folder> [1080|vita], 1080 drawing them at 1920x1080, as a
+ * 1080 console does (names ending in -1080), and vita at the Vita's 960x544 (ending in -vita). The
+ * data is the PS3's */
 
 #include "changelog.h"
 #include "font.h"
-#include "model.h"
+#include "check_model.h"
 #include "ui.h"
 
 #include <stdint.h>
@@ -60,13 +61,16 @@ static int measure(const char *text)
 
 int main(int argc, char **argv)
 {
-	if (argc != 2 && !(argc == 3 && strcmp(argv[2], "1080") == 0)) {
-		fprintf(stderr, "usage: %s <folder> [1080]\n", argv[0]);
+	if (argc != 2 && !(argc == 3 && (strcmp(argv[2], "1080") == 0 || strcmp(argv[2], "vita") == 0))) {
+		fprintf(stderr, "usage: %s <folder> [1080|vita]\n", argv[0]);
 		return 2;
 	}
-	if (argc == 3) {
+	if (argc == 3 && strcmp(argv[2], "1080") == 0) {
 		check_canvas_set(1920, 1080);
 		suffix = "-1080";
+	} else if (argc == 3) {
+		check_canvas_set(960, 544);
+		suffix = "-vita";
 	}
 	if (check_font_init() < 0)
 		return 1;
@@ -144,7 +148,8 @@ int main(int argc, char **argv)
 	                                    "Copying vitals_boot.sprx to /dev_hdd0/plugins/vitals_boot.sprx",
 	                                    "Copying Mozilla's certificates to /dev_hdd0/vitals/system/cacert.pem",
 	                                    "Adding vitals to /dev_hdd0/boot_plugins.txt"};
-	AppTask task = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5"}, "Installing vitals", lines, 4, CHECK_RUNNING, "Working...", NULL, 0};
+	static const AppHint waiting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "Please wait and keep your PS3 turned on."};
+	AppTask task = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5"}, "Installing vitals", lines, 4, CHECK_RUNNING, "Working...", &waiting, 1};
 	app_draw_task(canvas, &task);
 	save(out, "task-running");
 	static const AppHint done[] = {{APP_GLYPH_START, APP_GLYPH_NONE, "Reboot now"}, {APP_GLYPH_BACK, APP_GLYPH_NONE, "Later"}};

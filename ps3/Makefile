@@ -29,7 +29,8 @@
 #                           redirects.txt and dns.txt and the changelog inside
 #   make update-certs       refreshes the app's Mozilla CA bundle (vitals-app/assets/) from curl,
 #                           checked against curl's SHA-256; review and commit the result
-#   make preview            the app's screens drawn on this Mac with made-up data (build/preview/)
+#   make preview            the app's screens drawn on this Mac with made-up data (build/preview/), at
+#                           720, 1080 and the Vita's 960x544
 #   make test               the host tests (this machine's compiler, Python 3 and openssl): libssl's,
 #                           the libhttp probe against vitals' libhttp and libssl (PS3DK's cell/http
 #                           and cell/ssl headers copied out of the SDK image first), the app's
@@ -160,10 +161,11 @@ preview:
 	mkdir -p build/preview
 	clang -std=c11 -Wall -Wextra -DVITALS_VERSION='"$(VERSION)"' -Ivitals-app/src -Icommon -I../shared/app -I../shared/include \
 		vitals-app/host/preview.c vitals-app/host/font_host.c ../shared/app/ui.c ../shared/app/font.c ../shared/app/changelog.c \
-		vitals-app/src/check_model.c -framework CoreText -framework CoreGraphics -framework CoreFoundation \
+		vitals-app/src/check_model.c ../shared/app/model.c -framework CoreText -framework CoreGraphics -framework CoreFoundation \
 		-o build/preview/preview
 	build/preview/preview build/preview
 	build/preview/preview build/preview 1080
+	build/preview/preview build/preview vita
 	for f in build/preview/*.bmp; do sips -s format png "$$f" --out "$${f%.bmp}.png" >/dev/null; done
 
 test: build/ps3dk-include/cell/http.h

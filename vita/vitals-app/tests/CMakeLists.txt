@@ -5,9 +5,10 @@ project(vitals_app_tests C)
 set(CMAKE_C_STANDARD 11)
 
 set(APP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
-# The changelog and input code shared with the PS3's app, which the app's headers include
+# The app shared with the PS3's (../../shared/app), whose headers include the Vita's own vitals_paths.h
+# and check_result.h from this app's folder, which each test adds
 set(SHARED_APP ${APP_DIR}/../../shared/app)
-include_directories(${SHARED_APP})
+include_directories(AFTER ${SHARED_APP})
 
 option(VITALS_ENABLE_SANITIZERS "Build the tests with AddressSanitizer and UBSan" ON)
 if(VITALS_ENABLE_SANITIZERS)
@@ -25,8 +26,9 @@ add_executable(vitals_app_options_tests test_options.c ${APP_DIR}/options.c)
 target_include_directories(vitals_app_options_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_options COMMAND vitals_app_options_tests)
 
-# The connection test's rules: the badssl.com battery and how each of its results is judged
-add_executable(vitals_app_check_model_tests test_check_model.c ${APP_DIR}/model.c)
+# The connection test's rules: the badssl.com battery and how each of its results is judged, with the
+# model shared with the PS3 (the endpoints, the battery, the TLS report's parser)
+add_executable(vitals_app_check_model_tests test_check_model.c ${APP_DIR}/check_model.c ${SHARED_APP}/model.c)
 target_include_directories(vitals_app_check_model_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_check_model COMMAND vitals_app_check_model_tests)
 

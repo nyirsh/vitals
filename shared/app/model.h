@@ -4,12 +4,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "check_result.h"
 #include "vitals_paths.h"
 
-/* The connection test's results, which ui.c draws. A request's error and a refused certificate's flags
- * are the console's HTTP library's (on the PS3, libhttp's 0x8071xxxx and CELL_HTTPS_VERIFY_ERROR_*),
- * which the console's check_model.c judges and names. vitals_paths.h is the console's: where its
- * redirect and DNS lists are (VITALS_REDIRECTS, VITALS_DNS) */
+/* The connection test's results, which ui.c draws. The same on every console, but for what each
+ * console's requests add (check_result.h's CHECK_RESULT_CONSOLE): its HTTP library's errors are its
+ * own, which its check_model.c judges and names. vitals_paths.h is the console's: where its redirect and
+ * DNS lists are (VITALS_REDIRECTS, VITALS_DNS) */
 
 #define CHECK_BODY_MAX (96u * 1024u)
 #define CHECK_LIST_MAX 64
@@ -28,14 +29,11 @@ typedef struct {
 
 typedef struct {
 	enum CheckState state;
-	/* The response's status (0 without one), the request's error (libhttp's, 0 when it worked),
-	 * and the certificate check's flags when libhttp's check refused the server */
+	/* The response's status (0 without one) and the request's error (the console's HTTP library's, 0
+	 * when it worked) */
 	int http_code, error;
-	uint32_t verify_error;
-	/* What the connection used: Sony's CELL_SSL_VERSION (0 TLS, 1 SSL 3.0, -1 none) and the cipher's
-	 * name; http_protocol_name names them */
-	int ssl_version;
-	char cipher[64];
+	/* What else the console's requests record (check_result.h) */
+	CHECK_RESULT_CONSOLE
 	unsigned elapsed_ms;
 	/* Requests made, timeouts retried included */
 	unsigned attempts;
@@ -55,14 +53,13 @@ typedef struct {
 	char ja3[65], ja4[129], alpn[96];
 } CheckHandshake;
 
-/* Host redirects as /dev_hdd0/vitals/redirects.txt lists them, at most as many as vitals applies */
+/* Host redirects as the console's redirects.txt lists them, at most as many as vitals applies */
 #define CHECK_REDIRECTS_PATH VITALS_REDIRECTS
 #define CHECK_REDIRECT_MAX 32
 /* The DNS rules, tested by looking each name up as a game would: the kernel plugin sees the
  * app's own queries */
 #define CHECK_DNS_PATH VITALS_DNS
 #define CHECK_DNS_MAX 32
-#define CHECK_DNS_ADDRESSES 8
 #define CHECK_HOST_MAX 254
 typedef struct {
 	char from[CHECK_HOST_MAX], to[CHECK_HOST_MAX];
@@ -83,7 +80,8 @@ typedef struct {
 	CheckResult badssl[CHECK_BADSSL_COUNT];
 	CheckRedirect redirects[CHECK_REDIRECT_MAX];
 	unsigned redirect_count;
-	/* The DNS rules (dns.txt), as host -> target pairs; dns_off while flags/dns.off is there */
+	/* The DNS rules (dns.txt), as host -> target pairs; dns_off while they're turned off. None on a
+	 * console whose test doesn't look them up */
 	CheckRedirect dns[CHECK_DNS_MAX];
 	unsigned dns_count;
 	int dns_off;
@@ -91,49 +89,23 @@ typedef struct {
 	int started, complete;
 	/* The run was cancelled (Triangle, or leaving the test) before it finished */
 	int interrupted;
-	/* -1 until the TLS 1.3 tile is done, then whether it connected: Sony's libssl has no TLS 1.3,
-	 * so a connection there is vitals' */
+	/* Whether vitals is running here, -1 until known: on the PS3 whether the TLS 1.3 tile connected
+	 * (Sony's libssl has no TLS 1.3, so a connection there is vitals'), on the Vita whether vitals'
+	 * libhttp is the one loaded */
 	int vitals_enabled;
-	/* Whether vitals' libhttp is the one this boot loads (the boot plugin's libhttp.active, written
-	 * this boot): the redirects are tested only then. -1 until known */
+	/* On the PS3, whether vitals' libhttp is the one this boot loads (the boot plugin's libhttp.active,
+	 * written this boot): the redirects are tested only then. -1 until known */
 	int libhttp_active;
 	/* The run's report: 0 not saved, 1 saved (as report), -1 the last attempt failed */
 	int report_saved;
 	char report[160];
 } CheckService;
 
+/* ---- shared/app/model.c ---- */
+
+/* The BrowserLeaks endpoints: tests 0 to 3, then the TLS report */
 const char *check_endpoint(unsigned test);
 const CheckBadssl *check_badssl(unsigned index);
-/* A finished request to a protocol endpoint: which state the tile shows */
-void check_protocol_judge(unsigned version, CheckResult *result);
-CheckProtocolDisplay check_protocol_display(unsigned version, const CheckResult *result, int vitals_enabled);
-void check_protocol_detail(const CheckResult *result, char *text, size_t capacity);
-/* A finished badssl.com request against what the case expects: a refusal passes only when the
- * host was reached and the TLS or its certificate was refused */
-void check_badssl_judge(const CheckBadssl *test, CheckResult *result);
-/* A finished request to a redirect's old host: any final HTTP status passes, as on the Vita, since
- * only the new server's reachability through vitals is tested */
-void check_redirect_judge(CheckResult *result);
-/* A name's lookup through libnet: found, else the resolver's h_errno, and the IPv4 addresses */
-typedef struct {
-	int found, error;
-	unsigned count;
-	unsigned char addresses[CHECK_DNS_ADDRESSES][4];
-} CheckLookup;
-/* What a DNS rule's target is: another host name, an IPv4 address, or block */
-enum CheckDnsTarget { CHECK_DNS_NAME, CHECK_DNS_ADDRESS, CHECK_DNS_BLOCK };
-enum CheckDnsTarget check_dns_target(const char *target, unsigned char address[4]);
-/* A rule's lookup against what the rule says: block passes when the name doesn't exist, an address
- * when it's among the answers, a host name when an answer is among the target's own (target is the
- * target's lookup, for a host name only) */
-void check_dns_judge(const char *rule_target, const CheckLookup *answer, const CheckLookup *target, CheckResult *result);
-/* libhttp's error, or the certificate check's first flag, in words */
-const char *check_error_name(int error, uint32_t verify_error);
-/* 1 when a request ran out of time, which the test makes again (http.c): libhttp's own timeout, or a
- * socket's EAGAIN (35) on send or receive, plain or TLS */
-int check_timed_out(int error);
-/* 1 when the request failed before any TLS: the name, the network or the connection */
-int check_unreachable(int error);
 /* Which detail page shows how far the run has got, for the test screen to follow it: the TLS tiles'
  * request details, the TLS report's ciphers, the badssl.com checks, the redirects, the DNS rules;
  * -1 before any check has started. item is the latest host's place in its list (0 for the others) */
@@ -147,5 +119,16 @@ enum {
 int check_follow(const CheckService *s, unsigned *item);
 /* The TLS report's JSON (tls.browserleaks.com); 0, or -1 when it isn't one */
 int check_parse_browserleaks(const char *body, size_t size, CheckHandshake *out);
+
+/* ---- each console's check_model.c: what ui.c shows of a request ---- */
+
+/* A protocol tile (TLS 1.<version>): its mark, words and colours */
+CheckProtocolDisplay check_protocol_display(unsigned version, const CheckResult *result, int vitals_enabled);
+/* The tile's request in a line, on the request details page */
+void check_protocol_detail(unsigned version, const CheckResult *result, char *text, size_t capacity);
+/* The request's error codes, or "OK" or "-", for that page's codes column */
+void check_request_codes(const CheckResult *result, char *text, size_t capacity);
+/* How long the request took in all, retries included, for its time column */
+unsigned check_request_ms(const CheckResult *result);
 
 #endif

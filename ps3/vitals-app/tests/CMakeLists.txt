@@ -23,7 +23,7 @@ enable_testing()
 
 # The connection test's rules: how each result is judged and shown, the timeouts it retries, and
 # the TLS report's parser
-add_executable(vitals_app_check_model_tests test_check_model.c ${APP_DIR}/src/check_model.c)
+add_executable(vitals_app_check_model_tests test_check_model.c ${APP_DIR}/src/check_model.c ${SHARED}/app/model.c)
 target_include_directories(vitals_app_check_model_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
 add_test(NAME vitals_app_check_model COMMAND vitals_app_check_model_tests)
 

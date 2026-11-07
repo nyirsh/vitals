@@ -4,6 +4,7 @@
  * in /dev_hdd0/vitals/dns.txt (the PS3's own: the Vita's app has no DNS test) */
 
 #include "check.h"
+#include "check_model.h"
 
 #include "app_log.h"
 #include "firmware.h"
@@ -439,7 +440,7 @@ static int save_report(const CheckService *s, char *path, size_t path_size)
 		add_result(&report, r);
 		if (i < 4) {
 			char detail[160];
-			check_protocol_detail(r, detail, sizeof(detail));
+			check_protocol_detail(i, r, detail, sizeof(detail));
 			add(&report, "classification=%s\ndetail=%s\n", check_protocol_display(i, r, s->vitals_enabled).label, detail);
 		}
 	}

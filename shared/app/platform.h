@@ -31,8 +31,9 @@ typedef struct {
 
 /* The screen: 0, or an error */
 int platform_display_init(void);
-/* A canvas the console shows from itself, to draw in after platform_display_init; NULL when there's
- * none, and platform_present copies (and scales) the one the app made */
+/* A canvas at the console's own size to draw in after platform_display_init, which platform_present
+ * shows: one the screen shows from itself (the PS3's), or one it copies in (the Vita's). NULL when
+ * there's none, and platform_present copies (and scales) the 1280x720 one the app made */
 uint32_t *platform_canvas(void);
 /* The canvas's size: CHECK_WIDTH x CHECK_HEIGHT, or the screen's own, which ui.c draws the layout at */
 void platform_canvas_size(int *width, int *height);

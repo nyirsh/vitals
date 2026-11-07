@@ -42,30 +42,39 @@ endforeach()
 add_subdirectory(curl)
 
 add_executable(vitals-app
-    main.c
+    # The app itself, the same on the PS3 (../../shared/app)
+    ../../shared/app/app.c
+    ../../shared/app/ui.c
+    ../../shared/app/font.c
+    ../../shared/app/model.c
     ../../shared/app/changelog.c
+    ../../shared/app/input.c
+    # What's the Vita's under it: console.h, platform.h and check.h
+    main.c
+    console_vita.c
+    platform_vita.c
+    font_vita.c
+    app_log_vita.c
+    network.c
+    check.c
+    check_model.c
+    probe.c
     install.c
+    options.c
+    config_edit.c
+    certificates.c
+    crypto_lock_vita.c
     module_version.c
     release_version.c
     version_check.c
     # The host redirect list is read as vitals' provider reads it
     ../../shared/src/host_map.c
     ../../shared/src/redirect_list.c
-    config_edit.c
-    check.c
-    ui.c
-    certificates.c
-    crypto_lock_vita.c
-    options.c
-    font.c
-    font_vita.c
-    ../../shared/app/input.c
-    model.c
-    probe.c
 )
 target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
-# With the changelog, input and redirect list code shared with the PS3's app (../../shared)
-target_include_directories(vitals-app PRIVATE ../tls13-vita/include ../../shared/include ../../shared/app)
+# With the app and the redirect list code shared with the PS3's (../../shared); this folder first, for
+# the Vita's own vitals_paths.h and check_result.h, which the shared headers include
+target_include_directories(vitals-app PRIVATE . ../tls13-vita/include ../../shared/include ../../shared/app)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 # OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
 foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock
@@ -108,6 +117,7 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          ${debug_entries}
          ../README.md README.md
          ../../CHANGELOG.md CHANGELOG.md
+         ../CREDITS.md CREDITS.md
          ../../THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.md
          ${license_entries}
          assets/sony-certs.pem sony-certs.pem

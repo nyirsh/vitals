@@ -1,7 +1,7 @@
 /* The connection test's rules (check_model.c): how each kind of result is judged and shown, which
  * errors are timeouts the test makes again, and the BrowserLeaks TLS report's parser, including
  * what it must refuse */
-#include "model.h"
+#include "check_model.h"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -109,7 +109,7 @@ static void display(void)
 	r.state = CHECK_PASS;
 	snprintf(r.message, sizeof(r.message), "HTTP 200");
 	snprintf(r.cipher, sizeof(r.cipher), "TLS1-3-AES-256-GCM-SHA384");
-	check_protocol_detail(&r, detail, sizeof(detail));
+	check_protocol_detail(3, &r, detail, sizeof(detail));
 	assert(strcmp(detail, "HTTP 200, TLS1-3-AES-256-GCM-SHA384") == 0);
 }
 

@@ -26,6 +26,8 @@ int console_unsupported_allowed(void);
 
 /* The words that differ between consoles */
 typedef struct {
+	/* The console's name in a sentence: "PS3" */
+	const char *name;
 	/* What vitals is made for, after "vitals is made for ": "4.93 CEX with Cobra" */
 	const char *made_for;
 	/* The Install item's description */

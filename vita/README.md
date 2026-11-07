@@ -31,14 +31,19 @@ You need a hacked PS Vita on **firmware 3.60 or 3.65** with taiHEN. Supporting o
 - Transfer it to your vita and install it (`VitaShell` can do both)
 - Launch `vitals`, select **Install** and press **Cross**  
   _This installs everything: the browser plugin, the system plugin and the certificates. The certificates are also downloaded from the internet, so there's no need to update them -- yet_
-- The Vita reboots after a successful operation
+- When it's done, press **START** to reboot the Vita (or **Circle** to reboot later): `vitals` starts at the next boot
+
+`vitals` is listed first in the first `*KERNEL` section of `ur0:tai/config.txt`, so it loads before your other kernel plugins.
 
 Once `vitals` is installed, from the same application you'll be able to:
 
-- **Reinstall** (or **Update**, when the installed version differs): installs this version over the existing one, to update `vitals` or repair an installation
-- **Uninstall**: this removes all of `vitals` files and configurations
-- **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current
+- **Installation**: **Update** (when the installed version differs), **Reinstall** and **Uninstall** share this item, and **Left** and **Right** pick one
+  - **Update** or **Reinstall** installs this version over the existing one, to update `vitals` or repair an installation
+  - **Uninstall** removes all of `vitals` files and configurations
+- **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current. The date next to it is when they were last updated, in red once they're more than three months old
+- **Options**: turns TLS, HTTP, the DNS rules and the redirects on or off, as on the PS3, and picks the debug output (see below); **START** applies them and reboots the Vita. Each switch is a file in `ux0:data/vitals/flags/` (`tls.off`, `http.off`, `dns.off`, `redirects.off`), there while that part is off. For now only the debug output changes anything: vitals' modules and kernel plugin don't read the switches yet
 - **Test connections**: is `vitals` installed correctly and running just fine?
+- **Changelog** and **Credits**
 
 Before installing, the app removes the plugins known to conflict with vitals. Uninstalling vitals does not reinstall them:
 
@@ -198,7 +203,17 @@ Debug output levels, for `vitals-http` and the browser provider (lines start wit
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
 - **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write). This produces a lot of output and slows connections down, use it only to investigate a problem
 
-Every build includes all three levels; choose one on the console from the app's **Debug output** option, which reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
+Every build includes all three levels; choose one on the console in the app's **Options**, where **START** applies it and reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
+
+### Working with a Vita
+
+[tools/vita_comms.py](tools/vita_comms.py) talks to the Vita over VitaShell's FTP server (**SELECT** in VitaShell starts it). Put the Vita's address in `.env` first (`cp .env.example .env`, then set `VITA_HOST`), or pass it as `make status VITA_HOST=...`.
+
+- `make upload-app`: builds the app and puts `vitals-app.vpk` in `ux0:data/vitals/`, for VitaShell to install
+- `make fetch`: brings the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, and deletes them from the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed
+- `make status`: `config.txt`, vitals' plugin and modules, the certificate store and your lists, as they are on the Vita
+
+Installing, uninstalling and switching the debug output stay the app's: they need `vs0:` mounted for writing and a reboot, which the app takes care of.
 
 ### Updating `Mbed TLS` or `curl`
 

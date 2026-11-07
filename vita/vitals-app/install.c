@@ -21,9 +21,9 @@
 #include "install.h"
 #include "module_version.h"
 
-/* Progress messages go to the app's screen through install_note (see vitals_install_run) */
+/* Progress messages go to the app's screen through install_note (see vitals_install_apply) */
 #define printf install_note
-static VitalsInstallNote g_note;
+static VitalsNote g_note;
 static void install_note(const char *format, ...) __attribute__((format(__printf__, 1, 2)));
 static void install_note(const char *format, ...)
 {
@@ -1060,7 +1060,7 @@ static int apply_component(void *context, unsigned component, int removing)
     }
 }
 
-int vitals_install_detect(void)
+int vitals_install_complete(void)
 {
     /* vitals counts as installed when its plugin, every module and the certificates are in place */
     return !path_exists("vs0:sys/external/libhttp.supr0") &&
@@ -1150,7 +1150,7 @@ int vitals_install_debug_level(void)
     return -1;
 }
 
-int vitals_install_set_debug_level(int level, VitalsInstallNote note)
+int vitals_install_debug_modules(int level, VitalsNote note)
 {
     uint8_t mount_data[0x100] = {0};
     char source[64];
@@ -1204,7 +1204,7 @@ int vitals_install_plugin_version(char *version, size_t size)
     return result;
 }
 
-int vitals_install_run(enum VitalsOption option, int removing, VitalsInstallNote note)
+int vitals_install_apply(enum VitalsOption option, int removing, VitalsNote note)
 {
     uint8_t mount_data[0x100] = {0};
     VitalsInstallPlan plan;

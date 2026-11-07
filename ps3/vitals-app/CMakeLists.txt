@@ -29,6 +29,7 @@ add_executable(vitals-app
 	src/font_ps3.c
 	src/check.c
 	src/check_model.c
+	../../shared/app/model.c
 	src/http.c
 	src/install.c
 	src/custom_certs.c

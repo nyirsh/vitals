@@ -2,7 +2,7 @@
  * them (cellSslCertificateLoader, cellHttpsInit), then one fresh connection a request */
 
 #include "http.h"
-#include "model.h"
+#include "check_model.h"
 
 #include <cell/http.h>
 #include <cell/libnetctl.h>

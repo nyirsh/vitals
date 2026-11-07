@@ -21,6 +21,7 @@ int console_supported(void)
 }
 
 static const ConsoleWords words = {
+    .name = "PS3",
     .made_for = "4.93 CEX with Cobra",
     .install_description = "Lets games and apps connect to modern secure (TLS 1.2 and 1.3) sites",
     .debug_purposes =
