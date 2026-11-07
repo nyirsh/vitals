@@ -15,6 +15,8 @@
 #define VITALS_FLAGS_DIRECTORY VITALS_DIRECTORY "/flags"
 #define VITALS_LOGS_DIRECTORY VITALS_DIRECTORY "/logs"
 #define VITALS_REPORTS_DIRECTORY VITALS_DIRECTORY "/reports"
+/* The Mozilla CA bundle the app carries in its USRDIR, which its own downloads trust */
+#define VITALS_APP_CA_BUNDLE "cacert.pem"
 
 /* What a user might edit */
 #define VITALS_REDIRECTS VITALS_DIRECTORY "/redirects.txt"

@@ -3,6 +3,12 @@
 
 #include <stddef.h>
 
+/* The new-release notice's release numbers, the same on every console: each console asks these for
+ * the latest published release (console.h), GitHub's first; only the number is read, nothing is
+ * downloaded or installed */
+#define VITALS_RELEASE_URL_GITHUB "https://api.github.com/repos/nyirsh/vitals/releases/latest"
+#define VITALS_RELEASE_URL_GITLAB "https://gitlab.com/api/v4/projects/nyirsh%2Fvitals/releases?per_page=1"
+
 /* Release numbers as VERSION writes them: major.minor, each 0 to 99 without leading zeros */
 
 /* Reads text as a release number; 0, or -1 when it is not one ("v1.2", "1.2-beta", "1.2.0") */

@@ -1,9 +1,10 @@
 /* The PS3's part of the shared app (console.h): what the system is (firmware.c), the words that
- * are the PS3's, the four switches in /dev_hdd0/vitals/flags, and where the app's files are. vitals'
- * operations themselves are install.c's */
+ * are the PS3's, the four switches in /dev_hdd0/vitals/flags, the network for the app's downloads, and
+ * where the app's files are. vitals' operations themselves are install.c's */
 
 #include "console.h"
 
+#include "crypto_platform.h"
 #include "firmware.h"
 #include "http.h"
 #include "install.h"
@@ -65,6 +66,20 @@ int console_switch_is_off(unsigned index)
 int console_switch_set(unsigned index, int off)
 {
 	return vitals_switch_set(switches[index].file, off);
+}
+
+/* ---- the network, for the app's own downloads ---- */
+
+/* curl's TLS is Mbed TLS (vitals-app/curl), whose mutexes are liblv2's: set once, before its first use */
+int console_network_start(int (*stop)(void))
+{
+	static int crypto_ready;
+	if (!crypto_ready) {
+		if (vitals_crypto_platform_init() < 0)
+			return -1;
+		crypto_ready = 1;
+	}
+	return http_network_wait(stop);
 }
 
 /* Next to the EBOOT.BIN, in the app's USRDIR */

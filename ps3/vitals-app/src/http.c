@@ -37,6 +37,11 @@ uint64_t http_now_ms(void)
 
 int http_network_start(void)
 {
+	return http_network_wait(NULL);
+}
+
+int http_network_wait(int (*stop)(void))
+{
 	int rc;
 	if (!network_ready) {
 		if ((rc = cellSysmoduleLoadModule(CELL_SYSMODULE_NET)) < 0)
@@ -54,6 +59,8 @@ int http_network_start(void)
 			return rc;
 		if (state == CELL_NET_CTL_STATE_IPObtained)
 			return 0;
+		if (stop != NULL && stop())
+			return (int)0x80130106;
 		if (http_now_ms() > deadline)
 			return (int)0x80130106; /* CELL_NET_CTL_ERROR_NOT_CONNECTED */
 		sys_timer_usleep(100 * 1000);

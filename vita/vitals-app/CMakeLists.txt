@@ -49,6 +49,10 @@ add_executable(vitals-app
     ../../shared/app/model.c
     ../../shared/app/changelog.c
     ../../shared/app/input.c
+    ../../shared/app/release_version.c
+    ../../shared/app/release_check.c
+    ../../shared/app/release_fetch.c
+    ../../shared/app/download.c
     # What's the Vita's under it: console.h, platform.h and check.h
     main.c
     console_vita.c
@@ -65,8 +69,6 @@ add_executable(vitals-app
     certificates.c
     crypto_lock_vita.c
     module_version.c
-    release_version.c
-    version_check.c
     # The host redirect list is read as vitals' provider reads it
     ../../shared/src/host_map.c
     ../../shared/src/redirect_list.c

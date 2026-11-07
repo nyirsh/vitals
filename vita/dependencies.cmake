@@ -6,10 +6,9 @@
 # provider use: pinned for both consoles in ../shared/mbedtls/mbedtls.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/../shared/mbedtls/mbedtls.cmake")
 
-# curl, used by the installer to download the latest Mozilla CA bundle
-set(VITALS_CURL_VERSION "8.17.0")
-set(VITALS_CURL_SHA256 "e8e74cdeefe5fb78b3ae6e90cd542babf788fa9480029cfcee6fd9ced42b7910")
-set(VITALS_CURL_URL "https://curl.se/download/curl-${VITALS_CURL_VERSION}.tar.gz")
+# curl, the app's downloads (the latest Mozilla CA bundle, the new-release check): pinned for both
+# consoles in ../shared/curl/curl.cmake
+include("${CMAKE_CURRENT_LIST_DIR}/../shared/curl/curl.cmake")
 
 set(VITALS_DEPS_DIR "${CMAKE_CURRENT_LIST_DIR}/build/deps")
 

@@ -6,6 +6,10 @@
 # ../shared/mbedtls/mbedtls.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/../shared/mbedtls/mbedtls.cmake")
 
+# curl, the app's downloads (the latest Mozilla CA bundle, the new-release check): pinned for both
+# consoles in ../shared/curl/curl.cmake
+include("${CMAKE_CURRENT_LIST_DIR}/../shared/curl/curl.cmake")
+
 set(VITALS_DEPS_DIR "${CMAKE_CURRENT_LIST_DIR}/build/deps")
 
 # Downloads <url> into build/deps (skipped when the cached copy already matches <sha256>)

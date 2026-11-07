@@ -1,9 +1,9 @@
 #include "certificates.h"
+#include "download.h"
 
 #include <curl/curl.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
-#include <openssl/ssl.h>
 #include <openssl/x509v3.h>
 
 #include <stdint.h>
@@ -13,13 +13,6 @@
 #include <string.h>
 
 #define CERTIFICATE_LIMIT 512
-
-typedef struct Download {
-    unsigned char *data;
-    size_t size;
-    STACK_OF(X509) *trust;
-    int trust_installed;
-} Download;
 
 static void free_chain(STACK_OF(X509) *chain) {
     sk_X509_pop_free(chain, X509_free);
@@ -108,96 +101,23 @@ static STACK_OF(X509) *parse_custom(const unsigned char *data, size_t size) {
     return chain;
 }
 
-static size_t receive_bundle(char *bytes, size_t size, size_t count, void *opaque) {
-    Download *download = opaque;
-    if (size != 0 && count > SIZE_MAX / size) return 0;
-    size_t length = size * count;
-    if (length > VITALS_CA_BUNDLE_LIMIT - download->size) return 0;
-    unsigned char *data = realloc(download->data, download->size + length + 1);
-    if (data == NULL) return 0;
-    download->data = data;
-    memcpy(data + download->size, bytes, length);
-    download->size += length;
-    data[download->size] = 0;
-    return length;
-}
-
-static CURLcode authoritative_trust(CURL *curl, void *ssl_context, void *opaque) {
-    Download *download = opaque;
-    X509_STORE *store = X509_STORE_new();
-    (void)curl;
-    if (store == NULL) return CURLE_OUT_OF_MEMORY;
-    for (int i = 0; i < sk_X509_num(download->trust); ++i) {
-        if (!X509_STORE_add_cert(store, sk_X509_value(download->trust, i))) {
-            unsigned long error = ERR_peek_last_error();
-            if (ERR_GET_REASON(error) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
-                X509_STORE_free(store);
-                ERR_clear_error();
-                return CURLE_SSL_CACERT_BADFILE;
-            }
-            ERR_clear_error();
-        }
-    }
-    /* Replace, rather than augment, curl/OpenSSL's default or cached trust store */
-    SSL_CTX_set_cert_store((SSL_CTX *)ssl_context, store);
-    download->trust_installed = 1;
-    return CURLE_OK;
-}
-
-static STACK_OF(X509) *fetch_bundle(const char *url, const char *mozilla_path,
-    long timeout, STACK_OF(X509) *embedded, VitalsCertificateBundle *result) {
-    Download download = {.trust = embedded};
+/* The latest bundle, through the app's shared download (../../shared/app/download.c), trusting only
+ * the Mozilla certificates the app carries: none of curl's or OpenSSL's own, nor Sony's */
+static STACK_OF(X509) *fetch_bundle(const char *url, const unsigned char *mozilla, size_t mozilla_size,
+    long timeout, VitalsCertificateBundle *result) {
     STACK_OF(X509) *chain = NULL;
-    CURL *curl = NULL;
-    CURLcode error = CURLE_FAILED_INIT;
-    int initialized = 0;
     if (url == NULL) { result->download_error = CURLE_COULDNT_CONNECT; return NULL; }
-    CURLsslset backend = curl_global_sslset(CURLSSLBACKEND_OPENSSL, NULL, NULL);
-    if (backend != CURLSSLSET_OK && backend != CURLSSLSET_TOO_LATE) goto done;
-    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) goto done;
-    initialized = 1;
-    const curl_version_info_data *version = curl_version_info(CURLVERSION_NOW);
-    if (version == NULL || version->ssl_version == NULL ||
-        strncmp(version->ssl_version, "OpenSSL/", 8) != 0) goto done;
-    curl = curl_easy_init();
-    if (curl == NULL) goto done;
-#define SET(option, value) do { error = curl_easy_setopt(curl, option, value); if (error != CURLE_OK) goto done; } while (0)
-    SET(CURLOPT_URL, url);
-    SET(CURLOPT_PROTOCOLS_STR, "https");
-    SET(CURLOPT_FOLLOWLOCATION, 0L);
-    SET(CURLOPT_FAILONERROR, 1L);
-    SET(CURLOPT_PROXY, "");
-    SET(CURLOPT_NETRC, CURL_NETRC_IGNORED);
-    SET(CURLOPT_SSL_VERIFYPEER, 1L);
-    SET(CURLOPT_SSL_VERIFYHOST, 2L);
-    SET(CURLOPT_SSLVERSION, (long)CURL_SSLVERSION_TLSv1_2);
-    SET(CURLOPT_CAINFO, mozilla_path);
-    SET(CURLOPT_CAPATH, NULL);
-    SET(CURLOPT_SSL_OPTIONS, 0L);
-    SET(CURLOPT_SSL_CTX_FUNCTION, authoritative_trust);
-    SET(CURLOPT_SSL_CTX_DATA, &download);
-    SET(CURLOPT_SSL_SESSIONID_CACHE, 0L);
-    SET(CURLOPT_CA_CACHE_TIMEOUT, 0L);
-    SET(CURLOPT_FRESH_CONNECT, 1L);
-    SET(CURLOPT_FORBID_REUSE, 1L);
-    SET(CURLOPT_CONNECTTIMEOUT, timeout < 10 ? timeout : 10L);
-    SET(CURLOPT_TIMEOUT, timeout);
-    SET(CURLOPT_NOSIGNAL, 1L);
-    SET(CURLOPT_USERAGENT, "vitals-certificate-updater");
-    SET(CURLOPT_WRITEFUNCTION, receive_bundle);
-    SET(CURLOPT_WRITEDATA, &download);
-    error = curl_easy_perform(curl);
-    (void)curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &result->http_status);
-    if (error == CURLE_OK && result->http_status == 200 && download.trust_installed) {
-        chain = parse_bundle(download.data, download.size);
-        if (chain == NULL) error = CURLE_SSL_CACERT_BADFILE;
-    } else if (error == CURLE_OK) error = CURLE_HTTP_RETURNED_ERROR;
-#undef SET
-done:
-    result->download_error = (int)error;
-    if (curl != NULL) curl_easy_cleanup(curl);
-    if (initialized) curl_global_cleanup();
-    free(download.data);
+    VitalsDownload request = {url, (const char *)mozilla, mozilla_size, "vitals-certificate-updater", NULL,
+        timeout, VITALS_CA_BUNDLE_LIMIT, NULL, NULL};
+    VitalsDownloaded download;
+    int failed = vitals_download(&request, &download);
+    result->download_error = download.error;
+    result->http_status = download.status;
+    if (!failed) {
+        chain = parse_bundle((const unsigned char *)download.data, download.size);
+        if (chain == NULL) result->download_error = CURLE_SSL_CACERT_BADFILE;
+    }
+    vitals_download_free(&download);
     return chain;
 }
 
@@ -244,7 +164,7 @@ int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path,
     embedded = parse_bundle(mozilla_data, mozilla_size);
     if (embedded == NULL) goto done;
     bundle->sony_count = (size_t)sk_X509_num(sony);
-    downloaded = fetch_bundle(url, mozilla_path, timeout_seconds, embedded, bundle);
+    downloaded = fetch_bundle(url, mozilla_data, mozilla_size, timeout_seconds, bundle);
     STACK_OF(X509) *selected = downloaded == NULL ? embedded : downloaded;
     bundle->downloaded = downloaded != NULL;
     bundle->mozilla_count = (size_t)sk_X509_num(selected);

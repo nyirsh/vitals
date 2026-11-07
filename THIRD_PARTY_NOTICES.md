@@ -1,12 +1,12 @@
 # Third-party notices
 
-These notices cover the third-party software and data in vitals, for the PS Vita and the PlayStation 3. Both apps' packages include this file and the [licenses](licenses/) folder. The exact versions and SHA-256 hashes of what's downloaded at build time are pinned in [shared/mbedtls/mbedtls.cmake](shared/mbedtls/mbedtls.cmake) for Mbed TLS and in [vita/dependencies.cmake](vita/dependencies.cmake) for curl.
+These notices cover the third-party software and data in vitals, for the PS Vita and the PlayStation 3. Both apps' packages include this file and the [licenses](licenses/) folder. The exact versions and SHA-256 hashes of what's downloaded at build time are pinned in [shared/mbedtls/mbedtls.cmake](shared/mbedtls/mbedtls.cmake) for Mbed TLS and in [shared/curl/curl.cmake](shared/curl/curl.cmake) for curl.
 
 ## Both consoles
 
 ### Mbed TLS
 
-vitals' libssl (`libssl.suprx` on the Vita, from `vita/vitals-ssl`; `libssl.sprx` on the PS3, from `ps3/vitals-ssl`) statically links `libmbedtls.a`, `libmbedx509.a` and `libtfpsacrypto.a`, built from the official Mbed TLS 4.2 source release (currently 4.2.0, which bundles TF-PSA-Crypto), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. vitals modifies it with four patches, in [shared/mbedtls](shared/mbedtls/), which both consoles' builds apply:
+vitals' libssl (`libssl.suprx` on the Vita, from `vita/vitals-ssl`; `libssl.sprx` on the PS3, from `ps3/vitals-ssl`), and the PS3's app (`ps3/vitals-app`, as libcurl's TLS), statically link `libmbedtls.a`, `libmbedx509.a` and `libtfpsacrypto.a`, built from the official Mbed TLS 4.2 source release (currently 4.2.0, which bundles TF-PSA-Crypto), downloaded from the `Mbed-TLS/mbedtls` GitHub releases. vitals modifies it with four patches, in [shared/mbedtls](shared/mbedtls/), which both consoles' builds apply:
 
 - [rsa-client.patch](shared/mbedtls/rsa-client.patch) puts back the client side of TLS 1.2's RSA key exchange and its four AES-CBC suites, which Mbed TLS removed in 4.0 and some of Sony's servers still use. It comes from devnoname120's [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) (v0.2.2, `tls13/crypto/patches/rsa-client-4.2.patch`), trimmed
 - [offer-unknown-ciphersuites.patch](shared/mbedtls/offer-unknown-ciphersuites.patch) lets a ClientHello list cipher suites Mbed TLS doesn't implement
@@ -27,7 +27,7 @@ Mbed TLS is an independent work; no endorsement by its authors is implied.
 
 ### curl
 
-The app statically links libcurl (currently 8.17.0), built from the unmodified official release archive from `curl.se` under the curl license (`licenses/curl-LICENSE.txt`). Source: <https://github.com/curl/curl/releases>. The Vita build disables unused protocols, default CA discovery and the console UI.
+Both apps statically link libcurl (currently 8.17.0), built from the unmodified official release archive from `curl.se` under the curl license (`licenses/curl-LICENSE.txt`). Source: <https://github.com/curl/curl/releases>. The builds disable unused protocols and default CA discovery; the Vita's uses OpenSSL (below) and disables the console UI, the PS3's uses Mbed TLS (above).
 
 ### OpenSSL, zlib and Zstandard
 

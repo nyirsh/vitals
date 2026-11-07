@@ -6,6 +6,8 @@
  * with, the connection test's reports and the Options' switches */
 #define VITALS_DIRECTORY "ux0:data/vitals"
 #define VITALS_REPORTS_DIRECTORY VITALS_DIRECTORY
+/* The Mozilla CA bundle the app carries (app0:), which its own downloads trust */
+#define VITALS_APP_CA_BUNDLE "mozilla-certs.pem"
 /* Each part's switch, as on the PS3: while its .off is there, that part is off from the next boot */
 #define VITALS_FLAGS_DIRECTORY VITALS_DIRECTORY "/flags"
 #define VITALS_TLS_OFF VITALS_FLAGS_DIRECTORY "/tls.off"

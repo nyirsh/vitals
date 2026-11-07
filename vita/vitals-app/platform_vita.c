@@ -170,6 +170,50 @@ int platform_circle_confirms(void)
     return circle_confirms;
 }
 
+/* ---- threads ---- */
+
+struct PlatformThread {
+    SceUID id;
+    void (*run)(void *argument);
+    void *argument;
+};
+
+static int thread_entry(SceSize size, void *arguments)
+{
+    (void)size;
+    PlatformThread *thread = *(PlatformThread **)arguments;
+    thread->run(thread->argument);
+    return sceKernelExitThread(0);
+}
+
+PlatformThread *platform_thread_start(const char *name, void (*run)(void *argument), void *argument, size_t stack_size)
+{
+    PlatformThread *thread = malloc(sizeof(*thread));
+    if (thread == NULL)
+        return NULL;
+    thread->run = run;
+    thread->argument = argument;
+    thread->id = sceKernelCreateThread(name, thread_entry, 0x10000100, (SceSize)stack_size, 0, 0, NULL);
+    /* The thread gets a copy of the pointer */
+    if (thread->id < 0 || sceKernelStartThread(thread->id, sizeof(thread), &thread) < 0)
+    {
+        if (thread->id >= 0)
+            sceKernelDeleteThread(thread->id);
+        free(thread);
+        return NULL;
+    }
+    return thread;
+}
+
+void platform_thread_join(PlatformThread *thread)
+{
+    if (thread == NULL)
+        return;
+    sceKernelWaitThreadEnd(thread->id, NULL, NULL);
+    sceKernelDeleteThread(thread->id);
+    free(thread);
+}
+
 /* ---- the system ---- */
 
 int platform_exit_requested(void)

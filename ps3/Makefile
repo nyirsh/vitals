@@ -41,6 +41,7 @@
 #                           (tools/ps3_comms.py); not SIGNED=1 on a console: the PlayStation Store
 #                           app hangs on a black screen loading the real-signed libssl and libhttp
 #   make uninstall, make reboot, make log, make status   tools/ps3_comms.py's
+#   make app-log            fetches the app's own log (vitals-app.log) into build/
 #   make upload-app [SIGNED=1]   builds the app and puts it in the console's /dev_hdd0/packages/
 #   make pull               pulls the newest published image (nyirsh/vitals-ps3-sdk:latest)
 # The console is PS3_HOST in .env (cp .env.example .env), or make's or the environment's PS3_HOST
@@ -191,6 +192,9 @@ update-certs:
 upload-app: app
 	python3 tools/ps3_comms.py app
 
+app-log:
+	python3 tools/ps3_comms.py app-log
+
 uninstall reboot log status:
 	python3 tools/ps3_comms.py $@
 
@@ -210,4 +214,4 @@ build/ps3dk-include/cell/http.h:
 		tar cf - cell/http.h cell/http cell/ssl.h cell/ssl cell/rtc.h cell/error.h' | tar xf - -C build/ps3dk-include
 	docker run --rm $(IMAGE) cat /opt/ps3dk-src/LICENSE > build/ps3dk-include/LICENSE
 
-.PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log status pull clean
+.PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log app-log status pull clean

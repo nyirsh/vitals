@@ -7,6 +7,7 @@
                                           redirects.txt and dns.txt, the boot_plugins.txt line,
                                           a fresh log
     tools/ps3_comms.py log                  fetches /dev_hdd0/vitals/logs/vitals.log (into build/)
+    tools/ps3_comms.py app-log              fetches the app's own, /dev_hdd0/vitals/logs/vitals-app.log
     tools/ps3_comms.py uninstall            the lines out of the two lists, the modules deleted
     tools/ps3_comms.py status               what's on the console now
     tools/ps3_comms.py reboot               a full reboot through webMAN MOD, waiting until it's back
@@ -395,12 +396,12 @@ def uninstall(ftp):
     print("Reboot the console to apply it.")
 
 
-def fetch_log(ftp):
-    data = read(ftp, LOG)
+def fetch_log(ftp, path=LOG):
+    data = read(ftp, path)
     if data is None:
-        sys.exit(f"{LOG}: not there (did the console reboot with the plugin?)")
+        sys.exit(f"{path}: not there" + (" (did the console reboot with the plugin?)" if path == LOG else " (has the app run?)"))
     os.makedirs(BUILD, exist_ok=True)
-    local = os.path.join(BUILD, "vitals.log")
+    local = os.path.join(BUILD, os.path.basename(path))
     with open(local, "wb") as file:
         file.write(data)
     sys.stdout.write(data.decode("latin1"))
@@ -440,7 +441,7 @@ def status(ftp):
 def main():
     load_env()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=("install", "log", "uninstall", "status", "reboot", "app"))
+    parser.add_argument("command", choices=("install", "log", "app-log", "uninstall", "status", "reboot", "app"))
     parser.add_argument("--signed", action="store_true", help="install the real-signed containers (the Store app hangs loading them)")
     parser.add_argument("--debug", type=int, choices=(0, 1, 2), default=0,
                         help="install libssl's and libhttp's debug builds of that level (build/vitals-ssl-debugN, build/vitals-http-debugN)")
@@ -458,6 +459,8 @@ def main():
             upload_app(ftp)
         elif arguments.command == "log":
             fetch_log(ftp)
+        elif arguments.command == "app-log":
+            fetch_log(ftp, APP_LOG)
         else:
             status(ftp)
     finally:

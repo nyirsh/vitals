@@ -51,8 +51,10 @@ def build_merge_tool(directory):
     """The installer's certificates.c with its host CLI, as the certificate tests build it."""
     flags = subprocess.check_output(["pkg-config", "--cflags", "--libs", "libcurl", "openssl"], text=True)
     tool = directory / "certificates"
-    subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-O1", str(APP / "certificates.c"),
-                    str(APP / "certificates_cli.c"), *shlex.split(flags), "-o", str(tool)], check=True)
+    shared = APP.parent.parent / "shared" / "app"
+    subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-O1", "-I", str(shared), str(shared / "download.c"),
+                    str(APP / "certificates.c"), str(APP / "certificates_cli.c"), *shlex.split(flags), "-o", str(tool)],
+                   check=True)
     return tool
 
 

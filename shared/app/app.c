@@ -12,6 +12,8 @@
 #include "font.h"
 #include "input.h"
 #include "platform.h"
+#include "release_check.h"
+#include "release_version.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -64,10 +66,18 @@ static char certificates_updated[40];
 /* The certificates on the console are more than three months old */
 static int certificates_stale;
 
+/* A newer published release than this app, once the console's check found one; NULL otherwise */
+static const char *newer_release(void)
+{
+	const char *latest = release_check_latest();
+	return latest != NULL && vitals_release_newer(latest, VITALS_VERSION) == 1 ? latest : NULL;
+}
+
 static AppStatus status(void)
 {
 	AppStatus s = {installed, outdated, installed_version,
-	               installed && !outdated && debug_level > 0 ? debug_names[debug_level] : NULL, console_system_text()};
+	               installed && !outdated && debug_level > 0 ? debug_names[debug_level] : NULL, console_system_text(),
+	               newer_release()};
 	return s;
 }
 
@@ -536,6 +546,10 @@ static void run_menu(void)
 	int refresh = 1, redraw = 1;
 	CheckScrollRepeat repeat = {0};
 	uint64_t started = platform_now_ms(), last_shown = started;
+	/* The new-release check starts once the menu has been up 3 seconds, past the PS3's first frames;
+	 * the menu is drawn again when it finds one */
+	int release_check = 0;
+	const char *shown_release = NULL;
 	for (;;) {
 		if (refresh) {
 			refresh_state();
@@ -604,6 +618,14 @@ static void run_menu(void)
 			platform_show_again();
 			last_shown = now;
 		}
+		if (!release_check && now - started >= 3000) {
+			release_check_start();
+			release_check = 1;
+		}
+		if (newer_release() != shown_release) {
+			shown_release = newer_release();
+			redraw = 1;
+		}
 		int direction = check_scroll_direction(pad.buttons & PAD_UP, pad.buttons & PAD_DOWN, pad.left_y, pad.right_y);
 		int steps = check_scroll_repeat(&repeat, direction, now);
 		if (steps != 0) {
@@ -628,7 +650,11 @@ static void run_menu(void)
 			int rc = 0;
 			if (action == ACTION_EXIT)
 				break;
-			else if (action == ACTION_TEST)
+			/* The check never runs alongside the test or an operation; reading the documents needs
+			 * no network, so it goes on */
+			if (action != ACTION_CHANGELOG && action != ACTION_CREDITS)
+				release_check_stop();
+			if (action == ACTION_TEST)
 				rc = run_test(0);
 			else if (action == ACTION_CHANGELOG)
 				rc = run_document(&changelog);
@@ -686,6 +712,7 @@ int app_main(int autotest)
 	} else
 		run_menu();
 	app_log("exiting%s", platform_exit_requested() ? ", as the system asked" : "");
+	release_check_stop();
 	vitals_check_stop();
 	console_close();
 	check_font_close();

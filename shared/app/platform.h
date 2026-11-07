@@ -58,4 +58,10 @@ uint64_t platform_now_ms(void);
 /* Reads at most capacity bytes of the file at path into data: how many, or -1 when it can't be read */
 long platform_read_file(const char *path, char *data, size_t capacity);
 
+/* A thread running run(argument) with a stack of stack_size bytes, or NULL when it couldn't start */
+typedef struct PlatformThread PlatformThread;
+PlatformThread *platform_thread_start(const char *name, void (*run)(void *argument), void *argument, size_t stack_size);
+/* Waits for it to end, and frees it */
+void platform_thread_join(PlatformThread *thread);
+
 #endif

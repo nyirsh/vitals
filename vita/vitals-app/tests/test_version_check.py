@@ -35,9 +35,10 @@ class VersionCheckTests(unittest.TestCase):
             raise unittest.SkipTest('Native version check tests require libcurl development libraries and pkg-config')
         cls.executable = cls.directory / 'version-check'
         subprocess.run([os.environ.get('CC', 'cc'), '-std=c11', '-Wall', '-Wextra', '-Werror', '-O1', '-g',
-                        '-I', str(ROOT / 'vitals-app'),
-                        str(ROOT / 'vitals-app/version_check.c'), str(ROOT / 'vitals-app/release_version.c'),
-                        str(ROOT / 'vitals-app/version_check_cli.c'), *shlex.split(flags),
+                        '-I', str(ROOT.parent / 'shared/app'),
+                        *(str(ROOT.parent / 'shared/app' / name) for name in
+                          ('download.c', 'release_fetch.c', 'release_version.c', 'tests/release_fetch_cli.c')),
+                        *shlex.split(flags),
                         '-o', str(cls.executable)], check=True, capture_output=True, timeout=60)
         for name in ('root', 'other'):
             cls.openssl('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '1',

@@ -15,8 +15,10 @@
 #include <rsx/gcm_sys.h>
 #include <rsx/rsx.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/memory.h>
+#include <sys/ppu_thread.h>
 #include <sys/sys_time.h>
 #include <sys/timer.h>
 #include <sysutil/video.h>
@@ -461,4 +463,44 @@ long platform_read_file(const char *path, char *data, size_t capacity)
 		length += read;
 	cellFsClose(fd);
 	return (long)length;
+}
+
+/* ---- threads ---- */
+
+struct PlatformThread {
+	sys_ppu_thread_t id;
+	void (*run)(void *argument);
+	void *argument;
+};
+
+static void thread_entry(uint64_t argument)
+{
+	PlatformThread *thread = (PlatformThread *)(uintptr_t)argument;
+	thread->run(thread->argument);
+	sys_ppu_thread_exit(0);
+}
+
+PlatformThread *platform_thread_start(const char *name, void (*run)(void *argument), void *argument, size_t stack_size)
+{
+	PlatformThread *thread = malloc(sizeof(*thread));
+	if (thread == NULL)
+		return NULL;
+	thread->run = run;
+	thread->argument = argument;
+	/* Below the main thread's priority (1000), as the test's worker */
+	if (sys_ppu_thread_create(&thread->id, thread_entry, (uint64_t)(uintptr_t)thread, 1500, stack_size,
+	                          SYS_PPU_THREAD_CREATE_JOINABLE, name) != 0) {
+		free(thread);
+		return NULL;
+	}
+	return thread;
+}
+
+void platform_thread_join(PlatformThread *thread)
+{
+	if (thread == NULL)
+		return;
+	uint64_t ignored;
+	sys_ppu_thread_join(thread->id, &ignored);
+	free(thread);
 }

@@ -26,6 +26,9 @@ typedef struct {
 
 /* Waits up to 10 seconds for an IP address: 0, or the error */
 int http_network_start(void);
+/* The same, asking stop while it waits: 1 from it ends the wait (the app's curl downloads,
+ * console_network_start) */
+int http_network_wait(int (*stop)(void));
 /* The network, libhttp and libssl with Sony's CAs: 0, or the failing call's result */
 int http_open(void);
 void http_close(void);

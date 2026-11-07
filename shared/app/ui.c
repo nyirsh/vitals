@@ -438,6 +438,11 @@ static void header(uint32_t *p, const AppStatus *s)
 	else
 		snprintf(line, sizeof(line), "Version %s", VITALS_VERSION);
 	text(p, X(30), Y(58), line, muted, 17);
+	if (s->latest_release != NULL) {
+		int left = X(30) + width(line, 17);
+		snprintf(line, sizeof(line), "  -  %s available on GitHub / GitLab", s->latest_release);
+		text(p, left, Y(58), line, amber, 17);
+	}
 	char status[48];
 	int known = s->installed_version != NULL && s->installed_version[0] != '\0';
 	if (s->outdated && known && strcmp(s->installed_version, VITALS_VERSION) != 0)

@@ -7,7 +7,7 @@
 #include "boot_plugins.h"
 #include "custom_certs.h"
 #include "dates.h"
-#include "http.h"
+#include "download.h"
 
 #include <cell/cell_fs.h>
 #include <stdarg.h>
@@ -444,48 +444,56 @@ static int bundle_looks_right(const char *data, size_t length, unsigned *count)
 	return *count >= 100;
 }
 
-/* The download and check; vitals_update_certificates closes libhttp after it */
+/* curl's notes on the download, into the app's log */
+static void log_line(const char *line)
+{
+	app_log("%s", line);
+}
+
+/* The download, through curl on the app's own Mbed TLS (download.h), trusting only the Mozilla bundle
+ * the app carries: it works whatever the console's TLS is, vitals' off or broken included. Then the
+ * check */
 static int download_certificates(VitalsNote note)
 {
 	note("Connecting to the network...");
-	int rc = http_open();
+	int rc = console_network_start(NULL);
 	if (rc < 0) {
-		notef(note, "The network or libhttp didn't start (0x%08X)", (unsigned)rc);
+		notef(note, "The network didn't start (0x%08X)", (unsigned)rc);
 		return rc;
 	}
-	char *data = malloc(CA_BUNDLE_LIMIT + 1);
-	if (data == NULL)
+	char trust_path[320];
+	size_t trust_length = 0;
+	snprintf(trust_path, sizeof(trust_path), "%s/" VITALS_APP_CA_BUNDLE, vitals_install_source());
+	char *trust = read_file(trust_path, CA_BUNDLE_LIMIT, &trust_length);
+	if (trust == NULL) {
+		notef(note, "Can't read %s", trust_path);
 		return -1;
+	}
 	note("Downloading " CA_UPDATE_URL);
-	HttpResult result;
-	http_reset_cancel();
-	rc = http_get(CA_UPDATE_URL, data, CA_BUNDLE_LIMIT + 1, &result);
+	VitalsDownload request = {CA_UPDATE_URL, trust, trust_length, "vitals/" VITALS_VERSION " (PS3)", NULL, 30,
+	                          CA_BUNDLE_LIMIT, NULL, log_line};
+	VitalsDownloaded result;
+	rc = vitals_download(&request, &result);
+	free(trust);
 	unsigned count = 0;
 	if (rc < 0) {
-		if (result.verify_error != 0)
-			notef(note, "The server's certificate was refused (flags 0x%04X)", (unsigned)result.verify_error);
+		if (result.status != 0 && result.status != 200)
+			notef(note, "The server answered HTTP %ld", result.status);
 		else
-			notef(note, "The download failed (0x%08X)%s", (unsigned)rc,
-			      /* Sony's libssl can't do curl.se's TLS: its handshake fails */
-			      ((uint32_t)rc & 0xffffff00u) == 0x80710b00u ? ": is vitals installed and the console rebooted?" : "");
-	} else if (result.http_code != 200) {
-		notef(note, "The server answered HTTP %d", result.http_code);
-		rc = -1;
-	} else if (result.length >= CA_BUNDLE_LIMIT) {
-		note("The bundle is larger than expected");
-		rc = -1;
-	} else if (!bundle_looks_right(data, result.length, &count)) {
+			notef(note, "The download failed (%d): %s", result.error,
+			      result.message[0] != '\0' ? result.message : vitals_download_error(result.error));
+	} else if (!bundle_looks_right(result.data, result.size, &count)) {
 		notef(note, "The download isn't a CA bundle (%u certificates)", count);
 		rc = -1;
 	} else {
-		const char *dated = strstr(data, "Certificate data from Mozilla as of: ");
+		const char *dated = strstr(result.data, "Certificate data from Mozilla as of: ");
 		char when[48] = "";
 		if (dated != NULL)
 			sscanf(dated + 37, "%47[^\r\n]", when);
-		notef(note, "Received %u certificates, %u bytes, over %s%s%s", count, (unsigned)result.length,
-		      http_protocol_name(result.ssl_version, result.cipher), when[0] ? ", Mozilla's of " : "", when);
+		notef(note, "Received %u certificates, %u bytes%s%s", count, (unsigned)result.size,
+		      when[0] ? ", Mozilla's of " : "", when);
 		make_directories();
-		rc = write_file(VITALS_BUNDLE, data, result.length);
+		rc = write_file(VITALS_BUNDLE, result.data, result.size);
 		if (rc != CELL_FS_SUCCEEDED)
 			notef(note, "Can't write " VITALS_BUNDLE " (0x%08X)", (unsigned)rc);
 		else {
@@ -493,7 +501,7 @@ static int download_certificates(VitalsNote note)
 			merge_custom_certificates(0, note);
 		}
 	}
-	free(data);
+	vitals_download_free(&result);
 	return rc;
 }
 
@@ -531,9 +539,7 @@ void vitals_certificates_date(char *text, size_t size, int *stale)
 
 int vitals_update_certificates(VitalsNote note)
 {
-	int rc = download_certificates(note);
-	http_close();
-	return rc;
+	return download_certificates(note);
 }
 
 void vitals_reboot(void)

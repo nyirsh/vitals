@@ -44,6 +44,7 @@ class CertificateUpdateTests(unittest.TestCase):
             raise unittest.SkipTest('Native certificate tests require libcurl/OpenSSL development libraries and pkg-config')
         cls.executable = cls.directory / 'certificates'
         command = [os.environ.get('CC', 'cc'), '-std=c11', '-Wall', '-Wextra', '-Werror', '-O1', '-g',
+                   '-I', str(ROOT.parent / 'shared/app'), str(ROOT.parent / 'shared/app/download.c'),
                    str(ROOT / 'vitals-app/certificates.c'), str(ROOT / 'vitals-app/certificates_cli.c'),
                    *shlex.split(flags), '-o', str(cls.executable)]
         if os.environ.get('VITALS_CERTIFICATE_SANITIZERS') == '1':

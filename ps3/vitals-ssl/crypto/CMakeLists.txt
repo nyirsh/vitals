@@ -1,6 +1,7 @@
-# Mbed TLS 4.2 and TF-PSA-Crypto, for vitals' libssl; VITALS_MBEDTLS_ARCHIVE comes from the including
-# CMakeLists.txt (see ../../dependencies.cmake). As vitals' tls13-vita/crypto, with the PS3's own
-# crypto options (psa_user_config.h) and mutexes (threading_alt.h)
+# Mbed TLS 4.2 and TF-PSA-Crypto, for vitals' libssl and the app's curl; VITALS_MBEDTLS_ARCHIVE comes
+# from the including CMakeLists.txt (see ../../dependencies.cmake). As vitals' tls13-vita/crypto, with
+# the PS3's own crypto options (psa_user_config.h, or the including build's VITALS_PSA_USER_CONFIG: the
+# app's, ../../vitals-app/crypto) and mutexes (threading_alt.h)
 # The patches, their applier and the TLS options are both consoles' (../../../shared/mbedtls); the
 # crypto options and mutexes, here, are this console's
 set(VITALS_SHARED_MBEDTLS "${CMAKE_CURRENT_LIST_DIR}/../../../shared/mbedtls")
@@ -10,7 +11,10 @@ set(GEN_FILES OFF CACHE BOOL "" FORCE)
 set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
 set(USE_STATIC_MBEDTLS_LIBRARY ON CACHE BOOL "" FORCE)
 set(MBEDTLS_USER_CONFIG_FILE "${VITALS_SHARED_MBEDTLS}/mbedtls_user_config.h" CACHE FILEPATH "" FORCE)
-set(TF_PSA_CRYPTO_USER_CONFIG_FILE "${CMAKE_CURRENT_LIST_DIR}/psa_user_config.h" CACHE FILEPATH "" FORCE)
+if(NOT VITALS_PSA_USER_CONFIG)
+    set(VITALS_PSA_USER_CONFIG "${CMAKE_CURRENT_LIST_DIR}/psa_user_config.h")
+endif()
+set(TF_PSA_CRYPTO_USER_CONFIG_FILE "${VITALS_PSA_USER_CONFIG}" CACHE FILEPATH "" FORCE)
 
 include(FetchContent)
 include_directories(BEFORE "${CMAKE_CURRENT_LIST_DIR}")

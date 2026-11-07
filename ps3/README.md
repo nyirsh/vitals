@@ -189,7 +189,9 @@ Its menu, as the Vita's:
   installed), and the confirm button (X, or O where the console confirms with O) does it.
 - **Update certificates**: downloads Mozilla's CA bundle as curl publishes it
   (`https://curl.se/ca/cacert.pem`). Its "Last update" date turns red once it's more than three
-  months old.
+  months old. The app downloads it with its own curl and Mbed TLS, as the Vita's app does, trusting
+  only the Mozilla bundle it carries, so it works with vitals' TLS switched off or not installed.
+- The menu shows when GitHub or GitLab has a newer release than the app, found the same way.
 - **Options**: the four switches and the debug output, applied with START (see
   [On the console](#on-the-console)).
 - **Test connections**: the connection test, below.

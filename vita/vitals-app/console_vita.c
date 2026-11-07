@@ -201,6 +201,13 @@ int console_switch_set(unsigned index, int off)
     return 0;
 }
 
+/* ---- the network, for the app's own downloads ---- */
+
+int console_network_start(int (*stop)(void))
+{
+    return network_start(stop);
+}
+
 /* ---- the rest ---- */
 
 void console_app_file(const char *name, char *path, size_t size)

@@ -76,6 +76,12 @@ int console_switch_is_off(unsigned index);
 /* Turns it off or on: 0, or the error */
 int console_switch_set(unsigned index, int off);
 
+/* ---- the network, for the app's own downloads (download.h) ---- */
+
+/* Starts the console's network and waits for it, and whatever curl needs under it: 0, or the error.
+ * stop, when given, is asked while it waits, and 1 from it ends the wait */
+int console_network_start(int (*stop)(void));
+
 /* ---- the rest ---- */
 
 /* Where the app's own file name (CHANGELOG.md, CREDITS.md) is, for platform_read_file */
