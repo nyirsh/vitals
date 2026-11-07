@@ -12,9 +12,13 @@
 #                                                  (64-bit pointers in header lists' sizes, and a
 #                                                  refused connection's real ECONNREFUSED where
 #                                                  RPCS3's gives 0x80710316)
-# libssl is vitals' release build either way. sony-4.93.txt is Sony's 4.93 libhttp's run, in RPCS3
+# libssl is vitals' release build either way. sony-4.93.txt is Sony's 4.93 libhttp's run, in RPCS3.
+# With VITALS_PROBE_SSL=sony, libssl stays RPCS3's own, Sony's, for either libhttp: its lines go in
+# build/http-probe/<label>-sony-ssl.txt, and vitals' are compared with Sony's libhttp's on that same
+# libssl (run `sony` first), as vitals' libhttp runs with tls.off
 set -eu
 label=$1
+sony_ssl=${VITALS_PROBE_SSL:-}
 here=$(cd "$(dirname "$0")/.." && pwd)
 out="$here/build/http-probe"
 mkdir -p "$out"
@@ -81,24 +85,35 @@ if [ "$label" = host ]; then
 	cp "$tls/ca.pem" "$host_hdd/vitals-probe/ca.pem"
 	VITALS_PROBE_HDD=$host_hdd "$2" > "$out/host.raw" || echo "probe: exited with $?" >> "$out/host.raw"
 	cat "$out/host.raw"
-elif [ "$label" = vitals ]; then
-	VITALS_HTTP=$2 "$here/tools/rpcs3_run.sh" "$here/build/vitals-ssl/libssl.fake.sprx" "$here/build/http-probe/http-probe.elf" 60
 else
-	"$here/tools/rpcs3_run.sh" "$here/build/vitals-ssl/libssl.fake.sprx" "$here/build/http-probe/http-probe.elf" 60
-fi | sed -n 's/^ *probe: //p' > "$out/$label.txt"
-echo "$out/$label.txt: $(wc -l < "$out/$label.txt") lines"
+	libssl="$here/build/vitals-ssl/libssl.fake.sprx"
+	if [ "$sony_ssl" = sony ]; then
+		# A copy: rpcs3_run.sh puts the module it's given over RPCS3's own, and back after
+		cp "$HOME/Library/Application Support/rpcs3/dev_flash/sys/external/libssl.sprx" "$out/sony-libssl.sprx"
+		libssl="$out/sony-libssl.sprx"
+	fi
+	if [ "$label" = vitals ]; then
+		VITALS_HTTP=$2 "$here/tools/rpcs3_run.sh" "$libssl" "$here/build/http-probe/http-probe.elf" 60
+	else
+		"$here/tools/rpcs3_run.sh" "$libssl" "$here/build/http-probe/http-probe.elf" 60
+	fi
+fi | sed -n 's/^ *probe: //p' > "$out/$label${sony_ssl:+-sony-ssl}.txt"
+result="$out/$label${sony_ssl:+-sony-ssl}.txt"
+echo "$result: $(wc -l < "$result") lines"
 # vitals' differs from Sony's where it does on purpose: those lines (Sony's "< ", vitals' "> ", in
 # order, without line numbers) are in tests/http-probe/vitals-differences.txt, and any other
 # difference fails the run. VITALS_PROBE_RECORD=1 writes that file from this run, to review
 if [ "$label" = vitals ] || [ "$label" = host ]; then
 	expected="$here/tests/http-probe/$label-differences.txt"
+	baseline="$here/tests/http-probe/sony-4.93.txt"
+	[ "$sony_ssl" = sony ] && baseline="$out/sony-sony-ssl.txt"
 	python3 -c 'import difflib, sys
 old, new = (open(p, encoding="latin1").read().splitlines() for p in sys.argv[1:3])
 with open(sys.argv[3], "w", encoding="latin1") as out:
     for tag, a, b, c, d in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
         if tag != "equal":
             out.writelines([f"< {line}\n" for line in old[a:b]] + [f"> {line}\n" for line in new[c:d]])' \
-		"$here/tests/http-probe/sony-4.93.txt" "$out/$label.txt" "$out/differences.txt"
+		"$baseline" "$result" "$out/differences.txt"
 	if [ "${VITALS_PROBE_RECORD:-0}" = 1 ]; then
 		cp "$out/differences.txt" "$expected"
 		echo "$expected: $(wc -l < "$expected") lines recorded"

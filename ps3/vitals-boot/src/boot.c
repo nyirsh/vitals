@@ -22,8 +22,7 @@
  * the XMB's SSL calls go through its bridge, and xmb-tls.off and xmb-http.off turn it off.
  *
  * Each component has a switch in /dev_hdd0/vitals/flags (common/vitals_paths.h): while tls.off is
- * there, Sony's libssl and libhttp stay for games (vitals' libhttp works on vitals' libssl);
- * http.off, Sony's libhttp; dns.off, no DNS rules; redirects.off, no host redirects (vitals'
+ * there, Sony's libssl stays for games (vitals' libhttp works on either); http.off, Sony's libhttp; dns.off, no DNS rules; redirects.off, no host redirects (vitals'
  * libhttp reads that one).
  *
  * Thirty seconds after start, a thread shows what this boot did in the XMB's own notification (the
@@ -111,7 +110,7 @@ static int create_file(const char *path)
 }
 
 /* Whether a component is on, and if not why, for the popup */
-enum { ON, OFF_BY_FLAG, OFF_MISSING, OFF_FAILED, OFF_NEEDS_TLS };
+enum { ON, OFF_BY_FLAG, OFF_MISSING, OFF_FAILED };
 
 /* vitals' libhttp, unless http.off is there or the module isn't */
 static int map_libhttp(void)
@@ -706,22 +705,21 @@ int module_start(size_t args, void *argp)
 	(void)args, (void)argp;
 	say(1, "start");
 	int cut_short = last_boot_cut_short();
-	/* vitals' libhttp works on vitals' libssl: tls.off leaves both Sony's */
 	if (file_exists(VITALS_TLS_OFF)) {
-		say(1, "tls.off is there: Sony's libssl and libhttp stay");
-		(void)unlink_file(LIBHTTP_ACTIVE);
+		say(1, "tls.off is there: Sony's libssl stays");
 		g_ssl = OFF_BY_FLAG;
-		g_http = OFF_NEEDS_TLS;
 	} else if (!file_exists(VITALS_LIBSSL)) {
 		say(1, "no " VITALS_LIBSSL ": Sony's libssl stays");
-		(void)unlink_file(LIBHTTP_ACTIVE);
 	} else {
 		int result = map_path(SONY_LIBSSL, VITALS_LIBSSL);
 		say(1, "map " SONY_LIBSSL " -> " VITALS_LIBSSL);
 		say(1, vitals_log_hex((uint32_t)result, hex));
 		g_ssl = result == 0 ? ON : OFF_FAILED;
-		g_http = map_libhttp();
 	}
+	/* vitals' libhttp on whichever libssl games get: it calls libssl through Sony's exports, as Sony's
+	 * libhttp does, so its switch is its own (the libhttp probe on Sony's libssl in RPCS3, where it
+	 * differs from Sony's libhttp only as on vitals', tools/http_probe.sh) */
+	g_http = map_libhttp();
 #ifdef VITALS_XMB
 	/* The XMB's own TLS has its switch (xmb-tls.off): it needs vitals' libssl there, not games' TLS on */
 	if (file_exists(VITALS_LIBSSL))
