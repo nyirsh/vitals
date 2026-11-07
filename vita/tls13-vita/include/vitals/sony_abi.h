@@ -86,13 +86,6 @@ extern "C" {
 
 #define VITALS_MAX_IO_CHUNK ((size_t)1500)
 
-typedef struct VitalsStartArgs {
-    uint32_t magic;
-    uint32_t version;
-    int32_t libhttp_modid;
-    uint32_t reserved;
-} VitalsStartArgs;
-
 static inline uint32_t vitals_read_u32(const void *base, size_t offset) {
     uint32_t value = 0;
     memcpy(&value, (const uint8_t *)base + offset, sizeof(value));

@@ -64,30 +64,8 @@ static int replace_suffix(const char *path, const char *suffix, size_t suffix_si
     return 1;
 }
 
-int vitals_browser_replacement_path(const char *path, char *output, size_t capacity) {
+int vitals_browser_engine_ca_path(const char *request, char *output, size_t capacity) {
     static const char suffix[] = "webcore/ScePsp2Compat.suprx";
-    static const char replacement[] = "vitals/ScePsp2Compat.suprx";
-    return replace_suffix(path, suffix, sizeof(suffix) - 1,
-        replacement, sizeof(replacement), output, capacity);
-}
-
-int vitals_browser_provider_path(const char *replacement, char *output, size_t capacity) {
-    static const char suffix[] = "vitals/ScePsp2Compat.suprx";
-    static const char provider[] = "vitals/" VITALS_BROWSER_PROVIDER_FILENAME;
-    return replace_suffix(replacement, suffix, sizeof(suffix) - 1,
-        provider, sizeof(provider), output, capacity);
-}
-
-int vitals_browser_ca_path(const char *replacement, char *output, size_t capacity) {
-    static const char suffix[] = "vitals/ScePsp2Compat.suprx";
     static const char ca[] = "cert/CA_LIST.cer";
-    return replace_suffix(replacement, suffix, sizeof(suffix) - 1,
-        ca, sizeof(ca), output, capacity);
-}
-
-int vitals_browser_module_path(const char *provider, char *output, size_t capacity) {
-    static const char suffix[] = "vitals/" VITALS_BROWSER_PROVIDER_FILENAME;
-    static const char module[] = "vitals/ScePsp2Compat.suprx";
-    return replace_suffix(provider, suffix, sizeof(suffix) - 1,
-        module, sizeof(module), output, capacity);
+    return replace_suffix(request, suffix, sizeof(suffix) - 1, ca, sizeof(ca), output, capacity);
 }

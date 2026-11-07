@@ -188,7 +188,8 @@ int vitals_browser_check(void *c, int *h) { (void)c; *h = 0; return 0; }
 int main(int argc, char **argv) {
     unsigned char *arena = mmap((void *)(uintptr_t)0x25000000, 0x500000, PROT_READ | PROT_WRITE,
         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
-    VitalsBrowserStartArgs args = {VITALS_BROWSER_START_MAGIC, VITALS_BROWSER_START_VERSION, 88, 0};
+    VitalsBrowserStartArgs args = {VITALS_BROWSER_START_MAGIC, VITALS_BROWSER_START_VERSION, 88, 0,
+        "wb0:/cert/CA_LIST.cer"};
     const void *arg_data = &args;
     SceSize arg_size = sizeof(args);
     const char *scenario;
@@ -246,8 +247,12 @@ int main(int argc, char **argv) {
     if (strcmp(scenario, "bad-data-memsz") == 0) {
         --mapped.segments[1].memsz; expect_gate_failure = 1;
     }
+    /* The certificate store's path from the kernel: unterminated, or not the store */
     if (strcmp(scenario, "bad-path") == 0) {
-        memset(mapped.path, 'x', sizeof(mapped.path)); expect_gate_failure = 1;
+        memset(args.ca_path, 'x', sizeof(args.ca_path)); expect_gate_failure = 1;
+    }
+    if (strcmp(scenario, "bad-ca-store") == 0) {
+        strcpy(args.ca_path, "wb0:/cert/other.cer"); expect_gate_failure = 1;
     }
     if (strcmp(scenario, "init-fail") == 0)
         init_error = -0x2180;

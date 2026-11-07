@@ -99,11 +99,6 @@ static int validate_module(int modid, uintptr_t *text) {
             (unsigned int)signature, (unsigned int)byte, result);
         return result;
     }
-    if (memchr(info.path, '\0', sizeof(info.path)) == NULL ||
-        !vitals_browser_ca_path(info.path, ca_path, sizeof(ca_path))) {
-        VITALS_LOG("browser module path rejected");
-        return -1;
-    }
     *text = (uintptr_t)info.segments[0].vaddr;
     return 0;
 }
@@ -135,6 +130,13 @@ int module_start(SceSize size, const void *data) {
         return SCE_KERNEL_START_FAILED;
     if (args.reserved != 0)
         return SCE_KERNEL_START_FAILED;
+    /* The certificate store as this process names it, from the kernel: whole, and the store */
+    if (memchr(args.ca_path, '\0', sizeof(args.ca_path)) == NULL ||
+        !vitals_path_has_suffix(args.ca_path, "cert/CA_LIST.cer", sizeof(args.ca_path))) {
+        VITALS_LOG("browser certificate store path rejected");
+        return SCE_KERNEL_START_FAILED;
+    }
+    memcpy(ca_path, args.ca_path, sizeof(args.ca_path));
     result = validate_module(args.compat_modid, &text);
     if (result != 0) return SCE_KERNEL_START_FAILED;
     ops.timeleft = (int (*)(void *, void *, int))(text + VITALS_BROWSER_TIMELEFT_OFFSET + 1);

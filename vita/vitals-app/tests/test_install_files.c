@@ -103,12 +103,12 @@ static int is(const char *vita_path, const char *expected)
 #define OLD_HTTP_PROVIDER "vs0:/data/external/vitals/native/vitals_http.suprx"
 #define OLD_REAUTH "vs0:/data/external/vitals/native/vitals-reauth.suprx"
 
-/* What vitals installs, and the app0: file each comes from: its modules in ux0:data/vitals/system,
- * but for the browser engine's, next to Sony's */
+/* What vitals installs, and the app0: file each comes from: the kernel plugin in ur0:tai, its modules
+ * in ux0:data/vitals/system */
 static const char *const installed[][2] = {
     {"ur0:tai/vitals.skprx", "app0:vitals.skprx"},
     {"ux0:data/vitals/system/vitals.suprx", "app0:vitals.suprx"},
-    {"vs0:/data/external/vitals/ScePsp2Compat.suprx", "app0:compat.suprx"},
+    {"ux0:data/vitals/system/ScePsp2Compat.suprx", "app0:compat.suprx"},
     {"ux0:data/vitals/system/libhttp.suprx", "app0:libhttp.suprx"},
     {"ux0:data/vitals/system/libssl.suprx", "app0:libssl.suprx"},
 };
@@ -117,6 +117,7 @@ static const char *const installed[][2] = {
 static const char *const old_layout[] = {
     "vs0:/data/external/vitals/libhttp.suprx",
     "vs0:/data/external/vitals/libssl.suprx",
+    "vs0:/data/external/vitals/ScePsp2Compat.suprx",
     "vs0:/data/external/vitals/native/vitals.suprx",
     "ur0:tai/vitals-native/vitals.suprx",
 };
@@ -200,7 +201,8 @@ static void expect_no_old_layout(void)
 {
     for (size_t i = 0; i < OLD_LAYOUT_COUNT; ++i)
         assert(!exists(old_layout[i]));
-    assert(!exists("vs0:/data/external/vitals/native") && !exists("ur0:tai/vitals-native"));
+    assert(!exists("vs0:/data/external/vitals/native") && !exists("vs0:/data/external/vitals") &&
+           !exists("ur0:tai/vitals-native"));
     assert(vitals_install_old_layout() == 0);
 }
 

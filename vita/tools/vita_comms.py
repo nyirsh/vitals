@@ -33,13 +33,13 @@ VITALS = "/ux0:/data/vitals"
 APP_TARGET = VITALS + "/vitals-app.vpk"
 CONFIG = "/ur0:/tai/config.txt"
 # What the app installs (vitals-app/install.c): the kernel plugin in ur0:tai, vitals' modules in
-# ux0:data/vitals/system, the browser engine's next to Sony's on vs0
+# ux0:data/vitals/system
 INSTALLED = [
     "/ur0:/tai/vitals.skprx",
     VITALS + "/system/libhttp.suprx",
     VITALS + "/system/libssl.suprx",
+    VITALS + "/system/ScePsp2Compat.suprx",
     VITALS + "/system/vitals.suprx",
-    "/vs0:/data/external/vitals/ScePsp2Compat.suprx",
     # Sony's certificate store, which the app rewrites, and its copy of Sony's original
     "/vs0:/data/external/cert/CA_LIST.cer",
     "/vs0:/data/external/cert/CA_LIST.cer_old",

@@ -13,10 +13,8 @@
 #define VITALS_LIBHTTP_PATH VITALS_SYSTEM_DIRECTORY "/libhttp.suprx"
 /* vitals-ssl, the system's libssl once installed; the browser provider's TLS too */
 #define VITALS_LIBSSL_PATH VITALS_SYSTEM_DIRECTORY "/libssl.suprx"
-/* vitals' browser engine stays next to Sony's: its swap keeps the folder the process names it by
- * (vitals_browser_replacement_path), so a process that sees vs0:data/external under another name
- * finds it there too */
-#define VITALS_COMPAT_PATH "vs0:/data/external/vitals/ScePsp2Compat.suprx"
+/* vitals' browser engine (ScePsp2Compat), loaded in place of Sony's webcore one */
+#define VITALS_COMPAT_PATH VITALS_SYSTEM_DIRECTORY "/ScePsp2Compat.suprx"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,10 +22,11 @@ extern "C" {
 
 int vitals_path_equals(const char *path, const char *expected, size_t maximum);
 int vitals_path_has_suffix(const char *path, const char *suffix, size_t maximum);
-int vitals_browser_replacement_path(const char *path, char *output, size_t capacity);
-int vitals_browser_provider_path(const char *replacement, char *output, size_t capacity);
-int vitals_browser_module_path(const char *provider, char *output, size_t capacity);
-int vitals_browser_ca_path(const char *replacement, char *output, size_t capacity);
+/* A process's request for Sony's browser engine (a path ending in webcore/ScePsp2Compat.suprx, right
+ * after a ':' or '/'): 1, with the certificate store as that process names it in output (the same
+ * start, then cert/CA_LIST.cer), as it may see vs0:data/external under a device of its own; 0 for
+ * any other path */
+int vitals_browser_engine_ca_path(const char *request, char *output, size_t capacity);
 
 #ifdef __cplusplus
 }

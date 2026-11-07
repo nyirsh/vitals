@@ -53,6 +53,7 @@ int ksceKernelGetModuleList(SceUID, unsigned int, unsigned int, SceUID *, SceSiz
 int ksceKernelGetModuleInfo(SceUID, SceUID, SceKernelModuleInfo *);
 int ksceKernelGetModuleIsSharedByAddr(SceUID, void *);
 SceUID ksceKernelLoadStartModuleForPid(SceUID, const char *, SceSize, const void *, int, const void *, int *);
+SceUID ksceKernelLoadModuleForPid(SceUID, const char *, int, void *);
 int ksceKernelUnloadModuleForPid(SceUID, SceUID, int, const void *);
 SceUID ksceKernelGetProcessId(void);
 int ksceKernelSysrootGetProcessTitleId(SceUID, char *, SceSize);

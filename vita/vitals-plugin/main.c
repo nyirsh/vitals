@@ -39,8 +39,6 @@ static const char *const g_replacement_modules[MODULE_COUNT] = {
     VITALS_LIBSSL_PATH,
 };
 
-/* The browser engine's replacement, on vs0, which is there from boot */
-static uint8_t g_replace_compat;
 
 static int g_loader_hook_id = -1;
 static tai_hook_ref_t g_loader_hook_ref;
@@ -67,12 +65,25 @@ static int path_is(const char *path, const char *a, const char *b)
            (b != NULL && vitals_path_equals(path, b, VITALS_MAX_MODULE_PATH));
 }
 
+/* vitals' engine, when the process's own load of it failed: the browser's process sees its files
+ * through a view of its own, without ux0 (0x80010013, no such device), so the kernel loads it with its
+ * own call, as it loads the provider into that same process (private, as the browser starts it so on
+ * the console; naming the process to the hooked load instead fails the same way). Its module ID, or
+ * the error */
+static SceUID load_engine_for_process(SceUID target_pid, const char *path, SceUID failed)
+{
+    ksceDebugPrintf("vitals: browser engine: the process's load failed (0x%08X)\n", failed);
+    SceUID res = ksceKernelLoadModuleForPid(target_pid, path, 0, NULL);
+    ksceDebugPrintf("vitals: browser engine: kernel load for pid=0x%X: 0x%08X\n", target_pid, res);
+    return res;
+}
+
 // load module for pid (0 for the caller), running in kernel context, path is in kernel
 static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags, int *ptr_to_four)
 {
     const SceUID target_pid = pid == 0 ? ksceKernelGetProcessId() : pid;
-    char browser_path[VITALS_PENDING_BROWSER_PATH_SIZE];
-    char browser_provider[VITALS_PENDING_BROWSER_PATH_SIZE];
+    const char *requested = path;
+    char browser_ca[VITALS_PENDING_BROWSER_PATH_SIZE];
     int module = -1;
 
     if ((path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
@@ -89,22 +100,34 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
         module = MODULE_LIBSSL;
         path = g_replacement_modules[module];
     }
-    else if (g_replace_compat && vitals_browser_replacement_path(path, browser_path, sizeof(browser_path)))
+    /* The browser engine: from ux0:data/vitals/system too, looked for at each load as libhttp is;
+     * the process names the certificate store by the start of its request, which the provider is
+     * given */
+    else if (vitals_browser_engine_ca_path(path, browser_ca, sizeof(browser_ca)) && module_present(MODULE_COMPAT))
     {
         module = MODULE_COMPAT;
-        path = browser_path;
+        path = g_replacement_modules[module];
     }
 
     /* vitals-http needs nothing injected, so libhttp keeps the mapping the loader asked for:
      * shared, as Sony's is, in the shell and everywhere else */
     SceUID res = TAI_CONTINUE(SceUID, g_loader_hook_ref, pid, path, flags, ptr_to_four);
+    if (res < 0 && module == MODULE_COMPAT)
+        res = load_engine_for_process(target_pid, path, res);
+    if (res < 0 && module == MODULE_COMPAT)
+    {
+        /* vitals' engine didn't load for this process: Sony's, so the browser still opens, without
+         * vitals' TLS (nothing is injected into it) */
+        ksceDebugPrintf("vitals: browser engine from %s failed (0x%08X), Sony's instead: %s\n", path, res, requested);
+        module = -1;
+        res = TAI_CONTINUE(SceUID, g_loader_hook_ref, pid, requested, flags, ptr_to_four);
+    }
     if (res < 0)
         return res;
 
     /* Injection waits until the native start hook reports that linking finished */
-    if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready() &&
-             vitals_browser_provider_path(path, browser_provider, sizeof(browser_provider)))
-        (void)vitals_post_start_defer(target_pid, res, browser_provider);
+    if (module == MODULE_COMPAT && vitals_kernel_browser_loader_ready())
+        (void)vitals_post_start_defer(target_pid, res, browser_ca);
     return res;
 }
 
@@ -147,20 +170,17 @@ int module_start(SceSize argc, const void *args)
     (void)args;
 
     ksceDebugPrintf("vitals module loaded\n");
-    /* The hooks go in whatever is there now: libhttp and libssl are looked for at each load */
-    g_replace_compat = module_present(MODULE_COMPAT);
+    /* The hooks go in whatever is there now: vitals' modules are looked for at each load */
 
 #if defined(__arm__)
     /* Resolve once here, never from a loader-hook callback */
     if (vitals_native_module_api_init() < 0)
         return SCE_KERNEL_START_FAILED;
 #endif
-    /* The browser provider, injected after vitals' browser engine starts */
-    if (g_replace_compat)
-    {
-        int init = vitals_kernel_loader_init();
-        ksceDebugPrintf("vitals: loader init=%d browser=%d\n", init, vitals_kernel_browser_loader_ready());
-    }
+    /* The browser provider, injected after vitals' browser engine starts; ready once it and the
+     * engine are found, now or at an engine load */
+    int init = vitals_kernel_loader_init();
+    ksceDebugPrintf("vitals: loader init=%d browser=%d\n", init, vitals_kernel_browser_loader_ready());
 
     SceUID modid = ksceKernelSearchModuleByName("SceKernelModulemgr");
     if (modid <= 0 || vitals_validate_loader_hook(modid) < 0 || vitals_post_start_init() < 0)

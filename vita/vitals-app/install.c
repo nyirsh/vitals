@@ -62,8 +62,7 @@ enum
     MODULE_OLD_REAUTH,
 };
 
-/* vitals' modules in ux0:data/vitals/system, but for the browser engine's, which stays next to Sony's
- * on vs0 (vitals/path.h) */
+/* vitals' modules, all in ux0:data/vitals/system (vitals/path.h) */
 static const char *const new_modules[] = {
     [MODULE_COMPAT] = VITALS_COMPAT_PATH,
     /* vitals-http, which does its own TLS */
@@ -76,17 +75,19 @@ static const char *const new_modules[] = {
     [MODULE_OLD_REAUTH] = "vs0:/data/external/vitals/native/vitals-reauth.suprx",
 };
 
-/* Where earlier versions kept the modules that are in ux0:data/vitals/system now: libhttp and libssl
- * on vs0, and the browser provider twice, the kernel plugin's copy in ur0:tai and a second on vs0.
- * Every install and uninstall takes them out, and their folders when empty */
+/* Where earlier versions kept the modules that are in ux0:data/vitals/system now: libhttp, libssl and
+ * the browser engine on vs0, and the browser provider twice, the kernel plugin's copy in ur0:tai and a
+ * second on vs0. Every install and uninstall takes them out, and their folders when empty */
 static const char *const old_layout[] = {
     "vs0:/data/external/vitals/libhttp.suprx",
     "vs0:/data/external/vitals/libssl.suprx",
+    "vs0:/data/external/vitals/ScePsp2Compat.suprx",
     "vs0:/data/external/vitals/native/vitals.suprx",
     "ur0:tai/vitals-native/vitals.suprx",
 };
 static const char *const old_layout_folders[] = {
     "vs0:/data/external/vitals/native",
+    "vs0:/data/external/vitals",
     "ur0:tai/vitals-native",
 };
 
@@ -1246,8 +1247,6 @@ int vitals_install_apply(enum VitalsOption option, int removing, VitalsNote note
     /* reAuth's redirect is built into vitals, and both would take over the same libhttp loads */
     if (result >= 0 && option == VITALS_OPTION_FULL && !removing)
         result = remove_reauth_install();
-    if (result >= 0 && !path_exists("vs0:/data/external/vitals"))
-        result = sceIoMkdir("vs0:/data/external/vitals", 0777);
     if (result >= 0)
         result = vitals_plan_option(option, removing, &plan);
     if (result >= 0)

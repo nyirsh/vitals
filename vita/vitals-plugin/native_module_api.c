@@ -13,6 +13,7 @@ static int (*get_info)(SceUID, SceUID, SceKernelModuleInfo *);
 static int (*get_list)(SceUID, int, int, SceUID *, SceSize *);
 static int (*unload_module)(SceUID, SceUID, int, const void *);
 static int (*is_shared)(SceUID, void *);
+static SceUID (*load_module)(SceUID, const char *, int, void *);
 static int ready;
 
 int vitals_native_module_api_init(void) {
@@ -50,6 +51,17 @@ int vitals_native_module_api_init(void) {
     get_list = (int (*)(SceUID, int, int, SceUID *, SceSize *))addresses[1];
     unload_module = (int (*)(SceUID, SceUID, int, const void *))addresses[2];
     is_shared = (int (*)(SceUID, void *))addresses[3];
+    /* ksceKernelLoadModuleForPid, which isn't needed to start: without it, only the browser engine's
+     * load from ux0 goes without its last try (vitals-headers' db/360 and db/363) */
+    static const uint32_t load_nids[VITALS_KERNEL_FAMILY_COUNT] = {
+        [VITALS_KERNEL_FAMILY_360] = UINT32_C(0xfa21d8cb),
+        [VITALS_KERNEL_FAMILY_365] = UINT32_C(0x4e85022d),
+    };
+    uintptr_t load_address = 0;
+    load_module = NULL;
+    if (module_get_export_func(KERNEL_PID, "SceKernelModulemgr", libraries[profile->family],
+            load_nids[profile->family], &load_address) >= 0 && load_address != 0)
+        load_module = (SceUID (*)(SceUID, const char *, int, void *))load_address;
     __atomic_store_n(&ready, 1, __ATOMIC_RELEASE);
     return 0;
 }
@@ -65,4 +77,7 @@ int vitals_native_module_unload(SceUID pid, SceUID module, int flags, const void
 }
 int vitals_native_module_shared(SceUID pid, void *address) {
     return __atomic_load_n(&ready, __ATOMIC_ACQUIRE) ? is_shared(pid, address) : -1;
+}
+SceUID vitals_native_module_load(SceUID pid, const char *path, int flags, void *options) {
+    return __atomic_load_n(&ready, __ATOMIC_ACQUIRE) && load_module != NULL ? load_module(pid, path, flags, options) : -1;
 }

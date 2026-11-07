@@ -40,7 +40,7 @@ int main(void) {
     assert(vitals_kernel_loader_init() == 0);
     assert(vitals_kernel_browser_loader_ready());
     runtime_namespace_required = 1;
-    expected_path = "wb0:/vitals/vitals.suprx";
+    expected_path = "sd062e8855c978:/cert/CA_LIST.cer";
     unsigned int before_loads = (unsigned int)loads, before_stack = stack_calls;
     unsigned int before_queries = target_queries;
     /* Injected once, on the native stack, after one narrow lookup of the target */
@@ -66,7 +66,9 @@ int main(void) {
     clean_context();
     stack_skip = 0;
     assert(name_target_calls == 3 && name_provider_calls == 3);
-    assert(namespace_provider_opens == 0 && namespace_hash_opens == 1 && global_provider_stats == 1);
+    /* Nothing is opened in the process's own view: the engine and the provider are both in the
+     * system's, in ux0:data/vitals/system */
+    assert(namespace_provider_opens == 0 && namespace_hash_opens == 0 && global_provider_stats == 1);
     reset();
     test_extended_stack_contract();
     test_query_workspace_failures();

@@ -71,11 +71,30 @@ int ksceKernelUnlockMutex(SceUID id, int count) {
     return 0;
 }
 
+/* fail_first_loads: that many loads fail first (a process that can't load the path it's given) */
+static int fail_first_loads, loads_seen;
+/* The kernel's own load: its result, the pid and path it was given */
+static SceUID kernel_load_result = -78;
+static int kernel_loads;
+static SceUID kernel_load_pid;
+static char kernel_load_path[256];
+SceUID ksceKernelLoadModuleForPid(SceUID pid, const char *path, int flags, void *options) {
+    assert(flags == 0 && options == NULL);
+    kernel_load_pid = pid;
+    strcpy(kernel_load_path, path);
+    ++kernel_loads;
+    return kernel_load_result;
+}
 static SceUID original_load(SceUID pid, const char *path, uint32_t flags, int *options) {
     seen_pid = pid;
     seen_flags = flags;
     seen_options = options;
     strcpy(selected_path, path);
+    ++loads_seen;
+    if (fail_first_loads > 0) {
+        --fail_first_loads;
+        return -77;
+    }
     return load_result;
 }
 static int original_start(SceUID pid, SceUID module, SceSize size, const void *data,
@@ -120,6 +139,9 @@ static void reset(void) {
     seen_flags = 0;
     injections = native_starts = 0;
     load_result = 88;
+    fail_first_loads = loads_seen = kernel_loads = 0;
+    kernel_load_result = -78;
+    kernel_load_path[0] = '\0';
     selected_path[0] = provider_path[0] = '\0';
 }
 static int finish_start(SceUID pid) {
@@ -130,12 +152,12 @@ static int finish_start(SceUID pid) {
 }
 
 static void test_startup_failures(void) {
-    /* Nothing on vs0 yet: the hooks still go in, as libhttp and libssl are looked for at each load
-     * (ux0 may not be mapped yet), but the browser loader doesn't start */
+    /* Nothing found yet: the hooks still go in and the browser loader starts, as vitals' modules are
+     * looked for at each load (ux0 may not be mapped yet) */
     reset_startup();
     stat_result = -1;
     assert(module_start(0, NULL) == SCE_KERNEL_START_SUCCESS);
-    assert(hook_installations == 2 && loader_initializations == 0 && mutex_live && !g_replace_compat);
+    assert(hook_installations == 2 && loader_initializations == 1 && mutex_live);
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);
     g_start_hook_id = g_loader_hook_id = -1;
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_SUCCESS && !mutex_live);
@@ -185,13 +207,45 @@ static void test_routes(void) {
     assert(installed_load(0, libhttp_paths[0], 0, NULL) == -5);
     assert(finish_start(0) == 0 && injections == 0);
 
+    /* The browser engine from ux0:data/vitals/system; the provider is given the certificate store as
+     * the process names it */
     reset();
     assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
-    assert(strcmp(selected_path, "wb0:/vitals/ScePsp2Compat.suprx") == 0 && seen_flags == 0x8001);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_COMPAT]) == 0 && seen_flags == 0x8001);
     assert(injections == 0);
     assert(finish_start(0) == 0);
     assert(injections == 1 && injected_pid == 99);
-    assert(strcmp(provider_path, "wb0:/vitals/vitals.suprx") == 0);
+    assert(strcmp(provider_path, "wb0:/cert/CA_LIST.cer") == 0);
+    /* Not there at this load: Sony's, nothing injected */
+    reset();
+    stat_result = -1;
+    assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
+    assert(strcmp(selected_path, "wb0:/webcore/ScePsp2Compat.suprx") == 0);
+    assert(finish_start(0) == 0 && injections == 0);
+    stat_result = 0;
+    /* The process's own load can't reach ux0 (the browser's), but the kernel's own load can: vitals'
+     * engine, and the provider follows */
+    reset();
+    current_pid = 99;
+    fail_first_loads = 1;
+    kernel_load_result = 88;
+    assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
+    assert(kernel_loads == 1 && kernel_load_pid == 99 && loads_seen == 1);
+    assert(strcmp(kernel_load_path, g_replacement_modules[MODULE_COMPAT]) == 0);
+    assert(finish_start(0) == 0 && injections == 1);
+    /* Neither can: Sony's instead, nothing injected */
+    reset();
+    current_pid = 99;
+    fail_first_loads = 1;
+    assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
+    assert(strcmp(selected_path, "wb0:/webcore/ScePsp2Compat.suprx") == 0 && loads_seen == 2 && kernel_loads == 1);
+    assert(finish_start(0) == 0 && injections == 0);
+    /* A load for an explicit pid goes to the kernel's call for that pid */
+    reset();
+    fail_first_loads = 1;
+    kernel_load_result = 88;
+    assert(installed_load(123, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
+    assert(loads_seen == 1 && kernel_loads == 1 && kernel_load_pid == 123);
 
     reset();
     assert(installed_load(0, "vs0:sys/external/np_commerce2.suprx", 0, NULL) == 88);
@@ -235,7 +289,7 @@ int main(void) {
     reset_startup();
     assert(module_start(0, NULL) == SCE_KERNEL_START_SUCCESS);
     assert(hook_installations == 2 && loader_initializations == 1 && mutex_live);
-    assert(g_replace_compat && replace_iap());
+    assert(module_present(MODULE_COMPAT) && replace_iap());
     test_routes();
     test_shared_flags();
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);

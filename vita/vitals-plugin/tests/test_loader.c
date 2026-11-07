@@ -164,7 +164,9 @@ int ksceIoOpen(const char *path, int flags, int mode) {
     int index = strstr(path, "ScePsp2Compat") != NULL;
     (void)flags; (void)mode;
     expect_hash_stage("hash.open.enter");
-    if (runtime_namespace_required && query_live && index)
+    /* A process's own device names mean nothing in the system's view; the engine is hashed at its
+     * fixed place in ux0:data/vitals/system, which is in it */
+    if (runtime_namespace_required && query_live && index && strcmp(path, VITALS_COMPAT_PATH) != 0)
         return (int32_t)UINT32_C(0x80010002);
     read_once[index] = 0;
     ++open_descriptors;
@@ -243,7 +245,7 @@ int timingsafe_memcmp(const void *left, const void *right, size_t size) {
 SceUID ksceKernelGetProcessId(void) { return argument_current_pid; }
 int ksceKernelCopyToUserProc(SceUID pid, void *destination, const void *source, SceSize size) {
     assert(pid == 99 && argument_live && destination == argument_memory && source != destination);
-    assert(size == sizeof(VitalsStartArgs) && !locked && query_live);
+    assert(size == sizeof(VitalsBrowserStartArgs) && !locked && query_live);
     expect_hash_stage("args.copy.enter");
     ++argument_copies;
     memcpy(destination, source, size);
@@ -251,7 +253,7 @@ int ksceKernelCopyToUserProc(SceUID pid, void *destination, const void *source, 
 }
 int ksceKernelCopyFromUserProc(SceUID pid, void *destination, const void *source, SceSize size) {
     assert(pid == 99 && argument_live && source == argument_memory);
-    assert(size == sizeof(VitalsStartArgs) && !locked);
+    assert(size == sizeof(VitalsBrowserStartArgs) && !locked);
     require_query_workspace(destination, size);
     expect_hash_stage("args.verify.enter");
     memcpy(destination, source, size);
@@ -290,7 +292,9 @@ SceUID ksceKernelLoadStartModuleForPid(SceUID pid, const char *path, SceSize siz
     assert(argument_live && data == argument_memory);
     assert(flags == 0);
     assert(args->compat_modid == 188 && args->reserved == 0);
-    assert(args->version == 1 && strcmp(path, VITALS_BROWSER_PROVIDER_BOOT_PATH) == 0);
+    assert(args->version == 2 && strcmp(path, VITALS_BROWSER_PROVIDER_BOOT_PATH) == 0);
+    /* The certificate store as the process names it, as the load hook worked it out */
+    assert(strcmp(args->ca_path, expected_path) == 0);
     assert(args->magic == VITALS_BROWSER_START_MAGIC);
     ++loads;
     if (reenter) {
@@ -332,7 +336,7 @@ static void reset(void) {
     target_wrong_name = 0;
     target_user_id = 188;
     browser_file = 1;
-    expected_path = "wb0:/vitals/" VITALS_BROWSER_PROVIDER_FILENAME;
+    expected_path = "wb0:/cert/CA_LIST.cer";
     expected_module_path = "wb0:/vitals/ScePsp2Compat.suprx";
     runtime_namespace_required = namespace_provider_error = namespace_hash_error = 0;
     namespace_stat_error = namespace_close_error = 0;
