@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "vitals/path.h"
+#include "vitals/switches.h"
 #include "tls13_loader.h"
 #include "hook_guard.h"
 #include "native_module_api.h"
@@ -51,12 +52,26 @@ static int module_present(unsigned module)
     return ksceIoGetstat(g_replacement_modules[module], &stat) >= 0;
 }
 
-/* vitals' libhttp and libssl, always swapped together, looked for at each load rather than once at
+/* An Options switch (vitals/switches.h): 1 while its .off is there */
+static int switched_off(const char *flag)
+{
+    SceIoStat stat;
+    return ksceIoGetstat(flag, &stat) >= 0;
+}
+
+/* vitals' libhttp and libssl, installed together and looked for at each load rather than once at
  * boot: they're on ux0, which a plugin loaded after this one may still be mapping when it starts (an
- * SD2Vita's), and while they aren't there Sony's load */
+ * SD2Vita's), and while they aren't there Sony's load. The switches, looked for at the same time:
+ * tls.off keeps Sony's libssl, and so Sony's libhttp too (vitals-http does its TLS through
+ * vitals-ssl's own additions); http.off keeps Sony's libhttp alone, on vitals-ssl */
 static int replace_iap(void)
 {
-    return module_present(MODULE_LIBHTTP) && module_present(MODULE_LIBSSL);
+    return module_present(MODULE_LIBHTTP) && module_present(MODULE_LIBSSL) && !switched_off(VITALS_TLS_OFF);
+}
+
+static int replace_libhttp(void)
+{
+    return replace_iap() && !switched_off(VITALS_HTTP_OFF);
 }
 
 static int path_is(const char *path, const char *a, const char *b)
@@ -87,7 +102,7 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
 
     if ((path_is(path, "vs0:sys/external/libhttp.suprx", "vs0:/sys/external/libhttp.suprx") ||
          path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)) &&
-        replace_iap())
+        replace_libhttp())
     {
         ksceDebugPrintf("vitals: libhttp load pid=0x%X flags=0x%08X path=%s\n", target_pid, flags, path);
         module = MODULE_LIBHTTP;
@@ -99,8 +114,9 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
         module = MODULE_LIBSSL;
         path = g_replacement_modules[module];
     }
-    /* The browser engine: from ux0:data/vitals/system too, looked for at each load as libhttp is */
-    else if (vitals_browser_engine_request(path) && module_present(MODULE_COMPAT))
+    /* The browser engine: from ux0:data/vitals/system too, looked for at each load as libhttp is; its
+     * TLS is vitals-ssl's, so tls.off keeps Sony's engine and its own TLS */
+    else if (vitals_browser_engine_request(path) && module_present(MODULE_COMPAT) && !switched_off(VITALS_TLS_OFF))
     {
         module = MODULE_COMPAT;
         path = g_replacement_modules[module];

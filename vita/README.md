@@ -41,7 +41,11 @@ Once `vitals` is installed, from the same application you'll be able to:
   - **Update** or **Reinstall** installs this version over the existing one, to update `vitals` or repair an installation
   - **Uninstall** removes all of `vitals` files and configurations
 - **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current. The date next to it is when they were last updated, in red once they're more than three months old
-- **Options**: turns TLS, HTTP, the DNS rules and the redirects on or off, as on the PS3, and picks the debug output (see below); **START** applies them and reboots the Vita. Each switch is a file in `ux0:data/vitals/flags/` (`tls.off`, `http.off`, `dns.off`, `redirects.off`), there while that part is off. For now only the debug output changes anything: vitals' modules and kernel plugin don't read the switches yet
+- **Options**: turns TLS, HTTP, the DNS rules and the redirects on or off, as on the PS3, and picks the debug output (see below); **START** applies them and reboots the Vita. Each switch is a file in `ux0:data/vitals/flags/` (`tls.off`, `http.off`, `dns.off`, `redirects.off`), there while that part is off, which the kernel plugin reads:
+  - **TLS** off: apps, games and the browser get Sony's TLS. On the Vita that also means Sony's HTTP library, as `vitals`' HTTP library does its TLS through `vitals`' own
+  - **HTTP** off: Sony's HTTP library, still on `vitals`' TLS, so no host redirects or User-Agent suffix
+  - **DNS rules** off: `dns.txt` isn't applied
+  - **Redirects** off: `redirects.txt` isn't applied, and `vitals`' HTTP library stays
 - **Test connections**: is `vitals` installed correctly and running just fine?
 - **Changelog** and **Credits**
 

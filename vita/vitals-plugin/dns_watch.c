@@ -1,4 +1,5 @@
 #include "dns_watch.h"
+#include "vitals/switches.h"
 #include "dns_message.h"
 
 #include "vitals/host_map.h"
@@ -171,15 +172,19 @@ static int keep_rule(void *context, const VitalsHostRule *rule)
 }
 
 /* Rereads the list once the last read is older than the refresh time; the lock is held. A
- * missing or unreadable list redirects nothing */
+ * missing or unreadable list redirects nothing, and nor does any while the Options' dns.off is there
+ * (vitals/switches.h), looked for at each reread */
 static void refresh_list(int64_t now)
 {
+    SceIoStat status;
     if (g_list_read && now - g_list_read_at < LIST_REFRESH)
         return;
     g_list_read = 1;
     g_list_read_at = now;
     g_map.count = 0;
     g_names_used = 0;
+    if (ksceIoGetstat(VITALS_DNS_OFF, &status) >= 0)
+        return;
     if (vitals_redirect_list_read(read_list, g_list_work, keep_rule, NULL) < 0)
         g_map.count = 0;
 }

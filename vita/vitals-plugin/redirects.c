@@ -4,10 +4,12 @@
 
 #include "vitals/ca_store.h"
 #include "vitals/redirects.h"
+#include "vitals/switches.h"
 #include "vitals/useragent.h"
 
-/* SCE_ERROR_ERRNO_EINVAL */
+/* SCE_ERROR_ERRNO_EINVAL, and ENOENT */
 #define VITALS_REDIRECTS_INVALID ((int)0x80010016)
+#define VITALS_REDIRECTS_NOT_FOUND ((int)0x80010002)
 
 /* Games run in a sandbox that keeps them out of ux0:data, while the kernel is not; a file is
  * opened for each read, so edits apply to the next game that starts */
@@ -37,7 +39,17 @@ static int read_file(const char *path, unsigned int offset, void *buffer, unsign
     return result;
 }
 
+/* The redirect list, as missing while the Options' redirects.off is there (vitals/switches.h): a
+ * process that starts then redirects nothing */
 int vitals_redirects_read(unsigned int offset, void *buffer, unsigned int size) {
+    SceIoStat status;
+    int state, off;
+    ENTER_SYSCALL(state);
+    off = ksceIoGetstat(VITALS_REDIRECTS_OFF, &status) >= 0;
+    EXIT_SYSCALL(state);
+    if (off) {
+        return VITALS_REDIRECTS_NOT_FOUND;
+    }
     return read_file(VITALS_REDIRECTS_PATH, offset, buffer, size);
 }
 

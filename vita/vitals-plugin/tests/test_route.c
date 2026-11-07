@@ -1,3 +1,4 @@
+#include "vitals/switches.h"
 #include <kernel_mock.h>
 #include <taihen.h>
 #include <assert.h>
@@ -26,7 +27,18 @@ static TestLoadFunction installed_load;
 
 SceUID ksceKernelGetProcessId(void) { return current_pid; }
 int ksceDebugPrintf(const char *format, ...) { (void)format; return 0; }
-int ksceIoGetstat(const char *path, SceIoStat *status) { (void)path; (void)status; return stat_result; }
+/* vitals' modules are there when stat_result is 0; an Options switch (vitals/switches.h) when it's
+ * in switches_off */
+static const char *switches_off[4];
+int ksceIoGetstat(const char *path, SceIoStat *status) {
+    (void)status;
+    if (strncmp(path, VITALS_FLAGS_DIRECTORY "/", sizeof(VITALS_FLAGS_DIRECTORY)) == 0) {
+        for (size_t i = 0; i < sizeof(switches_off) / sizeof(switches_off[0]); ++i)
+            if (switches_off[i] != NULL && strcmp(path, switches_off[i]) == 0) return 0;
+        return (int)0x80010002;
+    }
+    return stat_result;
+}
 static int dns_starts, dns_stops;
 SceUID vitals_dns_watch_start(void) { ++dns_starts; return 9; }
 void vitals_dns_watch_stop(void) { ++dns_stops; }
@@ -143,6 +155,7 @@ static void reset(void) {
     kernel_load_result = -78;
     kernel_load_path[0] = '\0';
     selected_path[0] = provider_path[0] = '\0';
+    memset(switches_off, 0, sizeof(switches_off));
 }
 static int finish_start(SceUID pid) {
     int status = -999;
@@ -264,11 +277,41 @@ static void test_routes(void) {
     assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
     assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
 
+    /* tls.off: Sony's libssl, and so Sony's libhttp (vitals-http's TLS is vitals-ssl's) and Sony's
+     * browser engine, nothing injected */
+    reset();
+    switches_off[0] = VITALS_TLS_OFF;
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88 && strcmp(selected_path, libhttp_paths[0]) == 0);
+    assert(installed_load(0, "vs0:sys/external/libssl.suprx", 0, NULL) == 88);
+    assert(strcmp(selected_path, "vs0:sys/external/libssl.suprx") == 0);
+    assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
+    assert(strcmp(selected_path, "wb0:/webcore/ScePsp2Compat.suprx") == 0);
+    assert(finish_start(0) == 0 && injections == 0);
+    /* http.off: Sony's libhttp alone, on vitals-ssl, and vitals' browser engine stays */
+    reset();
+    switches_off[0] = VITALS_HTTP_OFF;
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88 && strcmp(selected_path, libhttp_paths[0]) == 0);
+    assert(installed_load(0, "vs0:sys/external/libssl.suprx", 0, NULL) == 88);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBSSL]) == 0);
+    assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_COMPAT]) == 0);
+    assert(finish_start(0) == 0 && injections == 1);
+    /* The DNS and redirect switches change no module */
+    reset();
+    switches_off[0] = VITALS_DNS_OFF;
+    switches_off[1] = VITALS_REDIRECTS_OFF;
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
+    /* Taken out again, vitals' are back at the next load */
+    reset();
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
+
     reset();
     assert(installed_load(0, "ux0:/unrelated.suprx", 0x8001, NULL) == 88);
     assert(strcmp(selected_path, "ux0:/unrelated.suprx") == 0 && seen_flags == 0x8001);
     assert(finish_start(0) == 0 && injections == 0);
-    puts("kernel module route: redirection and post-start injection for current and explicit PIDs PASS");
+    puts("kernel module route: redirection, the TLS and HTTP switches, and post-start injection for current and explicit PIDs PASS");
 }
 
 static void test_shared_flags(void) {

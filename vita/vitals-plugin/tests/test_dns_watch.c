@@ -126,6 +126,13 @@ int ksceIoPread(SceUID fd, void *buffer, SceSize size, SceOff offset) {
     return (int)count;
 }
 int ksceIoClose(int fd) { assert(fd == 7); return 0; }
+/* The Options' dns.off (vitals/switches.h), while dns_off */
+static int dns_off;
+int ksceIoGetstat(const char *path, SceIoStat *status) {
+    (void)status;
+    assert(strcmp(path, "ux0:data/vitals/flags/dns.off") == 0);
+    return dns_off ? 0 : (int)0x80010002;
+}
 
 /* A standard question for name (dotted), of the given type, at out + 12 */
 static size_t question(unsigned char *out, const char *name, unsigned type) {
@@ -580,10 +587,19 @@ int main(void) {
                 "short.example a-much-longer-replacement-host.community.example.org\nip.example 10.0.0.5\n"
                 "ads.example BLOCK\n";
     test_redirect();
+    /* While dns.off is there no rule applies, from the next reread, and the list isn't read; taken
+     * out, they apply again */
+    dns_off = 1;
+    now += 6000000;
+    int reads = list_reads;
+    assert(!send_query(3, 0x0301, "activity01.ww.np.community.playstation.net", 1) && list_reads == reads);
+    dns_off = 0;
+    now += 6000000;
+    assert(send_query(3, 0x0302, "activity01.ww.np.community.playstation.net", 1) && list_reads > reads);
     vitals_dns_watch_stop();
     vitals_dns_watch_stop();
     assert(releases == 2 && mutexes == 0 && blocks_live == 0);
     puts("kernel DNS: query parsing, listed hosts renamed and answered for the old name, fixed addresses, blocks, "
-         "logging, start and stop PASS");
+         "logging, the dns.off switch, start and stop PASS");
     return 0;
 }

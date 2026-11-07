@@ -1,3 +1,4 @@
+#include "vitals/switches.h"
 #include "vitals/ca_store.h"
 #include "vitals/redirects.h"
 #include "vitals/useragent.h"
@@ -28,7 +29,13 @@ static int ca_part(const char *path) {
         if (strcmp(path, ca_paths[i]) == 0) return i;
     return -1;
 }
+/* redirects.off, while redirects_off */
+static int redirects_off;
 int ksceIoGetstat(const char *path, SceIoStat *status) {
+    if (strcmp(path, VITALS_REDIRECTS_OFF) == 0) {
+        assert(syscall_depth == 1);
+        return redirects_off ? 0 : NOT_FOUND;
+    }
     int part = ca_part(path);
     assert(ca_mode && part >= 0 && syscall_depth == 1);
     if (part == 0 && ca_stat_error) return ca_stat_error;
@@ -257,12 +264,24 @@ static void test_certificate_store(void) {
     ca_mode = 0;
 }
 
+/* While redirects.off is there the list reads as missing, without being opened */
+static void test_redirects_switch(void) {
+    char buffer[64];
+    reset("old.example new.example\n");
+    redirects_off = 1;
+    assert(vitals_redirects_read(0, buffer, sizeof(buffer)) == NOT_FOUND && opens == 0);
+    redirects_off = 0;
+    assert(vitals_redirects_read(0, buffer, sizeof(buffer)) == 24 && opens == 1);
+    check_state_restored();
+}
+
 int main(void) {
     test_reads_in_pieces();
     test_large_requests_are_cut();
     test_errors();
     test_useragent();
     test_certificate_store();
+    test_redirects_switch();
     puts("kernel redirect list, User-Agent and certificate store (Sony, Mozilla and custom as one) reads PASS");
     return 0;
 }

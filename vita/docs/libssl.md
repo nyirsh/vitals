@@ -41,8 +41,13 @@ reference vitals-ssl was written from).
 The kernel plugin's hooks go in at boot, whatever is installed. vitals' libhttp and libssl are in
 `ux0:data/vitals/system`, which may not be ready when the plugin starts (a plugin loaded after it maps
 an SD2Vita's card), so they're looked for at each load of Sony's libhttp or libssl (`replace_iap` in
-[vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, as the
-two libraries are always swapped together, and otherwise Sony's load.
+[vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, and
+otherwise Sony's load. The Options' switches are looked for at the same loads
+([switches.h](../tls13-vita/include/vitals/switches.h)): with `tls.off` both stay Sony's, as
+vitals-http's TLS needs vitals-ssl's own additions (and the browser keeps Sony's engine and TLS); with
+`http.off` only libhttp stays Sony's, on vitals-ssl, which has all Sony's libhttp uses. `dns.off`
+empties the DNS rules at their next reread, and `redirects.off` makes `vitals_redirects_read` answer
+as if `redirects.txt` were missing.
 
 ## 3. A process asks for libssl
 
