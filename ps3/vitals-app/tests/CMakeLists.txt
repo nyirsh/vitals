@@ -8,6 +8,16 @@ set(CMAKE_C_STANDARD 11)
 
 set(APP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
+# The app's curl on Mbed TLS (../curl, ../crypto), as the PS3 builds it, for the shared download's
+# tests (test_release_fetch.py): added before this folder's warnings and sanitizers, which aren't
+# theirs
+set(VITALS_SSL ${APP_DIR}/../vitals-ssl)
+include(${APP_DIR}/../dependencies.cmake)
+vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
+set(VITALS_PSA_USER_CONFIG "${APP_DIR}/crypto/psa_user_config.h")
+add_subdirectory(${VITALS_SSL}/crypto mbedtls)
+add_subdirectory(${APP_DIR}/curl curl)
+
 option(VITALS_ENABLE_SANITIZERS "Build the tests with AddressSanitizer and UBSan" ON)
 if(VITALS_ENABLE_SANITIZERS)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
@@ -48,3 +58,15 @@ add_test(NAME vitals_app_release_version COMMAND vitals_app_release_version_test
 add_executable(vitals_app_custom_certs_tests test_custom_certs.c ${APP_DIR}/src/custom_certs.c)
 target_include_directories(vitals_app_custom_certs_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
 add_test(NAME vitals_app_custom_certs COMMAND vitals_app_custom_certs_tests)
+
+# The shared download (../../../shared/app/download.c) and the release check's fetch on curl's Mbed
+# TLS backend, the PS3's, with this machine's mutexes, entropy and time (../../tests/host): run by
+# test_release_fetch.py against local HTTPS servers, as the Vita's tests run it on OpenSSL
+find_package(Threads REQUIRED)
+add_executable(vitals_app_release_fetch_mbedtls ${SHARED}/app/tests/release_fetch_cli.c ${SHARED}/app/download.c
+    ${SHARED}/app/release_fetch.c ${SHARED}/app/release_version.c
+    ${APP_DIR}/../tests/host/crypto_platform_posix.c ${VITALS_SSL}/src/platform/gmtime.c)
+target_include_directories(vitals_app_release_fetch_mbedtls PRIVATE ${VITALS_SSL}/src/platform)
+target_compile_definitions(vitals_app_release_fetch_mbedtls PRIVATE VITALS_MBEDTLS_PLATFORM=1)
+target_link_libraries(vitals_app_release_fetch_mbedtls PRIVATE libcurl_static mbedtls mbedx509 tfpsacrypto
+    Threads::Threads)

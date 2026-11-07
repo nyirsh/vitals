@@ -1,7 +1,13 @@
-/* Host-only exercise of the release check's fetch (release_fetch.c) against test servers, for the
- * Vita's tests/test_version_check.py: ca url [url] */
+/* Host-only exercise of the release check's fetch (release_fetch.c) and so of the shared download,
+ * against test servers (release_fetch_tests.py): ca url [url]. Built on curl's OpenSSL backend by the
+ * Vita's tests, and on its Mbed TLS backend, the PS3's, by the PS3's (VITALS_MBEDTLS_PLATFORM: Mbed
+ * TLS's mutexes first, as the PS3's console_network_start sets them) */
 
 #include "release_check.h"
+
+#ifdef VITALS_MBEDTLS_PLATFORM
+#include "crypto_platform.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +17,10 @@ int main(int argc, char **argv)
 	char version[16];
 	if (argc < 3 || argc > 4)
 		return 2;
+#ifdef VITALS_MBEDTLS_PLATFORM
+	if (vitals_crypto_platform_init() != 0)
+		return 2;
+#endif
 	FILE *file = fopen(argv[1], "rb");
 	if (file == NULL)
 		return 2;

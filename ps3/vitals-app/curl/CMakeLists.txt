@@ -1,7 +1,9 @@
 # curl for the app's downloads (the Mozilla CA bundle, the new-release check), on Mbed TLS 4.2 as
 # vitals' libssl builds it (../../vitals-ssl/crypto, with the app's crypto options, ../crypto): the
 # app's own TLS, so the downloads work whatever the console's TLS is. As the Vita's
-# vitals-app/curl, which is on OpenSSL; the pin is both consoles' (../../../shared/curl/curl.cmake)
+# vitals-app/curl, which is on OpenSSL; the pin is both consoles' (../../../shared/curl/curl.cmake).
+# The host tests build it for this machine too (../tests), so the shared download is tested on curl's
+# Mbed TLS backend as well as the Vita's OpenSSL one; the PS3's own settings apply only there
 vitals_download("${VITALS_CURL_URL}" "${VITALS_CURL_SHA256}" VITALS_CURL_ARCHIVE)
 
 set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
@@ -31,14 +33,19 @@ set(CURL_USE_MBEDTLS ON CACHE BOOL "" FORCE)
 set(CURL_CA_BUNDLE "none" CACHE STRING "No default/system CA file" FORCE)
 set(CURL_CA_PATH "none" CACHE STRING "No default/system CA directory" FORCE)
 set(CURL_CA_FALLBACK OFF CACHE BOOL "" FORCE)
-# The PS3's sockets (the SDK's BSD family, librt) have no fcntl: they're made non-blocking with
-# setsockopt's SO_NBIO, which curl knows as SO_NONBLOCK (below), and there's no close-on-exec to set
-# (curl's fcntl(F_SETFD, FD_CLOEXEC) on a new socket fails with ENOSYS, failing the connection)
-set(HAVE_FCNTL 0 CACHE INTERNAL "" FORCE)
-set(HAVE_FCNTL_O_NONBLOCK 0 CACHE INTERNAL "" FORCE)
-set(HAVE_SETSOCKOPT_SO_NONBLOCK 1 CACHE INTERNAL "" FORCE)
-# Nor basename, which the check finds in a header without a definition: curl has its own
-set(HAVE_BASENAME 0 CACHE INTERNAL "" FORCE)
+if(PS3DK)
+    # The PS3's sockets (the SDK's BSD family, librt) have no fcntl: they're made non-blocking with
+    # setsockopt's SO_NBIO, which curl knows as SO_NONBLOCK (below), and there's no close-on-exec to
+    # set (curl's fcntl(F_SETFD, FD_CLOEXEC) on a new socket fails with ENOSYS, failing the connection)
+    set(HAVE_FCNTL 0 CACHE INTERNAL "" FORCE)
+    set(HAVE_FCNTL_O_NONBLOCK 0 CACHE INTERNAL "" FORCE)
+    set(HAVE_SETSOCKOPT_SO_NONBLOCK 1 CACHE INTERNAL "" FORCE)
+    # Nor basename, which the check finds in a header without a definition: curl has its own
+    set(HAVE_BASENAME 0 CACHE INTERNAL "" FORCE)
+endif()
+# No pipe2 (curl's wake-up pipe is off, CURL_DISABLE_SOCKETPAIR): the PS3 has none, and a Mac's
+# header declares one its system may not have
+set(HAVE_PIPE2 0 CACHE INTERNAL "" FORCE)
 # curl's extra warnings fire on Mbed TLS's own headers
 set(PICKY_COMPILER OFF CACHE BOOL "" FORCE)
 # Mbed TLS is the targets ../../vitals-ssl/crypto made, not an installed copy: their names stand for
@@ -57,4 +64,6 @@ endif()
 FetchContent_Declare(vitals_curl URL "${VITALS_CURL_ARCHIVE}"
     URL_HASH SHA256=${VITALS_CURL_SHA256})
 FetchContent_MakeAvailable(vitals_curl)
-target_compile_definitions(libcurl_static PRIVATE SO_NONBLOCK=SO_NBIO)
+if(PS3DK)
+    target_compile_definitions(libcurl_static PRIVATE SO_NONBLOCK=SO_NBIO)
+endif()
