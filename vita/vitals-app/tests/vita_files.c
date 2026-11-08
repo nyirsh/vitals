@@ -2,10 +2,12 @@
 #define _POSIX_C_SOURCE 200809L
 #include "vita_files.h"
 
+#include <psp2/io/dirent.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/vshbridge.h>
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -125,6 +127,46 @@ int sceIoRmdir(const char *path)
 {
     char host[2048];
     return map(path, host, sizeof(host)) != NULL && rmdir(host) == 0 ? 0 : FAILED;
+}
+
+/* Open folders, by their SceUID's place here; "." and ".." aren't listed, as on the Vita */
+static DIR *folders[8];
+
+SceUID sceIoDopen(const char *dirname)
+{
+    char host[2048];
+    if (map(dirname, host, sizeof(host)) == NULL)
+        return FAILED;
+    for (int i = 0; i < 8; ++i)
+        if (folders[i] == NULL)
+        {
+            folders[i] = opendir(host);
+            return folders[i] != NULL ? i + 1 : FAILED;
+        }
+    return FAILED;
+}
+
+int sceIoDread(SceUID fd, SceIoDirent *dir)
+{
+    if (fd < 1 || fd > 8 || folders[fd - 1] == NULL)
+        return FAILED;
+    struct dirent *entry;
+    do
+        entry = readdir(folders[fd - 1]);
+    while (entry != NULL && (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0));
+    if (entry == NULL)
+        return 0;
+    snprintf(dir->d_name, sizeof(dir->d_name), "%s", entry->d_name);
+    return 1;
+}
+
+int sceIoDclose(SceUID fd)
+{
+    if (fd < 1 || fd > 8 || folders[fd - 1] == NULL)
+        return FAILED;
+    closedir(folders[fd - 1]);
+    folders[fd - 1] = NULL;
+    return 0;
 }
 
 /* Remounting vs0 writable is a no-op on the host */

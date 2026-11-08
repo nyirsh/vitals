@@ -51,6 +51,8 @@ LISTS = [VITALS + "/" + name for name in ("redirects.txt", "dns.txt", "custom-ce
 SWITCHES = [VITALS + "/flags/" + name for name in ("tls.off", "http.off", "dns.off", "redirects.off")]
 # What fetch takes: (folder, the names it takes, whether the folder may be missing)
 FETCH = [
+    (VITALS + "/reports", ("connection-test-",), True),
+    # Where earlier versions saved them, until the installer moves them to reports/
     (VITALS, ("vitals-testresults-", "browserleaks-"), False),
     ("/ux0:/data", ("psp2core-",), False),
     # A temporary SceWebKit dump, when the folder is there

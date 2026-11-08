@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <psp2/io/dirent.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/kernel/processmgr.h>
@@ -20,6 +21,7 @@
 #include "config_edit.h"
 #include "install.h"
 #include "module_version.h"
+#include "vitals_paths.h"
 #include "vitals/ca_store.h"
 #include "vitals/path.h"
 
@@ -117,6 +119,40 @@ static int remove_old_layout(void)
         if (path_exists(old_layout_folders[i]))
             (void)sceIoRmdir(old_layout_folders[i]);
     return result;
+}
+
+/* The connection test's reports folder, as on the PS3, with the reports earlier versions saved in
+ * ux0:data/vitals itself (vitals-testresults-<time>.txt) moved into it under today's name
+ * (connection-test-<time>.txt); one already there under that name is kept */
+static void move_reports(void)
+{
+    static const char earlier[] = "vitals-testresults-", now[] = "connection-test-";
+    (void)sceIoMkdir(VITALS_DIRECTORY, 0777);
+    (void)sceIoMkdir(VITALS_REPORTS_DIRECTORY, 0777);
+    /* Names first, then each moved, so the folder isn't changed while it's read */
+    char names[32][64];
+    unsigned count = 0;
+    SceUID folder = sceIoDopen(VITALS_DIRECTORY);
+    if (folder >= 0)
+    {
+        SceIoDirent entry;
+        while (count < 32 && sceIoDread(folder, &entry) > 0)
+        {
+            size_t length = strlen(entry.d_name);
+            if (strncmp(entry.d_name, earlier, sizeof(earlier) - 1) == 0 && length < sizeof(names[0]) &&
+                length > 4 && strcmp(entry.d_name + length - 4, ".txt") == 0)
+                memcpy(names[count++], entry.d_name, length + 1);
+        }
+        (void)sceIoDclose(folder);
+    }
+    for (unsigned i = 0; i < count; ++i)
+    {
+        char from[128], to[128];
+        snprintf(from, sizeof(from), VITALS_DIRECTORY "/%.63s", names[i]);
+        snprintf(to, sizeof(to), VITALS_REPORTS_DIRECTORY "/%s%.44s", now, names[i] + sizeof(earlier) - 1);
+        if (!path_exists(to) && sceIoRename(from, to) >= 0)
+            printf("Moved %.63s to %s\n", names[i], VITALS_REPORTS_DIRECTORY);
+    }
 }
 
 /* ux0:data/vitals/system, and ux0:data/vitals above it */
@@ -926,6 +962,9 @@ static int install_http_modules(int requested_state)
             result = remove_old_layout();
         if (result >= 0 && path_exists(VITALS_SYSTEM_DIRECTORY))
             (void)sceIoRmdir(VITALS_SYSTEM_DIRECTORY);
+        /* The reports are the user's: their folder goes only when empty */
+        if (result >= 0 && path_exists(VITALS_REPORTS_DIRECTORY))
+            (void)sceIoRmdir(VITALS_REPORTS_DIRECTORY);
     }
     else
     {
@@ -939,6 +978,8 @@ static int install_http_modules(int requested_state)
             result = remove_old_layout();
         if (result >= 0)
             result = make_system_directory();
+        if (result >= 0)
+            move_reports();
         if (result >= 0)
         {
             result = replace_file("app0:libhttp.suprx", new_modules[MODULE_LIBHTTP]);

@@ -148,7 +148,7 @@ The certificate must also name the host apps connect to: combined with [host red
 - every rule in your `dns.txt`, its host looked up through `sceNetResolver` as a game would, so the kernel plugin sees the query: a `block` rule passes when the name doesn't exist, an address when it's the answer, and a host name when the answer is among the target's own addresses. While `flags/dns.off` is there the rules aren't tested
 - whether vitals-http is loaded in the app
 
-A request that times out is tried again, up to 3 times in all, since slow servers say nothing about TLS. Square goes through the detail pages: cipher suites, request details, handshake details, certificate checks, host redirects and DNS rules. Press START after a run to save its log to `ux0:data/vitals/`. The test works on any firmware and changes nothing on the console.
+A request that times out is tried again, up to 3 times in all, since slow servers say nothing about TLS. Square goes through the detail pages: cipher suites, request details, handshake details, certificate checks, host redirects and DNS rules. Press START after a run to save its report to `ux0:data/vitals/reports/` as text, with every result (installing moves the reports earlier versions saved in `ux0:data/vitals/` there). The test works on any firmware and changes nothing on the console.
 
 ## Repository layout
 

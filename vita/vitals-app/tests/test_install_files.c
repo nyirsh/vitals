@@ -24,6 +24,11 @@
 #define EARLIER_BUNDLE "AN EARLIER VERSION'S BUNDLE\n"
 #define REDIRECTS "ux0:data/vitals/redirects.txt"
 #define DNS_RULES "ux0:data/vitals/dns.txt"
+/* A report where earlier versions saved it, and where it goes; another already moved */
+#define EARLIER_REPORT "ux0:data/vitals/vitals-testresults-2026-01-02_03-04-05.txt"
+#define REPORT "ux0:data/vitals/reports/connection-test-2026-01-02_03-04-05.txt"
+#define EARLIER_REPORT_TAKEN "ux0:data/vitals/vitals-testresults-2026-02-02_00-00-00.txt"
+#define REPORT_TAKEN "ux0:data/vitals/reports/connection-test-2026-02-02_00-00-00.txt"
 #define VITALS_BLOCK "# VITALS\n*KERNEL\nur0:tai/vitals.skprx\n\n"
 #define SONY_CA "SONY ORIGINAL CERTIFICATES\n"
 #define BUNDLE "VITALS MERGED CERTIFICATES\n"
@@ -296,9 +301,18 @@ static void test_install_reinstall_uninstall(void)
     make_directories("vs0:/data/external/vitals/native");
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
     put(OLD_REAUTH, "an earlier version's redirect\n");
+    /* Reports where earlier versions saved them move to reports/ under today's name; one already
+     * there under that name is kept, and the earlier one left where it was */
+    put(EARLIER_REPORT, "an earlier report\n");
+    put(EARLIER_REPORT_TAKEN, "older\n");
+    put(REPORT_TAKEN, "already moved\n");
+    put("ux0:data/vitals/notes.txt", "the user's\n");
     assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     assert(!exists(OLD_HTTP_PROVIDER) && !exists(OLD_REAUTH));
+    assert(!exists(EARLIER_REPORT) && is(REPORT, "an earlier report\n"));
+    assert(is(EARLIER_REPORT_TAKEN, "older\n") && is(REPORT_TAKEN, "already moved\n"));
+    assert(is("ux0:data/vitals/notes.txt", "the user's\n"));
     assert(is(REDIRECTS, "contents of redirects.txt\n") && is(DNS_RULES, "contents of dns.txt\n"));
     /* While it is there, vitals doesn't count as installed */
     put(OLD_HTTP_PROVIDER, "an earlier version's provider\n");
@@ -337,6 +351,12 @@ static void test_install_reinstall_uninstall(void)
     assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);
     expect_uninstalled();
     assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
+    /* and the reports, with their folder; an empty folder goes */
+    assert(is(REPORT, "an earlier report\n"));
+    assert(remove(vita_files_path(REPORT)) == 0 && remove(vita_files_path(REPORT_TAKEN)) == 0 &&
+           remove(vita_files_path(EARLIER_REPORT_TAKEN)) == 0);
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0 && exists("ux0:data/vitals/reports"));
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0 && !exists("ux0:data/vitals/reports"));
     /* Without an installed plugin there is nothing to compare */
     assert(vitals_install_plugin_current() < 0);
 }

@@ -105,8 +105,8 @@ int main(void)
 	/* The file's name, from the local time or else the fallback */
 	char path[96];
 	CheckReportTime t = {2026, 11, 7, 9, 5, 3};
-	check_report_path(path, sizeof(path), "ux0:data/vitals", "vitals-testresults", &t, 0);
-	assert(strcmp(path, "ux0:data/vitals/vitals-testresults-2026-11-07_09-05-03.txt") == 0);
+	check_report_path(path, sizeof(path), "ux0:data/vitals/reports", "connection-test", &t, 0);
+	assert(strcmp(path, "ux0:data/vitals/reports/connection-test-2026-11-07_09-05-03.txt") == 0);
 	check_report_path(path, sizeof(path), "/dev_hdd0/vitals/reports", "connection-test", NULL, 12345);
 	assert(strcmp(path, "/dev_hdd0/vitals/reports/connection-test-12345.txt") == 0);
 

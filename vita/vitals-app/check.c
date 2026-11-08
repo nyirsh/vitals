@@ -74,7 +74,7 @@ static char notice[120];
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 static void lock(void) { sceKernelLockMutex(guard, 1, NULL); }
 static void unlock(void) { sceKernelUnlockMutex(guard, 1); }
-#define REPORT_NAME "vitals-testresults"
+#define REPORT_NAME "connection-test"
 /* Room for the whole report, the longest lists included */
 #define REPORT_MAX (96 * 1024)
 static int stopped(void)
@@ -462,6 +462,7 @@ static int save_report(const CheckService *s)
     if (!failed)
     {
         check_report_write(&report_format, s, &report);
+        (void)sceIoMkdir(VITALS_DIRECTORY, 0777);
         (void)sceIoMkdir(REPORT_DIR, 0777);
         FILE *f = fopen(path, "w");
         failed = f == NULL;
