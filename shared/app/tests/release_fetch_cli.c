@@ -1,7 +1,7 @@
 /* Host-only exercise of the release check's fetch (release_fetch.c) and so of the shared download,
- * against test servers (release_fetch_tests.py): ca url [url]. Built on curl's OpenSSL backend by the
- * Vita's tests, and on its Mbed TLS backend, the PS3's, by the PS3's (VITALS_MBEDTLS_PLATFORM: Mbed
- * TLS's mutexes first, as the PS3's console_network_start sets them) */
+ * against test servers (release_fetch_tests.py): ca url [url]. Built on the apps' curl and Mbed TLS by
+ * both consoles' tests: the Vita's with the host's defaults, the PS3's with its own crypto options
+ * (VITALS_MBEDTLS_PLATFORM: Mbed TLS's mutexes first, as its console_network_start sets them) */
 
 #include "release_check.h"
 

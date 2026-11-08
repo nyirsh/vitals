@@ -1,6 +1,7 @@
 """update_certs.py refreshes the bundled snapshot consistently, and leaves a current one alone."""
 import hashlib
 import importlib.util
+import os
 import json
 from pathlib import Path
 import re
@@ -15,9 +16,7 @@ update_certs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(update_certs)
 
 
-@unittest.skipUnless(shutil.which("pkg-config") and
-                     subprocess.run(["pkg-config", "--exists", "libcurl", "openssl"]).returncode == 0,
-                     "requires libcurl/OpenSSL development libraries and pkg-config")
+@unittest.skipUnless(shutil.which(os.environ.get("CC", "cc")), "requires a C compiler")
 class UpdateCertsTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

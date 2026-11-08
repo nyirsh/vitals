@@ -145,6 +145,12 @@ int vitals_ca_download(const char *trust, size_t trust_length, const char *user_
                        const char *sony, size_t sony_length, VitalsCaBundle *out, VitalsNote note)
 {
 	memset(out, 0, sizeof(*out));
+	/* curl's TLS is Mbed TLS, which must have its mutexes, entropy and time before curl starts it,
+	 * however the caller started the network */
+	if (console_crypto_start() < 0) {
+		notef(note, "The download can't start: Mbed TLS didn't start");
+		return -1;
+	}
 	notef(note, "Downloading " VITALS_CA_UPDATE_URL);
 	VitalsDownload request = {VITALS_CA_UPDATE_URL, trust, trust_length, user_agent, NULL, 30,
 	                          VITALS_CA_BUNDLE_LIMIT, NULL, log};

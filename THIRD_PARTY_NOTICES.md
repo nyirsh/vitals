@@ -27,11 +27,11 @@ Mbed TLS is an independent work; no endorsement by its authors is implied.
 
 ### curl
 
-Both apps statically link libcurl (currently 8.17.0), built from the unmodified official release archive from `curl.se` under the curl license (`licenses/curl-LICENSE.txt`). Source: <https://github.com/curl/curl/releases>. The builds disable unused protocols and default CA discovery; the Vita's uses OpenSSL (below) and disables the console UI, the PS3's uses Mbed TLS (above).
+Both apps statically link libcurl (currently 8.17.0), built from the unmodified official release archive from `curl.se` under the curl license (`licenses/curl-LICENSE.txt`). Source: <https://github.com/curl/curl/releases>. The build, the same for both (`shared/curl`), disables unused protocols, compression and default CA discovery, and uses Mbed TLS (above).
 
-### OpenSSL, zlib and Zstandard
+### zlib
 
-`libhttp.suprx` (vita/vitals-http) statically links zlib from VitaSDK, for gzip bodies. libcurl uses OpenSSL, zlib and Zstandard from VitaSDK (OpenSSL 1.1.1t, zlib 1.3.2 and Zstandard 1.5.7 in the validated build). Their license texts are `licenses/OpenSSL-LICENSE.txt`, `licenses/zlib-LICENSE.txt` and `licenses/zstd-LICENSE.txt`; Zstandard's BSD option is selected. This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (<https://www.openssl.org/>). This product includes cryptographic software written by Eric Young (eay@cryptsoft.com).
+`libhttp.suprx` (vita/vitals-http) statically links zlib from VitaSDK, for gzip bodies, and so does the Vita's app, to read its modules' compressed headers (zlib 1.3.2 in the validated build). Its license text is `licenses/zlib-LICENSE.txt`.
 
 ### Sony material
 

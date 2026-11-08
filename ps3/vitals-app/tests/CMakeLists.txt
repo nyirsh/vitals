@@ -16,7 +16,7 @@ include(${APP_DIR}/../dependencies.cmake)
 vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
 set(VITALS_PSA_USER_CONFIG "${APP_DIR}/crypto/psa_user_config.h")
 add_subdirectory(${VITALS_SSL}/crypto mbedtls)
-add_subdirectory(${APP_DIR}/curl curl)
+add_subdirectory(${APP_DIR}/../../shared/curl curl)
 
 option(VITALS_ENABLE_SANITIZERS "Build the tests with AddressSanitizer and UBSan" ON)
 if(VITALS_ENABLE_SANITIZERS)

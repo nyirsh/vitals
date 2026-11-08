@@ -16,8 +16,10 @@
 #endif
 
 /* The console's: on the PS3's tests the host's mutexes for its Mbed TLS (tests/host), else nothing */
+static int crypto_starts;
 int console_crypto_start(void)
 {
+	++crypto_starts;
 #ifdef VITALS_TEST_CRYPTO_PLATFORM
 	static int ready;
 	if (!ready && vitals_crypto_platform_init() == 0)
@@ -38,6 +40,8 @@ static const char *expected_trust;
 int vitals_download(const VitalsDownload *request, VitalsDownloaded *result)
 {
 	++downloads;
+	/* Mbed TLS set up before curl starts it */
+	assert(crypto_starts > 0);
 	assert(strcmp(request->url, VITALS_CA_UPDATE_URL) == 0 && request->ca == expected_trust);
 	assert(request->limit == VITALS_CA_BUNDLE_LIMIT && strcmp(request->user_agent, "vitals-test") == 0);
 	memset(result, 0, sizeof(*result));
@@ -176,6 +180,7 @@ int main(void)
 	 * a bundle, makes nothing and says why */
 	const char trust[] = "the app's bundle";
 	expected_trust = trust;
+	crypto_starts = 0;
 	served = bundle;
 	served_length = length;
 	notes[0] = '\0';

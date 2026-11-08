@@ -6,7 +6,7 @@
 #include <psp2/kernel/processmgr.h>
 
 /* The glyph cache (shared/app/font.c), the screen's canvas, the documents and the certificate
- * download (curl and OpenSSL) */
+ * download (curl and Mbed TLS) */
 unsigned int _newlib_heap_size_user = 32u * 1024u * 1024u;
 
 int main(void)

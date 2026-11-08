@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
-# Host tests of the app's C code: install options, config.txt editing and the OpenSSL locking
-# adapter, built for this machine; `make test` runs them, then the Python tests next to them
+# Host tests of the app's C code: install options, config.txt editing, the connection test and the
+# certificate update, built for this machine; `make test` runs them, then the Python tests next to them
 project(vitals_app_tests C)
 set(CMAKE_C_STANDARD 11)
 
@@ -13,12 +13,14 @@ include_directories(AFTER ${SHARED_APP})
 include_directories(AFTER ${APP_DIR}/../common/include)
 
 # Mbed TLS on this machine, as vitals-ssl builds it but with the host's defaults
-# (../../../shared/tests/psa_host_config.h), for the certificate update's test: added before this
-# folder's warnings and sanitizers, which aren't its
+# (../../../shared/tests/psa_host_config.h), and the app's curl on it (../../../shared/curl), for the
+# certificate update's test and the shared download's: added before this folder's warnings and
+# sanitizers, which aren't theirs
 include(${APP_DIR}/../dependencies.cmake)
 vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
 set(VITALS_PSA_USER_CONFIG "${APP_DIR}/../../shared/tests/psa_host_config.h")
 add_subdirectory(${APP_DIR}/../vitals-ssl/crypto mbedtls)
+add_subdirectory(${APP_DIR}/../../shared/curl curl)
 
 option(VITALS_ENABLE_SANITIZERS "Build the tests with AddressSanitizer and UBSan" ON)
 if(VITALS_ENABLE_SANITIZERS)
@@ -109,19 +111,10 @@ add_test(NAME vitals_app_module_version COMMAND vitals_app_module_version_tests)
 add_executable(vitals_app_release_version_tests ${SHARED_APP}/tests/test_release_version.c ${SHARED_APP}/release_version.c)
 add_test(NAME vitals_app_release_version COMMAND vitals_app_release_version_tests)
 
-# The locking adapter only needs OpenSSL's headers; Homebrew's default OpenSSL on macOS, the
-# system's on Linux (libssl-dev)
-find_path(OPENSSL_HEADERS openssl/crypto.h
-    HINTS /opt/homebrew/opt/openssl/include /usr/local/opt/openssl/include)
-if(OPENSSL_HEADERS)
-    find_package(Threads REQUIRED)
-    add_executable(vitals_app_crypto_lock_tests fixtures/crypto_lock/test_lock.c)
-    target_include_directories(vitals_app_crypto_lock_tests PRIVATE fixtures/crypto_lock ${OPENSSL_HEADERS})
-    target_link_libraries(vitals_app_crypto_lock_tests PRIVATE Threads::Threads)
-    add_test(NAME vitals_app_crypto_lock COMMAND vitals_app_crypto_lock_tests)
-else()
-    # Reported as skipped rather than left out, so a missing dependency stays visible
-    add_test(NAME vitals_app_crypto_lock
-        COMMAND sh -c "echo 'OpenSSL development headers not found (libssl-dev, or brew install openssl)'; exit 77")
-    set_tests_properties(vitals_app_crypto_lock PROPERTIES SKIP_RETURN_CODE 77)
-endif()
+# The shared download (../../../shared/app/download.c) and the release check's fetch on the app's
+# curl and Mbed TLS, run by test_version_check.py against local HTTPS servers, as the PS3's tests run it
+find_package(Threads REQUIRED)
+add_executable(vitals_app_release_fetch_mbedtls ${SHARED_APP}/tests/release_fetch_cli.c ${SHARED_APP}/download.c
+    ${SHARED_APP}/release_fetch.c ${SHARED_APP}/release_version.c)
+target_link_libraries(vitals_app_release_fetch_mbedtls PRIVATE libcurl_static mbedtls mbedx509 tfpsacrypto
+    Threads::Threads)

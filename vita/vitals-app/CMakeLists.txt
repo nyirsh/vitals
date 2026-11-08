@@ -38,13 +38,14 @@ foreach(level 1 2)
     endforeach()
 endforeach()
 
-# libcurl, used to download the latest Mozilla CA bundle
-add_subdirectory(curl)
-# Mbed TLS, as vitals-ssl builds it (its crypto options and its platform: ../vitals-ssl/src), to read
-# each certificate of a bundle as vitals' libssl will (../../shared/app/ca_update.c)
+# The app's own TLS: Mbed TLS as vitals-ssl builds it (its crypto options and its platform:
+# ../vitals-ssl/src), for curl's downloads (../../shared/curl, the PS3's too: the Mozilla CA bundle, the
+# new-release check) and to read each certificate of a bundle as vitals' libssl will
+# (../../shared/app/ca_update.c)
 include(../dependencies.cmake)
 vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
 add_subdirectory(../vitals-ssl/crypto "${CMAKE_CURRENT_BINARY_DIR}/mbedtls")
+add_subdirectory(../../shared/curl "${CMAKE_CURRENT_BINARY_DIR}/curl")
 
 add_executable(vitals-app
     # The app itself, the same on the PS3 (../../shared/app)
@@ -78,7 +79,6 @@ add_executable(vitals-app
     config_edit.c
     ../../shared/src/store_certs.c
     ../vitals-ssl/src/platform_shims.c
-    crypto_lock_vita.c
     module_version.c
     # The host redirect list is read as vitals' provider reads it
     ../../shared/src/host_map.c
@@ -90,16 +90,11 @@ target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
 target_include_directories(vitals-app PRIVATE . ../common/include ../vitals-http/include ../../shared/include ../../shared/app
     ../vitals-ssl/src)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
-# OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
-foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock
-        CRYPTO_THREAD_unlock CRYPTO_THREAD_lock_free CRYPTO_atomic_add)
-    target_link_options(vitals-app PRIVATE "-Wl,--wrap=${function}")
-endforeach()
 # Keeps room for the tables vita-elf-create adds at the end of the code (sce_space.ld)
 target_link_options(vitals-app PRIVATE "-Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld")
 set_property(TARGET vitals-app APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld)
-target_link_libraries(vitals-app PRIVATE libcurl_static mbedx509 tfpsacrypto
-    ssl crypto pthread z zstd m
+target_link_libraries(vitals-app PRIVATE libcurl_static mbedtls mbedx509 tfpsacrypto
+    pthread z m
     ScePvf_stub SceHttp_stub SceSsl_stub SceNet_stub SceNetCtl_stub
     SceSysmodule_stub SceDisplay_stub SceCtrl_stub ScePower_stub SceVshBridge_stub SceRtc_stub
     SceLibKernel_stub SceIofilemgr_stub SceKernelThreadMgr_stub SceKernelModulemgr_stub

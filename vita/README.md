@@ -192,11 +192,11 @@ This produces `build/vitals-app/vitals-app.vpk`. Everything is built under `buil
 To build without Docker, install [VitaSDK](https://vitasdk.org) (make sure to add the sdk to your `PATH`) and the Vita libraries the app links, then run `make`:
 
 ```sh
-vdpm install openssl-1.1.1 zlib zstd
+vdpm install zlib
 make
 ```
 
-Use `openssl-1.1.1`: vdpm's plain `openssl` package is the older 1.0.2.
+The app's own TLS, for its downloads and its certificate checks, is the Mbed TLS vitals-ssl builds, as on the PS3; its curl is built with it (`../shared/curl`).
 
 Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-boot/`, `vitals-ssl/`, `vitals-http/` and `vitals-browser/` first, because the vpk bundles them. `vitals-dns/` is built as part of `vitals-boot/`, and `common/` as part of each module that uses it.
 
@@ -253,9 +253,9 @@ This runs every component's host tests (`make -C <folder> test` runs one compone
 - `common/tests/`: the core library (certificate checks, paths, the host redirect list's parser, firmware identities), the CA store's scanner and the user-mode runtime
 - `vitals-http/tests/`: the HTTP library against a local HTTP and HTTPS server: requests, keep-alive, bodies, redirects, cookies, Basic and Digest auth, HTTPS (including client certificates and the console's TLS profile), non-blocking calls, host redirects and the User-Agent
 - `vitals-ssl/tests/`: the SSL library's connection and certificate functions, called as Sony's libhttp calls them, against a local TLS server: reading and writing, close_notify and dropped sockets, timeouts, certificate and host name checks, the error codes, and a verify callback that checks a CA's chain through the certificate functions and the CA store
-- `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
+- `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, the certificate update (`../shared/app/tests/test_ca_update.c`) and `make update-certs`, the new-release check's download on the app's curl and Mbed TLS, and how the connection test runs and judges its checks
 
-The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them). The release check's download tests are skipped unless `pkg-config` and the libcurl and OpenSSL development files are installed: `pkg-config libcurl4-openssl-dev libssl-dev` on Debian/Ubuntu, `brew install pkgconf curl openssl` on macOS (the tests find Homebrew's copies themselves). The OpenSSL must be the one libcurl itself uses, as the code under test shares OpenSSL objects with curl.
+The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them).
 
 Each normal build also checks that the kernel plugin contains no floating-point instructions.
 

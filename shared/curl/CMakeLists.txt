@@ -1,9 +1,8 @@
-# curl for the app's downloads (the Mozilla CA bundle, the new-release check), on Mbed TLS 4.2 as
-# vitals' libssl builds it (../../vitals-ssl/crypto, with the app's crypto options, ../crypto): the
-# app's own TLS, so the downloads work whatever the console's TLS is. As the Vita's
-# vitals-app/curl, which is on OpenSSL; the pin is both consoles' (../../../shared/curl/curl.cmake).
-# The host tests build it for this machine too (../tests), so the shared download is tested on curl's
-# Mbed TLS backend as well as the Vita's OpenSSL one; the PS3's own settings apply only there
+# curl for both consoles' apps (the Mozilla CA bundle, the new-release check), on Mbed TLS 4.2 as each
+# console's vitals-ssl builds it (its crypto/, with the including app's crypto options): the app's own
+# TLS, so the downloads work whatever the console's TLS is. The pin is curl.cmake, next to this. The
+# host tests build it for this machine too, so the shared download is tested on the TLS the apps use;
+# each console's own settings below apply only to its build
 vitals_download("${VITALS_CURL_URL}" "${VITALS_CURL_SHA256}" VITALS_CURL_ARCHIVE)
 
 set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
@@ -33,6 +32,10 @@ set(CURL_USE_MBEDTLS ON CACHE BOOL "" FORCE)
 set(CURL_CA_BUNDLE "none" CACHE STRING "No default/system CA file" FORCE)
 set(CURL_CA_PATH "none" CACHE STRING "No default/system CA directory" FORCE)
 set(CURL_CA_FALLBACK OFF CACHE BOOL "" FORCE)
+if(CMAKE_C_COMPILER MATCHES "arm-vita-eabi")
+    # The Vita's sockets can't take O_NONBLOCK through fcntl
+    set(HAVE_FCNTL_O_NONBLOCK 0 CACHE INTERNAL "" FORCE)
+endif()
 if(PS3DK)
     # The PS3's sockets (the SDK's BSD family, librt) have no fcntl: they're made non-blocking with
     # setsockopt's SO_NBIO, which curl knows as SO_NONBLOCK (below), and there's no close-on-exec to
@@ -43,13 +46,13 @@ if(PS3DK)
     # Nor basename, which the check finds in a header without a definition: curl has its own
     set(HAVE_BASENAME 0 CACHE INTERNAL "" FORCE)
 endif()
-# No pipe2 (curl's wake-up pipe is off, CURL_DISABLE_SOCKETPAIR): the PS3 has none, and a Mac's
-# header declares one its system may not have
+# No pipe2 (curl's wake-up pipe is off, CURL_DISABLE_SOCKETPAIR): neither console has one, and a
+# Mac's header declares one its system may not have
 set(HAVE_PIPE2 0 CACHE INTERNAL "" FORCE)
 # curl's extra warnings fire on Mbed TLS's own headers
 set(PICKY_COMPILER OFF CACHE BOOL "" FORCE)
-# Mbed TLS is the targets ../../vitals-ssl/crypto made, not an installed copy: their names stand for
-# the libraries, and they bring their include folders and options along
+# Mbed TLS is the targets the console's vitals-ssl/crypto made, not an installed copy: their names
+# stand for the libraries, and they bring their include folders and options along
 include(FetchContent)
 FetchContent_GetProperties(vitals_mbedtls)
 set(MBEDTLS_INCLUDE_DIR "${vitals_mbedtls_SOURCE_DIR}/include" CACHE PATH "" FORCE)

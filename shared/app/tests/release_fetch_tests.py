@@ -1,10 +1,10 @@
 """The new-release check's fetch, and so the shared download (download.c), against local HTTPS
 servers, on whichever curl a console's tests build it with: the release number comes from the first
 site that gives one, and nothing untrusted, redirected, oversized or malformed is believed. Each console's
-tests make a class of ReleaseFetchTests and unittest.TestCase with its build_executable: the Vita's on
-curl's OpenSSL backend (vita/vitals-app/tests/test_version_check.py), the PS3's on its Mbed TLS one
-(ps3/vitals-app/tests/test_release_fetch.py), so a difference between the two shows here rather than on
-a console"""
+tests make a class of ReleaseFetchTests and unittest.TestCase with its build_executable, both on the
+apps' curl and Mbed TLS (vita/vitals-app/tests/test_version_check.py with the host's crypto options,
+ps3/vitals-app/tests/test_release_fetch.py with the PS3's), so a difference shows here rather than on a
+console"""
 import contextlib
 import http.server
 from pathlib import Path

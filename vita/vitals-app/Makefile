@@ -23,9 +23,9 @@ modules:
 update-certs:
 	python3 tools/update_certs.py
 
-# Host tests, built for this machine (no VitaSDK needed): the C tests of the install options,
-# config.txt editing and OpenSSL locking, then the Python tests of the certificate download and
-# updater, which need a real HTTPS server
+# Host tests, built for this machine (no VitaSDK needed): the C tests of the installer, config.txt
+# editing, the connection test and the certificate update, then the Python tests of the new-release
+# check's download (on the app's curl and Mbed TLS, against local HTTPS servers) and make update-certs
 TEST_DIR = $(BUILD_DIR)/vitals-app-tests
 
 test:

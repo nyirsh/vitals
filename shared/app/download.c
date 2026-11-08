@@ -104,8 +104,8 @@ int vitals_download(const VitalsDownload *request, VitalsDownloaded *result)
 	SET(CURLOPT_CAPATH, NULL);
 	SET(CURLOPT_CAINFO_BLOB, &ca);
 	SET(CURLOPT_SSL_SESSIONID_CACHE, 0L);
-	/* No CA store kept between transfers: only where the TLS has one (OpenSSL, the Vita's), as Mbed
-	 * TLS, the PS3's, has none and refuses the option (CURLE_NOT_BUILT_IN) */
+	/* No CA store kept between transfers: only where curl's TLS has one (OpenSSL, the host's), as Mbed
+	 * TLS, both consoles', has none and refuses the option (CURLE_NOT_BUILT_IN) */
 	(void)curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 0L);
 	SET(CURLOPT_FRESH_CONNECT, 1L);
 	SET(CURLOPT_FORBID_REUSE, 1L);

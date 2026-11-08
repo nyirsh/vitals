@@ -13,13 +13,13 @@ set(VITALS_TITLE_ID "VTLS00001")
 set(VITALS_CONTENT_ID "UP0001-${VITALS_TITLE_ID}_00-VITALSTLSTOOLKIT")
 set(STAGING "${CMAKE_CURRENT_BINARY_DIR}/pkg_files" CACHE PATH "The .pkg's other files, as the Makefile stages them")
 
-# The app's downloads go through curl on Mbed TLS (curl/), the same Mbed TLS as vitals' libssl,
+# The app's downloads go through curl on Mbed TLS (../../shared/curl, the Vita's too), the same Mbed TLS as vitals' libssl,
 # built with the app's crypto options (crypto/psa_user_config.h)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../dependencies.cmake)
 vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
 set(VITALS_PSA_USER_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/crypto/psa_user_config.h")
 add_subdirectory(../vitals-ssl/crypto "${CMAKE_CURRENT_BINARY_DIR}/mbedtls")
-add_subdirectory(curl)
+add_subdirectory(../../shared/curl "${CMAKE_CURRENT_BINARY_DIR}/curl")
 
 add_executable(vitals-app
 	# The app itself, the same on the Vita (../../shared/app)

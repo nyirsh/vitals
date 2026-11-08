@@ -3,8 +3,7 @@
 
 #include <stddef.h>
 
-/* HTTPS downloads through curl, the same on every console (the Vita's curl is on OpenSSL, the PS3's on
- * Mbed TLS): the app's own TLS, trusting only the CAs it's given, so a download works whatever the
+/* HTTPS downloads through curl on Mbed TLS, the same on every console (../curl): the app's own TLS, trusting only the CAs it's given, so a download works whatever the
  * console's own TLS is, vitals' included. The console's network must be up (console_network_start) */
 
 typedef struct {

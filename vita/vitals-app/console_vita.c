@@ -136,9 +136,10 @@ int console_crypto_start(void)
     return 0;
 }
 
+/* With Mbed TLS set up for curl, as console_network_start */
 int vitals_install_network_ready(void)
 {
-    return network_start(NULL) == 0;
+    return console_network_start(NULL) == 0;
 }
 
 void vitals_certificates_date(char *text, size_t size, int *stale)
@@ -230,8 +231,11 @@ int console_flag_set(const char *path, int present)
 
 /* ---- the network, for the app's own downloads ---- */
 
+/* curl's TLS is Mbed TLS (../../shared/curl), whose mutexes, entropy and time are set up first */
 int console_network_start(int (*stop)(void))
 {
+    if (console_crypto_start() < 0)
+        return -1;
     return network_start(stop);
 }
 
