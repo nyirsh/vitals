@@ -3,6 +3,9 @@
 #include "network.h"
 #include "probe.h"
 #include "vitals/redirect_list.h"
+#include "vitals/switches.h"
+#include "vitals_http.h"
+#include <taihen.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/kernel/modulemgr.h>
@@ -22,6 +25,27 @@
 #define REPORT_DIR VITALS_REPORTS_DIRECTORY
 /* VitaSDK has the stub, not the prototype: the HTTPS options of one template, connection or request */
 int sceHttpsDisableOption2(int id, unsigned int sslFlags);
+
+/* vitals-http's vitalsHttpGetUrl (vitals_http.h), found once in SceLibHttp's exports: NULL with
+ * Sony's libhttp or a vitals-http that predates it, which then can't say where a request went */
+typedef int (*GetUrl)(int reqId, char *url, unsigned int size, unsigned int *required);
+static GetUrl get_url(void)
+{
+    static int looked;
+    static GetUrl found;
+    if (!looked)
+    {
+        uintptr_t address = 0;
+        looked = 1;
+        if (taiGetModuleExportFunc("SceLibHttp", VITALS_HTTP_LIBRARY_NID, VITALS_HTTP_GET_URL_NID, &address) >= 0 &&
+            address != 0)
+            found = (GetUrl)address;
+    }
+    return found;
+}
+/* The URL the last request went to, as vitals-http sent it (after the host redirects); empty when
+ * that isn't known */
+static char reached_url[CHECK_HOST_MAX + 64];
 
 /* The retry's SSL callback where certificate checks can't be turned off: whatever was found is
  * accepted, so only the protocol decides */
@@ -153,6 +177,13 @@ static int fetch_once(const char *url, int verify, int unverified_allowed, int s
     REQUIRE(sceHttpSetResponseHeaderMaxSize(tmpl, 16384));
     REQUIRE(conn = sceHttpCreateConnectionWithURL(tmpl, url, SCE_HTTP_DISABLE));
     REQUIRE(req = sceHttpCreateRequestWithURL(conn, SCE_HTTP_METHOD_GET, url, 0));
+    reached_url[0] = '\0';
+    if (vitals_http == 1 && get_url() != NULL)
+    {
+        unsigned int required = 0;
+        if (get_url()(req, reached_url, sizeof(reached_url), &required) < 0)
+            reached_url[0] = '\0';
+    }
     REQUIRE(sceHttpAddRequestHeader(req, "Accept-Encoding", "identity", SCE_HTTP_HEADER_OVERWRITE));
     REQUIRE(sceHttpAddRequestHeader(req, "Cache-Control", "no-cache", SCE_HTTP_HEADER_OVERWRITE));
     lock();
@@ -704,11 +735,16 @@ static int run_checks(SceSize argc, void *argv)
             r.state = CHECK_INFO;
             snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
         }
-        /* Host redirects are vitals-http's */
+        /* Host redirects are vitals-http's, and HTTP's Redirects off keeps them from it */
         else if (vitals_http != 1)
         {
             r.state = CHECK_INFO;
             snprintf(r.message, sizeof(r.message), "Not tested: vitals' HTTP isn't active here");
+        }
+        else if (sceIoGetstat(VITALS_REDIRECTS_OFF, &(SceIoStat){0}) >= 0)
+        {
+            r.state = CHECK_INFO;
+            snprintf(r.message, sizeof(r.message), "Not tested: redirects are off");
         }
         else
         {
@@ -721,6 +757,24 @@ static int run_checks(SceSize argc, void *argv)
             {
                 r.state = CHECK_INFO;
                 snprintf(r.message, sizeof(r.message), "Cancelled / not tested");
+            }
+            /* The answer was the new host's: vitals-http says where the request went (and checked
+             * the certificate against that name) */
+            else if (r.state == CHECK_PASS)
+            {
+                char host[CHECK_HOST_MAX];
+                int reached = reached_url[0] != '\0'
+                                  ? check_url_host(reached_url, redirects[i].to, host, sizeof(host))
+                                  : -1;
+                if (reached == 1)
+                    snprintf(r.message, sizeof(r.message), "Reached %.96s (HTTP %d)", redirects[i].to, r.http_code);
+                else if (reached == 0)
+                {
+                    r.state = CHECK_FAIL;
+                    snprintf(r.message, sizeof(r.message), "Answered by %.50s, not %.50s", host, redirects[i].to);
+                }
+                else
+                    snprintf(r.message, sizeof(r.message), "Connected (HTTP %d); the host reached isn't known", r.http_code);
             }
             policy_failed = r.restore_error < 0;
         }

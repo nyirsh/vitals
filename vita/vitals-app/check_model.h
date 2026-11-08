@@ -19,6 +19,9 @@ int check_http_module_active(const char *name, const char *path, unsigned state)
 /* The same for vitals-ssl: SceLibSsl started from ux0:data/vitals/system (the Options' tls.off
  * keeps Sony's) */
 int check_ssl_module_active(const char *name, const char *path, unsigned state);
+/* The host a request's URL names ("https://HOST[:port]/..."), into host (size bytes): 1 when it's
+ * expected (case aside), 0 when it's another, -1 when the URL names none */
+int check_url_host(const char *url, const char *expected, char *host, size_t size);
 int check_protocol_body(unsigned version, const char *body, size_t size);
 /* sceHttp's error with sceSsl's error and detail, in words */
 const char *check_error_name(int error, int ssl_error, unsigned detail);

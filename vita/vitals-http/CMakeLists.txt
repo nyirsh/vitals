@@ -54,7 +54,7 @@ add_executable(vitals_libhttp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/host_map.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/redirect_list.c
 )
-target_include_directories(vitals_libhttp PRIVATE src ${VITALS_SSL_DIR}/include ${TLS13_DIR}/provider
+target_include_directories(vitals_libhttp PRIVATE src include ${VITALS_SSL_DIR}/include ${TLS13_DIR}/provider
     ${TLS13_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
@@ -76,9 +76,9 @@ foreach(function malloc calloc realloc free memchr memcmp memcpy memmove memset 
 endforeach()
 # Nothing in the module calls its exports, so --gc-sections would drop them: each one the yml lists
 # is kept
-file(STRINGS vitals_http_api.yml.in export_lines REGEX "^ +- sceHttps?[A-Za-z0-9]+:")
+file(STRINGS vitals_http_api.yml.in export_lines REGEX "^ +- (sceHttps?|vitalsHttp)[A-Za-z0-9]+:")
 foreach(line ${export_lines})
-    string(REGEX REPLACE "^ +- (sceHttps?[A-Za-z0-9]+):.*$" "\\1" function "${line}")
+    string(REGEX REPLACE "^ +- ((sceHttps?|vitalsHttp)[A-Za-z0-9]+):.*$" "\\1" function "${line}")
     target_link_options(vitals_libhttp PRIVATE "-Wl,--undefined=${function}")
 endforeach()
 # The host redirect list is read through the kernel plugin's system call, from the stub its build
@@ -111,3 +111,4 @@ target_link_libraries(vitals_libhttp PRIVATE
 configure_file(vitals_http_api.yml.in vitals_http_api.yml @ONLY)
 vita_create_self(libhttp.suprx vitals_libhttp
     CONFIG ${CMAKE_CURRENT_BINARY_DIR}/vitals_http_api.yml UNSAFE)
+

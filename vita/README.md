@@ -88,6 +88,8 @@ Installing `vitals` also creates the file with instructions and examples: it is 
 
 Every app and game that uses Sony's HTTP library, as well as the system shell, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
 
+The app's **Test connections** requests each old host as a game would, and passes it only when `vitals`' HTTP library says the request went to the new host and that host answered with a valid certificate. With HTTP on **Redirects off** they're not tested.
+
 For now, only up to a maximum of 32 hosts can be redirected (trying to be cautious with memory usage and performance), maybe one day after more careful testing the restriction will be lifted. Malformed host names are also ignored.
 
 ## DNS rules

@@ -3,6 +3,7 @@
 #include "md5.h"
 #include "vh.h"
 #include "vitals_ssl.h"
+#include "vitals_http.h"
 
 #include <psp2/libssl.h>
 
@@ -1394,8 +1395,29 @@ static void test_host_redirects(int template_)
     sceHttpDeleteConnection(connection);
     connection = sceHttpCreateConnection(template_, "OLD.vitals.test", "http", (unsigned short)g_port, 1);
     int request = sceHttpCreateRequest(connection, SCE_HTTP_METHOD_GET, "/hello", 0);
+    /* vitalsHttpGetUrl: where the request goes, the redirect applied, before and after sending */
+    char reached[128], expected[128];
+    unsigned int required = 0;
+    snprintf(expected, sizeof(expected), "http://localhost:%d/hello", g_port);
+    CHECK_EQ(vitalsHttpGetUrl(request, reached, sizeof(reached), &required), 0);
+    CHECK(strcmp(reached, expected) == 0 && required == strlen(expected) + 1);
     CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
     CHECK_EQ(read_all(request, body, sizeof(body), 64), 11);
+    CHECK_EQ(vitalsHttpGetUrl(request, reached, sizeof(reached), &required), 0);
+    CHECK(strcmp(reached, expected) == 0);
+    /* Too small a buffer, none, no size, another id */
+    CHECK_EQ(vitalsHttpGetUrl(request, reached, 5, &required), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
+    CHECK_EQ(required, strlen(expected) + 1);
+    CHECK_EQ(vitalsHttpGetUrl(request, NULL, 0, &required), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
+    CHECK_EQ(vitalsHttpGetUrl(request, reached, sizeof(reached), NULL), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsHttpGetUrl(12345, reached, sizeof(reached), &required), (int)SCE_HTTP_ERROR_INVALID_ID);
+    sceHttpDeleteConnection(connection);
+    /* A host no rule names stays as it is */
+    connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);
+    request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_base, "/hello"), 0);
+    snprintf(expected, sizeof(expected), "%s/hello", g_base);
+    CHECK_EQ(vitalsHttpGetUrl(request, reached, sizeof(reached), &required), 0);
+    CHECK(strcmp(reached, expected) == 0);
     sceHttpDeleteConnection(connection);
     /* A request with a URL on a connection to the real server */
     connection = sceHttpCreateConnectionWithURL(template_, g_base, 1);

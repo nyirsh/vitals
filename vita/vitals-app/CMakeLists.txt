@@ -78,7 +78,7 @@ add_executable(vitals-app
 target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
 # With the app and the redirect list code shared with the PS3's (../../shared); this folder first, for
 # the Vita's own vitals_paths.h and check_result.h, which the shared headers include
-target_include_directories(vitals-app PRIVATE . ../tls13-vita/include ../../shared/include ../../shared/app)
+target_include_directories(vitals-app PRIVATE . ../tls13-vita/include ../vitals-http/include ../../shared/include ../../shared/app)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 # OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
 foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock
@@ -93,7 +93,9 @@ target_link_libraries(vitals-app PRIVATE libcurl_static
     ScePvf_stub SceHttp_stub SceSsl_stub SceNet_stub SceNetCtl_stub
     SceSysmodule_stub SceDisplay_stub SceCtrl_stub ScePower_stub SceVshBridge_stub SceRtc_stub
     SceLibKernel_stub SceIofilemgr_stub SceKernelThreadMgr_stub SceKernelModulemgr_stub
-    SceSysmem_stub SceProcessmgr_stub SceAppUtil_stub)
+    SceSysmem_stub SceProcessmgr_stub SceAppUtil_stub
+    # vitals-http's own exports, looked for at run time (check.c)
+    taihen_stub)
 
 # UNSAFE: installing needs system access (firmware version, vs0 and ur0 writes, reboot)
 vita_create_self(eboot.bin vitals-app UNSAFE)

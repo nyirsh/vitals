@@ -1,4 +1,5 @@
 #include "vh.h"
+#include "vitals_http.h"
 
 #include "diagnostics.h"
 #include "md5.h"
@@ -1716,6 +1717,30 @@ int sceHttpGetStatusCode(int reqId, int *statusCode)
         *statusCode = request->status_code;
     vh_unlock();
     return result;
+}
+
+/* vitals_http.h: the URL as sent, a host redirect applied */
+int vitalsHttpGetUrl(int reqId, char *url, unsigned int size, unsigned int *required)
+{
+    VH_TRACE();
+    VH_REQUIRE_INIT();
+    if (required == NULL)
+        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    *required = 0;
+    char text[VH_URL_MAX];
+    vh_lock();
+    VhObject *object = vh_find(reqId, VH_REQUEST);
+    if (object != NULL)
+        current_url(&object->as.request, text, sizeof(text));
+    vh_unlock();
+    if (object == NULL)
+        return (int)SCE_HTTP_ERROR_INVALID_ID;
+    size_t length = strlen(text) + 1;
+    *required = (unsigned int)length;
+    if (url == NULL || size < length)
+        return (int)SCE_HTTP_ERROR_OUT_OF_SIZE;
+    memcpy(url, text, length);
+    return 0;
 }
 
 int sceHttpGetAllResponseHeaders(int reqId, char **header, unsigned int *headerSize)

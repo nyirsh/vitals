@@ -273,6 +273,10 @@ static void run_checks(uint64_t argument)
 		else if (!active) {
 			r.state = CHECK_INFO;
 			snprintf(r.message, sizeof(r.message), "Not tested: vitals' libhttp isn't active this boot");
+		} else if (vitals_switch_is_off(VITALS_REDIRECTS_OFF)) {
+			/* HTTP's Redirects off: vitals' libhttp without them */
+			r.state = CHECK_INFO;
+			snprintf(r.message, sizeof(r.message), "Not tested: redirects are off (flags/redirects.off)");
 		} else {
 			r.state = CHECK_RUNNING;
 			lock();
@@ -286,7 +290,7 @@ static void run_checks(uint64_t argument)
 			if (stopping && h.http_code == 0)
 				not_tested(&r);
 			else
-				check_redirect_judge(&r);
+				check_redirect_judge(&r, h.reached, redirects[i].to);
 		}
 		log_result(redirects[i].from, &r);
 		lock();

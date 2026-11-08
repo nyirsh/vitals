@@ -22,6 +22,9 @@ typedef struct {
 	unsigned elapsed_ms, attempts;
 	/* What was read into the body */
 	size_t length;
+	/* The host the transaction went to (cellHttpTransactionGetUri's: vitals' libhttp gives the one a
+	 * host redirect led to), empty when it isn't known */
+	char reached[256];
 } HttpResult;
 
 /* Waits up to 10 seconds for an IP address: 0, or the error */

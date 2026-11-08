@@ -176,6 +176,26 @@ int check_ssl_module_active(const char *name, const char *path, unsigned state) 
         return 0;
     return same_file(path, VITALS_LIBSSL_PATH);
 }
+int check_url_host(const char *url, const char *expected, char *host, size_t size) {
+    if (size == 0)
+        return -1;
+    host[0] = '\0';
+    const char *start = url != NULL ? strstr(url, "://") : NULL;
+    if (start == NULL)
+        return -1;
+    start += 3;
+    size_t length = strcspn(start, ":/?#");
+    if (length == 0 || length >= size)
+        return -1;
+    memcpy(host, start, length);
+    host[length] = '\0';
+    if (expected == NULL || strlen(expected) != length)
+        return 0;
+    for (size_t i = 0; i < length; ++i)
+        if (tolower((unsigned char)host[i]) != tolower((unsigned char)expected[i]))
+            return 0;
+    return 1;
+}
 int check_protocol_body(unsigned version, const char *b, size_t n) {
     char expected[16];
     if (b == NULL || version > 3)

@@ -216,6 +216,12 @@ static int fetch_once(const char *url, char *body, size_t capacity, HttpResult *
 	if (rc >= 0) {
 		CellHttpHeader no_cache = {"Cache-Control", "no-cache"};
 		(void)cellHttpRequestAddHeader(transaction, &no_cache);
+		/* Where it goes: a host redirect applies when the transaction is made */
+		char pool[512];
+		CellHttpUri reached;
+		size_t needed = 0;
+		if (cellHttpTransactionGetUri(transaction, &reached, pool, sizeof(pool), &needed) >= 0 && reached.hostname != NULL)
+			snprintf(result->reached, sizeof(result->reached), "%s", reached.hostname);
 	}
 	if (rc >= 0) {
 		sysMutexLock(guard, 0);

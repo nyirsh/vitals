@@ -58,7 +58,7 @@ add_executable(vitals_http_tests
 target_include_directories(vitals_http_tests BEFORE PRIVATE ${CMAKE_BINARY_DIR}/sdk)
 # With the debug log compiled in, so its lines run too (VH_TEST_LOG=1 shows them)
 target_compile_definitions(vitals_http_tests PRIVATE VITALS_DEBUG=1 VITALS_LOG_PREFIX="vitals-http")
-target_include_directories(vitals_http_tests PRIVATE ${ROOT}/src ${VITALS_SSL_DIR}/src ${VITALS_SSL_DIR}/include
+target_include_directories(vitals_http_tests PRIVATE ${ROOT}/src ${ROOT}/include ${VITALS_SSL_DIR}/src ${VITALS_SSL_DIR}/include
     ${TLS13_DIR}/provider ${TLS13_DIR}/include ${ROOT}/../../shared/include)
 target_compile_options(vitals_http_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
     -fsanitize=address,undefined -fno-omit-frame-pointer)

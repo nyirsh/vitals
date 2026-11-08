@@ -129,3 +129,9 @@ SceLibHttp:
         - sceHttpPrivateSetSocketOption: 0xF30073EC
         - sceHttpPrivateLoadedCertAddCa: 0xF8885CFD
         - sceHttpPrivateDumpRequests: 0xFE60380A
+    # vitals-http's own (include/vitals_http.h): none of Sony's
+    VitalsHttp:
+      syscall: false
+      nid: 0x56485450
+      functions:
+        - vitalsHttpGetUrl: 0x5B1F3A6D

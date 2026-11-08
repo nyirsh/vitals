@@ -70,15 +70,24 @@ static void judging(void)
 	check_badssl_judge(&bad, &r);
 	expect_message(&r, CHECK_FAIL, "Inconclusive: Name not resolved (0x80710101)");
 
-	/* A redirect passes on any final status, as on the Vita */
+	/* A redirect passes on any final status, as on the Vita, from the rule's new host */
 	r = result(404, OK, 0);
-	check_redirect_judge(&r);
-	expect_message(&r, CHECK_PASS, "Connected (HTTP 404)");
+	check_redirect_judge(&r, "SS.pigna.casa", "ss.pigna.casa");
+	expect_message(&r, CHECK_PASS, "Reached ss.pigna.casa (HTTP 404)");
+	r = result(200, OK, 0);
+	check_redirect_judge(&r, "soundshapes.psvita.online.scea.com", "ss.pigna.casa");
+	expect_message(&r, CHECK_FAIL, "Answered by soundshapes.psvita.online.scea.com, not ss.pigna.casa");
+	r = result(200, OK, 0);
+	check_redirect_judge(&r, "ss.pigna.casa.example", "ss.pigna.casa");
+	expect_message(&r, CHECK_FAIL, "Answered by ss.pigna.casa.example, not ss.pigna.casa");
+	r = result(404, OK, 0);
+	check_redirect_judge(&r, "", "ss.pigna.casa");
+	expect_message(&r, CHECK_PASS, "Connected (HTTP 404); the host reached isn't known");
 	r = result(0, RESOLVER, 0);
-	check_redirect_judge(&r);
+	check_redirect_judge(&r, "ss.pigna.casa", "ss.pigna.casa");
 	expect_message(&r, CHECK_FAIL, "Name not resolved (0x80710101)");
 	r = result(0, CERTIFICATE, VERIFY_COMMON_NAME);
-	check_redirect_judge(&r);
+	check_redirect_judge(&r, "ss.pigna.casa", "ss.pigna.casa");
 	expect_message(&r, CHECK_FAIL, "Certificate hostname mismatch");
 }
 

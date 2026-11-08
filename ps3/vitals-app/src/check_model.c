@@ -219,11 +219,26 @@ int check_timed_out(int error)
 	                                                  kind == 0x80710c00u || kind == 0x80710d00u));
 }
 
-void check_redirect_judge(CheckResult *r)
+static int same_host(const char *a, const char *b)
+{
+	for (; *a != '\0' && *b != '\0'; ++a, ++b)
+		if (tolower((unsigned char)*a) != tolower((unsigned char)*b))
+			return 0;
+	return *a == *b;
+}
+
+void check_redirect_judge(CheckResult *r, const char *reached, const char *expected)
 {
 	if (r->http_code >= 200 && r->http_code <= 599 && r->error == 0) {
 		r->state = CHECK_PASS;
-		snprintf(r->message, sizeof(r->message), "Connected (HTTP %d)", r->http_code);
+		if (reached == NULL || reached[0] == '\0' || expected == NULL)
+			snprintf(r->message, sizeof(r->message), "Connected (HTTP %d); the host reached isn't known", r->http_code);
+		else if (same_host(reached, expected))
+			snprintf(r->message, sizeof(r->message), "Reached %.96s (HTTP %d)", expected, r->http_code);
+		else {
+			r->state = CHECK_FAIL;
+			snprintf(r->message, sizeof(r->message), "Answered by %.50s, not %.50s", reached, expected);
+		}
 	} else {
 		r->state = CHECK_FAIL;
 		failure(r, "");
