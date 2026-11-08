@@ -171,7 +171,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="vitals-browser-") as temporary:
         directory = Path(temporary)
         certificates(directory)
-        bundled_ca = Path(__file__).resolve().parents[3] / "vitals-app" / "assets" / "certs.cer"
+        bundled_ca = Path(__file__).resolve().parents[2] / "vitals-app" / "assets" / "certs.cer"
         (directory / "combined-ca.pem").write_bytes(
             bundled_ca.read_bytes() + b"\n" + (directory / "ca.pem").read_bytes())
         # OpenSSL 3 rejects a negative -days, so the expired certificate gets explicit past dates
