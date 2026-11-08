@@ -48,7 +48,10 @@ turns it back on:
 | `dns.off`       | the DNS rules                                                                                            |
 | `redirects.off` | the host redirects; vitals' libhttp stays                                                                |
 
-The vitals app's **Options** screen turns each on or off with Left and Right (and picks the debug output); START there ("Apply and reboot") writes the switches to `flags/` and installs the debug
+The vitals app's **Options** screen turns TLS, HTTP and the DNS rules on or off with Left and Right
+(and picks the debug output). HTTP has three: On (vitals' libhttp with the host redirects), Redirects
+off (in orange: vitals' libhttp without them, `redirects.off`) and Off (Sony's libhttp, which has
+none, `http.off`), as the redirects are vitals' libhttp's; START there ("Apply and reboot") writes the switches to `flags/` and installs the debug
 output's builds, showing each step, then reboots the console after 3 seconds. Back leaves it all as
 it was. The boot popup says which are off, as `TLS: Off`. Uninstalling leaves your lists, `flags/`
 and `reports/`. Installing over an earlier version moves its files to these folders (its
@@ -195,7 +198,7 @@ Its menu, as the Vita's:
   months old. The app downloads it with its own curl and Mbed TLS, as the Vita's app does, trusting
   only the Mozilla bundle it carries, so it works with vitals' TLS switched off or not installed.
 - The menu shows when GitHub or GitLab has a newer release than the app, found the same way.
-- **Options**: the four switches and the debug output, applied with START (see
+- **Options**: TLS, HTTP (On, Redirects off, Off) and the DNS rules, and the debug output, applied with START (see
   [On the console](#on-the-console)).
 - **Test connections**: the connection test, below.
 - **Changelog** and **Credits** ([CREDITS.md](CREDITS.md)).

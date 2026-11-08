@@ -9,6 +9,7 @@
 #include "changelog.h"
 #include "check.h"
 #include "console.h"
+#include "switches.h"
 #include "font.h"
 #include "input.h"
 #include "platform.h"
@@ -214,7 +215,7 @@ static int run_operation(enum Action action)
  * then the debug output's builds when the level changed; when all of it worked, the console reboots
  * after APPLY_REBOOT_SECONDS. Returns -1 when the system asks the app to quit, else 0 (after a
  * failure, once Back is pressed) */
-static int run_apply_options(unsigned switch_count, const int *off, const int *saved)
+static int run_apply_options(unsigned switch_count, const unsigned *state, const unsigned *saved)
 {
 	for (unsigned i = 0; i < TASK_MAX_LINES; ++i)
 		task_line_pointers[i] = task_lines[i];
@@ -225,13 +226,10 @@ static int run_apply_options(unsigned switch_count, const int *off, const int *s
 	int result = 0, changed = 0;
 	char line[160];
 	for (unsigned i = 0; i < switch_count && result >= 0; ++i) {
-		if (off[i] == saved[i])
+		if (state[i] == saved[i])
 			continue;
 		changed = 1;
-		const ConsoleSwitch *s = console_switch(i);
-		int rc = console_switch_set(i, off[i]);
-		snprintf(line, sizeof(line), "%s %s: %s %s%s", s->label, off[i] ? "off" : "on", off[i] ? "wrote" : "deleted", s->file,
-		         rc == 0 ? "" : " (failed)");
+		int rc = switch_apply(console_switch(i), state[i], console_flag_set, line, sizeof(line));
 		task_note(line);
 		app_log("options: %s (0x%08X)", line, (unsigned)rc);
 		if (rc != 0)
@@ -277,9 +275,9 @@ static int run_apply_options(unsigned switch_count, const int *off, const int *s
 	return 0;
 }
 
-/* The Options screen: Left and Right turn a switch on or off and pick the debug output's level here
- * only; START applies all of it and reboots (run_apply_options), and Back leaves the console as it
- * was. A choice that is the one on the console now says "(current)" */
+/* The Options screen: Left and Right go through a switch's states (On, then the others, Off last) and
+ * the debug output's levels here only; START applies all of it and reboots (run_apply_options), and
+ * Back leaves the console as it was. A choice that is the one on the console now says "(current)" */
 static int run_options(void)
 {
 	unsigned switch_count = console_switch_count();
@@ -290,16 +288,21 @@ static int run_options(void)
 	unsigned selected = 0;
 	int redraw = 1;
 	CheckScrollRepeat repeat = {0};
-	/* What the console has (saved) and what this screen has chosen (off) */
-	int saved[SWITCH_MAX], off[SWITCH_MAX];
+	/* What the console has (saved) and what this screen has chosen (state) */
+	unsigned saved[SWITCH_MAX], state[SWITCH_MAX];
 	for (unsigned i = 0; i < switch_count; ++i)
-		saved[i] = off[i] = console_switch_is_off(i);
+		saved[i] = state[i] = switch_state(console_switch(i), console_flag_exists);
 	for (;;) {
 		AppMenuItem items[SWITCH_MAX + 1];
 		for (unsigned i = 0; i < switch_count; ++i) {
 			const ConsoleSwitch *s = console_switch(i);
-			items[i] = (AppMenuItem){s->label, off[i] ? s->off : s->on, off[i] ? "Off" : "On", off[i] == saved[i], !off[i], off[i],
-			                         off[i] ? APP_TONE_RED : APP_TONE_USUAL, NULL, 0};
+			const ConsoleSwitchState *chosen = &s->states[state[i]];
+			items[i] = (AppMenuItem){s->label, chosen->meaning, chosen->name, state[i] == saved[i], state[i] == 0,
+			                         state[i] + 1 == s->state_count,
+			                         chosen->tone == CONSOLE_TONE_RED      ? APP_TONE_RED
+			                         : chosen->tone == CONSOLE_TONE_ORANGE ? APP_TONE_ORANGE
+			                                                               : APP_TONE_USUAL,
+			                         NULL, 0};
 		}
 		items[debug_option] = (AppMenuItem){"Debug output", console_words()->debug_purposes[debug_choice], debug_names[debug_choice],
 		                                    debug_choice == debug_level, debug_choice == 0,
@@ -330,13 +333,14 @@ static int run_options(void)
 			selected = next < 0 ? 0 : next >= (int)option_count ? option_count - 1 : (unsigned)next;
 			redraw = 1;
 		}
-		/* Left and Right stop at the ends: On then Off, the levels in order */
-		if (selected < switch_count && (pressed & (PAD_LEFT | PAD_RIGHT))) {
-			int wanted = (pressed & PAD_RIGHT) != 0;
-			if (off[selected] != wanted) {
-				off[selected] = wanted;
-				redraw = 1;
-			}
+		/* Left and Right stop at the ends: a switch's states in order (On first), the levels in order */
+		if (selected < switch_count && (pressed & PAD_LEFT) && state[selected] > 0) {
+			--state[selected];
+			redraw = 1;
+		}
+		if (selected < switch_count && (pressed & PAD_RIGHT) && state[selected] + 1 < console_switch(selected)->state_count) {
+			++state[selected];
+			redraw = 1;
 		}
 		if (selected == debug_option && (pressed & PAD_LEFT) && debug_choice > 0) {
 			--debug_choice;
@@ -347,11 +351,11 @@ static int run_options(void)
 			redraw = 1;
 		}
 		if (pressed & PAD_START) {
-			if (run_apply_options(switch_count, off, saved) < 0)
+			if (run_apply_options(switch_count, state, saved) < 0)
 				return -1;
 			/* After a failure: what the console has now */
 			for (unsigned i = 0; i < switch_count; ++i)
-				saved[i] = off[i] = console_switch_is_off(i);
+				saved[i] = state[i] = switch_state(console_switch(i), console_flag_exists);
 			redraw = 1;
 		}
 		if (pressed & back_button) {

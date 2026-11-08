@@ -49,6 +49,10 @@ target_compile_definitions(vitals_app_changelog_tests PRIVATE
     VITALS_CHANGELOG_FILE="${APP_DIR}/../../CHANGELOG.md")
 add_test(NAME vitals_app_changelog COMMAND vitals_app_changelog_tests)
 
+# The Options' switches on flag files, HTTP's three states among them (shared with the Vita's tests)
+add_executable(vitals_app_switches_tests ${SHARED}/app/tests/test_switches.c ${SHARED}/app/switches.c)
+add_test(NAME vitals_app_switches COMMAND vitals_app_switches_tests)
+
 # The release number in GitHub's and GitLab's release responses, for the new-release notice (shared
 # with the Vita's tests)
 add_executable(vitals_app_release_version_tests ${SHARED}/app/tests/test_release_version.c ${SHARED}/app/release_version.c)

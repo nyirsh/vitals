@@ -41,6 +41,10 @@ target_compile_definitions(vitals_app_changelog_tests PRIVATE
     VITALS_CHANGELOG_FILE="${APP_DIR}/../../CHANGELOG.md")
 add_test(NAME vitals_app_changelog COMMAND vitals_app_changelog_tests)
 
+# The Options' switches on flag files, HTTP's three states among them (shared with the PS3's tests)
+add_executable(vitals_app_switches_tests ${SHARED_APP}/tests/test_switches.c ${SHARED_APP}/switches.c)
+add_test(NAME vitals_app_switches COMMAND vitals_app_switches_tests)
+
 # Mozilla's part of the certificate store without Sony's, as both consoles' apps write it (shared with
 # the PS3's tests)
 add_executable(vitals_app_store_certs_tests ${APP_DIR}/../../shared/tests/test_store_certs.c

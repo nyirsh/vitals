@@ -61,20 +61,36 @@ void vitals_reboot(void);
 
 /* ---- the switches the Options screen turns on and off, which apply from the next boot ---- */
 
+/* The flag files a switch owns, at most */
+#define CONSOLE_SWITCH_FILES 3
+
+/* A state's colour on the screen */
+enum { CONSOLE_TONE_USUAL, CONSOLE_TONE_ORANGE, CONSOLE_TONE_RED };
+
+/* One of a switch's states: its name ("On", "Redirects off"), what it means ("vitals TLS enabled"),
+ * its colour, and which of the switch's files are there in it (bit i for files[i]) */
 typedef struct {
-	/* "TLS", and what each state means: "vitals TLS enabled", "Sony TLS enabled" */
-	const char *label, *on, *off;
-	/* The file that turns it off, named in the Options' progress */
-	const char *file;
+	const char *name, *meaning;
+	int tone;
+	unsigned files;
+} ConsoleSwitchState;
+
+/* A switch: "TLS", its flag files, and its states in the order Left and Right go through them, the
+ * one with everything on first (switches.c reads and writes them) */
+typedef struct {
+	const char *label;
+	const char *files[CONSOLE_SWITCH_FILES];
+	const ConsoleSwitchState *states;
+	unsigned state_count;
 } ConsoleSwitch;
 
 /* How many there are (none on a console without them) */
 unsigned console_switch_count(void);
 const ConsoleSwitch *console_switch(unsigned index);
-/* 1 when it's off */
-int console_switch_is_off(unsigned index);
-/* Turns it off or on: 0, or the error */
-int console_switch_set(unsigned index, int off);
+/* A flag file: 1 when it's there; and writing it (empty, its folders too) or deleting it: 0, or the
+ * error */
+int console_flag_exists(const char *path);
+int console_flag_set(const char *path, int present);
 
 /* ---- the network, for the app's own downloads (download.h) ---- */
 

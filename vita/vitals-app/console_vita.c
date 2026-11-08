@@ -158,11 +158,25 @@ void vitals_reboot(void)
 
 /* Each one's .off in ux0:data/vitals/flags, the PS3's four (vitals/switches.h), which the app writes
  * and deletes and the kernel plugin reads */
+static const ConsoleSwitchState tls_states[] = {
+    {"On", "vitals TLS enabled", CONSOLE_TONE_USUAL, 0},
+    {"Off", "Sony TLS enabled", CONSOLE_TONE_RED, 1},
+};
+/* The host redirects are vitals' HTTP's, so they're one of its states: On (both), Redirects off
+ * (vitals' HTTP without them, redirects.off) and Off (Sony's, which has none: http.off) */
+static const ConsoleSwitchState http_states[] = {
+    {"On", "vitals HTTP and redirects enabled", CONSOLE_TONE_USUAL, 0},
+    {"Redirects off", "vitals HTTP enabled, redirects disabled", CONSOLE_TONE_ORANGE, 2},
+    {"Off", "Sony HTTP enabled, no redirects", CONSOLE_TONE_RED, 1},
+};
+static const ConsoleSwitchState dns_states[] = {
+    {"On", "vitals DNS rules enabled", CONSOLE_TONE_USUAL, 0},
+    {"Off", "vitals DNS rules disabled", CONSOLE_TONE_RED, 1},
+};
 static const ConsoleSwitch switches[] = {
-    {"TLS", "vitals TLS enabled", "Sony TLS enabled", VITALS_TLS_OFF},
-    {"HTTP", "vitals HTTP enabled", "Sony HTTP enabled", VITALS_HTTP_OFF},
-    {"DNS rules", "vitals DNS rules enabled", "vitals DNS rules disabled", VITALS_DNS_OFF},
-    {"Redirects", "vitals redirects enabled", "vitals redirects disabled", VITALS_REDIRECTS_OFF},
+    {"TLS", {VITALS_TLS_OFF, NULL, NULL}, tls_states, 2},
+    {"HTTP", {VITALS_HTTP_OFF, VITALS_REDIRECTS_OFF, NULL}, http_states, 3},
+    {"DNS rules", {VITALS_DNS_OFF, NULL, NULL}, dns_states, 2},
 };
 
 unsigned console_switch_count(void)
@@ -175,22 +189,21 @@ const ConsoleSwitch *console_switch(unsigned index)
     return &switches[index];
 }
 
-int console_switch_is_off(unsigned index)
+int console_flag_exists(const char *path)
 {
     SceIoStat status;
-    return sceIoGetstat(switches[index].file, &status) >= 0;
+    return sceIoGetstat(path, &status) >= 0;
 }
 
-/* Off writes the empty .off (and its folders), on deletes it: 0, or the error */
-int console_switch_set(unsigned index, int off)
+/* Present writes the empty file (and its folders), absent deletes it: 0, or the error */
+int console_flag_set(const char *path, int present)
 {
-    const char *path = switches[index].file;
-    if (!off)
+    if (!present)
     {
         int rc = sceIoRemove(path);
-        return rc >= 0 || !console_switch_is_off(index) ? 0 : rc;
+        return rc >= 0 || !console_flag_exists(path) ? 0 : rc;
     }
-    if (console_switch_is_off(index))
+    if (console_flag_exists(path))
         return 0;
     (void)sceIoMkdir(VITALS_DIRECTORY, 0777);
     (void)sceIoMkdir(VITALS_FLAGS_DIRECTORY, 0777);
