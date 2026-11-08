@@ -63,6 +63,9 @@ typedef struct {
 #define CHECK_HOST_MAX 254
 typedef struct {
 	char from[CHECK_HOST_MAX], to[CHECK_HOST_MAX];
+	/* A redirect's: the host that answered its request, "" until one did or when the console can't
+	 * tell */
+	char reached[CHECK_HOST_MAX];
 	CheckResult result;
 } CheckRedirect;
 

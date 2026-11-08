@@ -160,6 +160,8 @@ static void backend_parts(CheckParts *parts)
 	parts->redirects_off = vitals_switch_is_off(VITALS_REDIRECTS_OFF);
 	parts->dns_off = vitals_switch_is_off(VITALS_DNS_OFF);
 	parts->vitals = -1;
+	/* libhttp's own transaction says which host answered */
+	parts->http_outdated = 0;
 	app_log("vitals' libhttp %s%s%s", parts->http ? "active" : "not active", parts->redirects_off ? ", redirects off" : "",
 	        parts->dns_off ? ", DNS rules off" : "");
 }

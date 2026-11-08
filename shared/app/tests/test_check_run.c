@@ -131,7 +131,7 @@ int main(void)
 {
 	/* Everything on: the tiles TLS 1.3 first, then the report, badssl.com, the redirects (reached
 	 * the new host) and the DNS rules */
-	parts = (CheckParts){1, 1, 0, 0, 1};
+	parts = (CheckParts){1, 1, 0, 0, 1, 0};
 	rule_counts[0] = 2, rule_counts[1] = 1;
 	run();
 	assert(protocol_count == 4 && protocol_order[0] == 3 && protocol_order[3] == 0);
@@ -142,14 +142,16 @@ int main(void)
 		assert(strncmp(service.badssl[i].message, "judged ", 7) == 0);
 	assert(service.redirect_count == 2 && service.redirects[1].result.state == CHECK_PASS);
 	assert(strcmp(service.redirects[0].from, "old0.example") == 0 && strcmp(last_reached, "new.example") == 0);
+	assert(strcmp(service.redirects[1].reached, "new.example") == 0);
 	assert(service.dns_count == 1 && service.dns[0].result.state == CHECK_PASS && strcmp(dns_names[0], "old0.example") == 0);
 	assert(service.vitals_enabled == 1 && service.libhttp_active == 1 && !service.interrupted);
 	assert(requests == 5 + CHECK_BADSSL_COUNT + 2);
 
-	/* Another host answered a redirect: the console's judge says so */
-	reached_host = "old0.example";
+	/* Another host answered a redirect: the console's judge says so, and the row shows that host,
+	 * from a URL (the Vita's) as from a host (the PS3's) */
+	reached_host = "https://old0.example:443/x";
 	run();
-	assert(service.redirects[0].result.state == CHECK_FAIL);
+	assert(service.redirects[0].result.state == CHECK_FAIL && strcmp(service.redirects[0].reached, "old0.example") == 0);
 	reached_host = "new.example";
 
 	/* vitals' HTTP not here, or its redirects off, or the DNS rules off: not tested, and no request
@@ -158,12 +160,20 @@ int main(void)
 	run();
 	assert(service.redirects[0].result.state == CHECK_INFO &&
 	       strcmp(service.redirects[0].result.message, "Not tested: vitals' HTTP isn't active") == 0);
-	assert(requests == 5 + CHECK_BADSSL_COUNT);
+	assert(requests == 5 + CHECK_BADSSL_COUNT && service.redirects[0].reached[0] == '\0');
 	parts.http = 1, parts.redirects_off = 1, parts.dns_off = 1;
 	run();
 	assert(strcmp(service.redirects[1].result.message, "Not tested: redirects are off") == 0);
 	assert(strcmp(service.dns[0].result.message, "Not tested: DNS rules are off") == 0 && service.dns_off == 1);
 	parts.redirects_off = parts.dns_off = 0;
+	/* vitals' HTTP too old to say which host answered: the redirects can't be tested, without a
+	 * request */
+	parts.http_outdated = 1;
+	run();
+	assert(service.redirects[0].result.state == CHECK_WARNING &&
+	       strcmp(service.redirects[0].result.message, "Couldn't test (outdated vitals)") == 0);
+	assert(requests == 5 + CHECK_BADSSL_COUNT);
+	parts.http_outdated = 0;
 	/* A console that doesn't look DNS rules up */
 	backend.dns = NULL;
 	run();

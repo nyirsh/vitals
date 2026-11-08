@@ -752,16 +752,36 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 			snprintf(line, sizeof(line), "%u listed / Hold arrows or stick", s->redirect_count);
 			text(p, X(932) - width(line, 16), Y(370), line, muted, 16);
 		}
-		/* Old host -> new host, then what requesting the old host through vitals gave */
+		/* Old host -> the host that answered, green when it's the new host and red when it isn't;
+		 * before that the new host (waiting), "Testing...", or why there's no answer in the
+		 * result's colour (outdated vitals in orange). Then its HTTP status, right-aligned, and the
+		 * time */
 		for (unsigned i = 0; i < CHECK_VISIBLE_REDIRECTS && scroll + i < s->redirect_count; ++i) {
 			const CheckRedirect *redirect = &s->redirects[scroll + i];
 			const CheckResult *r = &redirect->result;
-			int y = Y(397 + (int)i * 21);
-			snprintf(line, sizeof(line), "%s -> %s", redirect->from, redirect->to);
-			text_clipped(p, X(30), y, line, white, 16, X(530));
-			snprintf(line, sizeof(line), "%s",
-			         r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..." : "Waiting");
-			text_clipped(p, X(545), y, line, tone(r->state), 16, X(840));
+			int y = Y(397 + (int)i * 21), x = X(30);
+			snprintf(line, sizeof(line), "%s  -> ", redirect->from);
+			text_clipped(p, x, y, line, white, 16, X(770));
+			x += width(line, 16);
+			const char *answer;
+			uint32_t colour;
+			if (redirect->reached[0] != '\0' && (r->state == CHECK_PASS || r->state == CHECK_FAIL)) {
+				answer = redirect->reached;
+				colour = r->state == CHECK_PASS ? green : red;
+			} else if (r->state == CHECK_WAIT) {
+				answer = redirect->to;
+				colour = muted;
+			} else {
+				answer = r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..." : "Waiting";
+				colour = tone(r->state);
+			}
+			if (x < X(770))
+				text_clipped(p, x, y, answer, colour, 16, X(770));
+			if (r->http_code > 0)
+				snprintf(line, sizeof(line), "%d", r->http_code);
+			else
+				snprintf(line, sizeof(line), "-");
+			text(p, X(836) - width(line, 16), y, line, muted, 16);
 			if (r->elapsed_ms)
 				snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
 			else

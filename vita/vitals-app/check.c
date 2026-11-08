@@ -594,6 +594,8 @@ static void backend_parts(CheckParts *parts)
     parts->redirects_off = flag_there(VITALS_REDIRECTS_OFF);
     parts->dns_off = flag_there(VITALS_DNS_OFF);
     parts->vitals = enabled != 0;
+    /* A vitals-http without vitalsHttpGetUrl can't say which host answered */
+    parts->http_outdated = vitals_http && get_url() == NULL;
 }
 
 static void backend_protocol(unsigned test, char *body, CheckResult *r)

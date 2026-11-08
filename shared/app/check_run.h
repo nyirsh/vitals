@@ -21,6 +21,9 @@ typedef struct {
 	/* Whether vitals is running, as the screen and the tiles show it; -1 to take it from the TLS 1.3
 	 * tile (the PS3's way: Sony's TLS has no 1.3, so a connection is vitals') */
 	int vitals;
+	/* 1 when vitals' HTTP is too old to say which host answered a request (the Vita's before
+	 * vitalsHttpGetUrl): the redirects can't be tested then */
+	int http_outdated;
 } CheckParts;
 
 typedef struct {

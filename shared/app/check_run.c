@@ -78,11 +78,27 @@ static void publish_badssl(Run *run, unsigned i, const CheckResult *r)
 	unlock(run);
 }
 
-static void publish_rule(Run *run, CheckRedirect *list, unsigned i, const CheckResult *r)
+/* With the host that answered, when there is one */
+static void publish_rule(Run *run, CheckRedirect *list, unsigned i, const CheckResult *r, const char *reached)
 {
 	lock(run);
 	list[i].result = *r;
+	if (reached != NULL)
+		snprintf(list[i].reached, sizeof(list[i].reached), "%s", reached);
 	unlock(run);
+}
+
+/* The host alone from what the console says was reached: a URL (the Vita's) or a host, with or
+ * without its port (the PS3's) */
+static void reached_host(const char *reached, char *host, size_t size)
+{
+	const char *start = strstr(reached, "://");
+	start = start != NULL ? start + 3 : reached;
+	size_t length = strcspn(start, ":/?#");
+	if (length >= size)
+		length = 0;
+	memcpy(host, start, length);
+	host[length] = '\0';
 }
 
 /* The TLS report: tls.browserleaks.com's JSON, with a fresh URL so no cache answers for the server */
@@ -182,11 +198,14 @@ static void run_redirects(Run *run, const CheckParts *parts, char *body)
 			set_info(&r, "Not tested: vitals' HTTP isn't active");
 		} else if (parts->redirects_off == 1) {
 			set_info(&r, "Not tested: redirects are off");
+		} else if (parts->http_outdated == 1) {
+			set_info(&r, "Couldn't test (outdated vitals)");
+			r.state = CHECK_WARNING;
 		} else {
 			r.state = CHECK_RUNNING;
-			publish_rule(run, list, i, &r);
+			publish_rule(run, list, i, &r, "");
 			memset(&r, 0, sizeof(r));
-			char url[CHECK_HOST_MAX + 16], reached[CHECK_HOST_MAX];
+			char url[CHECK_HOST_MAX + 16], reached[CHECK_HOST_MAX], host[CHECK_HOST_MAX] = "";
 			size_t length = 0;
 			snprintf(url, sizeof(url), "https://%s/", list[i].from);
 			reached[0] = '\0';
@@ -194,8 +213,13 @@ static void run_redirects(Run *run, const CheckParts *parts, char *body)
 			run->b->judge_redirect(&r, reached, list[i].to);
 			cancelled_request(run, rc, &r);
 			after(run, list[i].from, &r);
+			/* Only a host that gave a final status answered */
+			if (rc == 0 && r.http_code > 0)
+				reached_host(reached, host, sizeof(host));
+			publish_rule(run, list, i, &r, host);
+			continue;
 		}
-		publish_rule(run, list, i, &r);
+		publish_rule(run, list, i, &r, NULL);
 	}
 }
 
@@ -213,7 +237,7 @@ static void run_dns(Run *run, const CheckParts *parts)
 			set_info(&r, "Not tested: DNS rules are off");
 		} else {
 			r.state = CHECK_RUNNING;
-			publish_rule(run, list, i, &r);
+			publish_rule(run, list, i, &r, NULL);
 			memset(&r, 0, sizeof(r));
 			run->b->dns(list[i].from, list[i].to, &r);
 			if (r.state == CHECK_FAIL && run->b->stopped())
@@ -221,7 +245,7 @@ static void run_dns(Run *run, const CheckParts *parts)
 			if (run->b->log != NULL)
 				run->b->log(list[i].from, &r);
 		}
-		publish_rule(run, list, i, &r);
+		publish_rule(run, list, i, &r, NULL);
 	}
 }
 
@@ -253,7 +277,7 @@ void check_run(const CheckBackend *backend, CheckService *service, char *notice,
 		free(rules);
 		return;
 	}
-	CheckParts parts = {-1, -1, -1, -1, -1};
+	CheckParts parts = {-1, -1, -1, -1, -1, -1};
 	backend->parts(&parts);
 	/* The rules are listed first, so their pages fill in as they're tested */
 	unsigned redirect_count = backend->load(CHECK_REDIRECTS_PATH, rules, CHECK_REDIRECT_MAX);
