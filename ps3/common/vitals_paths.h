@@ -5,7 +5,8 @@
  * the DNS kernel plugin, the app; tools/ps3_comms.py has the same list). /dev_hdd0/vitals itself
  * holds only what a user might edit; the rest is in its folders:
  *   system/   the modules, Mozilla's certificates and what the installers keep (not to be edited)
- *   flags/    a component's .off: while it's there, that component is off from the next boot
+ *   flags/    a component's .off: while it's there, that component is off from the next boot; and
+ *             debug.1 or debug.2, the installed modules' debug level
  *   logs/     the debug builds' log and the app's
  *   reports/  the app's connection test reports
  * Only plain defines: the DNS kernel plugin includes it too */

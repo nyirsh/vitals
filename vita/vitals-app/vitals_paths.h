@@ -12,5 +12,7 @@
 #include "vitals/switches.h"
 #define VITALS_REDIRECTS VITALS_DIRECTORY "/redirects.txt"
 #define VITALS_DNS VITALS_DIRECTORY "/dns.txt"
+/* Which release installed vitals and its modules' debug level, as on the PS3 (shared/app/installed.c) */
+#define VITALS_INSTALLED VITALS_DIRECTORY "/system/installed.txt"
 
 #endif

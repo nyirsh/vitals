@@ -7,8 +7,8 @@
  * builds of the chosen debug level), the boot plugin, the DNS kernel plugin (which the boot plugin
  * loads; not listed in boot_plugins_kernel.txt), Mozilla's CA bundle, the example redirects.txt
  * and dns.txt (only where there are none: they're the user's, and uninstalling leaves them, as on
- * the Vita) and boot_plugins.txt's line, with installed.txt saying which version and level are
- * there */
+ * the Vita) and boot_plugins.txt's line, with installed.txt saying which release installed them and
+ * flags/debug.<level> their debug level (shared/app/installed.h) */
 
 /* Where each file goes (common/vitals_paths.h): the user's lists in /dev_hdd0/vitals, the modules
  * and what the installer keeps in system/, the switches in flags/, the logs in logs/, the connection
@@ -29,7 +29,7 @@ void vitals_install_set_source(const char *eboot_path);
 /* That folder, "/dev_hdd0/game/VTLS00001/USRDIR" */
 const char *vitals_install_source(void);
 /* Here, vitals_install_detect is 1 when boot_plugins.txt lists the plugin and its files are there;
- * vitals_install_read reads installed.txt; vitals_install_set_debug_level changes only libssl's and
+ * vitals_install_read reads installed.txt and the level's marker; vitals_install_set_debug_level changes only libssl's and
  * libhttp's builds; vitals_update_certificates downloads Mozilla's bundle again (curl.se), checks it
  * and writes it into VITALS_BUNDLE without Sony's CAs, then closes libhttp; vitals_certificates_date is in UTC; and
  * vitals_reboot is a hard reboot (lv2's sys_sm_shutdown), which Cobra needs to load its boot plugins

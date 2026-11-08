@@ -61,7 +61,9 @@ static const char *const debug_names[VITALS_DEBUG_LEVEL_COUNT] = {"Off", "Basic 
 static uint32_t *canvas;
 static unsigned held = ~0u;
 static unsigned confirm_button = PAD_CROSS, back_button = PAD_CIRCLE;
-static int installed, outdated, debug_level = -1, debug_choice;
+/* debug_level is the installed level, -1 without an install; known_level the level the console has
+ * recorded, which an install keeps, 0 when none is */
+static int installed, outdated, debug_level = -1, debug_choice, known_level;
 static char installed_version[16];
 static char certificates_updated[40];
 /* The certificates on the console are more than three months old */
@@ -85,15 +87,18 @@ static AppStatus status(void)
 static void refresh_state(void)
 {
 	installed = vitals_install_detect();
-	int level = 0;
-	if (vitals_install_read(installed_version, sizeof(installed_version), &level) < 0) {
+	int level = 0, known = vitals_install_read(installed_version, sizeof(installed_version), &level) == 0;
+	if (!known) {
 		installed_version[0] = '\0';
 		level = 0;
 	}
 	outdated = installed && strcmp(installed_version, VITALS_VERSION) != 0;
 	debug_level = installed ? level : -1;
 	app_log("state: installed %d, version \"%s\", outdated %d, debug %d", installed, installed_version, outdated, level);
-	debug_choice = debug_level < 0 ? 0 : debug_level;
+	/* An install, reinstall or update keeps the debug output the console has, whenever it's known,
+	 * also for an install the app doesn't count as complete */
+	known_level = known ? level : 0;
+	debug_choice = known_level;
 	vitals_certificates_date(certificates_updated, sizeof(certificates_updated), &certificates_stale);
 }
 
@@ -360,7 +365,7 @@ static int run_options(void)
 		}
 		if (pressed & back_button) {
 			/* Nothing applied: the level the console has */
-			debug_choice = debug_level < 0 ? 0 : debug_level;
+			debug_choice = known_level;
 			return 0;
 		}
 		platform_sleep_ms(16);

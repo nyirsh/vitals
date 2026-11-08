@@ -226,6 +226,8 @@ static void expect_uninstalled(void)
     for (size_t i = 0; i < INSTALLED_COUNT; ++i)
         assert(!exists(installed[i][0]));
     assert(is(CA, SONY_CA) && !exists(CA_BACKUP) && store_absent());
+    assert(!exists("ux0:data/vitals/system/installed.txt") && vitals_install_debug_level() == 0);
+    assert(!exists("ux0:data/vitals/flags/debug.1") && !exists("ux0:data/vitals/flags/debug.2"));
     assert(vitals_install_complete() == 0);
 }
 
@@ -427,7 +429,7 @@ static void expect_debug_level(int level)
 static void test_debug_levels(void)
 {
     fresh_console();
-    assert(vitals_install_debug_level() < 0);
+    assert(vitals_install_debug_level() == 0);
     assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_debug_level(0);
     for (int level = 2; level >= 0; --level)
@@ -443,9 +445,20 @@ static void test_debug_levels(void)
     assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
     expect_installed();
     expect_debug_level(0);
-    /* A libhttp that matches none of the app's builds (another version's) has no level */
+    /* installed.txt has the release; the level is a marker in flags/, as on the PS3, whatever the
+     * modules hold, none for Off */
+    assert(is("ux0:data/vitals/system/installed.txt", "version=" VITALS_VERSION "\n"));
+    assert(!exists("ux0:data/vitals/flags/debug.1") && !exists("ux0:data/vitals/flags/debug.2"));
     put("ux0:data/vitals/system/libhttp.suprx", "another version's libhttp\n");
-    assert(vitals_install_debug_level() < 0);
+    assert(vitals_install_debug_level() == 0);
+    assert(vitals_install_debug_modules(2, note) >= 0);
+    assert(exists("ux0:data/vitals/flags/debug.2") && !exists("ux0:data/vitals/flags/debug.1"));
+    assert(vitals_install_debug_level() == 2);
+    assert(vitals_install_debug_modules(1, note) >= 0);
+    assert(exists("ux0:data/vitals/flags/debug.1") && !exists("ux0:data/vitals/flags/debug.2"));
+    /* An install puts the release modules back, and takes the marker away */
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    assert(vitals_install_debug_level() == 0 && !exists("ux0:data/vitals/flags/debug.1"));
 }
 
 static void test_conflicting_installs_are_removed(void)

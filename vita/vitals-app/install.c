@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <psp2/io/dirent.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/stat.h>
 #include <psp2/kernel/processmgr.h>
@@ -18,6 +17,7 @@
 #include <stdarg.h>
 
 #include "ca_update.h"
+#include "installed.h"
 #include "config_edit.h"
 #include "install.h"
 #include "module_version.h"
@@ -121,40 +121,6 @@ static int remove_old_layout(void)
         if (path_exists(old_layout_folders[i]))
             (void)sceIoRmdir(old_layout_folders[i]);
     return result;
-}
-
-/* The connection test's reports folder, as on the PS3, with the reports earlier versions saved in
- * ux0:data/vitals itself (vitals-testresults-<time>.txt) moved into it under today's name
- * (connection-test-<time>.txt); one already there under that name is kept */
-static void move_reports(void)
-{
-    static const char earlier[] = "vitals-testresults-", now[] = "connection-test-";
-    (void)sceIoMkdir(VITALS_DIRECTORY, 0777);
-    (void)sceIoMkdir(VITALS_REPORTS_DIRECTORY, 0777);
-    /* Names first, then each moved, so the folder isn't changed while it's read */
-    char names[32][64];
-    unsigned count = 0;
-    SceUID folder = sceIoDopen(VITALS_DIRECTORY);
-    if (folder >= 0)
-    {
-        SceIoDirent entry;
-        while (count < 32 && sceIoDread(folder, &entry) > 0)
-        {
-            size_t length = strlen(entry.d_name);
-            if (strncmp(entry.d_name, earlier, sizeof(earlier) - 1) == 0 && length < sizeof(names[0]) &&
-                length > 4 && strcmp(entry.d_name + length - 4, ".txt") == 0)
-                memcpy(names[count++], entry.d_name, length + 1);
-        }
-        (void)sceIoDclose(folder);
-    }
-    for (unsigned i = 0; i < count; ++i)
-    {
-        char from[128], to[128];
-        snprintf(from, sizeof(from), VITALS_DIRECTORY "/%.63s", names[i]);
-        snprintf(to, sizeof(to), VITALS_REPORTS_DIRECTORY "/%s%.44s", now, names[i] + sizeof(earlier) - 1);
-        if (!path_exists(to) && sceIoRename(from, to) >= 0)
-            printf("Moved %.63s to %s\n", names[i], VITALS_REPORTS_DIRECTORY);
-    }
 }
 
 /* ux0:data/vitals/system, and ux0:data/vitals above it */
@@ -947,7 +913,10 @@ static int install_http_modules(int requested_state)
     if (removing)
     {
         printf("Removing the vitals HTTP, SSL, and TLS 1.3 modules... \n");
-        result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
+        /* What the install recorded goes with the modules, so system/ can go too */
+        result = remove_if_exists(VITALS_INSTALLED);
+        if (result >= 0)
+            result = remove_if_exists(new_modules[MODULE_OLD_HTTP_PROVIDER]);
         if (result >= 0)
         {
             result = remove_if_exists(new_modules[MODULE_OLD_REAUTH]);
@@ -981,7 +950,7 @@ static int install_http_modules(int requested_state)
         if (result >= 0)
             result = make_system_directory();
         if (result >= 0)
-            move_reports();
+            vitals_move_earlier_reports(g_note);
         if (result >= 0)
         {
             result = replace_file("app0:libhttp.suprx", new_modules[MODULE_LIBHTTP]);
@@ -1246,16 +1215,8 @@ int vitals_install_plugin_current(void)
 
 int vitals_install_debug_level(void)
 {
-    char source[64];
-
-    /* The modules are always switched together, so vitals-http tells the level */
-    for (int level = 0; level < VITALS_DEBUG_LEVEL_COUNT; ++level)
-    {
-        debug_source(level, DEBUG_LIBHTTP, source, sizeof(source));
-        if (same_contents(new_modules[MODULE_LIBHTTP], source) == 1)
-            return level;
-    }
-    return -1;
+    /* As on the PS3: the marker the install, or the last debug output change, wrote in flags/ */
+    return vitals_debug_read();
 }
 
 int vitals_install_debug_modules(int level, VitalsNote note)
@@ -1287,6 +1248,8 @@ int vitals_install_debug_modules(int level, VitalsNote note)
         debug_source(level, DEBUG_PLUGIN, source, sizeof(source));
         result = replace_file(source, vitals_plugin_path);
     }
+    if (result >= 0)
+        result = vitals_debug_write(level);
     g_note = NULL;
     return result;
 }
@@ -1326,6 +1289,12 @@ int vitals_install_apply(enum VitalsOption option, int removing, VitalsNote note
         result = vitals_plan_option(option, removing, &plan);
     if (result >= 0)
         result = vitals_execute_plan(&plan, apply_component, NULL);
+    /* An install puts the release modules in place: installed.txt records the release, and the
+     * level's marker in flags/ goes, as on the PS3; an uninstall takes the marker away too */
+    if (result >= 0 && option == VITALS_OPTION_FULL && !removing)
+        result = vitals_installed_write() < 0 ? -1 : vitals_debug_write(0);
+    if (result >= 0 && option == VITALS_OPTION_FULL && removing)
+        (void)vitals_debug_write(0);
     g_note = NULL;
     g_updating_certificates = 0;
     return result;

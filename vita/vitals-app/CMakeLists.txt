@@ -64,10 +64,12 @@ add_executable(vitals-app
     ../../shared/app/release_fetch.c
     ../../shared/app/download.c
     ../../shared/app/ca_update.c
+    ../../shared/app/installed.c
     # What's the Vita's under it: console.h, platform.h and check.h
     main.c
     console_vita.c
     platform_vita.c
+    files_vita.c
     font_vita.c
     app_log_vita.c
     network.c

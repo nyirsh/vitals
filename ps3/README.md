@@ -30,7 +30,7 @@ Everything vitals keeps is in `/dev_hdd0/vitals`, which itself holds only what y
   redirects.txt   dns.txt   useragent.txt      your lists (installing never overwrites them)
   custom-certs.pem                              your own certificates, if any (none to start with)
   system/    libssl.sprx  libhttp.sprx  vitals_dns.bin  mozilla-certs.pem  installed.txt  ...
-  flags/     tls.off  http.off  dns.off  redirects.off
+  flags/     tls.off  http.off  dns.off  redirects.off  debug.1 or debug.2
   logs/      vitals.log (debug builds)  vitals-app.log
   reports/   the app's connection test reports
 ```
@@ -53,8 +53,9 @@ The vitals app's **Options** screen turns TLS, HTTP and the DNS rules on or off 
 off (in orange: vitals' libhttp without them, `redirects.off`) and Off (Sony's libhttp, which has
 none, `http.off`), as the redirects are vitals' libhttp's; START there ("Apply and reboot") writes the switches to `flags/` and installs the debug
 output's builds, showing each step, then reboots the console after 3 seconds. Back leaves it all as
-it was. The boot popup says which are off, as `TLS: Off`. Uninstalling leaves your lists, `flags/`
-and `reports/`. Installing over an earlier version moves its files to these folders (its
+it was. The boot popup says which are off, as `TLS: Off`. The debug output is a marker there too,
+`debug.1` for Basic or `debug.2` for Full (none for Off), which installing keeps. Uninstalling leaves
+your lists, the switches in `flags/` and `reports/`. Installing over an earlier version moves its files to these folders (its
 `dns.off`, its certificate update and its reports kept).
 
 ## Host redirects

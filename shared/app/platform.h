@@ -55,8 +55,22 @@ void platform_sleep_ms(unsigned ms);
 /* Milliseconds since some fixed point, for timing key repeats */
 uint64_t platform_now_ms(void);
 
+/* ---- files (each console's files_*.c, which the installers' host tests build too) ---- */
 /* Reads at most capacity bytes of the file at path into data: how many, or -1 when it can't be read */
 long platform_read_file(const char *path, char *data, size_t capacity);
+/* The file at path made to hold data alone: 0, or -1 */
+int platform_write_file(const char *path, const void *data, size_t length);
+/* 1 when there's a file or folder at path */
+int platform_file_exists(const char *path);
+/* The folder at path, when it isn't there: 0 when it is now, else -1 */
+int platform_make_folder(const char *path);
+/* The file at path deleted: 0, or -1 (also when it wasn't there) */
+int platform_remove_file(const char *path);
+/* from moved to to, which mustn't be there: 0, or -1 */
+int platform_rename(const char *from, const char *to);
+/* each called with the name of every entry in the folder at path (not . or ..): 0, or -1 when it
+ * can't be read */
+int platform_list_folder(const char *path, void (*each)(void *context, const char *name), void *context);
 
 /* A thread running run(argument) with a stack of stack_size bytes, or NULL when it couldn't start */
 typedef struct PlatformThread PlatformThread;

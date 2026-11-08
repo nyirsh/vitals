@@ -37,12 +37,14 @@ add_executable(vitals-app
 	../../shared/app/release_fetch.c
 	../../shared/app/download.c
 	../../shared/app/ca_update.c
+	../../shared/app/installed.c
 	# The PS3's part of it (console.h, platform.h, check.h)
 	src/main.c
 	src/console_ps3.c
 	src/firmware.c
 	src/app_log.c
 	src/platform_ps3.c
+	src/files_ps3.c
 	src/font_ps3.c
 	src/check.c
 	src/check_model.c

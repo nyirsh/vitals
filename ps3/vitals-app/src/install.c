@@ -4,6 +4,7 @@
 #include "install.h"
 
 #include "ca_update.h"
+#include "installed.h"
 
 #include "app_log.h"
 #include "boot_plugins.h"
@@ -204,30 +205,14 @@ int vitals_install_detect(void)
 
 int vitals_install_read(char *version, size_t size, int *debug_level)
 {
-	size_t length;
-	char *text = read_file(VITALS_INSTALLED, 4096, &length);
-	if (text == NULL)
-		return -1;
-	if (size != 0)
-		version[0] = '\0';
-	*debug_level = 0;
-	for (char *line = strtok(text, "\r\n"); line != NULL; line = strtok(NULL, "\r\n")) {
-		if (strncmp(line, "version=", 8) == 0 && size != 0)
-			snprintf(version, size, "%s", line + 8);
-		else if (strncmp(line, "debug=", 6) == 0)
-			*debug_level = atoi(line + 6);
-	}
-	free(text);
-	if (*debug_level < 0 || *debug_level >= VITALS_DEBUG_LEVEL_COUNT)
-		*debug_level = 0;
-	return 0;
+	*debug_level = vitals_debug_read();
+	return vitals_installed_read(version, size);
 }
 
+/* The release that installed vitals, and its modules' level as flags/debug.<level> (installed.h) */
 static int write_installed(int debug_level)
 {
-	char text[64];
-	int length = snprintf(text, sizeof(text), "version=%s\ndebug=%d\n", VITALS_VERSION, debug_level);
-	return write_file(VITALS_INSTALLED, text, (size_t)length) == CELL_FS_SUCCEEDED ? 0 : -1;
+	return vitals_installed_write() < 0 || vitals_debug_write(debug_level) < 0 ? -1 : 0;
 }
 
 /* The debug level's builds of the four modules, as the Vita's has one per level of each */
@@ -281,29 +266,8 @@ static void move_earlier_layout(VitalsNote note)
 	for (unsigned i = 0; i < sizeof(gone) / sizeof(gone[0]); ++i)
 		if (cellFsUnlink(gone[i]) == CELL_FS_SUCCEEDED)
 			notef(note, "Deleted %s (an earlier version's place)", gone[i]);
-	/* The connection test's reports: names first, then each moved */
-	/* A report's name is under 64 characters ("connection-test-2026-11-05_21-40-00.txt") */
-	char names[32][64];
-	unsigned count = 0;
-	int fd;
-	if (cellFsOpendir(VITALS_DIRECTORY, &fd) == CELL_FS_SUCCEEDED) {
-		CellFsDirent entry;
-		uint64_t read = 0;
-		while (count < 32 && cellFsReaddir(fd, &entry, &read) == CELL_FS_SUCCEEDED && read != 0) {
-			size_t length = strlen(entry.d_name);
-			if (strncmp(entry.d_name, "connection-test-", 16) == 0 && length > 4 && length < sizeof(names[0]) &&
-			    strcmp(entry.d_name + length - 4, ".txt") == 0)
-				memcpy(names[count++], entry.d_name, length + 1);
-		}
-		cellFsClosedir(fd);
-	}
-	for (unsigned i = 0; i < count; ++i) {
-		char from[128], to[128];
-		snprintf(from, sizeof(from), VITALS_DIRECTORY "/%.63s", names[i]);
-		snprintf(to, sizeof(to), VITALS_REPORTS_DIRECTORY "/%.63s", names[i]);
-		if (cellFsRename(from, to) == CELL_FS_SUCCEEDED)
-			notef(note, "Moved %s to " VITALS_REPORTS_DIRECTORY, names[i]);
-	}
+	/* The connection test's reports, into reports/ (shared/app/installed.c, as the Vita's) */
+	vitals_move_earlier_reports(note);
 }
 
 static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date, VitalsNote note);
@@ -356,6 +320,8 @@ int vitals_uninstall_run(VitalsNote note)
 {
 	if (edit_boot_plugins(0, note) < 0)
 		return -1;
+	/* The modules' level goes with them; the Options' other switches stay */
+	(void)vitals_debug_write(0);
 	/* An earlier version's files first, into their folders (dns.off and the reports stay) */
 	move_earlier_layout(note);
 	/* system/ and logs/ go; the user's lists, flags/ and reports/ stay, as on the Vita, and so does

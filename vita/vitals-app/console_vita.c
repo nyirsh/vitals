@@ -6,6 +6,7 @@
 #include "check_vita.h"
 #include "dates.h"
 #include "install.h"
+#include "installed.h"
 #include "crypto_platform.h"
 #include "network.h"
 #include "vitals_paths.h"
@@ -81,12 +82,15 @@ int vitals_install_detect(void)
 int vitals_install_read(char *version, size_t size, int *debug_level)
 {
     /* An earlier layout's install reads as unknown, so the menu offers to update it */
-    if (vitals_install_old_layout() || vitals_install_plugin_version(version, size) < 0)
+    if (vitals_install_old_layout())
         return -1;
-    /* Modules that match none of this app's builds (another version's) count as release ones */
-    int level = vitals_install_debug_level();
-    *debug_level = level < 0 ? 0 : level;
-    return 0;
+    /* The level's marker in flags/, as on the PS3 (shared/app/installed.c), none for Off */
+    *debug_level = vitals_debug_read();
+    /* The release the install recorded, or, from an earlier release that recorded nothing, its
+     * plugin's */
+    if (vitals_installed_read(version, size) == 0)
+        return 0;
+    return vitals_install_plugin_version(version, size) < 0 ? -1 : 0;
 }
 
 /* Every operation replaces vitals' modules or the certificate store, so the test's HTTP libraries

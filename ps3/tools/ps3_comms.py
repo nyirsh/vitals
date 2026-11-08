@@ -72,7 +72,8 @@ BUNDLE = SYSTEM + "/mozilla-certs.pem"
 BUNDLE_EARLIER = SYSTEM + "/cacert.pem"
 # Sony's CAs, which libssl reads from flash (common/sony_cas.h)
 SONY_CERTS = "/dev_flash/data/cert"
-# Which version and debug level are installed, as the vitals app writes it (vitals-app/src/install.c)
+# Which release installed vitals, as the vitals app writes it (shared/app/installed.c); the debug level
+# is a marker in flags/
 INSTALLED = SYSTEM + "/installed.txt"
 # The boot plugin's mark of a boot that maps vitals' libhttp, for the app's test
 # What the boot plugin wrote on earlier releases, which uninstalling still deletes
@@ -371,8 +372,15 @@ def install(ftp, signed, debug):
     add_line(ftp, BOOT_PLUGINS, PLUGIN)
     with open(os.path.join(ROOT, "..", "VERSION"), encoding="utf-8") as file:
         version = file.read().strip()
-    write(ftp, INSTALLED, f"version={version}\ndebug={debug or 0}\n".encode())
-    print(f"{INSTALLED}: version {version}, debug level {debug or 0}")
+    write(ftp, INSTALLED, f"version={version}\n".encode())
+    print(f"{INSTALLED}: version {version}")
+    # The level as the app writes it: flags/debug.<level>, none for off (shared/app/installed.h)
+    for level in (1, 2):
+        if level == (debug or 0):
+            write(ftp, f"{FLAGS}/debug.{level}", b"")
+            print(f"{FLAGS}/debug.{level}: debug level {level}")
+        else:
+            delete(ftp, f"{FLAGS}/debug.{level}")
     # Never listed: loaded at boot, the DNS plugin froze the console at every boot
     remove_line(ftp, BOOT_PLUGINS_KERNEL, VITALS + "/vitals_dns.bin")
     remove_line(ftp, BOOT_PLUGINS_KERNEL, DNS_PLUGIN)
@@ -409,8 +417,10 @@ def uninstall(ftp):
     remove_line(ftp, BOOT_PLUGINS, PLUGIN)
     remove_line(ftp, BOOT_PLUGINS_KERNEL, DNS_PLUGIN)
     move_earlier_layout(ftp)
-    # system/ and logs/ go; the user's lists, flags/ and reports/ stay, as on the Vita
+    # system/ and logs/ go, and the debug level's marker; the user's lists, the other flags and reports/
+    # stay, as on the Vita
     for path in (PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, BUNDLE, BUNDLE_EARLIER, INSTALLED, *EARLIER_MARKERS,
+                 FLAGS + "/debug.1", FLAGS + "/debug.2",
                  SYSTEM + "/boot_plugins.txt.bak", SYSTEM + "/boot_plugins_kernel.txt.bak", LOG, APP_LOG):
         if delete(ftp, path):
             print(f"{path}: deleted")

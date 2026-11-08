@@ -54,6 +54,12 @@ target_compile_definitions(vitals_app_ca_update_tests PRIVATE VITALS_TEST_BUNDLE
 target_link_libraries(vitals_app_ca_update_tests PRIVATE mbedx509 tfpsacrypto Threads::Threads)
 add_test(NAME vitals_app_ca_update COMMAND vitals_app_ca_update_tests)
 
+# What both installers do the same way (shared with the Vita's tests): installed.txt and the earlier
+# reports, on this machine's files under the PS3's paths
+add_executable(vitals_app_installed_tests ${SHARED}/app/tests/test_installed.c ${SHARED}/app/installed.c)
+target_include_directories(vitals_app_installed_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
+add_test(NAME vitals_app_installed COMMAND vitals_app_installed_tests)
+
 # The connection test's lifecycle (shared with the Vita's tests): its thread, cancelling and saving
 find_package(Threads REQUIRED)
 add_executable(vitals_app_check_service_tests ${SHARED}/app/tests/test_check_service.c ${SHARED}/app/check_service.c)

@@ -31,7 +31,8 @@ int vitals_install_plugin_version(char *version, size_t size);
 /* Debug output on the console: 0 off, 1 summaries and failures, 2 everything (console.h's
  * VITALS_DEBUG_LEVEL_COUNT levels); each level has its own build of vitals-http, the browser provider
  * and the kernel plugin, all carried by the app */
-/* The level of the installed modules, or -1 when they match none of the app's builds */
+/* The level of the installed modules: flags/debug.<level>'s, as on the PS3 (shared/app/installed.h), 0
+ * without one */
 int vitals_install_debug_level(void);
 /* Replaces vitals-http, the browser provider and the kernel plugin with the given level's builds
  * The caller reboots the Vita after a success */

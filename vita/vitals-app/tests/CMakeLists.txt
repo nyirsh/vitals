@@ -59,6 +59,12 @@ target_compile_definitions(vitals_app_ca_update_tests PRIVATE VITALS_TEST_BUNDLE
 target_link_libraries(vitals_app_ca_update_tests PRIVATE mbedx509 tfpsacrypto)
 add_test(NAME vitals_app_ca_update COMMAND vitals_app_ca_update_tests)
 
+# What both installers do the same way (shared with the PS3's tests): installed.txt and the earlier
+# reports, on this machine's files under the Vita's paths
+add_executable(vitals_app_installed_tests ${SHARED_APP}/tests/test_installed.c ${SHARED_APP}/installed.c)
+target_include_directories(vitals_app_installed_tests PRIVATE ${APP_DIR})
+add_test(NAME vitals_app_installed COMMAND vitals_app_installed_tests)
+
 # The connection test's lifecycle (shared with the PS3's tests): its thread, cancelling and saving
 find_package(Threads REQUIRED)
 add_executable(vitals_app_check_service_tests ${SHARED_APP}/tests/test_check_service.c ${SHARED_APP}/check_service.c)
@@ -96,6 +102,7 @@ add_test(NAME vitals_app_config_edit COMMAND vitals_app_config_edit_tests)
 
 # The installer's file operations, on a console mapped onto a temporary folder (vita_files.c)
 add_executable(vitals_app_install_files_tests test_install_files.c vita_files.c ${APP_DIR}/install.c
+    ${APP_DIR}/files_vita.c ${SHARED_APP}/installed.c
     ${APP_DIR}/options.c ${APP_DIR}/config_edit.c ${APP_DIR}/module_version.c)
 target_include_directories(vitals_app_install_files_tests PRIVATE include ${APP_DIR} ${APP_DIR}/../../shared/include)
 target_link_libraries(vitals_app_install_files_tests PRIVATE ZLIB::ZLIB)

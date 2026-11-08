@@ -213,7 +213,7 @@ Debug output levels, for `vitals-http` and the browser provider (lines start wit
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
 - **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write), and each request's whole URL, headers and body as they are, PSN's sign-in, cookies and tokens included: keep a Full log to yourself. This produces a lot of output and slows connections down, use it only to investigate a problem
 
-Every build includes all three levels; choose one on the console in the app's **Options**, where **START** applies it and reboots the Vita. To build a single component at a level, run `make -C vitals-browser DEBUG=2` (each level has its own `build/` folder).
+Every build includes all three levels; choose one on the console in the app's **Options**, where **START** applies it and reboots the Vita. As on the PS3, the app records the release it installed in `ux0:data/vitals/system/installed.txt` and the level as a marker, `ux0:data/vitals/flags/debug.1` for Basic or `debug.2` for Full (none for Off), which installing, reinstalling and updating keep. To build a single component at a level, run `make -C vitals-browser DEBUG=2` (each level has its own `build/` folder).
 
 ### Working with a Vita
 

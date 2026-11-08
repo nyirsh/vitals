@@ -455,17 +455,6 @@ uint64_t platform_now_ms(void)
 	return (uint64_t)sys_time_get_system_time() / 1000;
 }
 
-long platform_read_file(const char *path, char *data, size_t capacity)
-{
-	int fd;
-	if (cellFsOpen(path, CELL_FS_O_RDONLY, &fd, NULL, 0) != CELL_FS_SUCCEEDED)
-		return -1;
-	uint64_t length = 0, read = 0;
-	while (length < capacity && cellFsRead(fd, data + length, capacity - length, &read) == CELL_FS_SUCCEEDED && read != 0)
-		length += read;
-	cellFsClose(fd);
-	return (long)length;
-}
 
 /* ---- threads ---- */
 

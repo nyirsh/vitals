@@ -260,24 +260,3 @@ uint64_t platform_now_ms(void)
     return (uint64_t)sceKernelGetSystemTimeWide() / 1000;
 }
 
-long platform_read_file(const char *path, char *data, size_t capacity)
-{
-    SceUID file = sceIoOpen(path, SCE_O_RDONLY, 0);
-    if (file < 0)
-        return -1;
-    size_t length = 0;
-    while (length < capacity)
-    {
-        int read = sceIoRead(file, data + length, (SceSize)(capacity - length));
-        if (read < 0)
-        {
-            sceIoClose(file);
-            return -1;
-        }
-        if (read == 0)
-            break;
-        length += (size_t)read;
-    }
-    sceIoClose(file);
-    return (long)length;
-}
