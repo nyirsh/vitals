@@ -338,3 +338,123 @@ void check_redirect_judge(CheckResult *r, int rc, const char *host, const char *
 		snprintf(r->message, sizeof(r->message), "Answered by %.50s, not %.50s", host, expected);
 	}
 }
+
+enum CheckDnsTarget check_dns_target(const char *target, unsigned char address[4])
+{
+	static const char block[] = "block";
+	size_t length = strlen(target);
+	if (length == sizeof(block) - 1) {
+		size_t i = 0;
+		while (i < length && tolower((unsigned char)target[i]) == block[i])
+			++i;
+		if (i == length)
+			return CHECK_DNS_BLOCK;
+	}
+	/* Four decimal parts of at most 255, as the kernel plugin reads them */
+	unsigned part = 0, parts = 0, digits = 0;
+	for (size_t i = 0;; ++i) {
+		char c = target[i];
+		if (c >= '0' && c <= '9') {
+			part = part * 10 + (unsigned)(c - '0');
+			if (++digits > 3 || part > 255)
+				return CHECK_DNS_NAME;
+		} else if ((c == '.' || c == '\0') && digits) {
+			if (parts == 4)
+				return CHECK_DNS_NAME;
+			address[parts++] = (unsigned char)part;
+			part = digits = 0;
+			if (c == '\0')
+				return parts == 4 ? CHECK_DNS_ADDRESS : CHECK_DNS_NAME;
+		} else
+			return CHECK_DNS_NAME;
+	}
+}
+
+static void print_addresses(const CheckLookup *lookup, char *text, size_t capacity)
+{
+	size_t used = 0;
+	text[0] = '\0';
+	for (unsigned i = 0; i < lookup->count && i < CHECK_DNS_ADDRESSES && used < capacity; ++i) {
+		const unsigned char *a = lookup->addresses[i];
+		int n = snprintf(text + used, capacity - used, "%s%u.%u.%u.%u", i ? ", " : "", a[0], a[1], a[2], a[3]);
+		if (n < 0)
+			break;
+		used += (size_t)n;
+	}
+}
+
+static int has_address(const CheckLookup *lookup, const unsigned char address[4])
+{
+	for (unsigned i = 0; i < lookup->count && i < CHECK_DNS_ADDRESSES; ++i)
+		if (memcmp(lookup->addresses[i], address, 4) == 0)
+			return 1;
+	return 0;
+}
+
+static const char *lookup_error(int error)
+{
+	switch (error) {
+	case CHECK_LOOKUP_NO_HOST: return "no such host";
+	case CHECK_LOOKUP_TRY_AGAIN: return "no answer, try again";
+	case CHECK_LOOKUP_FAILED: return "the resolver failed";
+	case CHECK_LOOKUP_NO_ADDRESS: return "no address";
+	default: return "the lookup failed";
+	}
+}
+
+void check_dns_judge(const char *rule_target, const CheckLookup *answer, const CheckLookup *target, CheckResult *r)
+{
+	unsigned char address[4];
+	char got[96];
+	print_addresses(answer, got, sizeof(got));
+	switch (check_dns_target(rule_target, address)) {
+	case CHECK_DNS_BLOCK:
+		/* The plugin answers "no such name"; a resolver may call that no address */
+		if (!answer->found && (answer->error == CHECK_LOOKUP_NO_HOST || answer->error == CHECK_LOOKUP_NO_ADDRESS)) {
+			r->state = CHECK_PASS;
+			snprintf(r->message, sizeof(r->message), "Blocked (no such host)");
+		} else if (answer->found) {
+			r->state = CHECK_FAIL;
+			snprintf(r->message, sizeof(r->message), "Not blocked: %s", got);
+		} else {
+			r->state = CHECK_FAIL;
+			snprintf(r->message, sizeof(r->message), "Not blocked: %s", lookup_error(answer->error));
+		}
+		return;
+	case CHECK_DNS_ADDRESS:
+		if (answer->found && has_address(answer, address)) {
+			r->state = CHECK_PASS;
+			snprintf(r->message, sizeof(r->message), "Resolved to %s", got);
+		} else {
+			r->state = CHECK_FAIL;
+			if (answer->found)
+				snprintf(r->message, sizeof(r->message), "Resolved to %s instead", got);
+			else
+				snprintf(r->message, sizeof(r->message), "Not resolved: %s", lookup_error(answer->error));
+		}
+		return;
+	case CHECK_DNS_NAME:
+		break;
+	}
+	if (!target->found) {
+		/* Renamed, the name gets the target's answer: none to compare with */
+		r->state = CHECK_INFO;
+		snprintf(r->message, sizeof(r->message), "Can't tell: the target doesn't resolve (%s)", lookup_error(target->error));
+		return;
+	}
+	if (!answer->found) {
+		r->state = CHECK_FAIL;
+		snprintf(r->message, sizeof(r->message), "Not resolved: %s", lookup_error(answer->error));
+		return;
+	}
+	/* Any address the two share: a server that rotates its addresses may give each lookup a
+	 * different few */
+	for (unsigned i = 0; i < answer->count && i < CHECK_DNS_ADDRESSES; ++i)
+		if (has_address(target, answer->addresses[i])) {
+			r->state = CHECK_PASS;
+			snprintf(r->message, sizeof(r->message), "Resolved: %s", got);
+			return;
+		}
+	r->state = CHECK_FAIL;
+	snprintf(r->message, sizeof(r->message), "Resolved to %s, not the target's", got);
+}

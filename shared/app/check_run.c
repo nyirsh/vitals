@@ -210,7 +210,7 @@ static void run_redirects(Run *run, const CheckParts *parts, char *body)
 	}
 }
 
-/* Each DNS rule's name is looked up and its answer held against the rule */
+/* Each DNS rule's name is looked up as a game would and its answer held against the rule */
 static void run_dns(Run *run, const CheckParts *parts)
 {
 	CheckRedirect *list = run->service->dns;
@@ -218,7 +218,7 @@ static void run_dns(Run *run, const CheckParts *parts)
 		CheckResult r = {0};
 		if (run->b->stopped()) {
 			set_info(&r, "Cancelled / not tested");
-		} else if (run->b->dns == NULL) {
+		} else if (run->b->lookup == NULL) {
 			set_info(&r, "Not tested on this console yet");
 		} else if (parts->dns_off == 1) {
 			set_info(&r, "Not tested: DNS rules are off");
@@ -226,7 +226,15 @@ static void run_dns(Run *run, const CheckParts *parts)
 			r.state = CHECK_RUNNING;
 			publish_rule(run, list, i, &r, NULL);
 			memset(&r, 0, sizeof(r));
-			run->b->dns(list[i].from, list[i].to, &r);
+			/* The name, timed, and a host name target's own addresses to hold its answer against */
+			uint64_t started = run->b->now_ms();
+			CheckLookup answer = {0}, wanted = {0};
+			run->b->lookup(list[i].from, &answer);
+			r.elapsed_ms = (unsigned)(run->b->now_ms() - started);
+			unsigned char address[4];
+			if (check_dns_target(list[i].to, address) == CHECK_DNS_NAME && !run->b->stopped())
+				run->b->lookup(list[i].to, &wanted);
+			check_dns_judge(list[i].to, &answer, &wanted, &r);
 			if (r.state == CHECK_FAIL && run->b->stopped())
 				set_info(&r, "Cancelled / not tested");
 			if (run->b->log != NULL)

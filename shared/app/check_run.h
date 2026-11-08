@@ -49,9 +49,9 @@ typedef struct {
 	/* The console's judge of a finished badssl.com request (its check_model.c); a redirect's is
 	 * shared (check_redirect_judge) */
 	void (*judge_badssl)(const CheckBadssl *test, CheckResult *result);
-	/* A DNS rule's name looked up as a game would and judged against its target, timed; NULL on a
-	 * console whose test doesn't look them up */
-	void (*dns)(const char *name, const char *target, CheckResult *result);
+	/* A name looked up as a game would, where the DNS rules apply (the PS3's libnet, the Vita's
+	 * sceNetResolver); NULL on a console whose test doesn't look them up */
+	void (*lookup)(const char *name, CheckLookup *answer);
 	/* 1 once the run was cancelled */
 	int (*stopped)(void);
 	/* A result that leaves the rest untested (the Vita's certificate checks that couldn't be turned

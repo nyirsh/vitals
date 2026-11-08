@@ -6,6 +6,7 @@
 #include "check_run.h"
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -82,12 +83,11 @@ static void fake_badssl(const CheckBadssl *test, CheckResult *r)
 		r->error = -77;
 }
 
-static void fake_dns(const char *name, const char *target, CheckResult *r)
+/* Every name answers 1.2.3.4, its target's too */
+static void fake_lookup(const char *name, CheckLookup *answer)
 {
-	(void)target;
 	snprintf(dns_names[dns_count++ % 4], sizeof(dns_names[0]), "%s", name);
-	r->state = CHECK_PASS;
-	snprintf(r->message, sizeof(r->message), "Renamed");
+	*answer = (CheckLookup){1, 0, 1, {{1, 2, 3, 4}}};
 }
 
 static int fake_policy(const CheckResult *r)
@@ -109,7 +109,7 @@ static CheckBackend backend = {
 	.protocol = fake_protocol,
 	.fetch = fake_fetch,
 	.judge_badssl = fake_badssl,
-	.dns = fake_dns,
+	.lookup = fake_lookup,
 	.stopped = fake_stopped,
 	.lock = fake_lock,
 	.unlock = fake_unlock,
@@ -186,6 +186,69 @@ static void judge_redirects(void)
 	assert(r.state == CHECK_FAIL && strcmp(r.message, "Unexpected HTTP status 101") == 0);
 }
 
+static CheckLookup lookup(int found, int error, unsigned count, ...)
+{
+	CheckLookup l = {found, error, count, {{0}}};
+	va_list list;
+	va_start(list, count);
+	for (unsigned i = 0; i < count; ++i) {
+		unsigned value = va_arg(list, unsigned);
+		l.addresses[i][0] = (unsigned char)(value >> 24);
+		l.addresses[i][1] = (unsigned char)(value >> 16);
+		l.addresses[i][2] = (unsigned char)(value >> 8);
+		l.addresses[i][3] = (unsigned char)value;
+	}
+	va_end(list);
+	return l;
+}
+
+/* A DNS rule's lookup against what the rule says */
+static void dns_judging(void)
+{
+	unsigned char a[4];
+	assert(check_dns_target("block", a) == CHECK_DNS_BLOCK && check_dns_target("BLOCK", a) == CHECK_DNS_BLOCK);
+	assert(check_dns_target("10.0.0.5", a) == CHECK_DNS_ADDRESS && a[0] == 10 && a[3] == 5);
+	assert(check_dns_target("255.255.255.255", a) == CHECK_DNS_ADDRESS);
+	static const char *const names[] = {"blocks", "1.2.3", "1.2.3.4.5", "256.1.1.1", "1..2.3", "1.2.3.4.", "0001.2.3.4",
+	                                    "new.example", "1.2.3.a"};
+	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
+		assert(check_dns_target(names[i], a) == CHECK_DNS_NAME);
+
+	CheckLookup none = lookup(0, 1, 0), empty = lookup(0, 0, 0);
+	CheckResult r;
+	check_dns_judge("block", &none, &empty, &r);
+	assert(r.state == CHECK_PASS);
+	CheckLookup no_address = lookup(0, 4, 0);
+	check_dns_judge("block", &no_address, &empty, &r);
+	assert(r.state == CHECK_PASS);
+	CheckLookup real = lookup(1, 0, 2, 0x5DB8D822u, 0x5DB8D823u);
+	check_dns_judge("block", &real, &empty, &r);
+	assert(r.state == CHECK_FAIL && strstr(r.message, "93.184.216.34") != NULL);
+	CheckLookup again = lookup(0, 2, 0);
+	check_dns_judge("block", &again, &empty, &r);
+	assert(r.state == CHECK_FAIL);
+
+	CheckLookup local = lookup(1, 0, 1, 0x0A000005u);
+	check_dns_judge("10.0.0.5", &local, &empty, &r);
+	assert(r.state == CHECK_PASS && strcmp(r.message, "Resolved to 10.0.0.5") == 0);
+	check_dns_judge("10.0.0.6", &local, &empty, &r);
+	assert(r.state == CHECK_FAIL);
+	check_dns_judge("10.0.0.5", &none, &empty, &r);
+	assert(r.state == CHECK_FAIL);
+
+	/* A host name: one address in common is enough, as a server may rotate its addresses */
+	CheckLookup target = lookup(1, 0, 3, 0x01010101u, 0x02020202u, 0x03030303u);
+	CheckLookup renamed = lookup(1, 0, 2, 0x03030303u, 0x04040404u);
+	check_dns_judge("new.example", &renamed, &target, &r);
+	assert(r.state == CHECK_PASS && strcmp(r.message, "Resolved: 3.3.3.3, 4.4.4.4") == 0);
+	check_dns_judge("new.example", &real, &target, &r);
+	assert(r.state == CHECK_FAIL);
+	check_dns_judge("new.example", &none, &target, &r);
+	assert(r.state == CHECK_FAIL);
+	check_dns_judge("new.example", &renamed, &none, &r);
+	assert(r.state == CHECK_INFO);
+}
+
 static void read_rules(void)
 {
 	CheckRedirect list[3];
@@ -221,6 +284,7 @@ int main(void)
 {
 	read_rules();
 	judge_redirects();
+	dns_judging();
 
 	/* Everything on: the tiles TLS 1.3 first, then the report, badssl.com, the redirects (reached
 	 * the new host) and the DNS rules */
@@ -270,10 +334,10 @@ int main(void)
 	assert(requests == 5 + CHECK_BADSSL_COUNT);
 	parts.http_outdated = 0;
 	/* A console that doesn't look DNS rules up */
-	backend.dns = NULL;
+	backend.lookup = NULL;
 	run();
 	assert(strcmp(service.dns[0].result.message, "Not tested on this console yet") == 0);
-	backend.dns = fake_dns;
+	backend.lookup = fake_lookup;
 
 	/* Where the console can't tell, vitals is what the TLS 1.3 tile says */
 	parts.vitals = -1;
@@ -307,6 +371,6 @@ int main(void)
 	assert(strcmp(notice, "No network connection") == 0 && requests == 0 && service.protocols[0].state == CHECK_WAIT);
 	open_rc = 0;
 
-	puts("connection test's run: order, what isn't tested, redirects' host, cancelling, policy failure, failed start, rule lists, redirect judge PASS");
+	puts("connection test's run: order, what isn't tested, redirects' host, cancelling, policy failure, failed start, rule lists, redirect and DNS judges PASS");
 	return 0;
 }

@@ -196,69 +196,6 @@ static void following(void)
 	assert(check_follow(&s, &item) == CHECK_FOLLOW_DNS && item == 1);
 }
 
-static CheckLookup lookup(int found, int error, unsigned count, ...)
-{
-	CheckLookup l = {found, error, count, {{0}}};
-	va_list list;
-	va_start(list, count);
-	for (unsigned i = 0; i < count; ++i) {
-		unsigned value = va_arg(list, unsigned);
-		l.addresses[i][0] = (unsigned char)(value >> 24);
-		l.addresses[i][1] = (unsigned char)(value >> 16);
-		l.addresses[i][2] = (unsigned char)(value >> 8);
-		l.addresses[i][3] = (unsigned char)value;
-	}
-	va_end(list);
-	return l;
-}
-
-/* A DNS rule's lookup against what the rule says */
-static void dns_judging(void)
-{
-	unsigned char a[4];
-	assert(check_dns_target("block", a) == CHECK_DNS_BLOCK && check_dns_target("BLOCK", a) == CHECK_DNS_BLOCK);
-	assert(check_dns_target("10.0.0.5", a) == CHECK_DNS_ADDRESS && a[0] == 10 && a[3] == 5);
-	assert(check_dns_target("255.255.255.255", a) == CHECK_DNS_ADDRESS);
-	static const char *const names[] = {"blocks", "1.2.3", "1.2.3.4.5", "256.1.1.1", "1..2.3", "1.2.3.4.", "0001.2.3.4",
-	                                    "new.example", "1.2.3.a"};
-	for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
-		assert(check_dns_target(names[i], a) == CHECK_DNS_NAME);
-
-	CheckLookup none = lookup(0, 1, 0), empty = lookup(0, 0, 0);
-	CheckResult r;
-	check_dns_judge("block", &none, &empty, &r);
-	assert(r.state == CHECK_PASS);
-	CheckLookup no_address = lookup(0, 4, 0);
-	check_dns_judge("block", &no_address, &empty, &r);
-	assert(r.state == CHECK_PASS);
-	CheckLookup real = lookup(1, 0, 2, 0x5DB8D822u, 0x5DB8D823u);
-	check_dns_judge("block", &real, &empty, &r);
-	assert(r.state == CHECK_FAIL && strstr(r.message, "93.184.216.34") != NULL);
-	CheckLookup again = lookup(0, 2, 0);
-	check_dns_judge("block", &again, &empty, &r);
-	assert(r.state == CHECK_FAIL);
-
-	CheckLookup local = lookup(1, 0, 1, 0x0A000005u);
-	check_dns_judge("10.0.0.5", &local, &empty, &r);
-	assert(r.state == CHECK_PASS && strcmp(r.message, "Resolved to 10.0.0.5") == 0);
-	check_dns_judge("10.0.0.6", &local, &empty, &r);
-	assert(r.state == CHECK_FAIL);
-	check_dns_judge("10.0.0.5", &none, &empty, &r);
-	assert(r.state == CHECK_FAIL);
-
-	/* A host name: one address in common is enough, as a server may rotate its addresses */
-	CheckLookup target = lookup(1, 0, 3, 0x01010101u, 0x02020202u, 0x03030303u);
-	CheckLookup renamed = lookup(1, 0, 2, 0x03030303u, 0x04040404u);
-	check_dns_judge("new.example", &renamed, &target, &r);
-	assert(r.state == CHECK_PASS && strcmp(r.message, "Resolved: 3.3.3.3, 4.4.4.4") == 0);
-	check_dns_judge("new.example", &real, &target, &r);
-	assert(r.state == CHECK_FAIL);
-	check_dns_judge("new.example", &none, &target, &r);
-	assert(r.state == CHECK_FAIL);
-	check_dns_judge("new.example", &renamed, &none, &r);
-	assert(r.state == CHECK_INFO);
-}
-
 int main(void)
 {
 	judging();
@@ -266,7 +203,6 @@ int main(void)
 	errors();
 	report_parser();
 	following();
-	dns_judging();
-	puts("check_model: protocol, badssl.com and redirect judging, display, timeouts, error names, the TLS report, following the run, DNS rules PASS");
+	puts("check_model: protocol, badssl.com judging, display, timeouts, error names, the TLS report, following the run PASS");
 	return 0;
 }

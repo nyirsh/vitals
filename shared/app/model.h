@@ -130,6 +130,28 @@ void check_reached_host(const char *reached, char *host, size_t size);
  * it's another; host "" when the console can't tell. A failed request keeps the fetch's words */
 void check_redirect_judge(CheckResult *result, int rc, const char *host, const char *expected);
 
+/* A name looked up as a game would: found, else why (the resolver's h_errno on the PS3, the
+ * Vita's resolver errors in the same words), and its IPv4 addresses */
+#define CHECK_DNS_ADDRESSES 8
+enum {
+	CHECK_LOOKUP_NO_HOST = 1,
+	CHECK_LOOKUP_TRY_AGAIN = 2,
+	CHECK_LOOKUP_FAILED = 3,
+	CHECK_LOOKUP_NO_ADDRESS = 4
+};
+typedef struct {
+	int found, error;
+	unsigned count;
+	unsigned char addresses[CHECK_DNS_ADDRESSES][4];
+} CheckLookup;
+/* What a DNS rule's target is: another host name, an IPv4 address, or block */
+enum CheckDnsTarget { CHECK_DNS_NAME, CHECK_DNS_ADDRESS, CHECK_DNS_BLOCK };
+enum CheckDnsTarget check_dns_target(const char *target, unsigned char address[4]);
+/* A rule's lookup against what the rule says: block passes when the name doesn't exist, an address
+ * when it's among the answers, a host name when an answer is among the target's own (target is the
+ * target's lookup, for a host name only) */
+void check_dns_judge(const char *rule_target, const CheckLookup *answer, const CheckLookup *target, CheckResult *result);
+
 /* ---- each console's check_model.c: what ui.c shows of a request ---- */
 
 /* A protocol tile (TLS 1.<version>): its mark, words and colours */

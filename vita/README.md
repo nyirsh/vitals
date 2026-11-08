@@ -139,15 +139,16 @@ The certificate must also name the host apps connect to: combined with [host red
 
 ## Connection test
 
-**Test connections** in the app checks what an ordinary app experiences, using only Sony's HTTP APIs, and you can run it even without `vitals` being installed:
+**Test connections** in the app checks what an ordinary app experiences, using only Sony's HTTP and network APIs, and you can run it even without `vitals` being installed:
 
 - TLS 1.0–1.3 checks against BrowserLeaks (with `vitals`, TLS 1.0 and 1.1 show as blocked, which is intended)
 - the negotiated cipher and handshake details, from the BrowserLeaks TLS report
 - certificate checks against [badssl.com](https://badssl.com): 5 hosts that must load (valid certificate, SHA-256, ECDSA P-256, RSA 2048, TLS 1.2 only) and 7 that must be refused (expired, wrong host name, self-signed, untrusted root, RC4, 3DES, DH 512). A refusal only counts when the host was reachable, so being offline shows as inconclusive, never as a pass
-- every host in your [host redirects](#host-redirects), requested by its old name
+- every host in your [host redirects](#host-redirects), requested by its old name: it passes when the rule's new host answered, with any HTTP status. vitals-http says which host that was, so one too old to say shows the redirects as "Couldn't test (outdated vitals)"
+- every rule in your `dns.txt`, its host looked up through `sceNetResolver` as a game would, so the kernel plugin sees the query: a `block` rule passes when the name doesn't exist, an address when it's the answer, and a host name when the answer is among the target's own addresses. While `flags/dns.off` is there the rules aren't tested
 - whether vitals-http is loaded in the app
 
-A request that times out is tried again, up to 3 times in all, since slow servers say nothing about TLS. Square goes through the detail pages: cipher suites, request details, handshake details, certificate checks and host redirects. Press START after a run to save its log to `ux0:data/vitals/`. The test works on any firmware and changes nothing on the console.
+A request that times out is tried again, up to 3 times in all, since slow servers say nothing about TLS. Square goes through the detail pages: cipher suites, request details, handshake details, certificate checks, host redirects and DNS rules. Press START after a run to save its log to `ux0:data/vitals/`. The test works on any firmware and changes nothing on the console.
 
 ## Repository layout
 

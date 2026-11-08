@@ -177,19 +177,6 @@ static int backend_fetch(const char *url, int status_only, char *body, size_t *l
 	return rc;
 }
 
-/* A DNS rule's name looked up through libnet, and a host name target too, for the addresses the
- * renamed answer should carry */
-static void backend_dns(const char *name, const char *target, CheckResult *r)
-{
-	uint64_t started = sys_time_get_system_time();
-	CheckLookup answer, wanted = {0};
-	look_up(name, &answer);
-	r->elapsed_ms = (unsigned)((sys_time_get_system_time() - started) / 1000);
-	unsigned char address[4];
-	if (check_dns_target(target, address) == CHECK_DNS_NAME && !stopping)
-		look_up(target, &wanted);
-	check_dns_judge(target, &answer, &wanted, r);
-}
 
 static int backend_stopped(void)
 {
@@ -208,7 +195,7 @@ static const CheckBackend backend = {
     .protocol = backend_protocol,
     .fetch = backend_fetch,
     .judge_badssl = check_badssl_judge,
-    .dns = backend_dns,
+    .lookup = look_up,
     .stopped = backend_stopped,
     .policy_failed = NULL,
     .log = log_result,

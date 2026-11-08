@@ -13,6 +13,7 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/libssl.h>
+#include <psp2/net/net.h>
 #include <psp2/net/http.h>
 #include <psp2/rtc.h>
 #include <psp2/sysmodule.h>
@@ -61,7 +62,7 @@ static CheckService service = {.vitals_enabled = -1};
  * vitals-ssl (tls.off keeps Sony's); -1 until looked for. service.vitals_enabled is either */
 static int vitals_http = -1, vitals_tls = -1;
 static SceUID guard = -1, worker = -1;
-static int busy, active_request = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
+static int busy, active_request = -1, active_resolver = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
 static uint64_t request_begin;
 static char notice[120];
 /* A request that times out is made again, up to this many times in all */
@@ -92,6 +93,9 @@ static void abort_current(int user_cancel)
         abort_sent = 1;
         (void)sceHttpAbortRequest(active_request);
     }
+    /* A DNS rule's lookup ends at the resolver's own timeout, or at once when cancelled */
+    if (user_cancel && active_resolver >= 0)
+        (void)sceNetResolverAbort(active_resolver, 0);
     unlock();
 }
 /* One request to url; status_only accepts any final HTTP status without reading the body, and
@@ -334,6 +338,53 @@ static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned m
     fclose(redirect_file);
     redirect_file = NULL;
     return count;
+}
+/* A name looked up through sceNetResolver, as a game would: its query goes out through sendto,
+ * where the kernel plugin applies the DNS rules. The resolver gives one address, and its errors
+ * in the PS3's resolver's words (check_dns_judge) */
+static void look_up(const char *name, CheckLookup *out)
+{
+    memset(out, 0, sizeof(*out));
+    int resolver = sceNetResolverCreate("vitals-check", NULL, 0);
+    if (resolver < 0)
+    {
+        out->error = CHECK_LOOKUP_FAILED;
+        return;
+    }
+    lock();
+    active_resolver = resolver;
+    int stop = cancelled;
+    unlock();
+    SceNetInAddr address = {0};
+    int rc = stop ? -1 : sceNetResolverStartNtoa(resolver, name, &address, 0, 0, 0);
+    lock();
+    active_resolver = -1;
+    unlock();
+    (void)sceNetResolverDestroy(resolver);
+    if (rc >= 0)
+    {
+        /* In network order, as it went over the wire */
+        memcpy(out->addresses[0], &address.s_addr, 4);
+        out->count = 1;
+        out->found = 1;
+        return;
+    }
+    switch ((unsigned)rc & 0xffu)
+    {
+    case SCE_NET_RESOLVER_ENOHOST:
+        out->error = CHECK_LOOKUP_NO_HOST;
+        break;
+    case SCE_NET_RESOLVER_ENORECORD:
+        out->error = CHECK_LOOKUP_NO_ADDRESS;
+        break;
+    case SCE_NET_RESOLVER_ETIMEDOUT:
+    case SCE_NET_RESOLVER_ESERVERFAILURE:
+    case SCE_NET_RESOLVER_ENODNS:
+        out->error = CHECK_LOOKUP_TRY_AGAIN;
+        break;
+    default:
+        out->error = CHECK_LOOKUP_FAILED;
+    }
 }
 /* Which of vitals' libraries are this process's: 1 vitals-http, 2 vitals-ssl, both, or none */
 static int detect_vitals(void)
@@ -606,8 +657,7 @@ static const CheckBackend backend = {
     .protocol = backend_protocol,
     .fetch = backend_fetch,
     .judge_badssl = check_badssl_judge,
-    /* The Vita's test doesn't look the DNS rules up yet */
-    .dns = NULL,
+    .lookup = look_up,
     .stopped = stopped,
     .policy_failed = backend_policy_failed,
     .log = NULL,
