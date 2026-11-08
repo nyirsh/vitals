@@ -27,12 +27,12 @@ Everything lives until the process exits.
 | File on the console                             | Comes from                                                                                | Installed by                                                    |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | `ux0:data/vitals/system/ScePsp2Compat.suprx` | `app0:compat.suprx` ([vitals-app/assets/compat.suprx](../vitals-app/assets/compat.suprx)) | `install_compat` in [install.c](../vitals-app/install.c) |
-| `ux0:data/vitals/system/vitals.suprx`            | the browser provider, built from [tls13-vita/browser/](../tls13-vita/browser/)            | same function                                                   |
+| `ux0:data/vitals/system/vitals.suprx`            | the browser provider, built from [vitals-browser/](../vitals-browser/)            | same function                                                   |
 | `ux0:data/vitals/system/libssl.suprx`        | vitals-ssl, the system's libssl, which also does the provider's TLS                       | `install_http_modules`                                          |
 | `ux0:data/vitals/system/sony-certs.pem`, `mozilla-certs.pem` | the certificate store libssl trusts, with `ux0:data/vitals/custom-certs.pem` ([libssl.md](libssl.md)) | `install_certificates`                                          |
 
 - **One copy of the provider**, in `ux0:data/vitals/system` with vitals' other modules
-  (`VITALS_BROWSER_PROVIDER_BOOT_PATH`, [path.h](../tls13-vita/include/vitals/path.h)). Earlier
+  (`VITALS_BROWSER_PROVIDER_BOOT_PATH`, [path.h](../common/include/vitals/path.h)). Earlier
   versions kept it in `ur0:tai/vitals-native/` with an unused second copy on `vs0:`; installing
   removes both.
 - **Everything in `ux0:data/vitals/system`**: the engine, the provider, libssl and the certificate
@@ -49,16 +49,16 @@ Everything lives until the process exits.
 
 ## 2. Boot: the kernel plugin gets ready
 
-The kernel plugin's `module_start` ([vitals-plugin/main.c](../vitals-plugin/main.c)):
+The kernel plugin's `module_start` ([vitals-boot/main.c](../vitals-boot/main.c)):
 
 1. **Nothing looked for yet** — vitals' engine is in `ux0:data/vitals/system`, which may not be mapped
    when the plugin starts, so it's looked for at each engine load (section 3), independently of the
    libhttp and libssl pair.
 2. **Loader readiness** — `vitals_kernel_loader_init`
-   ([tls13_loader.c](../vitals-plugin/tls13_loader.c)) runs `target_matches` for the
-   browser target ([tls13_loader.c](../vitals-plugin/tls13_loader.c)): the provider
+   ([tls13_loader.c](../vitals-boot/tls13_loader.c)) runs `target_matches` for the
+   browser target ([tls13_loader.c](../vitals-boot/tls13_loader.c)): the provider
    at `ux0:data/vitals/system/vitals.suprx` must exist, and the replacement module's SHA-256 must
-   equal `g_expected_browser_sha256` ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
+   equal `g_expected_browser_sha256` ([tls13_loader.c](../vitals-boot/tls13_loader.c)).
    Only then is the loader ready (`browser=1` in `vitals: loader init=…`). When the provider isn't
    there yet at boot (`ux0:` not mapped), `vitals_kernel_browser_loader_ready` looks again at each
    engine load.
@@ -66,28 +66,28 @@ The kernel plugin's `module_start` ([vitals-plugin/main.c](../vitals-plugin/main
 
 ## 3. A process asks for the browser engine: the load hook
 
-`load_for_pid_patched` ([main.c](../vitals-plugin/main.c)) sees every load:
+`load_for_pid_patched` ([main.c](../vitals-boot/main.c)) sees every load:
 
-1. **Path swap** ([main.c](../vitals-plugin/main.c)) —
-   `vitals_browser_engine_request` ([path.c](../tls13-vita/src/path.c)) matches any path ending in
+1. **Path swap** ([main.c](../vitals-boot/main.c)) —
+   `vitals_browser_engine_request` ([path.c](../common/src/path.c)) matches any path ending in
    `webcore/ScePsp2Compat.suprx` right after a `/` or `:`, on a device: a process may see
    `vs0:data/external` under a device of its own (`sd062e8855c978:/webcore/…`). When
    `ux0:data/vitals/system/ScePsp2Compat.suprx` is there, the load is swapped to it.
 2. **Flags left alone** — the load is shared or private as the process asked; there is no HTTP
    policy for the browser engine.
-3. **The real load** — `TAI_CONTINUE` ([main.c](../vitals-plugin/main.c)), as the process asked. The
+3. **The real load** — `TAI_CONTINUE` ([main.c](../vitals-boot/main.c)), as the process asked. The
    browser's process sees its files through a view of its own, without `ux0:`, so there it fails
    (`0x80010013`, no such device; naming the process instead of the caller fails the same way).
    The kernel then loads vitals' engine with its own call, `ksceKernelLoadModuleForPid`, as it loads
    the provider (`load_engine_for_process`; logged as `vitals: browser engine: kernel load for
    pid=…`). That call's ID differs between 3.60 and 3.63 and later, so it's looked up at start
-   ([native_module_api.c](../vitals-plugin/native_module_api.c)) rather than imported, which would keep
+   ([native_module_api.c](../vitals-boot/native_module_api.c)) rather than imported, which would keep
    the plugin from loading at all on the other family. It loads the engine private, which the
    browser runs with. If that fails too, Sony's engine is loaded and nothing is injected, so the
    browser still opens with its own TLS (`vitals: browser engine from … failed`).
-4. **Queue the injection** ([main.c](../vitals-plugin/main.c)): when the loader is ready,
+4. **Queue the injection** ([main.c](../vitals-boot/main.c)): when the loader is ready,
    `vitals_post_start_defer(pid, module, VITALS_BROWSER_PROVIDER_BOOT_PATH)`
-   ([post_start.c](../vitals-plugin/post_start.c)) records the provider to inject once the engine
+   ([post_start.c](../vitals-boot/post_start.c)) records the provider to inject once the engine
    has started.
 
 ## 4. Which processes
@@ -98,53 +98,53 @@ libcurl connections are this provider's.
 
 ## 5. The module has started: injecting the provider
 
-`start_for_pid_patched` ([main.c](../vitals-plugin/main.c)) calls
-`vitals_post_start_complete` ([post_start.c](../vitals-plugin/post_start.c)), which calls
-`vitals_kernel_inject_browser_for_pid` ([tls13_loader.c](../vitals-plugin/tls13_loader.c))
+`start_for_pid_patched` ([main.c](../vitals-boot/main.c)) calls
+`vitals_post_start_complete` ([post_start.c](../vitals-boot/post_start.c)), which calls
+`vitals_kernel_inject_browser_for_pid` ([tls13_loader.c](../vitals-boot/tls13_loader.c))
 for the queued module, through `inject_target`
-([tls13_loader.c](../vitals-plugin/tls13_loader.c)):
+([tls13_loader.c](../vitals-boot/tls13_loader.c)):
 
 1. **One injection per process at a time**, in a 4 KiB lookup workspace.
 2. **Not already there** — `ScePsp2Compat` must be found in the process, and the module `vitals`
-   must not be ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
+   must not be ([tls13_loader.c](../vitals-boot/tls13_loader.c)).
 3. **The provider to load** — always `ux0:data/vitals/system/vitals.suprx`
-   ([tls13_loader.c](../vitals-plugin/tls13_loader.c)).
+   ([tls13_loader.c](../vitals-boot/tls13_loader.c)).
 4. **The module's hash** — `ux0:data/vitals/system/ScePsp2Compat.suprx`, the file the process loaded,
-   hashed in the system's view (`target_matches`, [tls13_loader.c](../vitals-plugin/tls13_loader.c)).
+   hashed in the system's view (`target_matches`, [tls13_loader.c](../vitals-boot/tls13_loader.c)).
 5. **Still the right module** — the module ID handed over must be `ScePsp2Compat`.
 6. **Start arguments** — `VitalsBrowserStartArgs` (magic `0x42544C53`, version 1, the module's ID;
-   [browser_abi.h](../tls13-vita/include/vitals/browser_abi.h)) in a user memory block of that
+   [browser_abi.h](../common/include/vitals/browser_abi.h)) in a user memory block of that
    process.
 7. **libssl first** — the browser engine's process doesn't load libssl, and the provider's TLS is
    libssl's: unless `SceLibSsl` is already there, Sony's libssl is loaded into the process as the
    system loads it for an app (the module manager's own load, with sceSysmodule's flags,
-   `vitals_kernel_load_system_libssl` in [main.c](../vitals-plugin/main.c)), which the path swap
-   turns into vitals-ssl, then started (`ensure_libssl`, [tls13_loader.c](../vitals-plugin/tls13_loader.c)).
+   `vitals_kernel_load_system_libssl` in [main.c](../vitals-boot/main.c)), which the path swap
+   turns into vitals-ssl, then started (`ensure_libssl`, [tls13_loader.c](../vitals-boot/tls13_loader.c)).
    It has to be **shared**: the shared libhttp there imports from it, and the kernel refuses a
    private module exporting to a shared one (`0x8002D018`). Logged as
    `vitals: libssl for the browser pid=… modid=… start=… status=…`. Without it the provider isn't
    loaded, and the browser keeps its own TLS.
 8. **Load and start** — `ksceKernelLoadStartModuleForPid`
-   ([tls13_loader.c](../vitals-plugin/tls13_loader.c)); unloaded again if its start fails.
+   ([tls13_loader.c](../vitals-boot/tls13_loader.c)); unloaded again if its start fails.
    Logged as `vitals: inject browser provider pid=… rc=…`.
 
 ## 6. The provider starts: checks and hooks
 
-`module_start` in [tls13-vita/browser/module.c:106](../tls13-vita/browser/module.c#L106), in the
+`module_start` in [vitals-browser/module.c:106](../vitals-browser/module.c#L106), in the
 browser's process:
 
 1. **Once per process** — a second start is refused.
 2. **Start arguments** checked: magic, version, a module ID, nothing reserved set.
-3. **The module it was given** — `validate_module` ([module.c:69](../tls13-vita/browser/module.c#L69)):
+3. **The module it was given** — `validate_module` ([module.c:69](../vitals-browser/module.c#L69)):
    named `ScePsp2Compat`; code `0x39f508`/`0x39f630` bytes and data `0x9c28`/`0xd234`
-   ([module_descriptor.h:25-28](../tls13-vita/browser/module_descriptor.h#L25-L28)); the code bytes
+   ([module_descriptor.h:25-28](../vitals-browser/module_descriptor.h#L25-L28)); the code bytes
    at six known functions matching their signatures
-   ([module_descriptor.h:12-19](../tls13-vita/browser/module_descriptor.h#L12-L19)).
+   ([module_descriptor.h:12-19](../vitals-browser/module_descriptor.h#L12-L19)).
 4. **Two of the engine's own functions** the provider will call: libcurl's time-left and
-   socket-wait helpers, at fixed offsets ([module.c:135-136](../tls13-vita/browser/module.c#L135-L136),
-   [browser_abi.h:13-14](../tls13-vita/include/vitals/browser_abi.h#L13-L14)), so its handshakes
+   socket-wait helpers, at fixed offsets ([module.c:135-136](../vitals-browser/module.c#L135-L136),
+   [browser_abi.h:13-14](../common/include/vitals/browser_abi.h#L13-L14)), so its handshakes
    respect the browser's timeouts.
-5. **State** — `vitals_browser_init` ([backend.c](../tls13-vita/browser/backend.c)): mutexes and
+5. **State** — `vitals_browser_init` ([backend.c](../vitals-browser/backend.c)): mutexes and
    the connection registry. The TLS is libssl's, imported through vitals-ssl's stub: on the first
    connection the provider checks the certificate store is there (`ensure_default_ca`, one byte
    read through the kernel plugin's `vitals_ca_read`) and sets libssl up with a 1 MiB pool
@@ -152,9 +152,9 @@ browser's process:
    store itself, through an index, as for apps. Without a store the browser keeps its own TLS. The provider's own
    few allocations come from the process's C library (it links `SceLibc`).
 6. **The four hooks** — by offset in `ScePsp2Compat` (`taiHookFunctionOffset`, Thumb;
-   [module.c:147-161](../tls13-vita/browser/module.c#L147-L161)), on libcurl's TLS layer:
+   [module.c:147-161](../vitals-browser/module.c#L147-L161)), on libcurl's TLS layer:
 
-   | Hook                            | Offset ([browser_abi.h:9-12](../tls13-vita/include/vitals/browser_abi.h#L9-L12)) | Goes to                  |
+   | Hook                            | Offset ([browser_abi.h:9-12](../common/include/vitals/browser_abi.h#L9-L12)) | Goes to                  |
    | ------------------------------- | -------------------------------------------------------------------------------- | ------------------------ |
    | connect (the handshake)         | `0xa5ece`                                                                        | `vitals_browser_connect` |
    | close                           | `0xa36ba`                                                                        | `vitals_browser_close`   |
@@ -178,9 +178,9 @@ libcurl ─ close ─▶ close_notify, session removed
     declined ─▶ libcurl's own TLS in the engine
 ```
 
-- **Connect, first call** — `create_or_acquire` ([backend.c](../tls13-vita/browser/backend.c))
+- **Connect, first call** — `create_or_acquire` ([backend.c](../vitals-browser/backend.c))
   reads curl's settings for the connection (`vitals_browser_read_options`,
-  [config.c](../tls13-vita/browser/config.c)): socket, host, CA file, peer and host
+  [config.c](../vitals-browser/config.c)): socket, host, CA file, peer and host
   verification, cipher list, and any context callback. It **declines**, leaving the engine's own
   TLS to handle the connection, when the provider is disabled, curl already set up TLS on it, a
   setting is one it can't honour (another TLS version, client certificates, CRLs, certificate info
@@ -191,7 +191,7 @@ libcurl ─ close ─▶ close_notify, session removed
   only trust (`vitalsSslCtxSetTrustBundle`), otherwise the bundle. A connection with verification
   turned off, to a host whose certificate was refused here, is refused too, unless the user was
   asked about it ([section 8](#8-a-certificate-refused-the-browser-asks)).
-- **The handshake** — `vitals_browser_connect` ([backend.c](../tls13-vita/browser/backend.c))
+- **The handshake** — `vitals_browser_connect` ([backend.c](../vitals-browser/backend.c))
   steps `vitalsSslHandshake`, waiting between steps with the engine's socket-wait and time-left,
   or returning at once for non-blocking connects. On a certificate failure it writes the verify
   result where curl reports it, and reports the failure to WebKit ([section 8](#8-a-certificate-refused-the-browser-asks)).
@@ -238,7 +238,7 @@ curl then fails the connection with error 60 or 51. WebKit's ResourceHandleManag
 
 **What the provider does.** On a certificate failure (curl errors 60 and 51), for a connection with
 the browser's default callback, it fills in the same record (`report_to_webkit`,
-[backend.c](../tls13-vita/browser/backend.c)): the server's certificates in DER form from libssl
+[backend.c](../vitals-browser/backend.c)): the server's certificates in DER form from libssl
 (`vitalsSslGetPeerCertificate`), each made into one of the engine's OpenSSL `X509`s with its own
 `d2i_X509`, in a chain record laid out as the engine's (the chain's top first, the server's
 certificate last), and the verify error at `+16`. Both come from the engine's C library heap, as
@@ -253,11 +253,11 @@ refused, with the same error, so nothing loads unasked.
 
 The record's layout and the engine's functions are at fixed places in the one ScePsp2Compat build
 vitals ships, whose hash the kernel checks: `d2i_X509` at `0x48d64` and `X509_free` at `0x48d84`
-([browser_abi.h](../tls13-vita/include/vitals/browser_abi.h)).
+([browser_abi.h](../common/include/vitals/browser_abi.h)).
 
 ## 9. The end
 
-- **The provider never unloads**: its `module_stop` refuses ([module.c:167-171](../tls13-vita/browser/module.c#L167-L171)).
+- **The provider never unloads**: its `module_stop` refuses ([module.c:167-171](../vitals-browser/module.c#L167-L171)).
 - **Process exit**: the module, the provider, their hooks and every connection go away with the
   process.
 
@@ -282,14 +282,14 @@ vitals ships, whose hash the kernel checks: `d2i_X509` at `0x48d64` and `X509_fr
 
 | File                                                                                                                            | Role                                                |
 | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| [vitals-plugin/main.c](../vitals-plugin/main.c)                                                                                 | the load and start hooks, the module swap           |
-| [tls13-vita/src/path.c](../tls13-vita/src/path.c)                                                                               | the module, provider and certificate paths          |
-| [vitals-plugin/tls13_loader.c](../vitals-plugin/tls13_loader.c)                                                                 | hashes and injection                                |
-| [vitals-plugin/post_start.c](../vitals-plugin/post_start.c)                                                                     | the queue between a load and its start              |
-| [tls13-vita/include/vitals/browser_abi.h](../tls13-vita/include/vitals/browser_abi.h)                                           | the engine's offsets and libcurl's structure fields |
-| [tls13-vita/browser/module.c](../tls13-vita/browser/module.c), [module_descriptor.h](../tls13-vita/browser/module_descriptor.h) | provider start, module checks, the four hooks       |
-| [tls13-vita/browser/backend.c](../tls13-vita/browser/backend.c)                                                                 | each connection, on libssl                          |
+| [vitals-boot/main.c](../vitals-boot/main.c)                                                                                 | the load and start hooks, the module swap           |
+| [common/src/path.c](../common/src/path.c)                                                                               | the module, provider and certificate paths          |
+| [vitals-boot/tls13_loader.c](../vitals-boot/tls13_loader.c)                                                                 | hashes and injection                                |
+| [vitals-boot/post_start.c](../vitals-boot/post_start.c)                                                                     | the queue between a load and its start              |
+| [common/include/vitals/browser_abi.h](../common/include/vitals/browser_abi.h)                                           | the engine's offsets and libcurl's structure fields |
+| [vitals-browser/module.c](../vitals-browser/module.c), [module_descriptor.h](../vitals-browser/module_descriptor.h) | provider start, module checks, the four hooks       |
+| [vitals-browser/backend.c](../vitals-browser/backend.c)                                                                 | each connection, on libssl                          |
 | [vitals-ssl/](../vitals-ssl/)                                                                                                   | the TLS                                             |
-| [tls13-vita/browser/config.c](../tls13-vita/browser/config.c)                                                                   | reading curl's settings                             |
-| [tls13-vita/browser/webkit_callback.c](../tls13-vita/browser/webkit_callback.c)                                                 | recognising the browser's default context callback  |
+| [vitals-browser/config.c](../vitals-browser/config.c)                                                                   | reading curl's settings                             |
+| [vitals-browser/webkit_callback.c](../vitals-browser/webkit_callback.c)                                                 | recognising the browser's default context callback  |
 | [vitals-app/install.c](../vitals-app/install.c)                                                                                 | putting the files on the console                    |

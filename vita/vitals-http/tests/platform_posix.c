@@ -18,7 +18,7 @@
 #include <unistd.h>
 
 /* The engine on a desktop, for testing it: malloc, a pthread mutex and BSD sockets; TLS is the real
- * Mbed TLS, over tls13-vita's Vita stand-ins (tests/transport/vita_mock.c) */
+ * Mbed TLS, over the Vita stand-ins (../../common/tests/vita_mock.c) */
 
 #define VH_CONNECT_SLICE_MS 100
 

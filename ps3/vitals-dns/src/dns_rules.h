@@ -9,7 +9,7 @@
 #include "vitals/redirect_list.h"
 
 /* The DNS rules (/dev_hdd0/vitals/dns.txt) as the Vita's kernel plugin applies them
- * (vitals-plugin/dns_watch.c), without any system call, so the host tests run them (tests/host)
+ * (vitals-dns/dns_watch.c), without any system call, so the host tests run them (tests/host)
  * and the kernel plugin only copies messages in and out:
  *   another host name  the query is sent asking for that name, and its answer is rewritten to
  *                      answer the old name

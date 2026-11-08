@@ -41,9 +41,9 @@ reference vitals-ssl was written from).
 The kernel plugin's hooks go in at boot, whatever is installed. vitals' libhttp and libssl are in
 `ux0:data/vitals/system`, which may not be ready when the plugin starts (a plugin loaded after it maps
 an SD2Vita's card), so they're looked for at each load of Sony's libhttp or libssl (`replace_iap` in
-[vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, and
+[vitals-boot/main.c](../vitals-boot/main.c)): the swap happens only when **both** are there, and
 otherwise Sony's load. The Options' switches are looked for at the same loads
-([switches.h](../tls13-vita/include/vitals/switches.h)), each keeping one of Sony's: `tls.off`
+([switches.h](../common/include/vitals/switches.h)), each keeping one of Sony's: `tls.off`
 libssl (and the browser keeps Sony's engine and TLS), under which vitals-http does its TLS as Sony's
 libhttp does ([tls_sony.c](../vitals-http/src/tls_sony.c)); `http.off` libhttp, on vitals-ssl, which
 has all Sony's libhttp uses. `dns.off`
@@ -52,7 +52,7 @@ as if `redirects.txt` were missing.
 
 ## 3. A process asks for libssl
 
-Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-plugin/main.c)):
+Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-boot/main.c)):
 
 1. **Path swap**: `vs0:sys/external/libssl.suprx` or `vs0:/sys/external/libssl.suprx` becomes
    `ux0:data/vitals/system/libssl.suprx`.
@@ -63,7 +63,7 @@ Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-plugin/ma
 
 Its memory is the pool the process gives `sceSslInit`, as Sony's is, and the CA store it trusts is
 three files read as one, in this order, each followed by a line break
-([ca_store.h](../tls13-vita/include/vitals/ca_store.h)):
+([ca_store.h](../common/include/vitals/ca_store.h)):
 
 | File                                        | What                                                      | Written by                                 |
 | ------------------------------------------- | --------------------------------------------------------- | ------------------------------------------ |
@@ -72,7 +72,7 @@ three files read as one, in this order, each followed by a line break
 | `ux0:data/vitals/custom-certs.pem`          | the user's own, optional                                   | the user                                   |
 
 No app or game may open `ux0:data` itself, so vitals-ssl reads the store through the kernel
-plugin's system call `vitals_ca_read` ([redirects.c](../vitals-plugin/redirects.c)), which copies a
+plugin's system call `vitals_ca_read` ([redirects.c](../vitals-boot/redirects.c)), which copies a
 piece of it from an offset into the caller's memory, at most 64 KiB at a time. It takes each file's
 size at every call: Sony's must be there; the others add nothing when missing or empty. The store's
 index skips what isn't a certificate, so a mistake in the user's file costs only that block. The
@@ -81,7 +81,7 @@ system's own `vs0:/data/external/cert/CA_LIST.cer` is left as it was.
 ## 4. Never hooked
 
 Nothing in vitals patches libssl. libssl's sizes and the offsets of Sony's certificate getters are
-still kept in [sony_abi.h](../tls13-vita/include/vitals/sony_abi.h), unused.
+still kept in [sony_abi.h](../common/include/vitals/sony_abi.h), unused.
 
 ## 5. The end
 
@@ -93,5 +93,5 @@ process left initialized.
 | File                                            | Role                            |
 | ----------------------------------------------- | ------------------------------- |
 | [vitals-ssl/](../vitals-ssl/)                   | the library                     |
-| [vitals-plugin/main.c](../vitals-plugin/main.c) | the path swap                   |
+| [vitals-boot/main.c](../vitals-boot/main.c) | the path swap                   |
 | [vitals-app/install.c](../vitals-app/install.c) | putting the file on the console |

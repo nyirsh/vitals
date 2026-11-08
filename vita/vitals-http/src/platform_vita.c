@@ -19,7 +19,7 @@
 #include <psp2/rtc.h>
 
 /* The engine on the Vita: a memory block with an mspace for the app's pool, a lightweight mutex,
- * and SceNet. TLS's memory, and the C library this module is linked without, are tls13-vita's
+ * and SceNet. TLS's memory, and the C library this module is linked without, are ../common's
  * runtime (user_runtime.c) */
 
 #define VH_LW_MUTEX_RECURSIVE 0x02u

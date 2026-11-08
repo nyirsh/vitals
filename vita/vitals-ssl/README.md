@@ -2,7 +2,7 @@
 
 Sony's SSL library (`SceLibSsl`, the `sceSsl` API) being written from scratch, as a user module
 exported under libssl's own library and function NIDs ([libssl_api.yml.in](libssl_api.yml.in)),
-all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 4.2 ([tls13-vita/crypto](../tls13-vita/crypto/)),
+all 109 of them, with TLS 1.2 and 1.3 from Mbed TLS 4.2 ([vitals-ssl/crypto](../vitals-ssl/crypto/)),
 the only copy of it on the console: vitals-http and the browser provider do their TLS through
 this module.
 
@@ -293,7 +293,7 @@ reasons), its object layouts are SSLeay's, and the rest is what it reads and wri
 ## VitalsSsl: vitals' additions
 
 vitals-http does its TLS through this module, as Sony's libhttp does through Sony's, and so does
-the browser provider ([tls13-vita/browser](../tls13-vita/browser/)). They use Sony's functions and a
+the browser provider ([vitals-browser](../vitals-browser/)). They use Sony's functions and a
 few more, which
 the module exports as its own library, `VitalsSsl` (NID `0x6D89DA35`; each function's NID is the
 first word of the SHA-1 of its name, as Sony's are made). [include/vitals_ssl.h](include/vitals_ssl.h)
@@ -330,6 +330,6 @@ links. Its host tests build vitals-ssl in, with their own platform
 | [src/platform_vita.c](src/platform_vita.c) | module start and stop, the lock, the pool, SceNet and the handshake's thread |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py` |
 
-From tls13-vita it uses the Mbed TLS build in `crypto/`, `provider/ca_index.c`,
-`provider/platform_shims.c` (Mbed TLS's mutexes, entropy and time) and `provider/user_runtime.c`
+It builds Mbed TLS itself (`crypto/`), with its certificate index (`src/ca_index.c`) and
+`src/platform_shims.c` (Mbed TLS's mutexes, entropy and time), and links `../common/runtime/user_runtime.c`
 (the pool, and the C library the module is linked without).

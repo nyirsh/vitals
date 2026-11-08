@@ -33,7 +33,7 @@ enum
     MODULE_COUNT
 };
 
-/* libhttp's is vitals-http, which does its own TLS (tls13-vita's), in every process */
+/* libhttp's is vitals-http, which does its own TLS (vitals-ssl's), in every process */
 static const char *const g_replacement_modules[MODULE_COUNT] = {
     VITALS_COMPAT_PATH,
     VITALS_LIBHTTP_PATH,

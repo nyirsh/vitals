@@ -2,7 +2,7 @@
 #define VITALS_MBEDTLS_USER_CONFIG_H
 
 /* Mbed TLS 4.2's TLS and X.509 options, for vitals-ssl: a TLS 1.2 and 1.3 client verifying against
- * CAs loaded on demand (../provider/ca_index.c); the crypto options are in psa_user_config.h */
+ * CAs loaded on demand (the Vita's vitals-ssl/src/ca_index.c); the crypto options are in psa_user_config.h */
 
 #define MBEDTLS_X509_TRUSTED_CERTIFICATE_CALLBACK
 

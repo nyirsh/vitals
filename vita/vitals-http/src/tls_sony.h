@@ -30,7 +30,7 @@ typedef struct {
 typedef int (*VhSonyClientSource)(void *argument, VhSonyIdentity *identity);
 
 /* The server's chain checked against what the app loaded and libssl's roots, the host name too
- * when it isn't NULL: tls13-vita's VITALS_CERT_* flags of what's wrong (error_map.h). ssl is the
+ * when it isn't NULL: vitals' VITALS_CERT_* flags of what's wrong (error_map.h). ssl is the
  * connection, which the check gets its Cert-C context from */
 uint32_t vh_sony_check_chain(void *ssl, void *certificates[], int count, const char *host, const VhSonyTrust *trust);
 

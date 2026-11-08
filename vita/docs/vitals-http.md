@@ -51,9 +51,9 @@ never written again.
 The kernel plugin's hooks go in at boot, whatever is installed. vitals' libhttp and libssl are in
 `ux0:data/vitals/system`, which may not be ready when the plugin starts (a plugin loaded after it maps
 an SD2Vita's card), so they're looked for at each load of Sony's libhttp or libssl (`replace_iap` in
-[vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, and
+[vitals-boot/main.c](../vitals-boot/main.c)): the swap happens only when **both** are there, and
 otherwise Sony's load. The Options' switches are looked for at the same loads
-([switches.h](../tls13-vita/include/vitals/switches.h)), each keeping one of Sony's: `tls.off`
+([switches.h](../common/include/vitals/switches.h)), each keeping one of Sony's: `tls.off`
 libssl (and the browser keeps Sony's engine and TLS), under which vitals-http does its TLS as Sony's
 libhttp does ([tls_sony.c](../vitals-http/src/tls_sony.c)); `http.off` libhttp, on vitals-ssl, which
 has all Sony's libhttp uses. `dns.off`
@@ -62,7 +62,7 @@ as if `redirects.txt` were missing.
 
 ## 3. A process asks for libhttp
 
-Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-plugin/main.c)):
+Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-boot/main.c)):
 
 1. **Path swap:** `vs0:sys/external/libhttp.suprx`, `vs0:/sys/external/libhttp.suprx` and reAuth's
    `ur0:data/reAuth/libhttp.suprx` all become `ux0:data/vitals/system/libhttp.suprx`. The load is
@@ -90,7 +90,7 @@ the space their kind needs: the shell creates about twenty templates at boot fro
 
 Nothing is read from disk yet. The redirect list and the User-Agent suffix are read on first use
 after each `sceHttpInit`, through the kernel plugin's `vitals_redirects_read` and
-`vitals_useragent_read` ([vitals-plugin/redirects.c](../vitals-plugin/redirects.c)), and kept in the
+`vitals_useragent_read` ([vitals-boot/redirects.c](../vitals-boot/redirects.c)), and kept in the
 pool until `sceHttpTerm`.
 
 ## 6. Templates, connections and requests
@@ -251,8 +251,8 @@ app's **Debug output** option.
 
 | File                                                                                                       | Role                                                       |
 | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| [vitals-plugin/main.c](../vitals-plugin/main.c)                                                            | the path swap                                              |
-| [vitals-plugin/redirects.c](../vitals-plugin/redirects.c)                                                  | reading `redirects.txt` and `useragent.txt` for games      |
+| [vitals-boot/main.c](../vitals-boot/main.c)                                                            | the path swap                                              |
+| [vitals-boot/redirects.c](../vitals-boot/redirects.c)                                                  | reading `redirects.txt` and `useragent.txt` for games      |
 | [vitals-app/install.c](../vitals-app/install.c)                                                            | putting the files on the console                           |
 | [vitals-http/src/platform_vita.c](../vitals-http/src/platform_vita.c)                                      | module start and stop, the pool's memory, sockets, threads |
 | [vitals-http/src/core.c](../vitals-http/src/core.c)                                                        | init and term, IDs, settings, headers, HTTPS options       |
@@ -261,6 +261,6 @@ app's **Debug output** option.
 | [vitals-http/src/tls.c](../vitals-http/src/tls.c)                                                          | TLS, trust and `sceHttpsLoadCert`                          |
 | [vitals-http/src/async.c](../vitals-http/src/async.c)                                                      | non-blocking calls and the epoll                           |
 | [vitals-http/src/redirect.c](../vitals-http/src/redirect.c), [useragent.c](../vitals-http/src/useragent.c) | the two lists from `ux0:data/vitals/`                      |
-| [tls13-vita/provider/ca_index.c](../tls13-vita/provider/ca_index.c)                                        | the certificate store's index                              |
+| [vitals-ssl/src/ca_index.c](../vitals-ssl/src/ca_index.c)                                        | the certificate store's index                              |
 | [shared/src/ca_scan.c](../../shared/src/ca_scan.c)                                                          | the store's certificate blocks, for the index (the PS3's too) |
-| [tls13-vita/src/error_map.c](../tls13-vita/src/error_map.c)                                                | TLS outcomes to Sony's error codes                         |
+| [common/src/error_map.c](../common/src/error_map.c)                                                | TLS outcomes to Sony's error codes                         |

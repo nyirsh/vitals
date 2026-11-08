@@ -1,12 +1,15 @@
 # Each component builds with its own Makefile; this one only calls them
-#   vitals-plugin/  kernel plugin (vitals.skprx)
+#   vitals-boot/    kernel plugin (vitals.skprx; option: DEBUG), with vitals-dns/ built in
+#   vitals-dns/     the DNS rules (dns.txt), part of the kernel plugin: no Makefile of its own, its
+#                   tests are vitals-boot's
 #   vitals-ssl/     libssl written from scratch (libssl.suprx; option: DEBUG), installed as the
 #                   system's libssl
-#   tls13-vita/     the browser's TLS provider, on vitals-ssl (option: DEBUG)
+#   vitals-browser/ the browser's TLS provider (vitals.suprx), on vitals-ssl (option: DEBUG)
 #   vitals-http/    libhttp written from scratch, importing vitals-ssl as Sony's imports libssl
 #                   (libhttp.suprx; options: TLS_HEAP_KIB, USER_AGENT, DEBUG)
-#   vitals-app/     the vitals app and vitals-app.vpk (builds the plugin, vitals-ssl, tls13-vita and
-#                   vitals-http first)
+#   vitals-app/     the vitals app and vitals-app.vpk (builds the plugin, vitals-ssl, vitals-browser
+#                   and vitals-http first)
+#   common/         the code they share (headers, core library, runtime): tests only
 # Command-line options such as `make TLS_HEAP_KIB=256` reach the components automatically
 # Every debug level of the providers and redirect is built and packaged; the app switches between
 # them
@@ -16,7 +19,7 @@
 #   make fetch              the app's test reports and the crash dumps, into build/vita-fetch/
 #   make status             what's on the Vita now
 # The Vita is VITA_HOST in .env (cp .env.example .env), or make's or the environment's VITA_HOST
-COMPONENTS = vitals-plugin vitals-ssl tls13-vita vitals-http vitals-app
+COMPONENTS = common vitals-boot vitals-ssl vitals-browser vitals-http vitals-app
 
 # The Vita: on make's command line (make status VITA_HOST=...), else tools/vita_comms.py reads .env
 $(foreach v,VITA_HOST VITA_PORT,$(if $($(v)),$(eval export $(v))))

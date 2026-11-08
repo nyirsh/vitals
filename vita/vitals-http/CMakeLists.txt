@@ -26,8 +26,9 @@ if(VITALS_HTTP_USER_AGENT_LENGTH EQUAL 0 OR VITALS_HTTP_USER_AGENT_LENGTH GREATE
     message(FATAL_ERROR "VITALS_HTTP_USER_AGENT must be 1..127 printable ASCII characters, without \" \\ # $ ; ` '")
 endif()
 
-# From tls13-vita: the heap and C library runtime, the error and certificate mapping, the redirect list
-set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
+# From ../common: the heap and C library runtime, the error and certificate mapping; the redirect list
+# is shared with the PS3 (../../shared)
+set(VITALS_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 # TLS is vitals-ssl's: the libssl module, imported as Sony's libhttp imports Sony's (its stub, which
 # ../vitals-ssl's build makes), so a connection's memory is the pool the app gives sceSslInit
 set(VITALS_SSL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vitals-ssl)
@@ -49,13 +50,13 @@ add_executable(vitals_libhttp
     src/tls_sony.c
     src/md5.c
     src/platform_vita.c
-    ${TLS13_DIR}/provider/user_runtime.c
-    ${TLS13_DIR}/src/error_map.c
+    ${VITALS_COMMON_DIR}/runtime/user_runtime.c
+    ${VITALS_COMMON_DIR}/src/error_map.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/host_map.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/redirect_list.c
 )
-target_include_directories(vitals_libhttp PRIVATE src include ${VITALS_SSL_DIR}/include ${TLS13_DIR}/provider
-    ${TLS13_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
+target_include_directories(vitals_libhttp PRIVATE src include ${VITALS_SSL_DIR}/include ${VITALS_COMMON_DIR}/runtime
+    ${VITALS_COMMON_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
     VITALS_LOG_PREFIX="vitals-http"
@@ -64,7 +65,7 @@ target_compile_definitions(vitals_libhttp PRIVATE
 )
 target_compile_options(vitals_libhttp PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -Os)
-set_source_files_properties(${TLS13_DIR}/provider/user_runtime.c PROPERTIES COMPILE_OPTIONS "-fno-builtin")
+set_source_files_properties(${VITALS_COMMON_DIR}/runtime/user_runtime.c PROPERTIES COMPILE_OPTIONS "-fno-builtin")
 
 # No C library: the runtime's wrappers stand in for the calls this module and its libraries make
 target_link_options(vitals_libhttp PRIVATE -nostdlib -Wl,--gc-sections
@@ -83,9 +84,9 @@ foreach(line ${export_lines})
 endforeach()
 # The host redirect list is read through the kernel plugin's system call, from the stub its build
 # generates
-set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-plugin/stubs/libvitals_kernel_stub.a")
+set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-boot/stubs/libvitals_kernel_stub.a")
 if(NOT EXISTS "${VITALS_KERNEL_STUB}")
-    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-plugin first (make does this)")
+    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-boot first (make does this)")
 endif()
 # Weak: a process that loads libhttp without libssl does no https, and still loads this one
 set(VITALS_SSL_STUB "${CMAKE_BINARY_DIR}/../vitals-ssl/stubs/libSceLibSsl_stub_weak.a")

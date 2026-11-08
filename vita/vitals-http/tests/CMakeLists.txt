@@ -2,16 +2,16 @@ cmake_minimum_required(VERSION 3.16)
 project(vitals_http_tests C)
 
 # The library, built for this machine with tests/platform_posix.c, and the real Mbed TLS over
-# tls13-vita's Vita stand-ins, tested through its API against tests/server.py
+# the Vita stand-ins (../../common/tests), tested through its API against tests/server.py
 if(NOT DEFINED ENV{VITASDK})
     message(FATAL_ERROR "VITASDK must be set: the tests use its <psp2/net/http.h>")
 endif()
 set(ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
-set(TLS13_DIR ${ROOT}/../tls13-vita)
+set(VITALS_COMMON_DIR ${ROOT}/../common)
 set(VITALS_SSL_DIR ${ROOT}/../vitals-ssl)
 include(${ROOT}/../dependencies.cmake)
 vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
-add_subdirectory(${TLS13_DIR}/crypto crypto)
+add_subdirectory(${VITALS_SSL_DIR}/crypto crypto)
 
 find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)
@@ -23,8 +23,8 @@ file(COPY $ENV{VITASDK}/arm-vita-eabi/include/psp2/net/http.h DESTINATION ${CMAK
 file(COPY $ENV{VITASDK}/arm-vita-eabi/include/psp2/libssl.h DESTINATION ${CMAKE_BINARY_DIR}/sdk/psp2)
 file(COPY $ENV{VITASDK}/arm-vita-eabi/include/vitasdk/build_utils.h DESTINATION ${CMAKE_BINARY_DIR}/sdk/vitasdk)
 
-add_library(vitals_vita_mock STATIC ${TLS13_DIR}/tests/transport/vita_mock.c)
-target_include_directories(vitals_vita_mock PUBLIC ${TLS13_DIR}/tests/transport/include)
+add_library(vitals_vita_mock STATIC ${VITALS_COMMON_DIR}/tests/vita_mock.c)
+target_include_directories(vitals_vita_mock PUBLIC ${VITALS_COMMON_DIR}/tests/include)
 target_link_libraries(vitals_vita_mock PUBLIC Threads::Threads)
 
 add_executable(vitals_http_tests
@@ -46,10 +46,10 @@ add_executable(vitals_http_tests
     ${VITALS_SSL_DIR}/src/connection.c
     ${VITALS_SSL_DIR}/src/certificate.c
     ${VITALS_SSL_DIR}/src/vitals.c
-    ${TLS13_DIR}/provider/platform_shims.c
-    ${TLS13_DIR}/provider/ca_index.c
+    ${VITALS_SSL_DIR}/src/platform_shims.c
+    ${VITALS_SSL_DIR}/src/ca_index.c
     ${ROOT}/../../shared/src/ca_scan.c
-    ${TLS13_DIR}/src/error_map.c
+    ${VITALS_COMMON_DIR}/src/error_map.c
     ${ROOT}/../../shared/src/host_map.c
     ${ROOT}/../../shared/src/redirect_list.c
     platform_posix.c
@@ -59,7 +59,7 @@ target_include_directories(vitals_http_tests BEFORE PRIVATE ${CMAKE_BINARY_DIR}/
 # With the debug log compiled in, so its lines run too (VH_TEST_LOG=1 shows them)
 target_compile_definitions(vitals_http_tests PRIVATE VITALS_DEBUG=1 VITALS_LOG_PREFIX="vitals-http")
 target_include_directories(vitals_http_tests PRIVATE ${ROOT}/src ${ROOT}/include ${VITALS_SSL_DIR}/src ${VITALS_SSL_DIR}/include
-    ${TLS13_DIR}/provider ${TLS13_DIR}/include ${ROOT}/../../shared/include)
+    ${VITALS_COMMON_DIR}/runtime ${VITALS_COMMON_DIR}/include ${ROOT}/../../shared/include)
 target_compile_options(vitals_http_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror
     -fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(vitals_http_tests PRIVATE -fsanitize=address,undefined)

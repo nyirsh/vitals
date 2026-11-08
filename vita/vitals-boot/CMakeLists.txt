@@ -9,9 +9,11 @@ project(HENkaku)
 set(CMAKE_C_FLAGS "-Wl,-q -Wall -Wextra -Werror -O3 -std=gnu11 -mgeneral-regs-only")
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
 
-# With the redirect lists and DNS messages shared with the PS3 (../../shared)
+# With vitals' common headers (../common), its DNS rules (../vitals-dns, built into this plugin), and
+# the redirect lists and DNS messages shared with the PS3 (../../shared)
 include_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../common/include
+	${CMAKE_CURRENT_SOURCE_DIR}/../vitals-dns
 	${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include
 	${CMAKE_CURRENT_SOURCE_DIR}/../../shared/dns
 )
@@ -27,10 +29,10 @@ add_executable(vitals.elf
 	hook_guard.c
 	post_start.c
 	redirects.c
-	dns_watch.c
+	../vitals-dns/dns_watch.c
 	../../shared/dns/dns_message.c
 	tls13_loader.c
-	../tls13-vita/src/path.c
+	../common/src/path.c
 	../../shared/src/host_map.c
 	../../shared/src/redirect_list.c
 )

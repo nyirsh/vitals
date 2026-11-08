@@ -9,14 +9,14 @@ if(NOT VITALS_DEBUG MATCHES "^[012]$")
     message(FATAL_ERROR "VITALS_DEBUG must be 0, 1 or 2")
 endif()
 
-# TLS is Mbed TLS 4.2 with TF-PSA-Crypto (tls13-vita/crypto), with tls13-vita's CA index and
-# runtime
-set(TLS13_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../tls13-vita)
+# TLS is Mbed TLS 4.2 with TF-PSA-Crypto (crypto/), with the user-mode runtime every module shares
+# (../common/runtime)
+set(VITALS_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
 include(../dependencies.cmake)
 # The release version from ../../VERSION, which the module header carries
 include(../../version.cmake)
 vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
-add_subdirectory(${TLS13_DIR}/crypto crypto)
+add_subdirectory(crypto)
 
 add_executable(vitals_libssl
     src/core.c
@@ -26,12 +26,12 @@ add_executable(vitals_libssl
     src/ssl.c
     src/internal.c
     src/platform_vita.c
-    ${TLS13_DIR}/provider/platform_shims.c
-    ${TLS13_DIR}/provider/ca_index.c
+    src/platform_shims.c
+    src/ca_index.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/ca_scan.c
-    ${TLS13_DIR}/provider/user_runtime.c
+    ${VITALS_COMMON_DIR}/runtime/user_runtime.c
 )
-target_include_directories(vitals_libssl PRIVATE src include ${TLS13_DIR}/provider ${TLS13_DIR}/include
+target_include_directories(vitals_libssl PRIVATE src include ${VITALS_COMMON_DIR}/runtime ${VITALS_COMMON_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libssl PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
@@ -39,7 +39,7 @@ target_compile_definitions(vitals_libssl PRIVATE
 )
 target_compile_options(vitals_libssl PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -Os)
-set_source_files_properties(${TLS13_DIR}/provider/user_runtime.c PROPERTIES COMPILE_OPTIONS "-fno-builtin")
+set_source_files_properties(${VITALS_COMMON_DIR}/runtime/user_runtime.c PROPERTIES COMPILE_OPTIONS "-fno-builtin")
 
 # No C library, as vitals-http: the runtime's wrappers stand in for the calls this module and Mbed
 # TLS make, and every allocation comes from the pool sceSslInit makes
@@ -59,9 +59,9 @@ foreach(line ${export_lines})
 endforeach()
 # vitals' certificate store is read through the kernel plugin's system call, from the stub its
 # build generates (no process but the kernel can open ux0:data/vitals/system)
-set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-plugin/stubs/libvitals_kernel_stub.a")
+set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-boot/stubs/libvitals_kernel_stub.a")
 if(NOT EXISTS "${VITALS_KERNEL_STUB}")
-    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-plugin first (make does this)")
+    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-boot first (make does this)")
 endif()
 target_link_libraries(vitals_libssl PRIVATE
     ${VITALS_KERNEL_STUB}

@@ -11,16 +11,16 @@ set(VITALS_TITLE "vitals")
 include(../../version.cmake)
 
 # The kernel plugin, vitals-http, vitals-ssl and browser provider this VPK installs, built by
-# ../vitals-plugin, ../vitals-http, ../vitals-ssl and ../tls13-vita
+# ../vitals-boot, ../vitals-http, ../vitals-ssl and ../vitals-browser
 set(VITALS_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build")
-set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-plugin/vitals.skprx")
+set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-boot/vitals.skprx")
 set(VITALS_LIBHTTP "${VITALS_BUILD_DIR}/vitals-http/libhttp.suprx")
 # vitals-ssl, installed as the system's libssl in place of Sony's
 set(VITALS_LIBSSL "${VITALS_BUILD_DIR}/vitals-ssl/libssl.suprx")
-set(VITALS_BROWSER_PROVIDER "${VITALS_BUILD_DIR}/tls13-vita/browser/vitals.suprx")
+set(VITALS_BROWSER_PROVIDER "${VITALS_BUILD_DIR}/vitals-browser/vitals.suprx")
 foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_LIBSSL VITALS_BROWSER_PROVIDER)
     if(NOT EXISTS "${${module}}")
-        message(FATAL_ERROR "${${module}} is missing; build ../vitals-plugin, ../vitals-http and ../tls13-vita first (make does this)")
+        message(FATAL_ERROR "${${module}} is missing; build ../vitals-boot, ../vitals-ssl, ../vitals-http and ../vitals-browser first (make does this)")
     endif()
 endforeach()
 # The debug builds of vitals-http, the browser provider and the kernel plugin (levels
@@ -28,8 +28,8 @@ endforeach()
 set(debug_entries)
 foreach(level 1 2)
     foreach(module vitals-http-debug${level}/libhttp.suprx vitals-ssl-debug${level}/libssl.suprx
-            tls13-vita-debug${level}/browser/vitals.suprx
-            vitals-plugin-debug${level}/vitals.skprx)
+            vitals-browser-debug${level}/vitals.suprx
+            vitals-boot-debug${level}/vitals.skprx)
         if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
             message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
         endif()
@@ -80,7 +80,7 @@ add_executable(vitals-app
 target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
 # With the app and the redirect list code shared with the PS3's (../../shared); this folder first, for
 # the Vita's own vitals_paths.h and check_result.h, which the shared headers include
-target_include_directories(vitals-app PRIVATE . ../tls13-vita/include ../vitals-http/include ../../shared/include ../../shared/app)
+target_include_directories(vitals-app PRIVATE . ../common/include ../vitals-http/include ../../shared/include ../../shared/app)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 # OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
 foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock

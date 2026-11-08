@@ -1,7 +1,7 @@
 #ifndef VITALS_THREADING_ALT_H
 #define VITALS_THREADING_ALT_H
 
-/* TF-PSA-Crypto's mutexes and condition variables are the kernel's (../provider/platform_shims.c);
+/* TF-PSA-Crypto's mutexes and condition variables are the kernel's (../src/platform_shims.c);
  * a condition is created on its first wait, as the kernel ties it to its mutex */
 typedef struct
 {

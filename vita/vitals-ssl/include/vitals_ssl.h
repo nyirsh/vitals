@@ -109,10 +109,10 @@ int vitalsSslCheckKey(const void *data, size_t size);
 
 /* Checks a chain a verify callback was given (the server's certificate first) against the bundle and
  * the store's certificates (NULL for none), with exact trust of self-signed ones, and the host name
- * when there is one: tls13-vita's VITALS_CERT_* flags, 0 when nothing is wrong */
+ * when there is one: vitals' VITALS_CERT_* flags, 0 when nothing is wrong */
 unsigned int vitalsSslCheckChain(void *const certificates[], int count, const char *host, void *store);
 
-/* What the server's certificate check found, as tls13-vita's VITALS_CERT_* flags: 0 when nothing
+/* What the server's certificate check found, as vitals' VITALS_CERT_* flags: 0 when nothing
  * (or it wasn't checked) */
 unsigned int vitalsSslGetCertificateFlags(void *ssl);
 /* Mbed TLS's own verification result, for logs: 0xFFFFFFFF when it didn't run */

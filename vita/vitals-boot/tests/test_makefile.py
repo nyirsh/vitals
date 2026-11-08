@@ -17,13 +17,13 @@ def dry_run(directory, *arguments):
 @unittest.skipUnless(shutil.which("make"), "make is required")
 class PluginMakefileTests(unittest.TestCase):
     def test_kernel_passes_its_settings(self):
-        output = dry_run(ROOT / "vitals-plugin")
-        self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin", output)
+        output = dry_run(ROOT / "vitals-boot")
+        self.assertIn(f"cmake -S . -B {BUILD}/vitals-boot", output)
         self.assertIn("-DVITALS_DEBUG=0", output)
 
     def test_debug_levels_build_apart(self):
-        output = dry_run(ROOT / "vitals-plugin", "DEBUG=2")
-        self.assertIn(f"cmake -S . -B {BUILD}/vitals-plugin-debug2", output)
+        output = dry_run(ROOT / "vitals-boot", "DEBUG=2")
+        self.assertIn(f"cmake -S . -B {BUILD}/vitals-boot-debug2", output)
         self.assertIn("-DVITALS_DEBUG=2", output)
 
 

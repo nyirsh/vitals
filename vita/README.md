@@ -152,15 +152,19 @@ A request that times out is tried again, up to 3 times in all, since slow server
 
 ## Repository layout
 
-| Folder               | Contents                                                                                                                                                                         |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vitals-plugin/`     | the kernel plugin (`vitals.skprx`) that redirects Sony's modules and injects the browser provider                                                                                |
-| `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with its TLS from `vitals-ssl`                                                                                       |
-| `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`): installed as the system's libssl, which vitals-http imports                                                             |
-| `tls13-vita/`        | the browser's TLS provider, the Mbed TLS build, and the code it shares with `vitals-ssl`, `vitals-http` and the kernel plugin                                                    |
-| `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                                                                                                   |
-| `docs/`              | how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals |
-| `dependencies.cmake` | pinned versions and SHA-256 hashes of `Mbed TLS` and `curl`                                                                                                                      |
+| Folder               | Contents                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                                                                                                                              |
+| `vitals-boot/`       | the kernel plugin (`vitals.skprx`) loaded at boot: points Sony's libssl and libhttp at vitals', puts the browser provider in the browser, and reads vitals' lists and certificate store for other processes |
+| `vitals-dns/`        | the DNS rules (`dns.txt`), built into the kernel plugin rather than a plugin of their own: they rewrite every process's DNS queries                                                                         |
+| `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with its TLS from `vitals-ssl`                                                                                                                  |
+| `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`), installed as the system's libssl, which vitals-http imports; with the Mbed TLS build (`crypto/`)                                                  |
+| `vitals-browser/`    | the browser's TLS provider (`vitals.suprx`), on `vitals-ssl`                                                                                                                                                |
+| `common/`            | what those share: vitals' headers (`include/vitals`), its core library (`src/`) and the user-mode runtime the modules link without a C library (`runtime/`)                                                 |
+| `docs/`              | how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals                            |
+| `dependencies.cmake` | pinned versions and SHA-256 hashes of `Mbed TLS` and `curl`                                                                                                                                                 |
+
+The parts match the PS3's (`../ps3`): its `vitals-boot`, `vitals-dns`, `vitals-http`, `vitals-ssl`, `vitals-app` and `common`, with `vitals-browser` the Vita's own.
 
 ## Why a separate project
 
@@ -194,7 +198,7 @@ make
 
 Use `openssl-1.1.1`: vdpm's plain `openssl` package is the older 1.0.2.
 
-Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-plugin/`, `vitals-http/` and `tls13-vita/` first, because the vpk bundles them.
+Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-boot/`, `vitals-ssl/`, `vitals-http/` and `vitals-browser/` first, because the vpk bundles them. `vitals-dns/` is built as part of `vitals-boot/`, and `common/` as part of each module that uses it.
 
 Available build options:
 
@@ -209,7 +213,7 @@ Debug output levels, for `vitals-http` and the browser provider (lines start wit
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
 - **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write), and each request's whole URL, headers and body as they are, PSN's sign-in, cookies and tokens included: keep a Full log to yourself. This produces a lot of output and slows connections down, use it only to investigate a problem
 
-Every build includes all three levels; choose one on the console in the app's **Options**, where **START** applies it and reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
+Every build includes all three levels; choose one on the console in the app's **Options**, where **START** applies it and reboots the Vita. To build a single component at a level, run `make -C vitals-browser DEBUG=2` (each level has its own `build/` folder).
 
 ### Working with a Vita
 
@@ -224,7 +228,7 @@ Installing, uninstalling and switching the debug output stay the app's, with the
 ### Updating `Mbed TLS` or `curl`
 
 Both are pinned in [dependencies.cmake](dependencies.cmake). Change the version and the SHA-256 together, where the SHA-256 is that of the new release archive (`sha256sum` of the downloaded file).  
-The next build downloads and verifies it. `vitals-ssl`, which does the TLS of apps, games and the browser, builds it ([tls13-vita/crypto](tls13-vita/crypto/)) with four patches, which must still apply to the new release; one of them puts back the client side of TLS 1.2's RSA key exchange, which Mbed TLS 4 removed and PSN sign-in needs, so check a new release against it with care.
+The next build downloads and verifies it. `vitals-ssl`, which does the TLS of apps, games and the browser, builds it ([vitals-ssl/crypto](vitals-ssl/crypto/)) with four patches, which must still apply to the new release; one of them puts back the client side of TLS 1.2's RSA key exchange, which Mbed TLS 4 removed and PSN sign-in needs, so check a new release against it with care.
 
 ### Updating the bundled certificates
 
@@ -244,8 +248,9 @@ make test
 
 This runs every component's host tests (`make -C <folder> test` runs one component's). Each component keeps its tests in its own `tests/` folder, and any helper scripts its build uses in `tools/`:
 
-- `vitals-plugin/tests/`: the kernel plugin's routing, injection and module checks, against mocks of the Vita kernel, and the build check that keeps floating-point instructions out of it
-- `tls13-vita/tests/`: the browser provider's real TLS handshakes over loopback, certificate checks, memory use, the host redirect list's parser, the Makefile's settings, and a build with debug output on, so every log line compiles
+- `vitals-boot/tests/`: the kernel plugin's routing, injection and module checks, and the DNS rules (`vitals-dns/tests/`), against mocks of the Vita kernel, and the build check that keeps floating-point instructions out of it
+- `vitals-browser/tests/`: the browser provider's real TLS handshakes over loopback, memory use, the Makefile's settings, and a build with debug output on, so every log line compiles
+- `common/tests/`: the core library (certificate checks, paths, the host redirect list's parser, firmware identities), the CA store's scanner and the user-mode runtime
 - `vitals-http/tests/`: the HTTP library against a local HTTP and HTTPS server: requests, keep-alive, bodies, redirects, cookies, Basic and Digest auth, HTTPS (including client certificates and the console's TLS profile), non-blocking calls, host redirects and the User-Agent
 - `vitals-ssl/tests/`: the SSL library's connection and certificate functions, called as Sony's libhttp calls them, against a local TLS server: reading and writing, close_notify and dropped sockets, timeouts, certificate and host name checks, the error codes, and a verify callback that checks a CA's chain through the certificate functions and the CA store
 - `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
@@ -268,7 +273,7 @@ Each normal build also checks that the kernel plugin contains no floating-point 
 
 ## Credits
 
-**`vitals` started from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, and the idea is his:** giving the Vita modern TLS by running `Mbed TLS` where Sony's old TLS stack used to be. vitals has since become a project of its own: Sony's HTTP library is now rewritten from scratch as `vitals-http` instead of having its TLS swapped, and the DNS rules, host redirects and User-Agent are new. What `vitals` still carries from `tls_fixer` is the browser's TLS provider, the kernel plugin's injection, the certificate merging/updating, the original connection test applet and the patch that puts TLS 1.2's RSA key exchange back into Mbed TLS 4 (`tls13-vita/crypto/rsa-client.patch`).
+**`vitals` started from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, and the idea is his:** giving the Vita modern TLS by running `Mbed TLS` where Sony's old TLS stack used to be. vitals has since become a project of its own: Sony's HTTP library is now rewritten from scratch as `vitals-http` instead of having its TLS swapped, and the DNS rules, host redirects and User-Agent are new. What `vitals` still carries from `tls_fixer` is the browser's TLS provider, the kernel plugin's injection, the certificate merging/updating, the original connection test applet and the patch that puts TLS 1.2's RSA key exchange back into Mbed TLS 4 (`../shared/mbedtls/rsa-client.patch`).
 
 **Thanks to SKGleba for the [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso) plugin!** His work updating the Vita's certificates is the foundation of `vitals`, along with his original installer and module-redirection code. Existing author notices are preserved in the source.
 
@@ -283,6 +288,6 @@ All contributions to vitals are released under the [Zero-Clause BSD license](../
 Some parts keep their own terms:
 
 - **Code from tls_fixer** by devnoname120: the parts of vitals that come from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) (listed in [Credits](#credits)) are published there without a license. That code remains devnoname120's; the 0BSD license covers it only if he agrees to it. `vitals-http` is not among them.
-- **Code from iTLS-Enso** by SKGleba: `vitals-plugin/main.c` (module redirection) and `vitals-app/install.c` (the install and uninstall operations) are derived from [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso), which is published without a license. Its code remains SKGleba's ("All Rights Reserved"); the 0BSD license does not cover the original iTLS-Enso code.
+- **Code from iTLS-Enso** by SKGleba: `vitals-boot/main.c` (module redirection) and `vitals-app/install.c` (the install and uninstall operations) are derived from [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso), which is published without a license. Its code remains SKGleba's ("All Rights Reserved"); the 0BSD license does not cover the original iTLS-Enso code.
 - **Third-party libraries and data:** under their own licenses, listed in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 - **Sony material:** the Sony modules and certificate bundle in `vitals-app/assets/` are not covered by any license.

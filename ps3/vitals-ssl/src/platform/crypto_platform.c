@@ -17,7 +17,7 @@
 #include <time.h>
 
 /* What TF-PSA-Crypto needs from the system, for vitals' libssl: mutexes and condition variables,
- * entropy and the time, from liblv2 and the kernel (as vitals' tls13-vita/provider/platform_shims.c
+ * entropy and the time, from liblv2 and the kernel (as the Vita's vitals-ssl/src/platform_shims.c
  * on the Vita); the date from a time is gmtime.c's */
 
 /* sys_get_random_number's largest request (RANDOM_NUMBER_MAX_SIZE); Sony's libssl asks for less */

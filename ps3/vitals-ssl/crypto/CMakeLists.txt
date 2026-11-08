@@ -1,5 +1,5 @@
 # Mbed TLS 4.2 and TF-PSA-Crypto, for vitals' libssl and the app's curl; VITALS_MBEDTLS_ARCHIVE comes
-# from the including CMakeLists.txt (see ../../dependencies.cmake). As vitals' tls13-vita/crypto, with
+# from the including CMakeLists.txt (see ../../dependencies.cmake). As the Vita's vitals-ssl/crypto, with
 # the PS3's own crypto options (psa_user_config.h, or the including build's VITALS_PSA_USER_CONFIG: the
 # app's, ../../vitals-app/crypto) and mutexes (threading_alt.h)
 # The patches, their applier and the TLS options are both consoles' (../../../shared/mbedtls); the

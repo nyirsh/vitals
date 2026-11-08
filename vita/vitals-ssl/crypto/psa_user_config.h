@@ -2,7 +2,7 @@
 #define VITALS_PSA_USER_CONFIG_H
 
 /* TF-PSA-Crypto's options, for Mbed TLS 4.2 in vitals-ssl: the Vita's own mutexes, entropy and
- * time (../provider/platform_shims.c), and no files */
+ * time (../src/platform_shims.c), and no files */
 
 #include <stdint.h>
 

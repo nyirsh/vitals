@@ -436,7 +436,7 @@ int vh_transport_network_error(VhTransport *transport, int error);
  * there's none: vitals-http then does its TLS as Sony's libhttp does (tls_sony.c) */
 int vh_platform_vitals_ssl(void);
 
-/* ---- tls.c: TLS over a transport, with tls13-vita's Mbed TLS ---- */
+/* ---- tls.c: TLS over a transport, with vitals-ssl's Mbed TLS ---- */
 
 typedef struct VhTls VhTls;
 /* Handshakes with the server and checks its certificate as open asks; 0 or a libhttp error, with

@@ -12,7 +12,7 @@
 
 /* TLS 1.2 and 1.3 through vitals-ssl, the libssl module, as Sony's libhttp goes through Sony's: its
  * connections over this library's transport, the CA bundle's index and the app's own CA
- * certificates, its exact trust of self-signed certificates, and tls13-vita's mapping of
+ * certificates, its exact trust of self-signed certificates, and vitals' mapping of
  * certificate problems to libhttp's detail bits. Its memory is the pool the app gave sceSslInit;
  * without one, as with Sony's, there is no https. (The host tests build vitals-ssl in.)
  *
@@ -145,7 +145,7 @@ static int tls_error(VhTls *tls)
     return tls->io_error != 0 ? tls->io_error : (int)SCE_HTTP_ERROR_SSL;
 }
 
-/* An outcome stored as the connection's SSL error, through tls13-vita's mapping */
+/* An outcome stored as the connection's SSL error, through vitals' mapping (../common) */
 static int store_outcome(VitalsOutcome outcome, uint32_t detail, int *ssl_error, unsigned int *ssl_detail)
 {
     VitalsMappedError mapped = vitals_map_outcome(outcome, detail);

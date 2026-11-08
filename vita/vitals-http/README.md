@@ -51,8 +51,8 @@ vitals-ssl is built first (`make` at the top does this), since this links its st
 | [src/platform_vita.c](src/platform_vita.c) | module start, the pool's memory, the lock, SceNet |
 | [tests/](tests/) | host tests: `platform_posix.c` in place of the Vita's, against `server.py`, with vitals-ssl built in (its platform in `ssl_platform.c`) |
 
-It links no crypto library: Digest authentication's MD5 is [src/md5.c](src/md5.c). From tls13-vita
-it uses `provider/user_runtime.c` (the heap, and the C library the module is linked without), `src/error_map.c`, and `../shared/src/host_map.c` with `../shared/src/redirect_list.c` for
+It links no crypto library: Digest authentication's MD5 is [src/md5.c](src/md5.c). From `../common`
+it uses `runtime/user_runtime.c` (the heap, and the C library the module is linked without), `src/error_map.c`, and `../shared/src/host_map.c` with `../shared/src/redirect_list.c` for
 the redirect list.
 
 ## Sony's own connections
@@ -94,7 +94,7 @@ The pairs in `ux0:data/vitals/redirects.txt` (`from-host to-host` per line, as e
 read them) are applied to the host a connection is made with: `sceHttpCreateConnection`'s host
 name, and the host in a URL passed to `sceHttpCreateConnectionWithURL`, `sceHttpCreateRequestWithURL`
 or `sceHttpCreateRequest2WithURL`. Games can't open `ux0:data`, so the list is read through the
-kernel plugin's `vitals_redirects_read`, which means building it needs `../vitals-plugin` built
+kernel plugin's `vitals_redirects_read`, which means building it needs `../vitals-boot` built
 first. It is read once per `sceHttpInit`, on the first connection or request, and kept in the
 pool until `sceHttpTerm`. With `DEBUG=1`, the number of rules and each rewrite are logged.
 

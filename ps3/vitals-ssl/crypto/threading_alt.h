@@ -7,7 +7,7 @@
 
 /* TF-PSA-Crypto's mutexes and condition variables are liblv2's lightweight ones
  * (../src/platform/crypto_platform.c); a condition is created on its first wait, as liblv2 ties it
- * to its mutex (as on the Vita, vitals' tls13-vita/crypto/threading_alt.h) */
+ * to its mutex (as on the Vita, vitals' vitals-ssl/crypto/threading_alt.h) */
 typedef struct
 {
 	sys_lwmutex_t lwmutex;

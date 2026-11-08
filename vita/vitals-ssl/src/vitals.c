@@ -389,7 +389,7 @@ int vs_find_issuers_with_store(void *context, const mbedtls_x509_crt *child, mbe
     return store_find(ssl->context->store, child, candidates);
 }
 
-/* Mbed TLS's verification flags as tls13-vita's certificate flags (VITALS_CERT_*) */
+/* Mbed TLS's verification flags as vitals' certificate flags (VITALS_CERT_*, ../../common) */
 static uint32_t certificate_flags(uint32_t flags)
 {
     const uint32_t invalid = MBEDTLS_X509_BADCERT_REVOKED | MBEDTLS_X509_BADCRL_EXPIRED |

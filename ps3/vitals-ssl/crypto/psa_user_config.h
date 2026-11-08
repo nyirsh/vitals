@@ -3,7 +3,7 @@
 
 /* TF-PSA-Crypto's options, for Mbed TLS 4.2 in vitals' libssl: the system's own mutexes, entropy
  * and time (../src/platform/crypto_platform.c), its memory from libssl's pool, and no files. As
- * vitals' tls13-vita/crypto/psa_user_config.h, with the pool */
+ * the Vita's vitals-ssl/crypto/psa_user_config.h, with the pool */
 
 #include <stdint.h>
 
