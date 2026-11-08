@@ -22,9 +22,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The connection test from Vital Signs: BrowserLeaks TLS 1.0-1.3, the BrowserLeaks TLS report,
- * the badssl.com battery and each host redirect, each over a fresh sceHttp connection on a worker
- * thread, which first starts the network and the HTTP libraries */
+/* The Vita's part of the connection test (check.h): its requests, each over a fresh sceHttp
+ * connection once the network and the HTTP libraries are started, its judges, its lookups through
+ * sceNetResolver, which of vitals' libraries this process has, and its report's own lines. The run
+ * itself, its thread and its results are shared with the PS3 (check_run.c, check_service.c) */
 #define REPORT_DIR VITALS_REPORTS_DIRECTORY
 /* VitaSDK has the stub, not the prototype: the HTTPS options of one template, connection or request */
 int sceHttpsDisableOption2(int id, unsigned int sslFlags);
@@ -58,22 +59,20 @@ static int accept_certificate(unsigned int bits, void *const certificates[], int
     return 0;
 }
 
-static CheckService service = {.vitals_enabled = -1};
 /* Which of vitals' libraries this process has: vitals-http (the Options' http.off keeps Sony's) and
  * vitals-ssl (tls.off keeps Sony's); -1 until looked for. service.vitals_enabled is either */
 static int vitals_http = -1, vitals_tls = -1;
-static SceUID guard = -1, worker = -1;
-static int busy, active_request = -1, active_resolver = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
+/* The run's request and lookup, which a cancel or the watchdog ends; under check_lock */
+static int active_request = -1, active_resolver = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
 static uint64_t request_begin;
-static char notice[120];
 /* A request that times out is made again, up to this many times in all */
 #define FETCH_ATTEMPTS 3
 #define ERROR_TIMED_OUT 0x80431068
 #define VERIFY_FLAGS (SCE_HTTPS_FLAG_SERVER_VERIFY | SCE_HTTPS_FLAG_CN_CHECK | \
                       SCE_HTTPS_FLAG_NOT_AFTER_CHECK | SCE_HTTPS_FLAG_NOT_BEFORE_CHECK | SCE_HTTPS_FLAG_KNOWN_CA_CHECK)
 static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
-static void lock(void) { sceKernelLockMutex(guard, 1, NULL); }
-static void unlock(void) { sceKernelUnlockMutex(guard, 1); }
+static void lock(void) { check_lock(); }
+static void unlock(void) { check_unlock(); }
 #define REPORT_NAME "connection-test"
 /* Room for the whole report, the longest lists included */
 #define REPORT_MAX (96 * 1024)
@@ -446,16 +445,15 @@ static void report_protocol(CheckReport *report, unsigned test, const CheckResul
 static const CheckReportFormat report_format = {"PS Vita", "sceHttp", report_about, report_result, report_protocol};
 
 /* Writes s's report; 0 when written, negative when the file couldn't be */
-static int save_report(const CheckService *s)
+static int save_report(const CheckService *s, char *path, size_t path_size)
 {
-    char path[160];
     /* Named after the console's local time; without it, after the system timer */
     SceDateTime now;
     CheckReportTime local = {0};
     int have_time = sceRtcGetCurrentClockLocalTime(&now) == 0;
     if (have_time)
         local = (CheckReportTime){now.year, now.month, now.day, now.hour, now.minute, now.second};
-    check_report_path(path, sizeof(path), REPORT_DIR, REPORT_NAME, have_time ? &local : NULL,
+    check_report_path(path, path_size, REPORT_DIR, REPORT_NAME, have_time ? &local : NULL,
                       (uint64_t)sceKernelGetSystemTimeWide());
     CheckReport report = {malloc(REPORT_MAX), 0, REPORT_MAX};
     int failed = report.data == NULL;
@@ -477,37 +475,9 @@ static int save_report(const CheckService *s)
         }
     }
     free(report.data);
-    lock();
-    service.report_saved = failed ? -1 : 1;
-    if (!failed)
-        snprintf(service.report, sizeof(service.report), "%s", path);
-    unlock();
     return failed ? -1 : 0;
 }
 
-int vitals_check_save_report(void)
-{
-    if (guard < 0)
-        return -1;
-    lock();
-    const int saved = service.report_saved == 1;
-    const int ready = !busy && service.started && service.complete && !service.interrupted;
-    unlock();
-    if (saved)
-        return 1;
-    if (!ready)
-        return -1;
-    /* The finished run's results, copied so the log is written without holding the lock */
-    CheckService *snapshot = malloc(sizeof(*snapshot));
-    if (snapshot == NULL)
-        return -1;
-    lock();
-    *snapshot = service;
-    unlock();
-    int result = save_report(snapshot);
-    free(snapshot);
-    return result;
-}
 /* Loads HTTPS and starts sceSsl and sceHttp, once: 0, or the failing call's result, with what was
  * set up released again. Only the worker calls it */
 static void close_libraries(void)
@@ -628,104 +598,32 @@ static const CheckBackend backend = {
     .now_ms = now_ms,
 };
 
-static int run_checks(SceSize argc, void *argv)
+/* Before each run: not cancelled */
+static void reset(void)
 {
-    (void)argc;
-    (void)argv;
-    char text[sizeof(notice)] = "";
-    check_run(&backend, &service, text, sizeof(text));
-    /* The log is saved only on request (vitals_check_save_report), and only for a run that
-     * wasn't cancelled */
     lock();
-    if (text[0] != '\0')
-        snprintf(notice, sizeof(notice), "%s", text);
-    busy = 0;
+    cancelled = 0;
     unlock();
-    return 0;
-}
-static void join_worker(void)
-{
-    if (worker >= 0)
-    {
-        sceKernelWaitThreadEnd(worker, NULL, NULL);
-        sceKernelDeleteThread(worker);
-        worker = -1;
-    }
 }
 
-void vitals_check_stop(void)
+static void cancel(void) { abort_current(1); }
+
+/* A request that hangs past its deadline is aborted so the test always finishes */
+static void watch(void)
 {
-    if (guard >= 0)
-        abort_current(1);
-    join_worker();
-    busy = 0;
+    lock();
+    uint64_t started = request_begin;
+    int request = active_request;
+    unlock();
+    if (request >= 0 && now_ms() - started > 20000)
+        abort_current(0);
 }
 
+const CheckConsole check_console = {&backend, reset, cancel, watch, save_report};
+
+/* Leaving the app: the run ended, then the HTTP libraries */
 void vitals_check_close(void)
 {
     vitals_check_stop();
     close_libraries();
-}
-
-void vitals_check_start(void)
-{
-    if (guard < 0)
-    {
-        guard = sceKernelCreateMutex("vitals test state", 0, 0, NULL);
-        if (guard < 0)
-            return;
-    }
-    lock();
-    int running = busy;
-    unlock();
-    if (running)
-        return;
-    join_worker();
-    lock();
-    memset(&service, 0, sizeof(service));
-    service.vitals_enabled = service.libhttp_active = service.tls_active = service.redirects_off = -1;
-    service.started = 1;
-    busy = 1;
-    cancelled = 0;
-    notice[0] = 0;
-    unlock();
-    worker =
-        sceKernelCreateThread("vitals connection test", run_checks, 0x10000100, 256 * 1024, 0, 0, NULL);
-    int rc = worker < 0 ? worker : sceKernelStartThread(worker, 0, NULL);
-    if (rc < 0)
-    {
-        if (worker >= 0)
-            sceKernelDeleteThread(worker);
-        worker = -1;
-        lock();
-        busy = 0;
-        snprintf(notice, sizeof(notice), "Could not start network worker: %08X", (unsigned)rc);
-        unlock();
-    }
-}
-
-void vitals_check_cancel(void) { abort_current(1); }
-
-int vitals_check_poll(CheckService *view, char *message, size_t size)
-{
-    if (guard < 0)
-    {
-        memset(view, 0, sizeof(*view));
-        view->vitals_enabled = view->libhttp_active = view->tls_active = view->redirects_off = -1;
-        snprintf(message, size, "%s", "The test couldn't start");
-        return 0;
-    }
-    lock();
-    int is_busy = busy;
-    uint64_t started = request_begin;
-    int request = active_request;
-    unlock();
-    /* A request that hangs past its deadline is aborted so the test always finishes */
-    if (is_busy && request >= 0 && now_ms() - started > 20000)
-        abort_current(0);
-    lock();
-    *view = service;
-    snprintf(message, size, "%s", notice);
-    unlock();
-    return is_busy;
 }

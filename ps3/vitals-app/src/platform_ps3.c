@@ -15,9 +15,11 @@
 #include <rsx/gcm_sys.h>
 #include <rsx/rsx.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/memory.h>
+#include <sys/mutex.h>
 #include <sys/ppu_thread.h>
 #include <sys/sys_time.h>
 #include <sys/timer.h>
@@ -503,4 +505,38 @@ void platform_thread_join(PlatformThread *thread)
 	uint64_t ignored;
 	sys_ppu_thread_join(thread->id, &ignored);
 	free(thread);
+}
+
+struct PlatformMutex {
+	sys_mutex_t id;
+};
+
+PlatformMutex *platform_mutex_create(const char *name)
+{
+	PlatformMutex *mutex = malloc(sizeof(*mutex));
+	if (mutex == NULL)
+		return NULL;
+	sys_mutex_attr_t attributes;
+	memset(&attributes, 0, sizeof(attributes));
+	attributes.attr_protocol = SYS_MUTEX_PROTOCOL_PRIO;
+	attributes.attr_recursive = SYS_MUTEX_ATTR_NOT_RECURSIVE;
+	attributes.attr_pshared = SYS_MUTEX_ATTR_NOT_PSHARED;
+	attributes.attr_adaptive = SYS_MUTEX_ATTR_NOT_ADAPTIVE;
+	/* lv2 keeps up to 7 characters of a name */
+	snprintf(attributes.name, sizeof(attributes.name), "%.7s", name);
+	if (sysMutexCreate(&mutex->id, &attributes) != 0) {
+		free(mutex);
+		return NULL;
+	}
+	return mutex;
+}
+
+void platform_mutex_lock(PlatformMutex *mutex)
+{
+	sysMutexLock(mutex->id, 0);
+}
+
+void platform_mutex_unlock(PlatformMutex *mutex)
+{
+	sysMutexUnlock(mutex->id);
 }

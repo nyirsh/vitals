@@ -1,7 +1,7 @@
-/* The connection test's worker, as the Vita's vitals-app check.c: each check independent, the
- * report last of the TLS ones so it can't gate the tiles, then badssl.com, then each host redirect
- * in /dev_hdd0/vitals/redirects.txt (read with the parser shared with the Vita, shared/src), then each DNS rule
- * in /dev_hdd0/vitals/dns.txt (the PS3's own: the Vita's app has no DNS test) */
+/* The PS3's part of the connection test (check.h): its requests through cellHttp (http.c), its
+ * judges, its lookups through libnet, which parts of vitals this boot has, and its report's own
+ * lines. The run itself, its thread and its results are shared with the Vita (check_run.c,
+ * check_service.c) */
 
 #include "check.h"
 #include "check_model.h"
@@ -23,25 +23,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mutex.h>
-#include <sys/ppu_thread.h>
 #include <sys/sys_time.h>
 
-static sys_mutex_t guard;
-static int guard_ready, busy, thread_running;
+/* The run was cancelled: http.c ends its request, and the run asks before each check */
 static volatile int stopping;
-static sys_ppu_thread_t worker;
-static CheckService service;
-static char notice[120];
 
 static void lock(void)
 {
-	sysMutexLock(guard, 0);
+	check_lock();
 }
 
 static void unlock(void)
 {
-	sysMutexUnlock(guard);
+	check_unlock();
 }
 
 static void copy_result(CheckResult *r, const HttpResult *h)
@@ -209,68 +203,6 @@ static const CheckBackend backend = {
     .now_ms = backend_now_ms,
 };
 
-static void run_checks(uint64_t argument)
-{
-	(void)argument;
-	char text[sizeof(notice)] = "";
-	check_run(&backend, &service, text, sizeof(text));
-	lock();
-	if (text[0] != '\0')
-		snprintf(notice, sizeof(notice), "%s", text);
-	busy = 0;
-	unlock();
-	sys_ppu_thread_exit(0);
-}
-
-static void join_worker(void)
-{
-	if (thread_running) {
-		uint64_t ignored;
-		sys_ppu_thread_join(worker, &ignored);
-		thread_running = 0;
-	}
-}
-
-void vitals_check_start(void)
-{
-	if (!guard_ready) {
-		sys_mutex_attr_t attributes;
-		memset(&attributes, 0, sizeof(attributes));
-		attributes.attr_protocol = SYS_MUTEX_PROTOCOL_PRIO;
-		attributes.attr_recursive = SYS_MUTEX_ATTR_NOT_RECURSIVE;
-		attributes.attr_pshared = SYS_MUTEX_ATTR_NOT_PSHARED;
-		attributes.attr_adaptive = SYS_MUTEX_ATTR_NOT_ADAPTIVE;
-		snprintf(attributes.name, sizeof(attributes.name), "vcheck");
-		if (sysMutexCreate(&guard, &attributes) != 0)
-			return;
-		guard_ready = 1;
-	}
-	lock();
-	int running = busy;
-	unlock();
-	if (running)
-		return;
-	join_worker();
-	lock();
-	memset(&service, 0, sizeof(service));
-	service.started = 1;
-	service.vitals_enabled = service.libhttp_active = service.tls_active = service.redirects_off = -1;
-	notice[0] = '\0';
-	busy = 1;
-	unlock();
-	stopping = 0;
-	http_reset_cancel();
-	/* The report's parser keeps its tokens static, but the requests nest deep in libhttp */
-	if (sys_ppu_thread_create(&worker, run_checks, 0, 1000, 256 * 1024, SYS_PPU_THREAD_CREATE_JOINABLE, "vitals test") != 0) {
-		lock();
-		busy = 0;
-		snprintf(notice, sizeof(notice), "The test's thread couldn't start");
-		unlock();
-		return;
-	}
-	thread_running = 1;
-}
-
 /* ---- the report (check_report.c), with the PS3's parts ---- */
 
 /* How requests are made, the console, and whether the boot plugin put vitals' libhttp in */
@@ -331,64 +263,17 @@ static int save_report(const CheckService *s, char *path, size_t path_size)
 	return rc == CELL_FS_SUCCEEDED ? 0 : -1;
 }
 
-int vitals_check_save_report(void)
+/* Before each run: not cancelled */
+static void reset(void)
 {
-	if (!guard_ready)
-		return -1;
-	lock();
-	const int saved = service.report_saved == 1;
-	const int ready = !busy && service.started && service.complete && !service.interrupted;
-	unlock();
-	if (saved)
-		return 1;
-	if (!ready)
-		return -1;
-	/* The finished run's results, copied so the report is written without holding the lock */
-	CheckService *snapshot = malloc(sizeof(*snapshot));
-	if (snapshot == NULL)
-		return -1;
-	lock();
-	*snapshot = service;
-	unlock();
-	char path[160];
-	int result = save_report(snapshot, path, sizeof(path));
-	free(snapshot);
-	lock();
-	service.report_saved = result == 0 ? 1 : -1;
-	if (result == 0)
-		snprintf(service.report, sizeof(service.report), "%s", path);
-	unlock();
-	return result;
+	stopping = 0;
+	http_reset_cancel();
 }
 
-void vitals_check_cancel(void)
+static void cancel(void)
 {
 	stopping = 1;
 	http_cancel();
 }
 
-int vitals_check_poll(CheckService *view, char *message, size_t size)
-{
-	if (!guard_ready) {
-		memset(view, 0, sizeof(*view));
-		view->vitals_enabled = view->libhttp_active = view->tls_active = view->redirects_off = -1;
-		if (size != 0)
-			message[0] = '\0';
-		return 0;
-	}
-	lock();
-	*view = service;
-	if (size != 0)
-		snprintf(message, size, "%s", notice);
-	int running = busy;
-	unlock();
-	return running;
-}
-
-void vitals_check_stop(void)
-{
-	if (!guard_ready)
-		return;
-	vitals_check_cancel();
-	join_worker();
-}
+const CheckConsole check_console = {&backend, reset, cancel, NULL, save_report};

@@ -63,5 +63,10 @@ typedef struct PlatformThread PlatformThread;
 PlatformThread *platform_thread_start(const char *name, void (*run)(void *argument), void *argument, size_t stack_size);
 /* Waits for it to end, and frees it */
 void platform_thread_join(PlatformThread *thread);
+/* A lock between threads, not recursive: NULL when it couldn't be made. It lasts as long as the app */
+typedef struct PlatformMutex PlatformMutex;
+PlatformMutex *platform_mutex_create(const char *name);
+void platform_mutex_lock(PlatformMutex *mutex);
+void platform_mutex_unlock(PlatformMutex *mutex);
 
 #endif

@@ -214,6 +214,34 @@ void platform_thread_join(PlatformThread *thread)
     free(thread);
 }
 
+struct PlatformMutex {
+    SceUID id;
+};
+
+PlatformMutex *platform_mutex_create(const char *name)
+{
+    PlatformMutex *mutex = malloc(sizeof(*mutex));
+    if (mutex == NULL)
+        return NULL;
+    mutex->id = sceKernelCreateMutex(name, 0, 0, NULL);
+    if (mutex->id < 0)
+    {
+        free(mutex);
+        return NULL;
+    }
+    return mutex;
+}
+
+void platform_mutex_lock(PlatformMutex *mutex)
+{
+    sceKernelLockMutex(mutex->id, 1, NULL);
+}
+
+void platform_mutex_unlock(PlatformMutex *mutex)
+{
+    sceKernelUnlockMutex(mutex->id, 1);
+}
+
 /* ---- the system ---- */
 
 int platform_exit_requested(void)

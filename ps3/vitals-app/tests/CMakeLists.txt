@@ -43,6 +43,13 @@ add_executable(vitals_app_check_run_tests ${SHARED}/app/tests/test_check_run.c $
 target_include_directories(vitals_app_check_run_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
 add_test(NAME vitals_app_check_run COMMAND vitals_app_check_run_tests)
 
+# The connection test's lifecycle (shared with the Vita's tests): its thread, cancelling and saving
+find_package(Threads REQUIRED)
+add_executable(vitals_app_check_service_tests ${SHARED}/app/tests/test_check_service.c ${SHARED}/app/check_service.c)
+target_include_directories(vitals_app_check_service_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
+target_link_libraries(vitals_app_check_service_tests PRIVATE Threads::Threads)
+add_test(NAME vitals_app_check_service COMMAND vitals_app_check_service_tests)
+
 # The connection test's saved report (shared with the Vita's tests), with the PS3's results
 add_executable(vitals_app_check_report_tests ${SHARED}/app/tests/test_check_report.c ${SHARED}/app/check_report.c
     ${SHARED}/app/model.c ${APP_DIR}/src/check_model.c)

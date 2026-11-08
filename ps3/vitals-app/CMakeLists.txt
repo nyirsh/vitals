@@ -29,6 +29,7 @@ add_executable(vitals-app
 	../../shared/app/changelog.c
 	../../shared/app/switches.c
 	../../shared/app/check_run.c
+	../../shared/app/check_service.c
 	../../shared/app/check_report.c
 	../../shared/app/input.c
 	../../shared/app/release_version.c
