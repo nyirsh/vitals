@@ -204,7 +204,7 @@ Its menu, as the Vita's:
 - **Options**: TLS, HTTP (On, Redirects off, Off) and the DNS rules, and the debug output, applied with START (see
   [On the console](#on-the-console)).
 - **Test connections**: the connection test, below.
-- **Changelog** and **Credits** ([CREDITS.md](CREDITS.md)).
+- **Changelog** and **Credits** ([CREDITS.md](../CREDITS.md), both consoles').
 
 **The connection test** goes through, in order:
 
@@ -282,7 +282,7 @@ python3 tools/ps3_disasm.py ../dumps/ps3/4.93-cex/libhttp.prx callers SSL_do_han
 
 ## Thanks
 
-The full credits are in [CREDITS.md](CREDITS.md), which the vitals app shows under Credits.
+The full credits, both consoles', are in [CREDITS.md](../CREDITS.md), which the vitals app shows under Credits.
 
 ## License
 

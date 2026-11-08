@@ -130,7 +130,7 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
          ${debug_entries}
          ../README.md README.md
          ../../CHANGELOG.md CHANGELOG.md
-         ../CREDITS.md CREDITS.md
+         ../../CREDITS.md CREDITS.md
          ../../THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.md
          ${license_entries}
          assets/sony-certs.pem sony-certs.pem

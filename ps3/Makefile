@@ -148,7 +148,7 @@ app:
 	cp "$(BUNDLE)" $(APP_STAGING)/USRDIR/cacert.pem
 	cp vitals-app/assets/redirects.txt vitals-app/assets/dns.txt $(APP_STAGING)/USRDIR/
 	cp ../CHANGELOG.md $(APP_STAGING)/USRDIR/CHANGELOG.md
-	cp CREDITS.md $(APP_STAGING)/USRDIR/CREDITS.md
+	cp ../CREDITS.md $(APP_STAGING)/USRDIR/CREDITS.md
 	@# The third-party notices and the licenses they refer to, as the Vita's app carries them
 	mkdir -p $(APP_STAGING)/USRDIR/licenses
 	cp ../THIRD_PARTY_NOTICES.md $(APP_STAGING)/USRDIR/THIRD_PARTY_NOTICES.md

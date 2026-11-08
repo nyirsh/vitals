@@ -183,7 +183,7 @@ int main(int argc, char **argv)
 	/* The credits as the app shows them: the repository's CREDITS.md, read from where make preview runs */
 	{
 		static char text[16384];
-		FILE *file = fopen("CREDITS.md", "rb");
+		FILE *file = fopen("../CREDITS.md", "rb");
 		size_t length = file != NULL ? fread(text, 1, sizeof(text), file) : 0;
 		if (file != NULL)
 			fclose(file);
