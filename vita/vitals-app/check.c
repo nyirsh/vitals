@@ -1,5 +1,6 @@
 #include "check.h"
 #include "check_vita.h"
+#include "check_report.h"
 #include "check_run.h"
 #include "network.h"
 #include "probe.h"
@@ -74,6 +75,8 @@ static uint64_t now_ms(void) { return sceKernelGetSystemTimeWide() / 1000; }
 static void lock(void) { sceKernelLockMutex(guard, 1, NULL); }
 static void unlock(void) { sceKernelUnlockMutex(guard, 1); }
 #define REPORT_NAME "vitals-testresults"
+/* Room for the whole report, the longest lists included */
+#define REPORT_MAX (96 * 1024)
 static int stopped(void)
 {
     lock();
@@ -409,112 +412,70 @@ static int detect_vitals(void)
     }
     return found;
 }
-/* Writes s's log; 0 when written, negative when the file couldn't be */
+/* The report's Vita parts (check_report.h): how requests are made, which of vitals' libraries this
+ * process has, and sceHttp's and sceSsl's fields of a request */
+static void report_about(CheckReport *report, const CheckService *s)
+{
+    (void)s;
+    check_report_add(report, "Certificate verification=enabled for primary requests\n"
+                             "Protocol-only diagnostic retries may disable certificate checks; both attempts are "
+                             "recorded.\nTimeouts are retried, up to %u attempts in all.\n",
+                     FETCH_ATTEMPTS);
+    check_report_add(report, "parts=HTTP: %s, TLS: %s in this process\n",
+                     vitals_http < 0 ? "?" : vitals_http ? "vitals-http" : "Sony's libhttp",
+                     vitals_tls < 0 ? "?" : vitals_tls ? "vitals-ssl" : "Sony's libssl");
+}
+static void report_result(CheckReport *report, const CheckResult *r)
+{
+    check_report_add(report, "ssl_error=0x%08X\nssl_detail=0x%08X\n", (unsigned)r->ssl_error, r->ssl_detail);
+}
+static void report_protocol(CheckReport *report, unsigned test, const CheckResult *r)
+{
+    check_report_add(report, "protocol_confirmed=%d\nverification_restore_error=0x%08X\n"
+                             "expected_vitals_policy_block=%d\n",
+                     r->protocol_confirmed, (unsigned)r->restore_error, check_expected_legacy_block(test, r));
+    if (r->retry.attempted)
+        check_report_add(report, "retry_verification=%s\nretry_protocol_confirmed=%d\n"
+                                 "retry_HTTP=%d\nretry_error=0x%08X\nretry_ssl_error=0x%08X\n"
+                                 "retry_ssl_detail=0x%08X\nretry_elapsed_ms=%u\n"
+                                 "retry_restore_error=0x%08X\n",
+                         r->retry.verification_disabled ? "disabled" : "unavailable", r->retry.protocol_confirmed,
+                         r->retry.http_code, (unsigned)r->retry.error, (unsigned)r->retry.ssl_error,
+                         r->retry.ssl_detail, r->retry.elapsed_ms, (unsigned)r->retry.restore_error);
+}
+static const CheckReportFormat report_format = {"PS Vita", "sceHttp", report_about, report_result, report_protocol};
+
+/* Writes s's report; 0 when written, negative when the file couldn't be */
 static int save_report(const CheckService *s)
 {
     char path[160];
     /* Named after the console's local time; without it, after the system timer */
     SceDateTime now;
-    if (sceRtcGetCurrentClockLocalTime(&now) == 0)
-        snprintf(path, sizeof(path), REPORT_DIR "/" REPORT_NAME "-%04u-%02u-%02u_%02u-%02u-%02u.txt", now.year,
-                 now.month, now.day, now.hour, now.minute, now.second);
-    else
-        snprintf(path, sizeof(path), REPORT_DIR "/" REPORT_NAME "-%llu.txt",
-                 (unsigned long long)sceKernelGetSystemTimeWide());
-    (void)sceIoMkdir(REPORT_DIR, 0777);
-    FILE *f = fopen(path, "w");
-    if (!f)
+    CheckReportTime local = {0};
+    int have_time = sceRtcGetCurrentClockLocalTime(&now) == 0;
+    if (have_time)
+        local = (CheckReportTime){now.year, now.month, now.day, now.hour, now.minute, now.second};
+    check_report_path(path, sizeof(path), REPORT_DIR, REPORT_NAME, have_time ? &local : NULL,
+                      (uint64_t)sceKernelGetSystemTimeWide());
+    CheckReport report = {malloc(REPORT_MAX), 0, REPORT_MAX};
+    int failed = report.data == NULL;
+    if (!failed)
     {
-        lock();
-        service.report_saved = -1;
-        unlock();
-        return -1;
-    }
-    fprintf(f,
-            "vitals " VITALS_VERSION " connection test\nAPI=sceHttp\nservice=%s\nCertificate "
-            "verification=enabled for primary requests\nConnection "
-            "reuse=disabled\nRedirects=disabled\nProtocol-only diagnostic retries may disable "
-            "certificate checks; both attempts are recorded.\n",
-            "BrowserLeaks + badssl.com");
-    fprintf(f, "vitals=%s (HTTP: %s, TLS: %s in this process)\n",
-            s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled" : "not enabled",
-            vitals_http < 0 ? "?" : vitals_http ? "vitals-http" : "Sony's libhttp",
-            vitals_tls < 0 ? "?" : vitals_tls ? "vitals-ssl" : "Sony's libssl");
-    for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
-    {
-        const CheckResult *r = i == CHECK_REPORT ? &s->connection : &s->protocols[i];
-        fprintf(f,
-                "\nURL=%s\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\nssl_"
-                "detail=0x%"
-                "08X\nelapsed_ms=%u\nresult=%s\n",
-                check_endpoint(i), r->state,
-                r->http_code, (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail,
-                r->elapsed_ms, r->message);
-        fprintf(f, "attempts=%u\nprotocol_confirmed=%d\nverification_restore_error=0x%08X\n",
-                r->attempts, r->protocol_confirmed, (unsigned)r->restore_error);
-        if (i < 4)
+        check_report_write(&report_format, s, &report);
+        (void)sceIoMkdir(REPORT_DIR, 0777);
+        FILE *f = fopen(path, "w");
+        failed = f == NULL;
+        if (f != NULL)
         {
-            char detail[128];
-            check_protocol_detail(i, r, detail, sizeof(detail));
-            fprintf(f, "classification=%s\ndetail=%s\n",
-                    check_protocol_display(i, r, s->vitals_enabled).label, detail);
-            fprintf(f, "expected_vitals_policy_block=%d\n",
-                    check_expected_legacy_block(i, r));
+            failed = fwrite(report.data, 1, report.used, f) != report.used || ferror(f);
+            if (fclose(f))
+                failed = 1;
+            /* A partly written report isn't kept */
+            if (failed)
+                (void)sceIoRemove(path);
         }
-        if (r->retry.attempted)
-            fprintf(f, "retry_verification=%s\nretry_protocol_confirmed=%d\n"
-                       "retry_HTTP=%d\nretry_error=0x%08X\nretry_ssl_error=0x%08X\n"
-                       "retry_ssl_detail=0x%08X\nretry_elapsed_ms=%u\n"
-                       "retry_restore_error=0x%08X\n",
-                    r->retry.verification_disabled ? "disabled" : "unavailable",
-                    r->retry.protocol_confirmed,
-                    r->retry.http_code, (unsigned)r->retry.error, (unsigned)r->retry.ssl_error,
-                    r->retry.ssl_detail, r->retry.elapsed_ms, (unsigned)r->retry.restore_error);
     }
-    fprintf(f, "\nbadssl.com=%u\n", CHECK_BADSSL_COUNT);
-    for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
-    {
-        const CheckBadssl *test = check_badssl(i);
-        const CheckResult *r = &s->badssl[i];
-        fprintf(f, "%s (%s, expected %s)\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\n"
-                   "ssl_detail=0x%08X\nelapsed_ms=%u\nattempts=%u\nresult=%s\n",
-                test->host, test->label, test->refuse ? "refused" : "loaded", r->state, r->http_code,
-                (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail, r->elapsed_ms, r->attempts,
-                r->message);
-    }
-    fprintf(f, "\nHost redirects (" VITALS_REDIRECTS_PATH ")=%u\n", s->redirect_count);
-    for (unsigned i = 0; i < s->redirect_count; ++i)
-    {
-        const CheckRedirect *redirect = &s->redirects[i];
-        fprintf(f, "%s -> %s\nstate=%d\nHTTP=%d\nerror=0x%08X\nssl_error=0x%08X\nssl_detail=0x%08X\n"
-                   "elapsed_ms=%u\nattempts=%u\nresult=%s\n",
-                redirect->from, redirect->to, redirect->result.state, redirect->result.http_code,
-                (unsigned)redirect->result.error, (unsigned)redirect->result.ssl_error,
-                redirect->result.ssl_detail, redirect->result.elapsed_ms, redirect->result.attempts,
-                redirect->result.message);
-    }
-    const CheckHandshake *h = &s->handshake;
-    fprintf(f,
-            "\nSelected protocol=%04X %s\nSelected cipher=%04X %s\nKey exchange=%04X "
-            "%s\nSignature=%04X %s\nALPN offered=%s\nJA3=%s\nJA4=%s\n",
-            h->version.id, h->version.name, h->cipher.id, h->cipher.name, h->group.id,
-            h->group.name, h->signature.id, h->signature.name, h->alpn, h->ja3, h->ja4);
-    const CheckNamed *lists[] = {h->ciphers, h->groups, h->extensions};
-    const unsigned counts[] = {h->cipher_count, h->group_count, h->extension_count};
-    const char *labels[] = {"Offered ciphers (not individually negotiated)", "Offered groups",
-                            "Offered extensions"};
-    for (unsigned l = 0; l < 3; ++l)
-    {
-        fprintf(f, "\n%s\n", labels[l]);
-        for (unsigned n = 0; n < counts[l]; ++n)
-            fprintf(f, "%04X %s\n", lists[l][n].id, lists[l][n].name);
-    }
-    int failed = ferror(f);
-    if (fclose(f))
-        failed = 1;
-    /* A partly written log isn't kept */
-    if (failed)
-        (void)sceIoRemove(path);
+    free(report.data);
     lock();
     service.report_saved = failed ? -1 : 1;
     if (!failed)

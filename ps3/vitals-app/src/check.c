@@ -5,6 +5,7 @@
 
 #include "check.h"
 #include "check_model.h"
+#include "check_report.h"
 #include "check_run.h"
 
 #include "app_log.h"
@@ -266,95 +267,45 @@ void vitals_check_start(void)
 	thread_running = 1;
 }
 
-/* ---- the report, as the Vita's vitals-app writes it ---- */
+/* ---- the report (check_report.c), with the PS3's parts ---- */
 
-typedef struct {
-	char *data;
-	size_t used, capacity;
-} Report;
-
-static void add(Report *report, const char *format, ...) __attribute__((format(printf, 2, 3)));
-static void add(Report *report, const char *format, ...)
+/* How requests are made, the console, and whether the boot plugin put vitals' libhttp in */
+static void report_about(CheckReport *report, const CheckService *s)
 {
-	if (report->used >= report->capacity)
-		return;
-	va_list arguments;
-	va_start(arguments, format);
-	int n = vsnprintf(report->data + report->used, report->capacity - report->used, format, arguments);
-	va_end(arguments);
-	if (n > 0)
-		report->used += (size_t)n < report->capacity - report->used ? (size_t)n : report->capacity - report->used - 1;
+	check_report_add(report, "Certificate verification=enabled\nTimeouts are retried, up to %u attempts in all.\n",
+	                 HTTP_ATTEMPTS);
+	const ConsoleInfo *console = console_info();
+	check_report_add(report, "console=%s (%s)\n", console->text,
+	                 console->supported ? "supported" : "not supported: vitals is made for 4.93 CEX with Cobra");
+	check_report_add(report, "parts=libhttp: %s (the boot plugin's libhttp.active, this boot); libssl: TLS 1.3 tells\n",
+	                 s->libhttp_active < 0 ? "checking" : s->libhttp_active ? "vitals'" : "Sony's");
 }
 
-static void add_result(Report *report, const CheckResult *r)
+/* libssl's verify flags, protocol and cipher */
+static void report_result(CheckReport *report, const CheckResult *r)
 {
-	add(report, "state=%d\nHTTP=%d\nerror=0x%08X\nverify_flags=0x%04X\nprotocol=%s (CELL_SSL_VERSION %d)\n"
-	            "cipher=%s\nelapsed_ms=%u\nattempts=%u\nresult=%s\n",
-	    r->state, r->http_code, (unsigned)r->error, (unsigned)r->verify_error, http_protocol_name(r->ssl_version, r->cipher),
-	    r->ssl_version, r->cipher, r->elapsed_ms, r->attempts, r->message);
+	check_report_add(report, "verify_flags=0x%04X\nprotocol=%s (CELL_SSL_VERSION %d)\ncipher=%s\n",
+	                 (unsigned)r->verify_error, http_protocol_name(r->ssl_version, r->cipher), r->ssl_version, r->cipher);
 }
+
+static const CheckReportFormat report_format = {"PS3", "cellHttp", report_about, report_result, NULL};
+
+/* Room for the whole report, the longest lists included */
+#define REPORT_MAX (96 * 1024)
 
 static int save_report(const CheckService *s, char *path, size_t path_size)
 {
 	CellRtcDateTime now;
-	if (cellRtcGetCurrentClockLocalTime(&now) == 0)
-		snprintf(path, path_size, VITALS_REPORTS_DIRECTORY "/connection-test-%04u-%02u-%02u_%02u-%02u-%02u.txt", now.year,
-		         now.month, now.day, now.hour, now.minute, now.second);
-	else
-		snprintf(path, path_size, VITALS_REPORTS_DIRECTORY "/connection-test-%llu.txt", (unsigned long long)http_now_ms());
-	Report report = {malloc(64 * 1024), 0, 64 * 1024};
+	CheckReportTime local = {0};
+	int have_time = cellRtcGetCurrentClockLocalTime(&now) == 0;
+	if (have_time)
+		local = (CheckReportTime){now.year, now.month, now.day, now.hour, now.minute, now.second};
+	check_report_path(path, path_size, VITALS_REPORTS_DIRECTORY, "connection-test", have_time ? &local : NULL,
+	                  http_now_ms());
+	CheckReport report = {malloc(REPORT_MAX), 0, REPORT_MAX};
 	if (report.data == NULL)
 		return -1;
-	add(&report, "vitals " VITALS_VERSION " connection test (PS3)\nAPI=cellHttp\nservice=BrowserLeaks + badssl.com\n"
-	             "Certificate verification=enabled\nConnection reuse=disabled\nRedirects=disabled\n"
-	             "Timeouts are retried, up to %u attempts in all.\n", HTTP_ATTEMPTS);
-	const ConsoleInfo *console = console_info();
-	add(&report, "console=%s (%s)\n", console->text,
-	    console->supported ? "supported" : "not supported: vitals is made for 4.93 CEX with Cobra");
-	add(&report, "vitals=%s (TLS 1.3 connected through this console's libssl)\n",
-	    s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled" : "not enabled");
-	add(&report, "vitals libhttp=%s (the boot plugin's libhttp.active, this boot)\n",
-	    s->libhttp_active < 0 ? "checking" : s->libhttp_active ? "active" : "not active");
-	for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i) {
-		const CheckResult *r = i == CHECK_REPORT ? &s->connection : &s->protocols[i];
-		add(&report, "\nURL=%s\n", check_endpoint(i));
-		add_result(&report, r);
-		if (i < 4) {
-			char detail[160];
-			check_protocol_detail(i, r, detail, sizeof(detail));
-			add(&report, "classification=%s\ndetail=%s\n", check_protocol_display(i, r, s->vitals_enabled).label, detail);
-		}
-	}
-	add(&report, "\nbadssl.com=%u\n", CHECK_BADSSL_COUNT);
-	for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i) {
-		const CheckBadssl *test = check_badssl(i);
-		add(&report, "%s (%s, expected %s)\n", test->host, test->label, test->refuse ? "refused" : "loaded");
-		add_result(&report, &s->badssl[i]);
-	}
-	add(&report, "\nHost redirects (" CHECK_REDIRECTS_PATH ")=%u\n", s->redirect_count);
-	for (unsigned i = 0; i < s->redirect_count; ++i) {
-		add(&report, "%s -> %s\n", s->redirects[i].from, s->redirects[i].to);
-		add_result(&report, &s->redirects[i].result);
-	}
-	add(&report, "\nDNS rules (" CHECK_DNS_PATH ")=%u%s\n", s->dns_count, s->dns_off ? ", off (flags/dns.off)" : "");
-	for (unsigned i = 0; i < s->dns_count; ++i) {
-		const CheckResult *r = &s->dns[i].result;
-		add(&report, "%s -> %s\nstate=%d\nelapsed_ms=%u\nresult=%s\n", s->dns[i].from, s->dns[i].to, r->state,
-		    r->elapsed_ms, r->message);
-	}
-	const CheckHandshake *h = &s->handshake;
-	add(&report, "\nSelected protocol=%04X %s\nSelected cipher=%04X %s\nKey exchange=%04X %s\nSignature=%04X %s\n"
-	             "ALPN offered=%s\nJA3=%s\nJA4=%s\n",
-	    h->version.id, h->version.name, h->cipher.id, h->cipher.name, h->group.id, h->group.name, h->signature.id,
-	    h->signature.name, h->alpn, h->ja3, h->ja4);
-	const CheckNamed *lists[] = {h->ciphers, h->groups, h->extensions};
-	const unsigned counts[] = {h->cipher_count, h->group_count, h->extension_count};
-	const char *labels[] = {"Offered ciphers (not individually negotiated)", "Offered groups", "Offered extensions"};
-	for (unsigned l = 0; l < 3; ++l) {
-		add(&report, "\n%s\n", labels[l]);
-		for (unsigned n = 0; n < counts[l]; ++n)
-			add(&report, "%04X %s\n", lists[l][n].id, lists[l][n].name);
-	}
+	check_report_write(&report_format, s, &report);
 	cellFsMkdir(VITALS_DIRECTORY, CELL_FS_S_IFDIR | 0777);
 	cellFsMkdir(VITALS_REPORTS_DIRECTORY, CELL_FS_S_IFDIR | 0777);
 	int fd, rc = cellFsOpen(path, CELL_FS_O_WRONLY | CELL_FS_O_CREAT | CELL_FS_O_TRUNC, &fd, NULL, 0);
