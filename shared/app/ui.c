@@ -754,14 +754,14 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 		}
 		/* Old host -> the host that answered, green when it's the new host and red when it isn't;
 		 * before that the new host (waiting), "Testing...", or why there's no answer in the
-		 * result's colour (outdated vitals in orange). Then its HTTP status, right-aligned, and the
-		 * time */
+		 * result's colour (outdated vitals in orange). Then its HTTP status ("HTTP response: 404") and the
+		 * time, both right-aligned */
 		for (unsigned i = 0; i < CHECK_VISIBLE_REDIRECTS && scroll + i < s->redirect_count; ++i) {
 			const CheckRedirect *redirect = &s->redirects[scroll + i];
 			const CheckResult *r = &redirect->result;
 			int y = Y(397 + (int)i * 21), x = X(30);
 			snprintf(line, sizeof(line), "%s  -> ", redirect->from);
-			text_clipped(p, x, y, line, white, 16, X(770));
+			text_clipped(p, x, y, line, white, 16, X(690));
 			x += width(line, 16);
 			const char *answer;
 			uint32_t colour;
@@ -775,18 +775,18 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 				answer = r->message[0] ? r->message : r->state == CHECK_RUNNING ? "Testing..." : "Waiting";
 				colour = tone(r->state);
 			}
-			if (x < X(770))
-				text_clipped(p, x, y, answer, colour, 16, X(770));
+			if (x < X(690))
+				text_clipped(p, x, y, answer, colour, 16, X(690));
 			if (r->http_code > 0)
-				snprintf(line, sizeof(line), "%d", r->http_code);
+				snprintf(line, sizeof(line), "HTTP response: %d", r->http_code);
 			else
 				snprintf(line, sizeof(line), "-");
-			text(p, X(836) - width(line, 16), y, line, muted, 16);
+			text(p, X(840) - width(line, 16), y, line, muted, 16);
 			if (r->elapsed_ms)
 				snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
 			else
 				snprintf(line, sizeof(line), "-");
-			text(p, X(856), y, line, muted, 16);
+			text(p, X(932) - width(line, 16), y, line, muted, 16);
 		}
 	} else if (page == CHECK_PAGE_DNS) {
 		text(p, X(28), Y(362), "DNS rules", white, 23);
