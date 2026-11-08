@@ -73,6 +73,45 @@ int main(void) {
     r = outcome((int)0x80431063, 0, 0);
     check_badssl_judge(expired, &r);
     assert(r.state == CHECK_FAIL && strncmp(r.message, "Inconclusive", 12) == 0);
+    /* vitals-ssl is the loaded libssl when SceLibSsl started from ux0:data/vitals/system */
+    assert(check_ssl_module_active("SceLibSsl", "ux0:data/vitals/system/libssl.suprx", 6));
+    assert(!check_ssl_module_active("SceLibSsl", "vs0:sys/external/libssl.suprx", 6));
+    assert(!check_ssl_module_active("SceLibHttp", "ux0:data/vitals/system/libssl.suprx", 6));
+    assert(!check_ssl_module_active("SceLibSsl", "ux0:data/vitals/system/libssl.suprx", 5));
+
+    /* TLS 1.0 and 1.1 refused by vitals: with vitals-http, by its detail */
+    r = outcome((int)0x80431075, (int)0x80435061, 0);
+    r.vitals_active = r.vitals_tls = 1;
+    r.ssl_detail = 0xffff8880u;
+    assert(check_expected_legacy_block(0, &r) && check_expected_legacy_block(1, &r));
+    assert(!check_expected_legacy_block(2, &r));
+    assert(!check_should_retry_unverified(0, &r));
+    /* With Sony's libhttp on vitals-ssl there's no detail: the retry with checks off failing the
+     * same way says so; before the retry it isn't decided, so the retry runs */
+    r = outcome((int)0x80431075, (int)0x80435061, 0);
+    r.vitals_tls = 1;
+    assert(!check_expected_legacy_block(0, &r) && check_should_retry_unverified(0, &r));
+    r.retry = (CheckRetry){.attempted = 1, .verification_disabled = 1, .error = (int)0x80431075,
+                           .ssl_error = (int)0x80435061};
+    assert(check_expected_legacy_block(0, &r) && check_expected_legacy_block(1, &r));
+    char detail[96];
+    check_protocol_detail(1, &r, detail, sizeof(detail));
+    assert(strcmp(detail, "Disabled by vitals (secure)") == 0);
+    assert(check_protocol_display(1, &r, 1).style == CHECK_PASS && strcmp(check_protocol_display(1, &r, 1).label, "Blocked") == 0);
+    /* Not when the retry couldn't turn checks off, connected, or hit a certificate */
+    r.retry.verification_disabled = 0;
+    assert(!check_expected_legacy_block(0, &r));
+    r.retry.verification_disabled = 1;
+    r.retry.protocol_confirmed = 1;
+    assert(!check_expected_legacy_block(0, &r));
+    r.retry.protocol_confirmed = 0;
+    r.retry.ssl_error = (int)0x80435060;
+    assert(!check_expected_legacy_block(0, &r));
+    /* Nor with Sony's libssl: that's Sony's TLS failing, not vitals blocking */
+    r.retry.ssl_error = (int)0x80435061;
+    r.vitals_tls = 0;
+    assert(!check_expected_legacy_block(0, &r));
+
     /* Nor does a run whose certificate checks couldn't be restored */
     r = outcome((int)0x80431075, (int)0x80435060, 0);
     r.restore_error = -1;

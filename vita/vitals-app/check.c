@@ -20,7 +20,21 @@
  * the badssl.com battery and each host redirect, each over a fresh sceHttp connection on a worker
  * thread, which first starts the network and the HTTP libraries */
 #define REPORT_DIR VITALS_REPORTS_DIRECTORY
+/* VitaSDK has the stub, not the prototype: the HTTPS options of one template, connection or request */
+int sceHttpsDisableOption2(int id, unsigned int sslFlags);
+
+/* The retry's SSL callback where certificate checks can't be turned off: whatever was found is
+ * accepted, so only the protocol decides */
+static int accept_certificate(unsigned int bits, void *const certificates[], int count, void *argument)
+{
+    (void)bits, (void)certificates, (void)count, (void)argument;
+    return 0;
+}
+
 static CheckService service = {.vitals_enabled = -1};
+/* Which of vitals' libraries this process has: vitals-http (the Options' http.off keeps Sony's) and
+ * vitals-ssl (tls.off keeps Sony's); -1 until looked for. service.vitals_enabled is either */
+static int vitals_http = -1, vitals_tls = -1;
 static SceUID guard = -1, worker = -1;
 static int busy, active_request = -1, cancelled, abort_sent, https_loaded, ssl_ready, http_ready;
 static uint64_t request_begin;
@@ -86,7 +100,8 @@ static int fetch_once(const char *url, int verify, int unverified_allowed, int s
     uint64_t begin = now_ms();
     memset(r, 0, sizeof(*r));
     r->state = CHECK_FAIL;
-    r->vitals_active = service.vitals_enabled == 1;
+    r->vitals_active = vitals_http == 1;
+    r->vitals_tls = vitals_tls == 1;
     *length = 0;
 #define REQUIRE(call)  \
     do                 \
@@ -110,12 +125,24 @@ static int fetch_once(const char *url, int verify, int unverified_allowed, int s
      * Only this worker sends HTTP
      * Reset it before every fresh attempt, and restore it on every retry exit */
     REQUIRE(sceHttpsEnableOption(VERIFY_FLAGS));
+    /* Sony's libhttp (the Options' http.off) refuses to turn the server's check off, process-wide
+     * or for a template (0x8043506B): then the template's SSL callback accepts what the check
+     * found, as apps on Sony's libhttp accept a certificate */
+    int per_template = 0;
     if (!verify)
     {
-        REQUIRE(sceHttpsDisableOption(VERIFY_FLAGS));
-        r->verification_disabled = 1;
+        if (sceHttpsDisableOption(VERIFY_FLAGS) >= 0)
+            r->verification_disabled = 1;
+        else
+            per_template = 1;
     }
     REQUIRE(tmpl = sceHttpCreateTemplate("vitals/" VITALS_VERSION, SCE_HTTP_VERSION_1_1, 0));
+    if (per_template)
+    {
+        if (sceHttpsDisableOption2(tmpl, VERIFY_FLAGS) < 0)
+            REQUIRE(sceHttpsSetSslCallback(tmpl, accept_certificate, NULL));
+        r->verification_disabled = 1;
+    }
     REQUIRE(sceHttpSetResolveTimeOut(tmpl, 3000000));
     REQUIRE(sceHttpSetResolveRetry(tmpl, 1));
     REQUIRE(sceHttpSetConnectTimeOut(tmpl, 5000000));
@@ -316,10 +343,12 @@ static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned m
     free(work);
     return collection.count;
 }
+/* Which of vitals' libraries are this process's: 1 vitals-http, 2 vitals-ssl, both, or none */
 static int detect_vitals(void)
 {
     SceUID ids[128];
     SceSize count = sizeof(ids) / sizeof(ids[0]);
+    int found = 0;
     int rc = sceKernelGetModuleList(0xff, ids, &count);
     if (rc >= 0)
     {
@@ -327,12 +356,15 @@ static int detect_vitals(void)
         {
             SceKernelModuleInfo info = {0};
             info.size = sizeof(info);
-            if (sceKernelGetModuleInfo(ids[i], &info) == 0 &&
-                check_http_module_active(info.module_name, info.path, info.state))
-                return 1;
+            if (sceKernelGetModuleInfo(ids[i], &info) != 0)
+                continue;
+            if (check_http_module_active(info.module_name, info.path, info.state))
+                found |= 1;
+            if (check_ssl_module_active(info.module_name, info.path, info.state))
+                found |= 2;
         }
     }
-    return 0;
+    return found;
 }
 /* Writes s's log; 0 when written, negative when the file couldn't be */
 static int save_report(const CheckService *s)
@@ -361,9 +393,10 @@ static int save_report(const CheckService *s)
             "reuse=disabled\nRedirects=disabled\nProtocol-only diagnostic retries may disable "
             "certificate checks; both attempts are recorded.\n",
             "BrowserLeaks + badssl.com");
-    fprintf(f, "vitals=%s (vitals-http loaded in this process)\n",
-            s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled"
-                                                                   : "not enabled");
+    fprintf(f, "vitals=%s (HTTP: %s, TLS: %s in this process)\n",
+            s->vitals_enabled < 0 ? "checking" : s->vitals_enabled ? "enabled" : "not enabled",
+            vitals_http < 0 ? "?" : vitals_http ? "vitals-http" : "Sony's libhttp",
+            vitals_tls < 0 ? "?" : vitals_tls ? "vitals-ssl" : "Sony's libssl");
     for (unsigned i = 0; i < CHECK_TEST_COUNT; ++i)
     {
         const CheckResult *r = i == CHECK_REPORT ? &s->connection : &s->protocols[i];
@@ -559,7 +592,9 @@ static int run_checks(SceSize argc, void *argv)
     }
     int enabled = detect_vitals();
     lock();
-    service.vitals_enabled = enabled;
+    vitals_http = (enabled & 1) != 0;
+    vitals_tls = (enabled & 2) != 0;
+    service.vitals_enabled = enabled != 0;
     unlock();
     /* The redirect rules are listed first, so their page fills in as they are tested */
     CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
@@ -669,10 +704,11 @@ static int run_checks(SceSize argc, void *argv)
             r.state = CHECK_INFO;
             snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
         }
-        else if (service.vitals_enabled != 1)
+        /* Host redirects are vitals-http's */
+        else if (vitals_http != 1)
         {
             r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "Not tested: vitals isn't active here");
+            snprintf(r.message, sizeof(r.message), "Not tested: vitals' HTTP isn't active here");
         }
         else
         {

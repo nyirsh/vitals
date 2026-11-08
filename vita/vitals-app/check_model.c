@@ -40,12 +40,18 @@ int check_expected_legacy_block(unsigned version, const CheckResult *r) {
     /* vitals blocks TLS 1.0 and 1.1, and reports this through sceHttpsGetSslError's detail value
      * Only that case is shown as a deliberate block (green tick); a missing detail, or a network
      * or certificate failure, is not, even when vitals is loaded */
-    return version < 2 && r->vitals_active == 1 && r->state == CHECK_FAIL &&
-           !r->http_code && !r->protocol_confirmed && !r->restore_error &&
-           !r->verification_disabled && !r->retry.protocol_confirmed &&
-           !r->retry.http_code && (uint32_t)r->retry.ssl_error != 0x80435060 &&
-           (uint32_t)r->error == 0x80431075 && (uint32_t)r->ssl_error == 0x80435061 &&
-           (r->ssl_detail == 0xffff8880u || r->ssl_detail == 0xffff9180u);
+    int refused = version < 2 && r->state == CHECK_FAIL && !r->http_code && !r->protocol_confirmed &&
+                  !r->restore_error && !r->verification_disabled && !r->retry.protocol_confirmed &&
+                  !r->retry.http_code && (uint32_t)r->retry.ssl_error != 0x80435060 &&
+                  (uint32_t)r->error == 0x80431075 && (uint32_t)r->ssl_error == 0x80435061;
+    /* vitals-http says why: Mbed TLS's protocol version error, in the detail */
+    if (refused && r->vitals_active == 1)
+        return r->ssl_detail == 0xffff8880u || r->ssl_detail == 0xffff9180u;
+    /* Sony's libhttp on vitals-ssl (the Options' http.off) gives no detail: the handshake failing
+     * again with certificate checks off says it's the protocol, which vitals-ssl never offers */
+    return refused && r->vitals_tls == 1 && r->vitals_active != 1 && r->ssl_detail == 0 && r->retry.attempted &&
+           r->retry.verification_disabled && (uint32_t)r->retry.error == 0x80431075 &&
+           (uint32_t)r->retry.ssl_error == 0x80435061;
 }
 CheckProtocolDisplay check_protocol_display(unsigned version, const CheckResult *r, int vitals_enabled) {
     (void)vitals_enabled;
@@ -163,6 +169,12 @@ int check_http_module_active(const char *name, const char *path, unsigned state)
     if (name == NULL || path == NULL || state != 6 || strncmp(name, module, sizeof(module)) != 0)
         return 0;
     return same_file(path, VITALS_LIBHTTP_PATH);
+}
+int check_ssl_module_active(const char *name, const char *path, unsigned state) {
+    static const char module[] = "SceLibSsl";
+    if (name == NULL || path == NULL || state != 6 || strncmp(name, module, sizeof(module)) != 0)
+        return 0;
+    return same_file(path, VITALS_LIBSSL_PATH);
 }
 int check_protocol_body(unsigned version, const char *b, size_t n) {
     char expected[16];
