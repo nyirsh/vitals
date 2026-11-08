@@ -305,6 +305,8 @@ void check_run(const CheckBackend *backend, CheckService *service, char *notice,
 	lock(&run);
 	service->vitals_enabled = parts.vitals;
 	service->libhttp_active = parts.http;
+	service->tls_active = parts.tls;
+	service->redirects_off = parts.redirects_off;
 	memcpy(service->redirects, rules, redirect_count * sizeof(*rules));
 	service->redirect_count = redirect_count;
 	memcpy(service->dns, rules + CHECK_REDIRECT_MAX, dns_count * sizeof(*rules));

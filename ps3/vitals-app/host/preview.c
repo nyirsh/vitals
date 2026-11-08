@@ -246,6 +246,9 @@ int main(int argc, char **argv)
 	                                                 {"motorstorm.example", "community.example"}};
 	s.redirect_count = 5;
 	s.libhttp_active = 1;
+	/* vitals' libssl too, and HTTP's redirects off, to show its orange state */
+	s.tls_active = 1;
+	s.redirects_off = 1;
 	for (unsigned i = 0; i < s.redirect_count; ++i) {
 		snprintf(s.redirects[i].from, sizeof(s.redirects[i].from), "%s", redirect_hosts[i][0]);
 		snprintf(s.redirects[i].to, sizeof(s.redirects[i].to), "%s", redirect_hosts[i][1]);

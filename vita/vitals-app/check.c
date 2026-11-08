@@ -683,7 +683,7 @@ void vitals_check_start(void)
     join_worker();
     lock();
     memset(&service, 0, sizeof(service));
-    service.vitals_enabled = service.libhttp_active = -1;
+    service.vitals_enabled = service.libhttp_active = service.tls_active = service.redirects_off = -1;
     service.started = 1;
     busy = 1;
     cancelled = 0;
@@ -711,7 +711,7 @@ int vitals_check_poll(CheckService *view, char *message, size_t size)
     if (guard < 0)
     {
         memset(view, 0, sizeof(*view));
-        view->vitals_enabled = view->libhttp_active = -1;
+        view->vitals_enabled = view->libhttp_active = view->tls_active = view->redirects_off = -1;
         snprintf(message, size, "%s", "The test couldn't start");
         return 0;
     }

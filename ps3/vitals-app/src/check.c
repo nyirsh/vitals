@@ -254,7 +254,7 @@ void vitals_check_start(void)
 	lock();
 	memset(&service, 0, sizeof(service));
 	service.started = 1;
-	service.vitals_enabled = service.libhttp_active = -1;
+	service.vitals_enabled = service.libhttp_active = service.tls_active = service.redirects_off = -1;
 	notice[0] = '\0';
 	busy = 1;
 	unlock();
@@ -371,7 +371,7 @@ int vitals_check_poll(CheckService *view, char *message, size_t size)
 {
 	if (!guard_ready) {
 		memset(view, 0, sizeof(*view));
-		view->vitals_enabled = view->libhttp_active = -1;
+		view->vitals_enabled = view->libhttp_active = view->tls_active = view->redirects_off = -1;
 		if (size != 0)
 			message[0] = '\0';
 		return 0;

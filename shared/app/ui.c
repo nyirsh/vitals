@@ -611,6 +611,51 @@ void app_draw_changelog(uint32_t *p, const AppChangelog *changelog)
 	footer(p, scrolls ? scrolling : scrolling + 1, scrolls ? 2u : 1u);
 }
 
+/* One of vitals' parts in the connection test's header: its name, then its state as the Options name
+ * it, green when on, orange with HTTP's redirects off, red when off, and a dash until known */
+typedef struct {
+	const char *name, *state;
+	enum CheckState style;
+} PartState;
+
+static PartState part_state(const char *name, int active, int partly)
+{
+	if (active < 0)
+		return (PartState){name, "...", CHECK_WAIT};
+	if (!active)
+		return (PartState){name, "Off", CHECK_FAIL};
+	if (partly == 1)
+		return (PartState){name, "Redirects off", CHECK_WARNING};
+	return (PartState){name, "On", CHECK_PASS};
+}
+
+/* SSL, HTTP and DNS in one card at the top right, each name with its mark and state */
+static void parts_card(uint32_t *p, const CheckService *s)
+{
+	/* DNS by its switch: known with the others, once the run read them */
+	int known = s->libhttp_active >= 0;
+	const PartState parts[] = {part_state("SSL", s->tls_active, 0),
+	                           part_state("HTTP", s->libhttp_active, s->redirects_off),
+	                           part_state("DNS", known ? !s->dns_off : -1, 0)};
+	enum { COUNT = sizeof(parts) / sizeof(parts[0]), GAP = 26, NAME_GAP = 10, MARK = 24, MARK_GAP = 12, SIZE = 18 };
+	int box_width = 48 - GAP;
+	for (unsigned i = 0; i < COUNT; ++i)
+		box_width += width(parts[i].name, SIZE) + NAME_GAP + MARK + MARK_GAP + width(parts[i].state, SIZE) + GAP;
+	int x = X(932) - box_width;
+	card(p, x, Y(27), box_width, Y(42), panel);
+	x += 24;
+	for (unsigned i = 0; i < COUNT; ++i) {
+		text(p, x, Y(35), parts[i].name, muted, SIZE);
+		x += width(parts[i].name, SIZE) + NAME_GAP;
+		/* The mark's bottom on the text's baseline: at size 18 the capitals end 25 pixels below where
+		 * the line is drawn, as 21's end 28 and 24's 31 */
+		mark_colored(p, x, Y(35) + 25 - mark_bottom(parts[i].style), parts[i].style, tone(parts[i].style));
+		x += MARK + MARK_GAP;
+		text(p, x, Y(35), parts[i].state, tone(parts[i].style), SIZE);
+		x += width(parts[i].state, SIZE) + GAP;
+	}
+}
+
 /* libhttp's certificate flags (CELL_HTTPS_VERIFY_ERROR_*) for the request details */
 void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, int busy, const char *notice)
 {
@@ -618,9 +663,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 	rect(p, 0, 0, CHECK_WIDTH, CHECK_HEIGHT, bg);
 	text(p, X(28), Y(17), "Connection test", white, 32);
 	text(p, X(30), Y(58), "TLS, certificates, redirects and DNS rules", muted, 17);
-	const char *provider_status = s->vitals_enabled < 0 ? "checking..." : s->vitals_enabled ? "enabled" : "not enabled";
-	enum CheckState provider_style = s->vitals_enabled < 0 ? CHECK_WAIT : s->vitals_enabled ? CHECK_PASS : CHECK_FAIL;
-	status_card(p, "vitals:", provider_status, provider_style, tone(provider_style));
+	parts_card(p, s);
 	for (unsigned col = 0; col < 4; ++col) {
 		unsigned v = 3 - col;
 		int left = X(28 + (int)col * 232);

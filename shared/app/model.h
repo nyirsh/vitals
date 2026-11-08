@@ -96,9 +96,10 @@ typedef struct {
 	 * (Sony's libssl has no TLS 1.3, so a connection there is vitals'), on the Vita whether vitals'
 	 * libhttp is the one loaded */
 	int vitals_enabled;
-	/* On the PS3, whether vitals' libhttp is the one this boot loads (the boot plugin's libhttp.active,
-	 * written this boot): the redirects are tested only then. -1 until known */
-	int libhttp_active;
+	/* Whether vitals' libhttp and libssl are the ones answering (the Vita's process, the PS3's boot
+	 * markers), and whether HTTP's redirects are off (redirects.off): the parts the screen shows, as
+	 * the Options name them. -1 until known; the redirects are tested only while libhttp is vitals' */
+	int libhttp_active, tls_active, redirects_off;
 	/* The run's report: 0 not saved, 1 saved (as report), -1 the last attempt failed */
 	int report_saved;
 	char report[160];
