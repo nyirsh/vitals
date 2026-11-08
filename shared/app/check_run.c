@@ -249,6 +249,31 @@ static void run_dns(Run *run, const CheckParts *parts)
 	}
 }
 
+typedef struct {
+	CheckRedirect *list;
+	unsigned count, max;
+} Rules;
+
+static int keep_rule(void *context, const VitalsHostRule *rule)
+{
+	Rules *rules = context;
+	CheckRedirect *kept = &rules->list[rules->count++];
+	memset(kept, 0, sizeof(*kept));
+	memcpy(kept->from, rule->from, rule->from_length);
+	memcpy(kept->to, rule->to, rule->to_length);
+	return rules->count == rules->max;
+}
+
+unsigned check_run_read_rules(VitalsRedirectListRead read, CheckRedirect *list, unsigned max)
+{
+	Rules rules = {list, 0, max};
+	char *work = max != 0 ? malloc(VITALS_REDIRECT_LIST_WORK_SIZE) : NULL;
+	if (work == NULL || vitals_redirect_list_read(read, work, keep_rule, &rules) < 0)
+		rules.count = 0;
+	free(work);
+	return rules.count;
+}
+
 void check_run(const CheckBackend *backend, CheckService *service, char *notice, size_t notice_size)
 {
 	Run run = {backend, service, 0};

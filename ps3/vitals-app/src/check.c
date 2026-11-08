@@ -75,34 +75,19 @@ static int read_redirects(unsigned int offset, void *buffer, unsigned int size)
 	return (int)got;
 }
 
-typedef struct {
-	CheckRedirect *list;
-	unsigned count, max;
-} RedirectCollection;
-
-static int keep_redirect(void *context, const VitalsHostRule *rule)
-{
-	RedirectCollection *collection = context;
-	CheckRedirect *redirect = &collection->list[collection->count++];
-	memset(redirect, 0, sizeof(*redirect));
-	memcpy(redirect->from, rule->from, rule->from_length);
-	memcpy(redirect->to, rule->to, rule->to_length);
-	return collection->count == collection->max;
-}
-
-/* The host redirects, or the DNS rules: the same "host target" lines, read by the same parser */
+/* The host redirects, or the DNS rules: the same "host target" lines, read as vitals reads them
+ * (check_run_read_rules); none when the file is missing or can't be read to its end */
 static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned max)
 {
-	RedirectCollection collection = {list, 0, max};
-	char *work = malloc(VITALS_REDIRECT_LIST_WORK_SIZE);
-	if (work != NULL && cellFsOpen(path, CELL_FS_O_RDONLY, &redirect_fd, NULL, 0) == CELL_FS_SUCCEEDED) {
-		if (vitals_redirect_list_read(read_redirects, work, keep_redirect, &collection) < 0)
-			app_log("%s: read failed after %u", path, collection.count);
-		cellFsClose(redirect_fd);
+	if (cellFsOpen(path, CELL_FS_O_RDONLY, &redirect_fd, NULL, 0) != CELL_FS_SUCCEEDED) {
+		redirect_fd = -1;
+		return 0;
 	}
+	unsigned count = check_run_read_rules(read_redirects, list, max);
+	cellFsClose(redirect_fd);
 	redirect_fd = -1;
-	free(work);
-	return collection.count;
+	app_log("%s: %u rules", path, count);
+	return count;
 }
 
 /* A name looked up through libnet, as a game would: its query goes out through sendto, where the

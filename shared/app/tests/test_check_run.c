@@ -115,6 +115,40 @@ static CheckBackend backend = {fake_open, fake_parts, fake_load, fake_protocol, 
 static CheckService service;
 static char notice[120];
 
+/* A list file for check_run_read_rules, in memory; reads fail from fail_at on */
+static const char *list_text;
+static unsigned fail_at = ~0u;
+static int read_list(unsigned int offset, void *buffer, unsigned int size)
+{
+	size_t length = strlen(list_text);
+	if (offset >= fail_at)
+		return -3;
+	if (offset >= length)
+		return 0;
+	unsigned n = (unsigned)(length - offset) < size ? (unsigned)(length - offset) : size;
+	memcpy(buffer, list_text + offset, n);
+	return (int)n;
+}
+
+static void read_rules(void)
+{
+	CheckRedirect list[3];
+	/* The pairs, with comments and lines vitals ignores left out */
+	list_text = "# comment\nold.example new.example\n\nnot-a-pair\nPSN.Example  other.example # why\n";
+	assert(check_run_read_rules(read_list, list, 3) == 2);
+	assert(strcmp(list[0].from, "old.example") == 0 && strcmp(list[0].to, "new.example") == 0);
+	assert(list[1].to[0] != '\0' && list[1].reached[0] == '\0');
+	/* At most max */
+	assert(check_run_read_rules(read_list, list, 1) == 1);
+	assert(check_run_read_rules(read_list, list, 0) == 0);
+	/* A list that can't be read to its end gives none, as vitals applies none */
+	fail_at = 0;
+	assert(check_run_read_rules(read_list, list, 3) == 0);
+	fail_at = ~0u;
+	list_text = "";
+	assert(check_run_read_rules(read_list, list, 3) == 0);
+}
+
 static void run(void)
 {
 	memset(&service, 0, sizeof(service));
@@ -129,6 +163,8 @@ static void run(void)
 
 int main(void)
 {
+	read_rules();
+
 	/* Everything on: the tiles TLS 1.3 first, then the report, badssl.com, the redirects (reached
 	 * the new host) and the DNS rules */
 	parts = (CheckParts){1, 1, 0, 0, 1, 0};
@@ -212,6 +248,6 @@ int main(void)
 	assert(strcmp(notice, "No network connection") == 0 && requests == 0 && service.protocols[0].state == CHECK_WAIT);
 	open_rc = 0;
 
-	puts("connection test's run: order, what isn't tested, redirects' host, cancelling, policy failure, failed start PASS");
+	puts("connection test's run: order, what isn't tested, redirects' host, cancelling, policy failure, failed start, rule lists PASS");
 	return 0;
 }

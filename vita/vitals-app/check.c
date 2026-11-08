@@ -323,35 +323,17 @@ static int read_redirects(unsigned int offset, void *buffer, unsigned int size)
     size_t count = fread(buffer, 1, size, redirect_file);
     return ferror(redirect_file) ? -1 : (int)count;
 }
-typedef struct
-{
-    CheckRedirect *list;
-    unsigned count, max;
-} RedirectCollection;
-static int keep_redirect(void *context, const VitalsHostRule *rule)
-{
-    RedirectCollection *collection = context;
-    CheckRedirect *redirect = &collection->list[collection->count++];
-    memset(redirect, 0, sizeof(*redirect));
-    memcpy(redirect->from, rule->from, rule->from_length);
-    memcpy(redirect->to, rule->to, rule->to_length);
-    return collection->count == collection->max;
-}
-/* The rules in the list at path (the redirects, or the DNS rules, which are written the same way), at
- * most max; none when the file is missing or unreadable */
+/* The rules in the list at path (the redirects, or the DNS rules, which are written the same way), as
+ * vitals reads them (check_run_read_rules); none when the file is missing or unreadable */
 static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned max)
 {
-    RedirectCollection collection = {list, 0, max};
-    char *work = malloc(VITALS_REDIRECT_LIST_WORK_SIZE);
     redirect_file = fopen(path, "rb");
-    if (work != NULL && redirect_file != NULL &&
-        vitals_redirect_list_read(read_redirects, work, keep_redirect, &collection) < 0)
-        collection.count = 0;
-    if (redirect_file != NULL)
-        fclose(redirect_file);
+    if (redirect_file == NULL)
+        return 0;
+    unsigned count = check_run_read_rules(read_redirects, list, max);
+    fclose(redirect_file);
     redirect_file = NULL;
-    free(work);
-    return collection.count;
+    return count;
 }
 /* Which of vitals' libraries are this process's: 1 vitals-http, 2 vitals-ssl, both, or none */
 static int detect_vitals(void)

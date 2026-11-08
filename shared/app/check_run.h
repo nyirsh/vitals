@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "model.h"
+#include "vitals/redirect_list.h"
 
 /* The connection test's run, the same on every console (check_run.c): the TLS tiles, TLS 1.3 first,
  * then the TLS report, last of those so it can't gate the tiles; the badssl.com battery; each host
@@ -63,6 +64,11 @@ typedef struct {
 	void (*unlock)(void);
 	uint64_t (*now_ms)(void);
 } CheckBackend;
+
+/* A list of "host target" rules (the redirects, the DNS rules) through read, the console's file read
+ * as vitals' own reader takes it, with the parser vitals applies them with: at most max, and none
+ * when the list can't be read to its end, as vitals applies none then. A console's load */
+unsigned check_run_read_rules(VitalsRedirectListRead read, CheckRedirect *list, unsigned max);
 
 /* The whole run, into service (cleared by the caller, started set), with what stopped it early in
  * notice; complete and interrupted are set when it ends */
