@@ -19,8 +19,9 @@ typedef struct {
 	int http, tls;
 	/* HTTP's Redirects off (redirects.off), and the DNS rules off (dns.off) */
 	int redirects_off, dns_off;
-	/* Whether vitals is running, as the screen and the tiles show it; -1 to take it from the TLS 1.3
-	 * tile (the PS3's way: Sony's TLS has no 1.3, so a connection is vitals') */
+	/* Whether vitals is running, as the screen and the tiles show it: either of its modules is (the
+	 * Vita's process, the PS3's boot markers); -1 for a console that can't tell, to take it from the
+	 * TLS 1.3 tile (Sony's TLS has no 1.3, so a connection there is vitals') */
 	int vitals;
 	/* 1 when vitals' HTTP is too old to say which host answered a request (the Vita's before
 	 * vitalsHttpGetUrl): the redirects can't be tested then */

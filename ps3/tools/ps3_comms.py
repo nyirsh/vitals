@@ -76,6 +76,7 @@ SONY_CERTS = "/dev_flash/data/cert"
 INSTALLED = SYSTEM + "/installed.txt"
 # The boot plugin's mark of a boot that maps vitals' libhttp, for the app's test
 LIBHTTP_ACTIVE = SYSTEM + "/libhttp.active"
+LIBSSL_ACTIVE = SYSTEM + "/libssl.active"
 # Each component's switch: while it's there, that component is off from the next boot
 # (xmb-tls.off and xmb-http.off count only for a boot plugin built with XMB=1, which isn't installed)
 SWITCHES = [FLAGS + "/" + name for name in ("tls.off", "http.off", "dns.off", "redirects.off")]
@@ -409,7 +410,7 @@ def uninstall(ftp):
     remove_line(ftp, BOOT_PLUGINS_KERNEL, DNS_PLUGIN)
     move_earlier_layout(ftp)
     # system/ and logs/ go; the user's lists, flags/ and reports/ stay, as on the Vita
-    for path in (PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, BUNDLE, BUNDLE_EARLIER, INSTALLED, LIBHTTP_ACTIVE,
+    for path in (PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, BUNDLE, BUNDLE_EARLIER, INSTALLED, LIBHTTP_ACTIVE, LIBSSL_ACTIVE,
                  SYSTEM + "/boot_plugins.txt.bak", SYSTEM + "/boot_plugins_kernel.txt.bak", LOG, APP_LOG):
         if delete(ftp, path):
             print(f"{path}: deleted")
@@ -455,7 +456,7 @@ def status(ftp):
         print(f"{listed}:")
         for line in lines:
             print(f"  {line}")
-    for path in [PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, LIBHTTP_ACTIVE, BUNDLE, INSTALLED, REDIRECTS, DNS, USER_AGENT, CUSTOM_CERTS,
+    for path in [PLUGIN, LIBSSL, LIBHTTP, DNS_PLUGIN, LIBHTTP_ACTIVE, LIBSSL_ACTIVE, BUNDLE, INSTALLED, REDIRECTS, DNS, USER_AGENT, CUSTOM_CERTS,
                  *SWITCHES, LOG, APP_LOG]:
         try:
             size = ftp.size(path)

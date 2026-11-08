@@ -41,8 +41,9 @@
  * install takes it from there */
 #define VITALS_BUNDLE_EARLIER VITALS_SYSTEM_DIRECTORY "/cacert.pem"
 #define VITALS_INSTALLED VITALS_SYSTEM_DIRECTORY "/installed.txt"
-/* Written by the boot plugin on a boot that maps vitals' libhttp, for the app's test */
+/* Written by the boot plugin on a boot that maps vitals' libhttp, or its libssl, for the app's test */
 #define VITALS_LIBHTTP_ACTIVE VITALS_SYSTEM_DIRECTORY "/libhttp.active"
+#define VITALS_LIBSSL_ACTIVE VITALS_SYSTEM_DIRECTORY "/libssl.active"
 
 /* flags/ */
 #define VITALS_TLS_OFF VITALS_FLAGS_DIRECTORY "/tls.off"

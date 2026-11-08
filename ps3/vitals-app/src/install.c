@@ -359,7 +359,7 @@ int vitals_uninstall_run(VitalsNote note)
 	 * the folder when anything's left in it */
 	static const char *const files[] = {VITALS_PLUGIN,      VITALS_LIBSSL,  VITALS_LIBHTTP,
 	                                    VITALS_DNS_PLUGIN,  VITALS_BUNDLE,  VITALS_BUNDLE_EARLIER, VITALS_INSTALLED,
-	                                    VITALS_LIBHTTP_ACTIVE, VITALS_SYSTEM_DIRECTORY "/boot_plugins.txt.bak",
+	                                    VITALS_LIBHTTP_ACTIVE, VITALS_LIBSSL_ACTIVE, VITALS_SYSTEM_DIRECTORY "/boot_plugins.txt.bak",
 	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins_kernel.txt.bak", VITALS_LOG,
 	                                    VITALS_APP_LOG};
 	for (unsigned i = 0; i < sizeof(files) / sizeof(files[0]); ++i)

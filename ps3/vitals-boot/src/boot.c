@@ -5,9 +5,10 @@
  * start, the plugin asks to be unloaded; the redirection stays in Cobra's table.
  *
  * libhttp is redirected the same way, to /dev_hdd0/vitals/system/libhttp.sprx, at every boot it's
- * there. On a boot where it's mapped, the plugin writes /dev_hdd0/vitals/system/libhttp.active, and
- * on every other boot it deletes it: vitals' libhttp answers as Sony's does, so the app's test reads
- * this (with its date against the boot's) to know whose libhttp it's talking to.
+ * there. On a boot where each is mapped, the plugin writes /dev_hdd0/vitals/system/libssl.active and
+ * libhttp.active, and on every other boot it deletes them: vitals' modules answer as Sony's do, so
+ * the app's test reads these (with their date against the boot's) to know whose it's talking to, as
+ * the Vita's app sees which modules its process loaded.
  *
  * The DNS kernel plugin (/dev_hdd0/vitals/system/vitals_dns.bin) is loaded from here too, with
  * Cobra's syscall 8 as webMAN MOD loads one. Early versions froze the console when loaded at boot,
@@ -66,6 +67,7 @@
 #define SONY_LIBSSL "/dev_flash/sys/external/libssl.sprx"
 #define SONY_LIBHTTP "/dev_flash/sys/external/libhttp.sprx"
 #define LIBHTTP_ACTIVE VITALS_LIBHTTP_ACTIVE
+#define LIBSSL_ACTIVE VITALS_LIBSSL_ACTIVE
 
 /* Cobra's sys_map_path (lv2 syscall 35): old path, new path (NULL removes the redirection) */
 #define COBRA_MAP_PATH 35
@@ -112,6 +114,41 @@ static int create_file(const char *path)
 /* Whether a component is on, and if not why, for the popup */
 enum { ON, OFF_BY_FLAG, OFF_MISSING, OFF_FAILED };
 
+/* A module's marker, after it was mapped (result 0), for the app's test */
+static void mark(const char *marker, int result)
+{
+	char hex[9];
+	if (result != 0)
+		return;
+	int marked = create_file(marker);
+	if (marked != 0) {
+		say(1, "can't write marker");
+		say(1, marker);
+		say(1, vitals_log_hex((uint32_t)marked, hex));
+	}
+}
+
+/* vitals' libssl, unless tls.off is there or the module isn't */
+static int map_libssl(void)
+{
+	char hex[9];
+	/* Last boot's marker goes; a boot that maps vitals' libssl writes it again */
+	(void)unlink_file(LIBSSL_ACTIVE);
+	if (file_exists(VITALS_TLS_OFF)) {
+		say(1, "tls.off is there: Sony's libssl stays");
+		return OFF_BY_FLAG;
+	}
+	if (!file_exists(VITALS_LIBSSL)) {
+		say(1, "no " VITALS_LIBSSL ": Sony's libssl stays");
+		return OFF_MISSING;
+	}
+	int result = map_path(SONY_LIBSSL, VITALS_LIBSSL);
+	say(1, "map " SONY_LIBSSL " -> " VITALS_LIBSSL);
+	say(1, vitals_log_hex((uint32_t)result, hex));
+	mark(LIBSSL_ACTIVE, result);
+	return result == 0 ? ON : OFF_FAILED;
+}
+
 /* vitals' libhttp, unless http.off is there or the module isn't */
 static int map_libhttp(void)
 {
@@ -129,13 +166,7 @@ static int map_libhttp(void)
 	int result = map_path(SONY_LIBHTTP, VITALS_LIBHTTP);
 	say(1, "map " SONY_LIBHTTP " -> " VITALS_LIBHTTP);
 	say(1, vitals_log_hex((uint32_t)result, hex));
-	if (result == 0) {
-		int marked = create_file(LIBHTTP_ACTIVE);
-		if (marked != 0) {
-			say(1, "can't write " LIBHTTP_ACTIVE);
-			say(1, vitals_log_hex((uint32_t)marked, hex));
-		}
-	}
+	mark(LIBHTTP_ACTIVE, result);
 	return result == 0 ? ON : OFF_FAILED;
 }
 
@@ -701,21 +732,10 @@ static int start_notify(void)
 
 int module_start(size_t args, void *argp)
 {
-	char hex[9];
 	(void)args, (void)argp;
 	say(1, "start");
 	int cut_short = last_boot_cut_short();
-	if (file_exists(VITALS_TLS_OFF)) {
-		say(1, "tls.off is there: Sony's libssl stays");
-		g_ssl = OFF_BY_FLAG;
-	} else if (!file_exists(VITALS_LIBSSL)) {
-		say(1, "no " VITALS_LIBSSL ": Sony's libssl stays");
-	} else {
-		int result = map_path(SONY_LIBSSL, VITALS_LIBSSL);
-		say(1, "map " SONY_LIBSSL " -> " VITALS_LIBSSL);
-		say(1, vitals_log_hex((uint32_t)result, hex));
-		g_ssl = result == 0 ? ON : OFF_FAILED;
-	}
+	g_ssl = map_libssl();
 	/* vitals' libhttp on whichever libssl games get: it calls libssl through Sony's exports, as Sony's
 	 * libhttp does, so its switch is its own (the libhttp probe on Sony's libssl in RPCS3, where it
 	 * differs from Sony's libhttp only as on vitals', tools/http_probe.sh) */

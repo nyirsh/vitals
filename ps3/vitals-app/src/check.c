@@ -111,12 +111,13 @@ static void look_up(const char *name, CheckLookup *out)
 		out->error = NO_DATA;
 }
 
-/* Whether vitals' libhttp is this boot's: the boot plugin writes libhttp.active on a boot that maps
- * it, so a file older than this boot is a stale one (a boot without the plugin) */
-static int libhttp_active(void)
+/* Whether one of vitals' modules is this boot's: the boot plugin writes its marker (libssl.active,
+ * libhttp.active) on a boot that maps it, so a file older than this boot is a stale one (a boot
+ * without the plugin). The PS3's way of knowing what the Vita's app sees in its own process */
+static int module_active(const char *marker)
 {
 	CellFsStat status;
-	if (cellFsStat(VITALS_LIBHTTP_ACTIVE, &status) != CELL_FS_SUCCEEDED)
+	if (cellFsStat(marker, &status) != CELL_FS_SUCCEEDED)
 		return 0;
 	CellRtcDateTime clock;
 	time_t now = 0;
@@ -138,18 +139,21 @@ static int backend_open(char *text, size_t size)
 	return rc;
 }
 
+/* Which of vitals' modules this boot has, for the report as the Vita's keeps its own */
+static int vitals_http = -1, vitals_tls = -1;
+
 static void backend_parts(CheckParts *parts)
 {
-	parts->http = libhttp_active();
-	/* The boot plugin leaves no word on libssl: the TLS 1.3 tile tells (vitals = -1) */
-	parts->tls = -1;
+	vitals_http = parts->http = module_active(VITALS_LIBHTTP_ACTIVE);
+	vitals_tls = parts->tls = module_active(VITALS_LIBSSL_ACTIVE);
 	parts->redirects_off = vitals_switch_is_off(VITALS_REDIRECTS_OFF);
 	parts->dns_off = vitals_switch_is_off(VITALS_DNS_OFF);
-	parts->vitals = -1;
+	/* As on the Vita: vitals is running when either of its modules is */
+	parts->vitals = parts->http || parts->tls;
 	/* libhttp's own transaction says which host answered */
 	parts->http_outdated = 0;
-	app_log("vitals' libhttp %s%s%s", parts->http ? "active" : "not active", parts->redirects_off ? ", redirects off" : "",
-	        parts->dns_off ? ", DNS rules off" : "");
+	app_log("vitals' libssl %s, libhttp %s%s%s", parts->tls ? "active" : "not active", parts->http ? "active" : "not active",
+	        parts->redirects_off ? ", redirects off" : "", parts->dns_off ? ", DNS rules off" : "");
 }
 
 static void backend_protocol(unsigned test, char *body, CheckResult *r)
@@ -277,8 +281,10 @@ static void report_about(CheckReport *report, const CheckService *s)
 	const ConsoleInfo *console = console_info();
 	check_report_add(report, "console=%s (%s)\n", console->text,
 	                 console->supported ? "supported" : "not supported: vitals is made for 4.93 CEX with Cobra");
-	check_report_add(report, "parts=libhttp: %s (the boot plugin's libhttp.active, this boot); libssl: TLS 1.3 tells\n",
-	                 s->libhttp_active < 0 ? "checking" : s->libhttp_active ? "vitals'" : "Sony's");
+	(void)s;
+	check_report_add(report, "parts=HTTP: %s, TLS: %s this boot (the boot plugin's libhttp.active, libssl.active)\n",
+	                 vitals_http < 0 ? "?" : vitals_http ? "vitals' libhttp" : "Sony's libhttp",
+	                 vitals_tls < 0 ? "?" : vitals_tls ? "vitals' libssl" : "Sony's libssl");
 }
 
 /* libssl's verify flags, protocol and cipher */
