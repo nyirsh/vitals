@@ -190,26 +190,9 @@ unsigned check_request_ms(const CheckResult *r)
 	return r->elapsed_ms;
 }
 
-void check_badssl_judge(const CheckBadssl *test, CheckResult *r)
+int check_request_unreachable(const CheckResult *r)
 {
-	if (!test->refuse) {
-		if (r->http_code > 0 && r->error == 0) {
-			r->state = CHECK_PASS;
-			snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d)", r->http_code);
-		} else {
-			r->state = CHECK_FAIL;
-			check_request_failure(r, "");
-		}
-	} else if (r->http_code > 0 && r->error == 0) {
-		r->state = CHECK_FAIL;
-		snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d), should be refused", r->http_code);
-	} else if (check_unreachable(r->error)) {
-		r->state = CHECK_FAIL;
-		check_request_failure(r, "Inconclusive: ");
-	} else {
-		r->state = CHECK_PASS;
-		check_request_failure(r, "Refused: ");
-	}
+	return check_unreachable(r->error);
 }
 
 int check_timed_out(int error)

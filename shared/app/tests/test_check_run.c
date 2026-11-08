@@ -71,17 +71,16 @@ static int fake_fetch(const char *url, int status_only, char *body, size_t *leng
 		return 0;
 	}
 	assert(status_only);
+	/* From the policy_after'th request on, a failure that leaves the rest untested (fake_policy) */
+	if (policy_after >= 0 && requests >= policy_after) {
+		r->error = -77;
+		return -1;
+	}
 	r->http_code = 404;
 	r->state = CHECK_PASS;
 	return 0;
 }
 
-static void fake_badssl(const CheckBadssl *test, CheckResult *r)
-{
-	snprintf(r->message, sizeof(r->message), "judged %s", test->host);
-	if (policy_after >= 0 && requests >= policy_after)
-		r->error = -77;
-}
 
 /* Every name answers 1.2.3.4, its target's too */
 static void fake_lookup(const char *name, CheckLookup *answer)
@@ -108,7 +107,6 @@ static CheckBackend backend = {
 	.load = fake_load,
 	.protocol = fake_protocol,
 	.fetch = fake_fetch,
-	.judge_badssl = fake_badssl,
 	.lookup = fake_lookup,
 	.stopped = fake_stopped,
 	.lock = fake_lock,
@@ -296,7 +294,8 @@ int main(void)
 		assert(service.protocols[i].state == CHECK_PASS);
 	assert(service.connection.state == CHECK_PASS && strcmp(service.connection.message, "Server report received") == 0);
 	for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
-		assert(strncmp(service.badssl[i].message, "judged ", 7) == 0);
+		assert(strcmp(service.badssl[i].message, check_badssl(i)->refuse ? "Loaded (HTTP 404), should be refused"
+		                                                                  : "Loaded (HTTP 404)") == 0);
 	assert(service.redirect_count == 2 && service.redirects[1].result.state == CHECK_PASS);
 	assert(strcmp(service.redirects[0].from, "old0.example") == 0 &&
 	       strcmp(service.redirects[0].result.message, "Reached new.example (HTTP 404)") == 0);

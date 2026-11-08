@@ -25,6 +25,5 @@ const char *check_error_name(int error, int ssl_error, unsigned detail);
 /* Judges a finished badssl.com request (made with certificate checks on, any final HTTP status
  * accepted) against what the case expects: a refusal passes only when no response came and the
  * host was reachable */
-void check_badssl_judge(const CheckBadssl *test, CheckResult *result);
 
 #endif

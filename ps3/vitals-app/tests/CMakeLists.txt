@@ -39,7 +39,7 @@ add_test(NAME vitals_app_check_model COMMAND vitals_app_check_model_tests)
 
 # The connection test's run (shared with the Vita's tests), over a console that answers from a script
 add_executable(vitals_app_check_run_tests ${SHARED}/app/tests/test_check_run.c ${SHARED}/app/check_run.c
-    ${SHARED}/app/model.c ${SHARED}/src/redirect_list.c ${SHARED}/src/host_map.c)
+    ${SHARED}/app/model.c ${APP_DIR}/src/check_model.c ${SHARED}/src/redirect_list.c ${SHARED}/src/host_map.c)
 target_include_directories(vitals_app_check_run_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
 add_test(NAME vitals_app_check_run COMMAND vitals_app_check_run_tests)
 

@@ -163,7 +163,7 @@ static void run_badssl(Run *run, char *body)
 			size_t length = 0;
 			snprintf(url, sizeof(url), "https://%s/", test->host);
 			int rc = run->b->fetch(url, 1, body, &length, reached, sizeof(reached), &r);
-			run->b->judge_badssl(test, &r);
+			check_badssl_judge(test, &r);
 			cancelled_request(run, rc, &r);
 			after(run, test->host, &r);
 		}

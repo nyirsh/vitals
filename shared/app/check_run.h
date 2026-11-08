@@ -47,9 +47,6 @@ typedef struct {
 	 * the error */
 	int (*fetch)(const char *url, int status_only, char *body, size_t *length, char *reached, size_t reached_size,
 	             CheckResult *result);
-	/* The console's judge of a finished badssl.com request (its check_model.c); a redirect's is
-	 * shared (check_redirect_judge) */
-	void (*judge_badssl)(const CheckBadssl *test, CheckResult *result);
 	/* A name looked up as a game would, where the DNS rules apply (the PS3's libnet, the Vita's
 	 * sceNetResolver); NULL on a console whose test doesn't look them up */
 	void (*lookup)(const char *name, CheckLookup *answer);

@@ -69,6 +69,10 @@ static void judging(void)
 	r = result(0, RESOLVER, 0);
 	check_badssl_judge(&bad, &r);
 	expect_message(&r, CHECK_FAIL, "Inconclusive: Name not resolved (0x80710101)");
+	/* Neither a response nor an error: nothing refused it, which the PS3's judge used to pass */
+	r = result(0, OK, 0);
+	check_badssl_judge(&bad, &r);
+	expect_message(&r, CHECK_FAIL, "Not refused");
 
 }
 

@@ -152,6 +152,10 @@ enum CheckDnsTarget check_dns_target(const char *target, unsigned char address[4
  * when it's among the answers, a host name when an answer is among the target's own (target is the
  * target's lookup, for a host name only) */
 void check_dns_judge(const char *rule_target, const CheckLookup *answer, const CheckLookup *target, CheckResult *result);
+/* A finished badssl.com request: a host that must load passes on any status; one that must be refused
+ * passes when it was reached and refused, fails when it loaded or nothing refused it, and is
+ * inconclusive when it wasn't reached (check_request_unreachable) */
+void check_badssl_judge(const CheckBadssl *test, CheckResult *result);
 
 /* ---- each console's check_model.c: what ui.c shows of a request ---- */
 
@@ -163,5 +167,10 @@ void check_protocol_detail(unsigned version, const CheckResult *result, char *te
 void check_request_codes(const CheckResult *result, char *text, size_t capacity);
 /* How long the request took in all, retries included, for its time column */
 unsigned check_request_ms(const CheckResult *result);
+/* A failed request in words after prefix, as the console's HTTP library names its error */
+void check_request_failure(CheckResult *result, const char *prefix);
+/* 1 when a failed request never reached the server's TLS (the resolver, the connection, a timeout),
+ * or the console can't trust its result: it proves nothing about the certificate */
+int check_request_unreachable(const CheckResult *result);
 
 #endif

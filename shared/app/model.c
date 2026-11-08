@@ -458,3 +458,28 @@ void check_dns_judge(const char *rule_target, const CheckLookup *answer, const C
 	r->state = CHECK_FAIL;
 	snprintf(r->message, sizeof(r->message), "Resolved to %s, not the target's", got);
 }
+
+void check_badssl_judge(const CheckBadssl *test, CheckResult *r)
+{
+	int loaded = r->http_code > 0 && r->error == 0;
+	if (!test->refuse) {
+		r->state = loaded ? CHECK_PASS : CHECK_FAIL;
+		if (loaded)
+			snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d)", r->http_code);
+		else
+			check_request_failure(r, "");
+	} else if (loaded) {
+		r->state = CHECK_FAIL;
+		snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d), should be refused", r->http_code);
+	} else if (r->error == 0) {
+		/* Neither a response nor an error: nothing refused it */
+		r->state = CHECK_FAIL;
+		snprintf(r->message, sizeof(r->message), "Not refused");
+	} else if (check_request_unreachable(r)) {
+		r->state = CHECK_FAIL;
+		check_request_failure(r, "Inconclusive: ");
+	} else {
+		r->state = CHECK_PASS;
+		check_request_failure(r, "Refused: ");
+	}
+}

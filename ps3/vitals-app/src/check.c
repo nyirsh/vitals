@@ -193,7 +193,6 @@ static const CheckBackend backend = {
     .load = load_redirects,
     .protocol = backend_protocol,
     .fetch = backend_fetch,
-    .judge_badssl = check_badssl_judge,
     .lookup = look_up,
     .stopped = backend_stopped,
     .policy_failed = NULL,

@@ -17,24 +17,15 @@ static int unreachable(const CheckResult *r) {
     return (uint32_t)r->error == 0x80431068 || (uint32_t)r->error == 0x80431063 ||
            ((uint32_t)r->error >= 0x80436000 && (uint32_t)r->error <= 0x804360ff);
 }
-void check_badssl_judge(const CheckBadssl *test, CheckResult *r) {
-    if (!test->refuse)
-        return;
-    if (r->http_code != 0) {
-        r->state = CHECK_FAIL;
-        snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d), should be refused", r->http_code);
-    } else if (r->error >= 0) {
-        r->state = CHECK_FAIL;
-        snprintf(r->message, sizeof(r->message), "Not refused");
-    } else if (unreachable(r) || r->restore_error) {
-        r->state = CHECK_FAIL;
-        snprintf(r->message, sizeof(r->message), "Inconclusive: %s",
-                 check_error_name(r->error, r->ssl_error, r->ssl_detail));
-    } else {
-        r->state = CHECK_PASS;
-        snprintf(r->message, sizeof(r->message), "Refused: %s",
-                 check_error_name(r->error, r->ssl_error, r->ssl_detail));
-    }
+/* Unreachable, or certificate checks that couldn't be turned back on: then the result can't be trusted */
+int check_request_unreachable(const CheckResult *r) {
+    return unreachable(r) || r->restore_error != 0;
+}
+void check_request_failure(CheckResult *r, const char *prefix) {
+    if (r->restore_error != 0)
+        snprintf(r->message, sizeof(r->message), "%sCould not restore certificate checks", prefix);
+    else
+        snprintf(r->message, sizeof(r->message), "%s%s", prefix, check_error_name(r->error, r->ssl_error, r->ssl_detail));
 }
 int check_expected_legacy_block(unsigned version, const CheckResult *r) {
     /* vitals blocks TLS 1.0 and 1.1, and reports this through sceHttpsGetSslError's detail value

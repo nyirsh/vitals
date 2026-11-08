@@ -43,7 +43,7 @@ int main(void) {
     /* A host that must load keeps what the request gave */
     CheckResult r = outcome(0, 0, 200);
     check_badssl_judge(valid, &r);
-    assert(r.state == CHECK_PASS);
+    assert(r.state == CHECK_PASS && strcmp(r.message, "Loaded (HTTP 200)") == 0);
     r = outcome((int)0x80431075, (int)0x80435060, 0);
     check_badssl_judge(valid, &r);
     assert(r.state == CHECK_FAIL);
@@ -116,6 +116,10 @@ int main(void) {
     r = outcome((int)0x80431075, (int)0x80435060, 0);
     r.restore_error = -1;
     check_badssl_judge(expired, &r);
-    assert(r.state == CHECK_FAIL);
+    assert(r.state == CHECK_FAIL && strcmp(r.message, "Inconclusive: Could not restore certificate checks") == 0);
+    /* Neither a response nor an error: nothing refused it */
+    r = outcome(0, 0, 0);
+    check_badssl_judge(expired, &r);
+    assert(r.state == CHECK_FAIL && strcmp(r.message, "Not refused") == 0);
     return 0;
 }
