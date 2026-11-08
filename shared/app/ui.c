@@ -647,9 +647,9 @@ static void parts_card(uint32_t *p, const CheckService *s)
 	for (unsigned i = 0; i < COUNT; ++i) {
 		text(p, x, Y(35), parts[i].name, muted, SIZE);
 		x += width(parts[i].name, SIZE) + NAME_GAP;
-		/* The mark's bottom on the text's baseline: at size 18 the capitals end 25 pixels below where
-		 * the line is drawn, as 21's end 28 and 24's 31 */
-		mark_colored(p, x, Y(35) + 25 - mark_bottom(parts[i].style), parts[i].style, tone(parts[i].style));
+		/* The mark's bottom on the text's baseline: at size 18 the capitals end 24 pixels below where
+		 * the line is drawn (measured in the preview) */
+		mark_colored(p, x, Y(35) + 24 - mark_bottom(parts[i].style), parts[i].style, tone(parts[i].style));
 		x += MARK + MARK_GAP;
 		text(p, x, Y(35), parts[i].state, tone(parts[i].style), SIZE);
 		x += width(parts[i].state, SIZE) + GAP;
