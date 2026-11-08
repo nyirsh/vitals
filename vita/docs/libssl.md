@@ -43,9 +43,10 @@ The kernel plugin's hooks go in at boot, whatever is installed. vitals' libhttp 
 an SD2Vita's card), so they're looked for at each load of Sony's libhttp or libssl (`replace_iap` in
 [vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, and
 otherwise Sony's load. The Options' switches are looked for at the same loads
-([switches.h](../tls13-vita/include/vitals/switches.h)): with `tls.off` both stay Sony's, as
-vitals-http's TLS needs vitals-ssl's own additions (and the browser keeps Sony's engine and TLS); with
-`http.off` only libhttp stays Sony's, on vitals-ssl, which has all Sony's libhttp uses. `dns.off`
+([switches.h](../tls13-vita/include/vitals/switches.h)), each keeping one of Sony's: `tls.off`
+libssl (and the browser keeps Sony's engine and TLS), under which vitals-http does its TLS as Sony's
+libhttp does ([tls_sony.c](../vitals-http/src/tls_sony.c)); `http.off` libhttp, on vitals-ssl, which
+has all Sony's libhttp uses. `dns.off`
 empties the DNS rules at their next reread, and `redirects.off` makes `vitals_redirects_read` answer
 as if `redirects.txt` were missing.
 

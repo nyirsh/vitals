@@ -230,6 +230,12 @@ static int network_error(VhTransport *transport, int error)
     return (int)SCE_HTTP_ERROR_NETWORK;
 }
 
+/* vitals-ssl's socket BIO gives SceNet's errors (0x804101xx, its errno in the low byte) */
+int vh_transport_network_error(VhTransport *transport, int error)
+{
+    return network_error(transport, ((unsigned int)error & 0xFFFFFF00u) == 0x80410100u ? error & 0xff : error);
+}
+
 static void set_timeout(int socket, int option, unsigned int usec)
 {
     struct timeval value = {.tv_sec = usec / 1000000u, .tv_usec = (int)(usec % 1000000u)};
@@ -358,6 +364,14 @@ void vh_transport_abort(VhTransport *transport)
 int vh_transport_aborted(VhTransport *transport)
 {
     return transport->aborted;
+}
+
+/* vitals-ssl, unless VH_TEST_SONY_SSL asks for the path vitals-http takes on Sony's libssl (the
+ * Options' tls.off): here it runs on vitals-ssl's own versions of Sony's functions */
+int vh_platform_vitals_ssl(void)
+{
+    const char *sony = getenv("VH_TEST_SONY_SSL");
+    return sony == NULL || sony[0] == '\0' || sony[0] == '0';
 }
 
 int vh_transport_errno(VhTransport *transport)

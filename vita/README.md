@@ -42,7 +42,7 @@ Once `vitals` is installed, from the same application you'll be able to:
   - **Uninstall** removes all of `vitals` files and configurations
 - **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current. The date next to it is when they were last updated, in red once they're more than three months old
 - **Options**: turns TLS, HTTP, the DNS rules and the redirects on or off, as on the PS3, and picks the debug output (see below); **START** applies them and reboots the Vita. Each switch is a file in `ux0:data/vitals/flags/` (`tls.off`, `http.off`, `dns.off`, `redirects.off`), there while that part is off, which the kernel plugin reads:
-  - **TLS** off: apps, games and the browser get Sony's TLS. On the Vita that also means Sony's HTTP library, as `vitals`' HTTP library does its TLS through `vitals`' own
+  - **TLS** off: apps, games and the browser get Sony's TLS (and its old certificates); `vitals`' HTTP library stays, doing its TLS on Sony's as Sony's HTTP library does, so the host redirects and the User-Agent suffix still apply
   - **HTTP** off: Sony's HTTP library, still on `vitals`' TLS, so no host redirects or User-Agent suffix
   - **DNS rules** off: `dns.txt` isn't applied
   - **Redirects** off: `redirects.txt` isn't applied, and `vitals`' HTTP library stays
@@ -205,7 +205,7 @@ Debug output levels, for `vitals-http` and the browser provider (lines start wit
 
 - **Off (0):** nothing, the default
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
-- **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write). This produces a lot of output and slows connections down, use it only to investigate a problem
+- **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write), and each request's whole URL, headers and body as they are, PSN's sign-in, cookies and tokens included: keep a Full log to yourself. This produces a lot of output and slows connections down, use it only to investigate a problem
 
 Every build includes all three levels; choose one on the console in the app's **Options**, where **START** applies it and reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
 

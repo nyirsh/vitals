@@ -1,6 +1,7 @@
 #include "vh.h"
 
 #include "diagnostics.h"
+#include "tls_sony.h"
 #include "user_runtime.h"
 #include "vitals/error_map.h"
 #include "vitals_ssl.h"
@@ -18,7 +19,11 @@
  * Sony's own connections (the ones with the private HTTPS option 0x40, as the shell's PSN
  * sign-in) get the console's own ClientHello (vitals-ssl's console profile), as a capture of a
  * working sign-in shows it. The CDN in front of PSN sign-in refuses handshakes that don't look
- * like a console's */
+ * like a console's.
+ *
+ * When the process's libssl is Sony's (the Options' tls.off), vitals-ssl's own additions aren't
+ * there: the connection is then Sony's libhttp's way, in tls_sony.c, on the functions Sony's libssl
+ * exports, with its roots and the app's loaded certificates */
 
 /* An app's size can't be larger than the TLS functions take at once */
 #define VH_TLS_CHUNK 0x40000000u
@@ -34,6 +39,9 @@ struct VhTls
     /* The server's handshake records, for the debug log */
     VhRecordScan scan;
     char host[VH_HOST_MAX];
+    /* On Sony's libssl: its connection (which ssl is), and what it was set up with */
+    VhSonyTls *sony;
+    VhSonyConnection connection;
 };
 
 /* Set up on the first https connection, with the lock held: 1 once ready, negative when it failed */
@@ -42,12 +50,7 @@ static int g_state;
  * keeps them and nothing more: libssl, which may not be in the process, reads them when an https
  * connection starts, into the store, which is made again when they change (g_store_made). Each
  * connection keeps the store it began with */
-typedef struct VhCa
-{
-    struct VhCa *next;
-    size_t size;
-    unsigned char data[];
-} VhCa;
+typedef VhSonyCa VhCa;
 static VhCa *g_cas;
 static unsigned int g_cas_changed;
 static void *g_store;
@@ -155,7 +158,10 @@ void vh_tls_close(VhTls *tls)
 {
     if (tls == NULL)
         return;
-    sceSslInternalFree(tls->ssl);
+    if (tls->sony != NULL)
+        vh_sony_tls_close(tls->sony);
+    else
+        sceSslInternalFree(tls->ssl);
     memset(tls, 0, sizeof(*tls));
     free(tls);
 }
@@ -254,6 +260,74 @@ static const char *client_certificate_asked(VhTls *tls)
 }
 #endif
 
+/* ---- on Sony's libssl ---- */
+
+static unsigned char *copy_bytes(const void *data, size_t size);
+
+/* The chain against what the app loaded, which stays while it's read */
+static uint32_t sony_check(void *argument, void *ssl, void *certificates[], int count, const char *host)
+{
+    (void)argument;
+    vh_lock();
+    VhSonyTrust trust = {g_cas};
+    uint32_t found = vh_sony_check_chain(ssl, certificates, count, host, &trust);
+    vh_unlock();
+    return found;
+}
+
+/* The loaded client certificate and key, copied for the handshake */
+static int sony_identity(void *argument, VhSonyIdentity *identity)
+{
+    (void)argument;
+    int given = 0;
+    vh_lock();
+    if (g_client_certificate != NULL && g_client_key != NULL) {
+        identity->certificate = copy_bytes(g_client_certificate, g_client_certificate_size);
+        identity->key = copy_bytes(g_client_key, g_client_key_size);
+        identity->certificate_size = g_client_certificate_size;
+        identity->key_size = g_client_key_size;
+        given = identity->certificate != NULL && identity->key != NULL;
+    }
+    vh_unlock();
+    return given;
+}
+
+/* The connection Sony's libhttp's way: 0, or a libhttp error with *ssl_error and *ssl_detail (the
+ * caller then closes tls) */
+static int sony_start(VhTls *tls, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail)
+{
+    tls->connection = (VhSonyConnection){vh_transport_socket(tls->transport), tls->host, open->https_options,
+                                         sony_check, NULL, open->ssl_callback, open->ssl_argument, sony_identity,
+                                         NULL};
+    if (vh_sony_tls_start(&tls->sony, &tls->connection) != 0) {
+        VITALS_LOG("tls setup failed host=%s on Sony's libssl", tls->host);
+        return store_outcome(VITALS_OUTCOME_NO_MEMORY, 0, ssl_error, ssl_detail);
+    }
+    tls->ssl = vh_sony_tls_ssl(tls->sony);
+    uint32_t flags = 0;
+    int refused = 0;
+    int connected = vh_sony_tls_connect(tls->sony, &flags, &refused);
+    if (connected == 1) {
+        VITALS_LOG("handshake ok host=%s on Sony's libssl options=%03X callback=%d", tls->host,
+                   (unsigned int)open->https_options, open->ssl_callback != NULL);
+        return 0;
+    }
+    /* libssl gives the socket's error as it is when it failed, -1 when TLS did */
+    if (connected < 0 && connected != -1)
+        tls->io_error = vh_transport_network_error(tls->transport, connected);
+    int result;
+    if (refused)
+        result = store_outcome(VITALS_OUTCOME_CERTIFICATE, flags, ssl_error, ssl_detail);
+    else
+        result = store_outcome(tls->io_error != 0 ? VITALS_OUTCOME_IO : VITALS_OUTCOME_HANDSHAKE, (uint32_t)connected,
+                               ssl_error, ssl_detail);
+    VITALS_LOG("handshake failed host=%s on Sony's libssl rc=%08X refused=%d flags=%02X", tls->host,
+               (unsigned int)connected, refused, (unsigned int)flags);
+    if (!refused && (tls->io_error != 0 || vh_transport_aborted(tls->transport)))
+        result = tls_error(tls);
+    return result;
+}
+
 int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail)
 {
     *out = NULL;
@@ -281,6 +355,16 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
     } else
         memcpy(tls->host, open->host, length + 1);
 
+    if (!vh_platform_vitals_ssl()) {
+        int started = sony_start(tls, open, ssl_error, ssl_detail);
+        if (started != 0) {
+            vh_tls_close(tls);
+            vitals_user_runtime_report("handshake failed", 1);
+            return started;
+        }
+        *out = tls;
+        return 0;
+    }
     int console = (open->https_options & VITALS_SCE_HTTPS_OPTION_PRIVATE_CHAIN) != 0;
     int result = setup(tls, console);
     if (result != 0) {
@@ -347,8 +431,11 @@ int vh_tls_send(VhTls *tls, const void *data, size_t size)
     while (size > 0) {
         int chunk = (int)(size > VH_TLS_CHUNK ? VH_TLS_CHUNK : size);
         int sent = sceSslInternalWrite(tls->ssl, at, chunk);
-        if (sent <= 0)
+        if (sent <= 0) {
+            if (tls->sony != NULL && sent < 0 && sent != -1)
+                tls->io_error = vh_transport_network_error(tls->transport, sent);
             return tls_error(tls);
+        }
         at += sent;
         size -= (size_t)sent;
     }
@@ -365,6 +452,8 @@ int vh_tls_recv(VhTls *tls, void *data, size_t size)
     /* close_notify, or a server that closes without it, both end the response */
     if (received == 0)
         return 0;
+    if (tls->sony != NULL && received != -1)
+        tls->io_error = vh_transport_network_error(tls->transport, received);
     VITALS_VERBOSE("tls read host=%s rc=%08X io=%08X", tls->host, (unsigned int)received, (unsigned int)tls->io_error);
     return tls_error(tls);
 }
@@ -401,23 +490,25 @@ typedef struct VhCertCheck
  * ask for, on the bundle and the certificates the app loaded, then the app's callback, which
  * decides when there is one (it accepts what was found unless it returns a negative), as with this
  * library's own connections */
-static int cert_check(void *ssl, void *certificates[], int count, void *argument, int *reason)
+static int check_with(void *ssl, void *certificates[], int count, void *argument, int *reason, int sony)
 {
     VhCertCheck *check = argument;
     uint32_t options = check != NULL && check->flags != 0 ? check->flags : VH_CERT_CHECK_DEFAULT;
     int locked = check != NULL && (check->flags & VH_CERT_CHECK_LOCKED) != 0 && check->lock != NULL &&
                  check->unlock != NULL;
-    (void)ssl;
     if (locked)
         (void)check->lock(check->argument);
     uint32_t found = 0;
     if ((options & VITALS_SCE_HTTPS_OPTION_SERVER_VERIFY) != 0) {
+        const char *host = (options & VITALS_SCE_HTTPS_OPTION_CN_CHECK) != 0 && check != NULL ? check->host : NULL;
         /* The store stays while it is read */
         vh_lock();
-        found = vitalsSslCheckChain(certificates, count,
-                                    (options & VITALS_SCE_HTTPS_OPTION_CN_CHECK) != 0 && check != NULL ? check->host
-                                                                                                       : NULL,
-                                    current_store());
+        if (sony) {
+            VhSonyTrust trust = {g_cas};
+            found = vh_sony_check_chain(ssl, certificates, count, host, &trust);
+        } else {
+            found = vitalsSslCheckChain(certificates, count, host, current_store());
+        }
         vh_unlock();
     }
     unsigned int bits = vitals_map_certificate_detail(vitals_filter_certificate_flags(found, options));
@@ -437,6 +528,17 @@ static int cert_check(void *ssl, void *certificates[], int count, void *argument
     return accepted;
 }
 
+static int cert_check(void *ssl, void *certificates[], int count, void *argument, int *reason)
+{
+    return check_with(ssl, certificates, count, argument, reason, 0);
+}
+
+/* The same on Sony's libssl, with the check Sony's libhttp's way (tls_sony.c) */
+static int cert_check_sony(void *ssl, void *certificates[], int count, void *argument, int *reason)
+{
+    return check_with(ssl, certificates, count, argument, reason, 1);
+}
+
 /* As Sony's: the verify mode on, and the check above in place of the bundle's; always 0. The context is
  * the libssl module's, another copy of vitals-ssl, of the same version (the two are installed
  * together), so its context is the same structure as this copy's */
@@ -449,7 +551,7 @@ int vh_tls_add_cert_check(void *context, void *argument)
     if (ready < 0)
         VITALS_LOG("cert check installed without tls");
     sceSslInternalCtxSetVerify(context, 1);
-    sceSslInternalCtxSetCertVerifyCallback(context, cert_check, argument);
+    sceSslInternalCtxSetCertVerifyCallback(context, vh_platform_vitals_ssl() ? cert_check : cert_check_sony, argument);
     return 0;
 }
 

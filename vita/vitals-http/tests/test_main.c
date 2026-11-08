@@ -1307,6 +1307,24 @@ static void test_client_certificate(int template_)
  * suites only */
 static void test_console_profile(int template_)
 {
+    /* The console's handshake is vitals-ssl's: on Sony's libssl the hello is Sony's own. What's
+     * checked there is the server's name in it, which the console's libssl reads from the verify
+     * callback's argument */
+    if (!vh_platform_vitals_ssl()) {
+        char hello_base[64], body[64], sent[2048] = "";
+        int status, request;
+        printf("server name on Sony's libssl\n");
+        snprintf(hello_base, sizeof(hello_base), "https://localhost:%d", g_port + 4);
+        int connection = sceHttpCreateConnectionWithURL(template_, hello_base, 1);
+        remove(g_hello_path);
+        fetch(connection, SCE_HTTP_METHOD_GET, url(hello_base, "/"), NULL, &status, body, sizeof(body), &request);
+        sceHttpDeleteRequest(request);
+        sceHttpDeleteConnection(connection);
+        read_file(g_hello_path, sent, sizeof(sent) - 1);
+        /* server_name: one host name, "localhost" */
+        CHECK(strstr(sent, "0000000e000c0000096c6f63616c686f7374") != NULL);
+        return;
+    }
     char body[64], legacy[64];
     int status, request;
     printf("console TLS profile\n");

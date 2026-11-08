@@ -46,6 +46,7 @@ add_executable(vitals_libhttp
     src/redirect.c
     src/useragent.c
     src/tls.c
+    src/tls_sony.c
     src/md5.c
     src/platform_vita.c
     ${TLS13_DIR}/provider/user_runtime.c
@@ -98,6 +99,8 @@ target_link_libraries(vitals_libhttp PRIVATE
     gcc
     SceLibKernel_stub
     SceKernelThreadMgr_stub
+    # Which libssl the process loaded (vh_platform_vitals_ssl)
+    SceKernelModulemgr_stub
     SceSysmem_stub
     SceIofilemgr_stub
     SceNet_stub

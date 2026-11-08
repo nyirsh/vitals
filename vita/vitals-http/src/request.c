@@ -1349,19 +1349,10 @@ int vh_request_perform(VhObject *object, const unsigned char *body, size_t body_
     return perform(object, connection, vh_parent(connection), body, body_size);
 }
 
-#if VITALS_DEBUG >= 1
-/* Whether a header's name has "token" in it (X-NP-CONSOLE-TOKEN, X-NP-TITLE-TOKEN...) */
-static int names_token(const char *name, size_t length)
-{
-    for (size_t i = 0; i + 5 <= length; ++i)
-        if (vh_equal_nocase(name + i, "token", 5))
-            return 1;
-    return 0;
-}
-
-/* A header block, a line at a time; with redact, Cookie, Set-Cookie, Authorization and any
- * header named with "token" show only their size */
-static void log_lines(const char *label, const char *text, size_t length, int redact)
+#if VITALS_DEBUG >= 2
+/* A header block, a line at a time, as it is: only with DEBUG=2, the full view, which shows what an
+ * app or the system sends (PSN's sign-in, cookies, tokens) */
+static void log_lines(const char *label, const char *text, size_t length)
 {
     char line[224];
     for (size_t at = 0; at < length;) {
@@ -1369,22 +1360,11 @@ static void log_lines(const char *label, const char *text, size_t length, int re
         while (end < length && text[end] != '\n')
             ++end;
         size_t size = (end > at && text[end - 1] == '\r' ? end - 1 : end) - at;
-        const char *colon = memchr(text + at, ':', size);
-        int secret = redact && colon != NULL &&
-                     (((size_t)(colon - (text + at)) == 6 && vh_equal_nocase(text + at, "Cookie", 6)) ||
-                      ((size_t)(colon - (text + at)) == 10 && vh_equal_nocase(text + at, "Set-Cookie", 10)) ||
-                      ((size_t)(colon - (text + at)) == 13 && vh_equal_nocase(text + at, "Authorization", 13)) ||
-                      names_token(text + at, (size_t)(colon - (text + at))));
-        if (secret)
-            size = (size_t)(colon - (text + at)) + 1;
         if (size != 0) {
             size_t shown = size < sizeof(line) - 1 ? size : sizeof(line) - 1;
             memcpy(line, text + at, shown);
             line[shown] = '\0';
-            if (secret)
-                VITALS_LOG("%s %s (%u bytes)", label, line, (unsigned int)((end > at && text[end - 1] == '\r' ? end - 1 : end) - at - size));
-            else
-                VITALS_LOG("%s %s", label, line);
+            VITALS_VERBOSE("%s %s", label, line);
         }
         at = end + 1;
     }
@@ -1397,21 +1377,31 @@ void vh_request_sent(VhObject *object, int result)
 #if VITALS_DEBUG >= 1
     char url[VH_URL_MAX];
     current_url(request, url, sizeof(url));
+#if VITALS_DEBUG >= 2
     VITALS_LOG("request %d %s %s rc=%08X status=%d", object->id, request->method, url, (unsigned int)result,
                result == 0 ? request->status_code : 0);
+#else
+    /* The scheme and host only: the path and query can hold what the request carries (IDs, tokens),
+     * which only DEBUG=2 shows */
+    char *path = strstr(url, "://");
+    if (path != NULL && (path = strchr(path + 3, '/')) != NULL)
+        *path = '\0';
+    VITALS_LOG("request %d %s %s rc=%08X status=%d", object->id, request->method, url, (unsigned int)result,
+               result == 0 ? request->status_code : 0);
+#endif
     /* A failed one, with how long it took and the timeouts it had */
     if (result < 0)
         VITALS_LOG("  after %ums; timeouts resolve=%u connect=%u send=%u recv=%u us",
                    (unsigned int)((vh_platform_clock_us() - request->started_us) / 1000u),
                    object->settings.resolve_timeout_us, object->settings.connect_timeout_us,
                    object->settings.send_timeout_us, object->settings.recv_timeout_us);
-    /* A refused or failed request, with what it sent and what came back; with DEBUG=2, every one */
-    if (result < 0 || request->status_code >= 400 || VITALS_DEBUG >= 2) {
-        if (request->request_header != NULL)
-            log_lines("  sent", request->request_header, request->request_header_size, 1);
-        if (request->response_header != NULL)
-            log_lines("  got", request->response_header, request->response_header_size, 1);
-    }
+#if VITALS_DEBUG >= 2
+    /* What each request sent and what came back, in full */
+    if (request->request_header != NULL)
+        log_lines("  sent", request->request_header, request->request_header_size);
+    if (request->response_header != NULL)
+        log_lines("  got", request->response_header, request->response_header_size);
+#endif
 #endif
     request->busy = 0;
     if (result < 0) {
@@ -1434,9 +1424,9 @@ int vh_request_read(VhRequest *request, unsigned char *data, size_t size)
             break;
         count += more;
     }
-#if VITALS_DEBUG >= 1
-    /* An error's body; with DEBUG=2, also a short one's bytes (a longer one may hold a token) */
-    if (count > 0 && (request->status_code >= 400 || (VITALS_DEBUG >= 2 && count <= 32)) && !request->body_logged) {
+#if VITALS_DEBUG >= 2
+    /* With DEBUG=2, the start of each body (an error's, and a short one's bytes) */
+    if (count > 0 && (request->status_code >= 400 || count <= 32) && !request->body_logged) {
         char text[161];
         size_t shown = (size_t)count < sizeof(text) - 1 ? (size_t)count : sizeof(text) - 1;
         for (size_t i = 0; i < shown; ++i)

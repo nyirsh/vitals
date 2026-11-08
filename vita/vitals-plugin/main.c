@@ -61,17 +61,22 @@ static int switched_off(const char *flag)
 
 /* vitals' libhttp and libssl, installed together and looked for at each load rather than once at
  * boot: they're on ux0, which a plugin loaded after this one may still be mapping when it starts (an
- * SD2Vita's), and while they aren't there Sony's load. The switches, looked for at the same time:
- * tls.off keeps Sony's libssl, and so Sony's libhttp too (vitals-http does its TLS through
- * vitals-ssl's own additions); http.off keeps Sony's libhttp alone, on vitals-ssl */
-static int replace_iap(void)
+ * SD2Vita's), and while they aren't there Sony's load. The switches, looked for at the same time,
+ * each keep one of Sony's: tls.off libssl (vitals-http then does its TLS on Sony's, as Sony's libhttp
+ * does), http.off libhttp (on vitals-ssl, which has all Sony's libhttp uses) */
+static int installed(void)
 {
-    return module_present(MODULE_LIBHTTP) && module_present(MODULE_LIBSSL) && !switched_off(VITALS_TLS_OFF);
+    return module_present(MODULE_LIBHTTP) && module_present(MODULE_LIBSSL);
+}
+
+static int replace_libssl(void)
+{
+    return installed() && !switched_off(VITALS_TLS_OFF);
 }
 
 static int replace_libhttp(void)
 {
-    return replace_iap() && !switched_off(VITALS_HTTP_OFF);
+    return installed() && !switched_off(VITALS_HTTP_OFF);
 }
 
 static int path_is(const char *path, const char *a, const char *b)
@@ -108,7 +113,7 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
         module = MODULE_LIBHTTP;
         path = g_replacement_modules[module];
     }
-    else if (path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx") && replace_iap())
+    else if (path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx") && replace_libssl())
     {
         ksceDebugPrintf("vitals: libssl load pid=0x%X flags=0x%08X\n", target_pid, flags);
         module = MODULE_LIBSSL;

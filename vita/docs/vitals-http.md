@@ -53,9 +53,10 @@ The kernel plugin's hooks go in at boot, whatever is installed. vitals' libhttp 
 an SD2Vita's card), so they're looked for at each load of Sony's libhttp or libssl (`replace_iap` in
 [vitals-plugin/main.c](../vitals-plugin/main.c)): the swap happens only when **both** are there, and
 otherwise Sony's load. The Options' switches are looked for at the same loads
-([switches.h](../tls13-vita/include/vitals/switches.h)): with `tls.off` both stay Sony's, as
-vitals-http's TLS needs vitals-ssl's own additions (and the browser keeps Sony's engine and TLS); with
-`http.off` only libhttp stays Sony's, on vitals-ssl, which has all Sony's libhttp uses. `dns.off`
+([switches.h](../tls13-vita/include/vitals/switches.h)), each keeping one of Sony's: `tls.off`
+libssl (and the browser keeps Sony's engine and TLS), under which vitals-http does its TLS as Sony's
+libhttp does ([tls_sony.c](../vitals-http/src/tls_sony.c)); `http.off` libhttp, on vitals-ssl, which
+has all Sony's libhttp uses. `dns.off`
 empties the DNS rules at their next reread, and `redirects.off` makes `vitals_redirects_read` answer
 as if `redirects.txt` were missing.
 
@@ -138,9 +139,10 @@ lists the headers as name and value pairs, both as Sony's do.
    known length fills the app's buffer up to its end, as some games read it in one call. Once read,
    the socket goes back to the connection for the next request, when keep-alive allows it.
 
-With debug output on, each finished request is one line, `request <id> <method> <url> rc=… status=…`,
-and a failed or refused one also shows the headers sent and received. Cookie, Set-Cookie and
-Authorization values are logged as their length only.
+With debug output on, each finished request is one line, `request <id> <method> <url> rc=… status=…`:
+on Basic (1) the URL's scheme and host only. Full (2) shows the whole URL, then every header sent
+and received and the start of each body, all as they are, PSN's sign-in, cookies and tokens
+included, so a Full log is as private as the account.
 
 ### Non-blocking requests
 
@@ -196,6 +198,27 @@ A client certificate and key given to `sceHttpsLoadCert` are presented to server
 
 The log, with debug output on: `handshake ok host=… <version> <cipher> profile=…`, or
 `handshake failed host=… tls=… io=… verify=…` and `certificate host=… verify=… detail=… accepted=…`.
+
+**On Sony's libssl** (the Options' `tls.off`, which keeps Sony's libssl but not Sony's libhttp),
+vitals-ssl's own additions aren't there, so vitals-http does its TLS as Sony's libhttp does, on
+the functions Sony's libssl exports ([tls_sony.c](../vitals-http/src/tls_sony.c)). It finds out at
+the first HTTPS connection, from where the process's `SceLibSsl` was loaded
+(`vh_platform_vitals_ssl`): only vitals-ssl's own place counts as vitals-ssl, so anything else gets
+this path, which vitals-ssl runs too. The connection is a socket BIO without SNI (the console's libssl has no `BIO_ctrl` to set it), Sony's
+options and no session cache. The server's chain is checked by vitals-http with libssl's certificate
+functions:
+- each certificate signed by the next, with no MD2, MD4 or MD5 signatures;
+- each issuer a CA, with room in its path length;
+- a trusted root at the top, from libssl's built-in roots or the CA certificates the app loaded, or
+  the server's own certificate when one of those is the same certificate;
+- the dates;
+- the host name: subjectAltName, and only without one the subject's CN.
+
+The same HTTPS options then decide which problems count, and the app's callback gets them with the
+server's certificates, as on Sony's. A client certificate the app loaded is sent when the server
+names its issuer, or names none. The TLS is then Sony's: TLS 1.2 at most, and Sony's roots of 2014.
+The host tests run all of vitals-http's tests on this path too (`VH_TEST_SONY_SSL=1`), on
+vitals-ssl's versions of those functions; the console profile is vitals-ssl's alone.
 
 ## 9. The end
 

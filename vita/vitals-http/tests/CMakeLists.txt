@@ -39,6 +39,7 @@ add_executable(vitals_http_tests
     ${ROOT}/src/redirect.c
     ${ROOT}/src/useragent.c
     ${ROOT}/src/tls.c
+    ${ROOT}/src/tls_sony.c
     ${ROOT}/src/md5.c
     ssl_platform.c
     ${VITALS_SSL_DIR}/src/core.c
@@ -68,3 +69,8 @@ target_link_libraries(vitals_http_tests PRIVATE mbedtls mbedx509 tfpsacrypto vit
 add_test(NAME vitals_http
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_tests.py $<TARGET_FILE:vitals_http_tests>)
 set_tests_properties(vitals_http PROPERTIES TIMEOUT 180)
+# The same on the path vitals-http takes when the process's libssl is Sony's (the Options' tls.off,
+# src/tls_sony.c): here on vitals-ssl's own versions of the functions Sony's libssl exports
+add_test(NAME vitals_http_on_sony_libssl
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/run_tests.py $<TARGET_FILE:vitals_http_tests>)
+set_tests_properties(vitals_http_on_sony_libssl PROPERTIES TIMEOUT 180 ENVIRONMENT VH_TEST_SONY_SSL=1)

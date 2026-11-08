@@ -277,11 +277,11 @@ static void test_routes(void) {
     assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
     assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
 
-    /* tls.off: Sony's libssl, and so Sony's libhttp (vitals-http's TLS is vitals-ssl's) and Sony's
-     * browser engine, nothing injected */
+    /* tls.off: Sony's libssl (vitals-http stays, on it) and Sony's browser engine, nothing injected */
     reset();
     switches_off[0] = VITALS_TLS_OFF;
-    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88 && strcmp(selected_path, libhttp_paths[0]) == 0);
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88);
+    assert(strcmp(selected_path, g_replacement_modules[MODULE_LIBHTTP]) == 0);
     assert(installed_load(0, "vs0:sys/external/libssl.suprx", 0, NULL) == 88);
     assert(strcmp(selected_path, "vs0:sys/external/libssl.suprx") == 0);
     assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
@@ -296,6 +296,13 @@ static void test_routes(void) {
     assert(installed_load(0, "wb0:/webcore/ScePsp2Compat.suprx", 0x8001, &options) == 88);
     assert(strcmp(selected_path, g_replacement_modules[MODULE_COMPAT]) == 0);
     assert(finish_start(0) == 0 && injections == 1);
+    /* Both: Sony's two */
+    reset();
+    switches_off[0] = VITALS_TLS_OFF;
+    switches_off[1] = VITALS_HTTP_OFF;
+    assert(installed_load(0, libhttp_paths[0], 0, NULL) == 88 && strcmp(selected_path, libhttp_paths[0]) == 0);
+    assert(installed_load(0, "vs0:sys/external/libssl.suprx", 0, NULL) == 88);
+    assert(strcmp(selected_path, "vs0:sys/external/libssl.suprx") == 0);
     /* The DNS and redirect switches change no module */
     reset();
     switches_off[0] = VITALS_DNS_OFF;
@@ -331,7 +338,7 @@ int main(void) {
     reset_startup();
     assert(module_start(0, NULL) == SCE_KERNEL_START_SUCCESS);
     assert(hook_installations == 2 && loader_initializations == 1 && mutex_live);
-    assert(module_present(MODULE_COMPAT) && replace_iap());
+    assert(module_present(MODULE_COMPAT) && installed() && replace_libssl() && replace_libhttp());
     test_routes();
     test_shared_flags();
     assert(module_stop(0, NULL) == SCE_KERNEL_STOP_FAIL);

@@ -429,6 +429,12 @@ int vh_platform_tls_init(void);
 int vh_transport_raw_send(VhTransport *transport, const void *data, size_t size);
 int vh_transport_raw_recv(VhTransport *transport, void *data, size_t size);
 int vh_transport_aborted(VhTransport *transport);
+/* A socket error Sony's libssl gave back as it is (its socket BIO's), as the transport's own: a
+ * libhttp error, its errno kept for sceHttpGetLastErrno */
+int vh_transport_network_error(VhTransport *transport, int error);
+/* 1 when the libssl this process loaded is vitals-ssl, 0 when it's Sony's (the Options' tls.off), or
+ * there's none: vitals-http then does its TLS as Sony's libhttp does (tls_sony.c) */
+int vh_platform_vitals_ssl(void);
 
 /* ---- tls.c: TLS over a transport, with tls13-vita's Mbed TLS ---- */
 

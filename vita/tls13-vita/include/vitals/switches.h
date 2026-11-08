@@ -5,8 +5,8 @@
  * is off. The app writes them and reboots; the kernel plugin looks for them where each part starts
  * (a module's load, the DNS list's reread, a process's redirect list), as ux0 may not be mapped
  * yet when it starts:
- * - tls.off: Sony's libssl and the browser's own TLS. vitals-http does its TLS through vitals-ssl's
- *   own additions, which Sony's libssl lacks, so Sony's libhttp loads too, as with http.off;
+ * - tls.off: Sony's libssl and the browser's own TLS; vitals-http stays, and does its TLS on Sony's
+ *   libssl as Sony's libhttp does (vitals-http/src/tls_sony.c);
  * - http.off: Sony's libhttp, on vitals-ssl (which has everything Sony's libhttp uses), and with it
  *   no host redirects or User-Agent suffix;
  * - dns.off: the DNS rules (dns.txt) aren't applied;

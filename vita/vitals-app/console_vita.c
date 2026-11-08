@@ -157,10 +157,9 @@ void vitals_reboot(void)
 /* ---- the switches ---- */
 
 /* Each one's .off in ux0:data/vitals/flags, the PS3's four (vitals/switches.h), which the app writes
- * and deletes and the kernel plugin reads. Unlike the PS3's, vitals-http can't run on Sony's
- * libssl (its TLS is vitals-ssl's own additions), so Sony's TLS brings Sony's HTTP with it */
+ * and deletes and the kernel plugin reads */
 static const ConsoleSwitch switches[] = {
-    {"TLS", "vitals TLS enabled", "Sony TLS and HTTP enabled", VITALS_TLS_OFF},
+    {"TLS", "vitals TLS enabled", "Sony TLS enabled", VITALS_TLS_OFF},
     {"HTTP", "vitals HTTP enabled", "Sony HTTP enabled", VITALS_HTTP_OFF},
     {"DNS rules", "vitals DNS rules enabled", "vitals DNS rules disabled", VITALS_DNS_OFF},
     {"Redirects", "vitals redirects enabled", "vitals redirects disabled", VITALS_REDIRECTS_OFF},

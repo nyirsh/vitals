@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "user_runtime.h"
+#include "vitals/path.h"
 #include "vitals/redirects.h"
 #include "vitals/useragent.h"
 
@@ -274,6 +275,11 @@ static int network_error(VhTransport *transport, int error)
     return (int)SCE_HTTP_ERROR_NETWORK;
 }
 
+int vh_transport_network_error(VhTransport *transport, int error)
+{
+    return network_error(transport, error);
+}
+
 static int resolver_error(int error)
 {
     switch (error) {
@@ -491,6 +497,34 @@ void vh_transport_abort(VhTransport *transport)
 int vh_transport_aborted(VhTransport *transport)
 {
     return transport->aborted;
+}
+
+/* The process's SceLibSsl, by where it was loaded from: vitals-ssl's place, or Sony's (the kernel
+ * plugin keeps Sony's while the Options' tls.off is there). Looked for once, at the first https
+ * connection, which needs libssl loaded; until it's found it's taken for Sony's, whose functions
+ * vitals-ssl has too, never the other way round */
+int vh_platform_vitals_ssl(void)
+{
+    static int found;
+    if (found != 0)
+        return found > 0;
+    SceUID modules[128];
+    SceSize count = sizeof(modules) / sizeof(modules[0]);
+    if (sceKernelGetModuleList(0xFF, modules, &count) < 0)
+        return 0;
+    for (SceSize i = 0; i < count; ++i) {
+        SceKernelModuleInfo info;
+        memset(&info, 0, sizeof(info));
+        info.size = sizeof(info);
+        if (sceKernelGetModuleInfo(modules[i], &info) < 0 || strcmp(info.module_name, "SceLibSsl") != 0)
+            continue;
+        /* ux0:data/vitals/system/libssl.suprx, however the device is written */
+        info.path[sizeof(info.path) - 1] = '\0';
+        found = strstr(info.path, "data/vitals/system/libssl.suprx") != NULL ? 1 : -1;
+        VITALS_LOG("libssl %s: %s", found > 0 ? "vitals-ssl" : "Sony's", info.path);
+        return found > 0;
+    }
+    return 0;
 }
 
 int vh_transport_errno(VhTransport *transport)
