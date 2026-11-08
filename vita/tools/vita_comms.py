@@ -3,10 +3,10 @@
 
     tools/vita_comms.py app [VPK]      uploads the vitals app (make, build/vitals-app/vitals-app.vpk, or
                                        VPK) to ux0:data/vitals/vitals-app.vpk, for VitaShell to install
-    tools/vita_comms.py fetch          fetches the app's test reports and BrowserLeaks dumps from
-                                       ux0:data/vitals, the crash dumps from ux0:data and any SceWebKit
-                                       dumps from ux0:data/vitals-dump into build/vita-fetch/, then
-                                       deletes them from the Vita
+    tools/vita_comms.py fetch          copies the app's test reports (ux0:data/vitals/reports, and
+                                       ux0:data/vitals from earlier versions), the crash dumps from
+                                       ux0:data and any SceWebKit dumps from ux0:data/vitals-dump into
+                                       build/vita-fetch/, leaving them on the Vita
     tools/vita_comms.py status         what's on the Vita now: config.txt, vitals' plugin and modules,
                                        the certificate store, the user's lists and the switches
 
@@ -144,7 +144,7 @@ def upload_app(ftp, source):
 
 
 def fetch(ftp):
-    """Each wanted file into build/vita-fetch/, then deleted from the Vita once it's saved"""
+    """Each wanted file copied into build/vita-fetch/, and left on the Vita"""
     os.makedirs(FETCHED, exist_ok=True)
     count = 0
     for folder, prefixes, optional in FETCH:
@@ -160,10 +160,6 @@ def fetch(ftp):
             target = os.path.join(FETCHED, name)
             with open(target, "wb") as out:
                 ftp.retrbinary("RETR " + name, out.write)
-            # VitaShell answers 226 rather than 250
-            reply = ftp.sendcmd("DELE " + name)
-            if not reply.startswith("2"):
-                raise ftplib.error_reply(reply)
             print(f"{path} -> {os.path.relpath(target, ROOT)}")
             count += 1
     print(f"{count} fetched" if count else "Nothing to fetch.")

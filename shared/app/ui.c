@@ -749,7 +749,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 	} else if (page == CHECK_PAGE_REQUESTS) {
 		text(p, X(28), Y(362), "Request details", white, 23);
 		text(p, X(608), Y(370), "Error / certificate", muted, 16);
-		text(p, X(878), Y(370), "Time", muted, 16);
+		text(p, X(932) - width("Time", 16), Y(370), "Time", muted, 16);
 		for (unsigned i = 0; i < 4; ++i) {
 			const CheckResult *r = &s->protocols[3 - i];
 			int y = Y(394 + (int)i * 22);
@@ -765,7 +765,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 				snprintf(line, sizeof(line), "%u ms", ms);
 			else
 				snprintf(line, sizeof(line), "-");
-			text(p, X(856), y + 2, line, muted, 16);
+			text(p, X(932) - width(line, 16), y + 2, line, muted, 16);
 		}
 	} else if (page == CHECK_PAGE_CERTIFICATES) {
 		text(p, X(28), Y(362), "Certificate checks", white, 23);
@@ -785,7 +785,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 				snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
 			else
 				snprintf(line, sizeof(line), "-");
-			text(p, X(856), y, line, muted, 16);
+			text(p, X(932) - width(line, 16), y, line, muted, 16);
 		}
 	} else if (page == CHECK_PAGE_REDIRECTS) {
 		text(p, X(28), Y(362), "Host redirects", white, 23);
@@ -853,7 +853,7 @@ void check_draw(uint32_t *p, const CheckService *s, int page, unsigned scroll, i
 				snprintf(line, sizeof(line), "%u ms", r->elapsed_ms);
 			else
 				snprintf(line, sizeof(line), "-");
-			text(p, X(856), y, line, muted, 16);
+			text(p, X(932) - width(line, 16), y, line, muted, 16);
 		}
 	} else {
 		text(p, X(28), Y(362), "Handshake details", white, 23);
