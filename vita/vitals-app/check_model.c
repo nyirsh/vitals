@@ -196,6 +196,19 @@ int check_url_host(const char *url, const char *expected, char *host, size_t siz
             return 0;
     return 1;
 }
+void check_redirect_judge(CheckResult *r, const char *reached, const char *expected) {
+    if (r->state != CHECK_PASS)
+        return;
+    char host[CHECK_HOST_MAX];
+    int found = reached != NULL && reached[0] != '\0' ? check_url_host(reached, expected, host, sizeof(host)) : -1;
+    if (found == 1)
+        snprintf(r->message, sizeof(r->message), "Reached %.96s (HTTP %d)", expected, r->http_code);
+    else if (found == 0) {
+        r->state = CHECK_FAIL;
+        snprintf(r->message, sizeof(r->message), "Answered by %.50s, not %.50s", host, expected);
+    } else
+        snprintf(r->message, sizeof(r->message), "Connected (HTTP %d); the host reached isn't known", r->http_code);
+}
 int check_protocol_body(unsigned version, const char *b, size_t n) {
     char expected[16];
     if (b == NULL || version > 3)

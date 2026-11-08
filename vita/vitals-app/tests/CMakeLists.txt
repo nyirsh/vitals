@@ -34,6 +34,12 @@ add_executable(vitals_app_check_model_tests test_check_model.c ${APP_DIR}/check_
 target_include_directories(vitals_app_check_model_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_check_model COMMAND vitals_app_check_model_tests)
 
+# The connection test's run (shared with the PS3's tests), over a console that answers from a script
+add_executable(vitals_app_check_run_tests ${SHARED_APP}/tests/test_check_run.c ${SHARED_APP}/check_run.c
+    ${SHARED_APP}/model.c)
+target_include_directories(vitals_app_check_run_tests PRIVATE ${APP_DIR})
+add_test(NAME vitals_app_check_run COMMAND vitals_app_check_run_tests)
+
 # The changelog's layout, and the CHANGELOG.md the app carries (the repository's)
 add_executable(vitals_app_changelog_tests ${SHARED_APP}/tests/test_changelog.c ${SHARED_APP}/changelog.c)
 target_include_directories(vitals_app_changelog_tests PRIVATE ${APP_DIR})

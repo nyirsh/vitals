@@ -5,6 +5,7 @@
 
 #include "check.h"
 #include "check_model.h"
+#include "check_run.h"
 
 #include "app_log.h"
 #include "firmware.h"
@@ -59,13 +60,6 @@ static void log_result(const char *what, const CheckResult *r)
 	app_log("test %s: state %d, HTTP %d, error 0x%08X, flags 0x%04X, %s %s, %u ms, %s", what, r->state, r->http_code,
 	        (unsigned)r->error, (unsigned)r->verify_error, http_protocol_name(r->ssl_version, r->cipher), r->cipher,
 	        r->elapsed_ms, r->message);
-}
-
-static void not_tested(CheckResult *r)
-{
-	memset(r, 0, sizeof(*r));
-	r->state = CHECK_INFO;
-	snprintf(r->message, sizeof(r->message), "Cancelled / not tested");
 }
 
 /* ---- the host redirect list, read as vitals' libhttp reads it ---- */
@@ -147,194 +141,104 @@ static int libhttp_active(void)
 	return (int64_t)status.st_mtime >= booted - 60;
 }
 
+/* ---- the PS3's side of the shared run (shared/app/check_run.c) ---- */
+
+static int backend_open(char *text, size_t size)
+{
+	int rc = http_open();
+	if (rc < 0)
+		snprintf(text, size, rc == (int)0x80130106 ? "No network connection" : "Network set-up failed: 0x%08X",
+		         (unsigned)rc);
+	return rc;
+}
+
+static void backend_parts(CheckParts *parts)
+{
+	parts->http = libhttp_active();
+	/* The boot plugin leaves no word on libssl: the TLS 1.3 tile tells (vitals = -1) */
+	parts->tls = -1;
+	parts->redirects_off = vitals_switch_is_off(VITALS_REDIRECTS_OFF);
+	parts->dns_off = vitals_switch_is_off(VITALS_DNS_OFF);
+	parts->vitals = -1;
+	app_log("vitals' libhttp %s%s%s", parts->http ? "active" : "not active", parts->redirects_off ? ", redirects off" : "",
+	        parts->dns_off ? ", DNS rules off" : "");
+}
+
+static void backend_protocol(unsigned test, char *body, CheckResult *r)
+{
+	/* A fresh URL each time, so no cache answers for the server */
+	char url[160];
+	const char *endpoint = check_endpoint(test);
+	snprintf(url, sizeof(url), "%s%ccheck=%llu", endpoint, strchr(endpoint, '?') != NULL ? '&' : '?',
+	         (unsigned long long)sys_time_get_system_time());
+	HttpResult h;
+	http_get(url, body, CHECK_BODY_MAX + 1, &h);
+	copy_result(r, &h);
+	check_protocol_judge(test, r);
+}
+
+static int backend_fetch(const char *url, int status_only, char *body, size_t *length, char *reached, size_t reached_size,
+                         CheckResult *r)
+{
+	HttpResult h;
+	int rc = http_get(url, body, status_only ? 0 : CHECK_BODY_MAX + 1, &h);
+	copy_result(r, &h);
+	*length = h.length;
+	snprintf(reached, reached_size, "%s", h.reached);
+	if (rc < 0)
+		snprintf(r->message, sizeof(r->message), "%s", check_error_name(h.error, h.verify_error));
+	return rc;
+}
+
+/* A DNS rule's name looked up through libnet, and a host name target too, for the addresses the
+ * renamed answer should carry */
+static void backend_dns(const char *name, const char *target, CheckResult *r)
+{
+	uint64_t started = sys_time_get_system_time();
+	CheckLookup answer, wanted = {0};
+	look_up(name, &answer);
+	r->elapsed_ms = (unsigned)((sys_time_get_system_time() - started) / 1000);
+	unsigned char address[4];
+	if (check_dns_target(target, address) == CHECK_DNS_NAME && !stopping)
+		look_up(target, &wanted);
+	check_dns_judge(target, &answer, &wanted, r);
+}
+
+static int backend_stopped(void)
+{
+	return stopping;
+}
+
+static uint64_t backend_now_ms(void)
+{
+	return http_now_ms();
+}
+
+static const CheckBackend backend = {
+    .open = backend_open,
+    .parts = backend_parts,
+    .load = load_redirects,
+    .protocol = backend_protocol,
+    .fetch = backend_fetch,
+    .judge_badssl = check_badssl_judge,
+    .judge_redirect = check_redirect_judge,
+    .dns = backend_dns,
+    .stopped = backend_stopped,
+    .policy_failed = NULL,
+    .log = log_result,
+    .lock = lock,
+    .unlock = unlock,
+    .now_ms = backend_now_ms,
+};
+
 static void run_checks(uint64_t argument)
 {
 	(void)argument;
-	char *body = malloc(CHECK_BODY_MAX + 1);
-	CheckHandshake *handshake = calloc(1, sizeof(*handshake));
-	int rc = body != NULL && handshake != NULL ? http_open() : (int)0x80710003;
-	if (rc < 0) {
-		lock();
-		snprintf(notice, sizeof(notice), rc == (int)0x80130106 ? "No network connection" : "Network set-up failed: 0x%08X",
-		         (unsigned)rc);
-		service.connection.state = CHECK_FAIL;
-		snprintf(service.connection.message, sizeof(service.connection.message), "%s", notice);
-		service.complete = 1;
-		busy = 0;
-		unlock();
-		free(body);
-		free(handshake);
-		sys_ppu_thread_exit(0);
-	}
-	/* The redirect rules are listed first, so their page fills in as they're tested */
-	CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
-	unsigned redirect_count = redirects != NULL ? load_redirects(CHECK_REDIRECTS_PATH, redirects, CHECK_REDIRECT_MAX) : 0;
-	int active = libhttp_active();
-	app_log("redirects: %u listed, vitals' libhttp %s", redirect_count, active ? "active" : "not active");
-	/* So are the DNS rules, which are left untested while flags/dns.off is there */
-	CheckRedirect *dns = calloc(CHECK_DNS_MAX, sizeof(*dns));
-	unsigned dns_count = dns != NULL ? load_redirects(CHECK_DNS_PATH, dns, CHECK_DNS_MAX) : 0;
-	CellFsStat flag;
-	int dns_off = cellFsStat(VITALS_DNS_OFF, &flag) == CELL_FS_SUCCEEDED;
-	app_log("DNS rules: %u listed%s", dns_count, dns_off ? ", off (dns.off)" : "");
+	char text[sizeof(notice)] = "";
+	check_run(&backend, &service, text, sizeof(text));
 	lock();
-	for (unsigned i = 0; i < redirect_count; ++i)
-		service.redirects[i] = redirects[i];
-	service.redirect_count = redirect_count;
-	service.libhttp_active = active;
-	for (unsigned i = 0; i < dns_count; ++i)
-		service.dns[i] = dns[i];
-	service.dns_count = dns_count;
-	service.dns_off = dns_off;
-	unlock();
-	static const unsigned order[] = {3, 2, 1, 0, CHECK_REPORT};
-	for (unsigned step = 0; step < sizeof(order) / sizeof(order[0]); ++step) {
-		unsigned test = order[step];
-		CheckResult r = {0};
-		if (stopping)
-			not_tested(&r);
-		else {
-			r.state = CHECK_RUNNING;
-			lock();
-			if (test < 4)
-				service.protocols[test] = r;
-			else
-				service.connection = r;
-			unlock();
-			/* A fresh URL each time, so no cache answers for the server, as the Vita's */
-			char url[160];
-			const char *endpoint = check_endpoint(test);
-			snprintf(url, sizeof(url), "%s%ccheck=%llu", endpoint, strchr(endpoint, '?') != NULL ? '&' : '?',
-			         (unsigned long long)sys_time_get_system_time());
-			HttpResult h;
-			http_get(url, body, CHECK_BODY_MAX + 1, &h);
-			copy_result(&r, &h);
-			if (stopping && h.http_code == 0)
-				not_tested(&r);
-			else if (test < 4)
-				check_protocol_judge(test, &r);
-			else if (h.http_code == 200 && check_parse_browserleaks(body, h.length, handshake) == 0) {
-				r.state = CHECK_PASS;
-				snprintf(r.message, sizeof(r.message), "Server report received");
-			} else {
-				r.state = CHECK_FAIL;
-				if (h.http_code == 200)
-					snprintf(r.message, sizeof(r.message), "Unexpected report format (HTTP 200)");
-				else
-					snprintf(r.message, sizeof(r.message), "%s", check_error_name(h.error, h.verify_error));
-			}
-		}
-		log_result(check_endpoint(test), &r);
-		lock();
-		if (test < 4) {
-			service.protocols[test] = r;
-			/* Sony's libssl has no TLS 1.3: a connection there is vitals' */
-			if (test == 3)
-				service.vitals_enabled = r.state == CHECK_PASS ? 1 : r.state == CHECK_FAIL ? 0 : -1;
-		} else {
-			service.connection = r;
-			if (r.state == CHECK_PASS)
-				service.handshake = *handshake;
-		}
-		unlock();
-	}
-	for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i) {
-		const CheckBadssl *test = check_badssl(i);
-		CheckResult r = {0};
-		if (stopping)
-			not_tested(&r);
-		else {
-			r.state = CHECK_RUNNING;
-			lock();
-			service.badssl[i] = r;
-			unlock();
-			char url[96];
-			snprintf(url, sizeof(url), "https://%s/", test->host);
-			HttpResult h;
-			http_get(url, body, 0, &h);
-			copy_result(&r, &h);
-			if (stopping && h.http_code == 0)
-				not_tested(&r);
-			else
-				check_badssl_judge(test, &r);
-		}
-		log_result(test->host, &r);
-		lock();
-		service.badssl[i] = r;
-		unlock();
-	}
-	/* Each redirect is requested by its old name, as a game would: vitals' libhttp sends it to the
-	 * new host and checks the certificate against the new name, so a pass proves the whole path;
-	 * any final HTTP status counts, as only the server's reachability is tested */
-	for (unsigned i = 0; i < redirect_count; ++i) {
-		CheckResult r = {0};
-		if (stopping)
-			not_tested(&r);
-		else if (!active) {
-			r.state = CHECK_INFO;
-			snprintf(r.message, sizeof(r.message), "Not tested: vitals' libhttp isn't active this boot");
-		} else if (vitals_switch_is_off(VITALS_REDIRECTS_OFF)) {
-			/* HTTP's Redirects off: vitals' libhttp without them */
-			r.state = CHECK_INFO;
-			snprintf(r.message, sizeof(r.message), "Not tested: redirects are off (flags/redirects.off)");
-		} else {
-			r.state = CHECK_RUNNING;
-			lock();
-			service.redirects[i].result = r;
-			unlock();
-			char url[CHECK_HOST_MAX + 16];
-			snprintf(url, sizeof(url), "https://%s/", redirects[i].from);
-			HttpResult h;
-			http_get(url, body, 0, &h);
-			copy_result(&r, &h);
-			if (stopping && h.http_code == 0)
-				not_tested(&r);
-			else
-				check_redirect_judge(&r, h.reached, redirects[i].to);
-		}
-		log_result(redirects[i].from, &r);
-		lock();
-		service.redirects[i].result = r;
-		unlock();
-	}
-	/* Each DNS rule's name is looked up, and its answer held against the rule; a host name target
-	 * is looked up too, for the addresses the renamed answer should carry */
-	for (unsigned i = 0; i < dns_count; ++i) {
-		CheckResult r = {0};
-		if (stopping)
-			not_tested(&r);
-		else if (dns_off) {
-			r.state = CHECK_INFO;
-			snprintf(r.message, sizeof(r.message), "Not tested: DNS rules are off (flags/dns.off)");
-		} else {
-			r.state = CHECK_RUNNING;
-			lock();
-			service.dns[i].result = r;
-			unlock();
-			uint64_t started = sys_time_get_system_time();
-			CheckLookup answer, target = {0};
-			look_up(dns[i].from, &answer);
-			r.elapsed_ms = (unsigned)((sys_time_get_system_time() - started) / 1000);
-			unsigned char address[4];
-			if (check_dns_target(dns[i].to, address) == CHECK_DNS_NAME && !stopping)
-				look_up(dns[i].to, &target);
-			if (stopping && !answer.found && answer.error != HOST_NOT_FOUND)
-				not_tested(&r);
-			else
-				check_dns_judge(dns[i].to, &answer, &target, &r);
-		}
-		app_log("test DNS %s -> %s: state %d, %u ms, %s", dns[i].from, dns[i].to, r.state, r.elapsed_ms, r.message);
-		lock();
-		service.dns[i].result = r;
-		unlock();
-	}
-	free(dns);
-	free(redirects);
-	free(body);
-	free(handshake);
-	lock();
-	service.complete = 1;
-	service.interrupted = stopping;
+	if (text[0] != '\0')
+		snprintf(notice, sizeof(notice), "%s", text);
 	busy = 0;
 	unlock();
 	sys_ppu_thread_exit(0);

@@ -1,5 +1,6 @@
 #include "check.h"
 #include "check_vita.h"
+#include "check_run.h"
 #include "network.h"
 #include "probe.h"
 #include "vitals/redirect_list.h"
@@ -79,28 +80,6 @@ static int stopped(void)
     unlock();
     return c;
 }
-static void publish_badssl(unsigned index, const CheckResult *r)
-{
-    lock();
-    service.badssl[index] = *r;
-    unlock();
-}
-static void publish_redirect(unsigned index, const CheckResult *r)
-{
-    lock();
-    service.redirects[index].result = *r;
-    unlock();
-}
-static void publish(unsigned row, const CheckResult *r)
-{
-    lock();
-    if (row == CHECK_REPORT)
-        service.connection = *r;
-    else
-        service.protocols[row] = *r;
-    unlock();
-}
-
 /* Keep request ownership locked across abort/delete, but never across blocking I/O */
 static void abort_current(int user_cancel)
 {
@@ -580,222 +559,91 @@ failed:
     return rc;
 }
 
-static int run_checks(SceSize argc, void *argv)
+/* ---- the Vita's side of the shared run (shared/app/check_run.c) ---- */
+
+static int backend_open(char *text, size_t size)
 {
-    (void)argc;
-    (void)argv;
-    char *body = malloc(CHECK_BODY_MAX + 1);
-    CheckHandshake *h = calloc(1, sizeof(*h));
-    if (!body || !h)
-    {
-        lock();
-        snprintf(notice, sizeof(notice), "Out of memory");
-        busy = 0;
-        unlock();
-        free(body);
-        free(h);
-        return 0;
-    }
-    /* The network and the HTTP libraries, the first time; a failure ends the run there, shown on
-     * the TLS report's row */
+    /* The network and the HTTP libraries, the first time */
     int rc = network_start(stopped);
-    int network_failed = rc < 0;
-    if (rc == 0)
-        rc = open_libraries();
     if (rc < 0)
     {
-        lock();
-        if (cancelled)
-            snprintf(notice, sizeof(notice), "Cancelled / not tested");
-        else if (network_failed)
-            snprintf(notice, sizeof(notice), "No network connection (0x%08X)", (unsigned)rc);
-        else
-            snprintf(notice, sizeof(notice), "Sony network initialization failed: 0x%08X", (unsigned)rc);
-        service.connection.state = cancelled ? CHECK_INFO : CHECK_FAIL;
-        snprintf(service.connection.message, sizeof(service.connection.message), "%s", notice);
-        service.complete = 1;
-        service.interrupted = cancelled;
-        busy = 0;
-        unlock();
-        free(body);
-        free(h);
-        return 0;
+        snprintf(text, size, "No network connection (0x%08X)", (unsigned)rc);
+        return rc;
     }
+    rc = open_libraries();
+    if (rc < 0)
+        snprintf(text, size, "Sony network initialization failed: 0x%08X", (unsigned)rc);
+    return rc;
+}
+
+static int flag_there(const char *path)
+{
+    SceIoStat status;
+    return sceIoGetstat(path, &status) >= 0;
+}
+
+static void backend_parts(CheckParts *parts)
+{
     int enabled = detect_vitals();
     lock();
     vitals_http = (enabled & 1) != 0;
     vitals_tls = (enabled & 2) != 0;
-    service.vitals_enabled = enabled != 0;
     unlock();
-    /* The redirect rules are listed first, so their page fills in as they are tested */
-    CheckRedirect *redirects = calloc(CHECK_REDIRECT_MAX, sizeof(*redirects));
-    unsigned redirect_count = redirects != NULL ? load_redirects(CHECK_REDIRECTS_PATH, redirects, CHECK_REDIRECT_MAX) : 0;
-    /* So are the DNS rules, which the Vita's test doesn't look up yet: they're marked as not tested
-     * once the run gets to them, last */
-    CheckRedirect *dns = calloc(CHECK_DNS_MAX, sizeof(*dns));
-    unsigned dns_count = dns != NULL ? load_redirects(CHECK_DNS_PATH, dns, CHECK_DNS_MAX) : 0;
-    lock();
-    for (unsigned i = 0; i < redirect_count; ++i)
-        service.redirects[i] = redirects[i];
-    service.redirect_count = redirect_count;
-    for (unsigned i = 0; i < dns_count; ++i)
-        service.dns[i] = dns[i];
-    service.dns_count = dns_count;
-    unlock();
-    free(dns);
-    /* Every check is independent
-     * The optional report is last, so its request and parser cannot gate the
-     * protocol tiles */
-    static const unsigned order[] = {3, 2, 1, 0, CHECK_REPORT};
-    int policy_failed = 0;
-    for (unsigned step = 0; step < sizeof(order) / sizeof(order[0]); ++step)
-    {
-        unsigned test = order[step];
-        CheckResult r = {0};
-        if (stopped() || policy_failed)
-        {
-            r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
-            publish((unsigned)test, &r);
-            continue;
-        }
-        r.state = CHECK_RUNNING;
-        publish((unsigned)test, &r);
-        size_t n = 0;
-        int fetched;
-        if (test < 4)
-        {
-            check_run_protocol(test, fetch, NULL, body, &n, &r);
-            fetched = r.error;
-        }
-        else
-            fetched = fetch(NULL, test, 1, body, &n, &r);
-        if (fetched < 0 && stopped())
-        {
-            r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "Cancelled / not tested");
-        }
-        else if (fetched == 0 && test == CHECK_REPORT)
-        {
-            if (check_parse_browserleaks(body, n, h))
-            {
-                r.state = CHECK_FAIL;
-                r.error = -1;
-                snprintf(r.message, sizeof(r.message), "Unexpected report format (HTTP 200)");
-                memset(h, 0, sizeof(*h));
-            }
-            else
-            {
-                snprintf(r.message, sizeof(r.message), "Server report received");
-                lock();
-                service.handshake = *h;
-                unlock();
-            }
-        }
-        policy_failed = r.restore_error < 0;
-        publish((unsigned)test, &r);
-    }
-    /* badssl.com: each host with certificate checks on; the good ones must give any final HTTP
-     * status, the bad ones must be refused */
-    for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
-    {
-        const CheckBadssl *test = check_badssl(i);
-        CheckResult r = {0};
-        if (stopped() || policy_failed)
-        {
-            r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
-        }
-        else
-        {
-            char url[64];
-            size_t n = 0;
-            r.state = CHECK_RUNNING;
-            publish_badssl(i, &r);
-            snprintf(url, sizeof(url), "https://%s/", test->host);
-            if (fetch_url(url, 1, 0, 1, body, &n, &r) < 0 && stopped())
-            {
-                r.state = CHECK_INFO;
-                snprintf(r.message, sizeof(r.message), "Cancelled / not tested");
-            }
-            else
-                check_badssl_judge(test, &r);
-            policy_failed = r.restore_error < 0;
-        }
-        publish_badssl(i, &r);
-    }
-    /* Each redirect is requested by its old name, as a game would: vitals' provider sends it to
-     * the new host and checks the certificate against the new name, so a pass proves the whole
-     * path; any final HTTP status counts, as only the server's reachability is tested */
-    for (unsigned i = 0; i < redirect_count; ++i)
-    {
-        CheckResult r = {0};
-        if (stopped() || policy_failed)
-        {
-            r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "%s", policy_failed ? "Not tested: certificate policy error" : "Cancelled / not tested");
-        }
-        /* Host redirects are vitals-http's, and HTTP's Redirects off keeps them from it */
-        else if (vitals_http != 1)
-        {
-            r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "Not tested: vitals' HTTP isn't active here");
-        }
-        else if (sceIoGetstat(VITALS_REDIRECTS_OFF, &(SceIoStat){0}) >= 0)
-        {
-            r.state = CHECK_INFO;
-            snprintf(r.message, sizeof(r.message), "Not tested: redirects are off");
-        }
-        else
-        {
-            char url[CHECK_HOST_MAX + 16];
-            size_t n = 0;
-            r.state = CHECK_RUNNING;
-            publish_redirect(i, &r);
-            snprintf(url, sizeof(url), "https://%s/", redirects[i].from);
-            if (fetch_url(url, 1, 0, 1, body, &n, &r) < 0 && stopped())
-            {
-                r.state = CHECK_INFO;
-                snprintf(r.message, sizeof(r.message), "Cancelled / not tested");
-            }
-            /* The answer was the new host's: vitals-http says where the request went (and checked
-             * the certificate against that name) */
-            else if (r.state == CHECK_PASS)
-            {
-                char host[CHECK_HOST_MAX];
-                int reached = reached_url[0] != '\0'
-                                  ? check_url_host(reached_url, redirects[i].to, host, sizeof(host))
-                                  : -1;
-                if (reached == 1)
-                    snprintf(r.message, sizeof(r.message), "Reached %.96s (HTTP %d)", redirects[i].to, r.http_code);
-                else if (reached == 0)
-                {
-                    r.state = CHECK_FAIL;
-                    snprintf(r.message, sizeof(r.message), "Answered by %.50s, not %.50s", host, redirects[i].to);
-                }
-                else
-                    snprintf(r.message, sizeof(r.message), "Connected (HTTP %d); the host reached isn't known", r.http_code);
-            }
-            policy_failed = r.restore_error < 0;
-        }
-        publish_redirect(i, &r);
-    }
-    lock();
-    for (unsigned i = 0; i < dns_count; ++i)
-    {
-        CheckResult *r = &service.dns[i].result;
-        r->state = CHECK_INFO;
-        snprintf(r->message, sizeof(r->message), "%s", cancelled ? "Cancelled / not tested" : "Not tested on the Vita yet");
-    }
-    unlock();
-    free(redirects);
-    free(body);
-    free(h);
+    parts->http = vitals_http;
+    parts->tls = vitals_tls;
+    parts->redirects_off = flag_there(VITALS_REDIRECTS_OFF);
+    parts->dns_off = flag_there(VITALS_DNS_OFF);
+    parts->vitals = enabled != 0;
+}
+
+static void backend_protocol(unsigned test, char *body, CheckResult *r)
+{
+    size_t n = 0;
+    check_run_protocol(test, fetch, NULL, body, &n, r);
+}
+
+static int backend_fetch(const char *url, int status_only, char *body, size_t *length, char *reached, size_t reached_size,
+                         CheckResult *r)
+{
+    int rc = fetch_url(url, 1, 0, status_only, body, length, r);
+    snprintf(reached, reached_size, "%s", reached_url);
+    return rc;
+}
+
+static int backend_policy_failed(const CheckResult *r)
+{
+    return r->restore_error < 0;
+}
+
+static const CheckBackend backend = {
+    .open = backend_open,
+    .parts = backend_parts,
+    .load = load_redirects,
+    .protocol = backend_protocol,
+    .fetch = backend_fetch,
+    .judge_badssl = check_badssl_judge,
+    .judge_redirect = check_redirect_judge,
+    /* The Vita's test doesn't look the DNS rules up yet */
+    .dns = NULL,
+    .stopped = stopped,
+    .policy_failed = backend_policy_failed,
+    .log = NULL,
+    .lock = lock,
+    .unlock = unlock,
+    .now_ms = now_ms,
+};
+
+static int run_checks(SceSize argc, void *argv)
+{
+    (void)argc;
+    (void)argv;
+    char text[sizeof(notice)] = "";
+    check_run(&backend, &service, text, sizeof(text));
     /* The log is saved only on request (vitals_check_save_report), and only for a run that
      * wasn't cancelled */
     lock();
-    service.complete = 1;
-    service.interrupted = cancelled;
+    if (text[0] != '\0')
+        snprintf(notice, sizeof(notice), "%s", text);
     busy = 0;
     unlock();
     return 0;
