@@ -52,6 +52,9 @@ add_executable(libhttp
 	src/exports.S)
 target_include_directories(libhttp PRIVATE src ../common ../../shared/include)
 target_compile_definitions(libhttp PRIVATE VITALS_DEBUG=${VITALS_DEBUG} VH_DEFAULT_SUFFIX="${VITALS_HTTP_USER_AGENT}")
+# The release (../../VERSION) in the module's marker (common/vitals_marker.h)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../version.cmake)
+target_compile_definitions(libhttp PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 target_compile_options(libhttp PRIVATE -Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections)
 target_link_options(libhttp PRIVATE -nodefaultlibs -Wl,--gc-sections
 	"-Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/libhttp.map")

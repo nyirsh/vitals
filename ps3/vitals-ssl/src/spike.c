@@ -4,6 +4,7 @@
  * OpenSSL's int ones, and success for the public cellSsl ones. The written ones (core.c,
  * connection.c) replace these at link time. */
 
+#include "vitals_marker.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -54,8 +55,12 @@ static const VitalsXmbFunction k_functions[] = {
 #include "cellssl_exports.h"
 };
 
+/* What tells this module from Sony's in the app's connection test (common/vitals_marker.h) */
+static const char k_marker[] = VITALS_MARKER("libssl");
+
 int module_start(size_t args, void *argp)
 {
+	VITALS_KEEP_MARKER(k_marker);
 	VitalsXmbRequest *request = argp;
 	if (args == sizeof(*request) && request != NULL && request->magic == VITALS_XMB_MAGIC) {
 		uint32_t count = sizeof(k_functions) / sizeof(k_functions[0]);

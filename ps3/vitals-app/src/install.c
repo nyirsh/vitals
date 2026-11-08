@@ -252,7 +252,8 @@ static void make_directories(void)
 	make_directory("/dev_hdd0/plugins");
 }
 
-/* Earlier versions kept everything in /dev_hdd0/vitals itself, and the logs in /dev_hdd0/tmp: what
+/* Earlier versions kept everything in /dev_hdd0/vitals itself, and the logs in /dev_hdd0/tmp, and the
+ * boot plugin left markers in system/: what
  * the user chose or got (the certificate update's bundle, dns.off, the reports, xmb.off as xmb-tls.off) moves to its
  * folder; the rest goes, the installer having put its own in place */
 static void move_earlier_layout(VitalsNote note)
@@ -274,7 +275,9 @@ static void move_earlier_layout(VitalsNote note)
 	    VITALS_DIRECTORY "/installed.txt",     VITALS_DIRECTORY "/libhttp.active", VITALS_DIRECTORY "/libhttp.once",
 	    VITALS_DIRECTORY "/dns.once",          VITALS_DIRECTORY "/dns.loading",    VITALS_DIRECTORY "/dns.delay",
 	    VITALS_DIRECTORY "/boot_plugins.txt.bak", VITALS_DIRECTORY "/boot_plugins_kernel.txt.bak",
-	    "/dev_hdd0/tmp/vitals.log",            "/dev_hdd0/tmp/vitals-app.log"};
+	    "/dev_hdd0/tmp/vitals.log",            "/dev_hdd0/tmp/vitals-app.log",
+	    /* The boot plugin's markers of what it mapped, which the app no longer reads */
+	    VITALS_SYSTEM_DIRECTORY "/libhttp.active", VITALS_SYSTEM_DIRECTORY "/libssl.active"};
 	for (unsigned i = 0; i < sizeof(gone) / sizeof(gone[0]); ++i)
 		if (cellFsUnlink(gone[i]) == CELL_FS_SUCCEEDED)
 			notef(note, "Deleted %s (an earlier version's place)", gone[i]);
@@ -359,7 +362,7 @@ int vitals_uninstall_run(VitalsNote note)
 	 * the folder when anything's left in it */
 	static const char *const files[] = {VITALS_PLUGIN,      VITALS_LIBSSL,  VITALS_LIBHTTP,
 	                                    VITALS_DNS_PLUGIN,  VITALS_BUNDLE,  VITALS_BUNDLE_EARLIER, VITALS_INSTALLED,
-	                                    VITALS_LIBHTTP_ACTIVE, VITALS_LIBSSL_ACTIVE, VITALS_SYSTEM_DIRECTORY "/boot_plugins.txt.bak",
+	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins.txt.bak",
 	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins_kernel.txt.bak", VITALS_LOG,
 	                                    VITALS_APP_LOG};
 	for (unsigned i = 0; i < sizeof(files) / sizeof(files[0]); ++i)

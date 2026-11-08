@@ -5,10 +5,8 @@
  * start, the plugin asks to be unloaded; the redirection stays in Cobra's table.
  *
  * libhttp is redirected the same way, to /dev_hdd0/vitals/system/libhttp.sprx, at every boot it's
- * there. On a boot where each is mapped, the plugin writes /dev_hdd0/vitals/system/libssl.active and
- * libhttp.active, and on every other boot it deletes them: vitals' modules answer as Sony's do, so
- * the app's test reads these (with their date against the boot's) to know whose it's talking to, as
- * the Vita's app sees which modules its process loaded.
+ * there. vitals' modules answer as Sony's do, under Sony's names; the app's test tells them apart by
+ * the marker each carries (common/vitals_marker.h).
  *
  * The DNS kernel plugin (/dev_hdd0/vitals/system/vitals_dns.bin) is loaded from here too, with
  * Cobra's syscall 8 as webMAN MOD loads one. Early versions froze the console when loaded at boot,
@@ -66,16 +64,11 @@
  * /dev_hdd0/vitals/flags */
 #define SONY_LIBSSL "/dev_flash/sys/external/libssl.sprx"
 #define SONY_LIBHTTP "/dev_flash/sys/external/libhttp.sprx"
-#define LIBHTTP_ACTIVE VITALS_LIBHTTP_ACTIVE
-#define LIBSSL_ACTIVE VITALS_LIBSSL_ACTIVE
 
 /* Cobra's sys_map_path (lv2 syscall 35): old path, new path (NULL removes the redirection) */
 #define COBRA_MAP_PATH 35
 #define VITALS_LV2_FS_OPEN 801
 #define VITALS_FS_READ_ONLY 0
-/* CELL_FS_O_WRONLY | CELL_FS_O_CREAT | CELL_FS_O_TRUNC */
-#define VITALS_FS_WRITE_NEW 01101
-#define VITALS_LV2_FS_UNLINK 814
 
 static int map_path(const char *from, const char *to)
 {
@@ -94,46 +87,13 @@ static int file_exists(const char *path)
 	return 1;
 }
 
-static int unlink_file(const char *path)
-{
-	lv2syscall1(VITALS_LV2_FS_UNLINK, (uint64_t)(uintptr_t)path);
-	return (int)p1;
-}
-
-/* An empty file at path: 0, or lv2's error */
-static int create_file(const char *path)
-{
-	int fd = -1;
-	lv2syscall6(VITALS_LV2_FS_OPEN, (uint64_t)(uintptr_t)path, VITALS_FS_WRITE_NEW, (uint64_t)(uintptr_t)&fd, 0644, 0, 0);
-	if (p1 != 0)
-		return (int)p1;
-	vitals_log_close(fd);
-	return 0;
-}
-
 /* Whether a component is on, and if not why, for the popup */
 enum { ON, OFF_BY_FLAG, OFF_MISSING, OFF_FAILED };
-
-/* A module's marker, after it was mapped (result 0), for the app's test */
-static void mark(const char *marker, int result)
-{
-	char hex[9];
-	if (result != 0)
-		return;
-	int marked = create_file(marker);
-	if (marked != 0) {
-		say(1, "can't write marker");
-		say(1, marker);
-		say(1, vitals_log_hex((uint32_t)marked, hex));
-	}
-}
 
 /* vitals' libssl, unless tls.off is there or the module isn't */
 static int map_libssl(void)
 {
 	char hex[9];
-	/* Last boot's marker goes; a boot that maps vitals' libssl writes it again */
-	(void)unlink_file(LIBSSL_ACTIVE);
 	if (file_exists(VITALS_TLS_OFF)) {
 		say(1, "tls.off is there: Sony's libssl stays");
 		return OFF_BY_FLAG;
@@ -145,7 +105,6 @@ static int map_libssl(void)
 	int result = map_path(SONY_LIBSSL, VITALS_LIBSSL);
 	say(1, "map " SONY_LIBSSL " -> " VITALS_LIBSSL);
 	say(1, vitals_log_hex((uint32_t)result, hex));
-	mark(LIBSSL_ACTIVE, result);
 	return result == 0 ? ON : OFF_FAILED;
 }
 
@@ -153,8 +112,6 @@ static int map_libssl(void)
 static int map_libhttp(void)
 {
 	char hex[9];
-	/* Last boot's marker goes; a boot that maps vitals' libhttp writes it again */
-	(void)unlink_file(LIBHTTP_ACTIVE);
 	if (file_exists(VITALS_HTTP_OFF)) {
 		say(1, "http.off is there: Sony's libhttp stays");
 		return OFF_BY_FLAG;
@@ -166,7 +123,6 @@ static int map_libhttp(void)
 	int result = map_path(SONY_LIBHTTP, VITALS_LIBHTTP);
 	say(1, "map " SONY_LIBHTTP " -> " VITALS_LIBHTTP);
 	say(1, vitals_log_hex((uint32_t)result, hex));
-	mark(LIBHTTP_ACTIVE, result);
 	return result == 0 ? ON : OFF_FAILED;
 }
 

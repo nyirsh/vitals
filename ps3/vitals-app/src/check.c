@@ -12,6 +12,7 @@
 #include "firmware.h"
 #include "http.h"
 #include "install.h"
+#include "vitals_marker.h"
 #include "vitals/redirect_list.h"
 
 #include <cell/cell_fs.h>
@@ -23,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prx.h>
 #include <sys/sys_time.h>
 
 /* The run was cancelled: http.c ends its request, and the run asks before each check */
@@ -105,21 +107,47 @@ static void look_up(const char *name, CheckLookup *out)
 		out->error = NO_DATA;
 }
 
-/* Whether one of vitals' modules is this boot's: the boot plugin writes its marker (libssl.active,
- * libhttp.active) on a boot that maps it, so a file older than this boot is a stale one (a boot
- * without the plugin). The PS3's way of knowing what the Vita's app sees in its own process */
-static int module_active(const char *marker)
+/* Whether the module this process loaded under Sony's name is vitals' (common/vitals_marker.h): 1 with
+ * its release in version, 0 for Sony's, -1 when none is loaded. Its segments are only read, as the
+ * Vita's app reads its modules' paths: nothing in the module is called */
+#define MODULE_SEGMENTS 8
+static int vitals_module(const char *name, const char *module, char *version, size_t version_size)
 {
-	CellFsStat status;
-	if (cellFsStat(marker, &status) != CELL_FS_SUCCEEDED)
-		return 0;
-	CellRtcDateTime clock;
-	time_t now = 0;
-	if (cellRtcGetCurrentClockUtc(&clock) != 0 || cellRtcGetTime_t(&clock, &now) != 0)
-		return 1; /* No clock to compare with: the file's word is taken */
-	int64_t booted = (int64_t)now - (int64_t)(sys_time_get_system_time() / 1000000);
-	/* A minute's slack: the plugin writes it early in the boot, and the clock may move */
-	return (int64_t)status.st_mtime >= booted - 60;
+	version[0] = '\0';
+	sys_prx_id_t id = sys_prx_get_module_id_by_name(name, 0, NULL);
+	if (id < 0)
+		return -1;
+	sys_prx_segment_info_t segments[MODULE_SEGMENTS];
+	char filename[128];
+	sys_prx_module_info_t info;
+	memset(&info, 0, sizeof(info));
+	memset(segments, 0, sizeof(segments));
+	info.size = sizeof(info);
+	info.filename = (__typeof__(info.filename))(uintptr_t)filename;
+	info.filename_size = sizeof(filename);
+	info.segments = (__typeof__(info.segments))(uintptr_t)segments;
+	info.segments_num = MODULE_SEGMENTS;
+	if (sys_prx_get_module_info(id, 0, &info) != 0)
+		return -1;
+	char prefix[48];
+	int prefix_length = snprintf(prefix, sizeof(prefix), VITALS_MARKER_PREFIX "%s/", module);
+	unsigned count = info.segments_num < MODULE_SEGMENTS ? info.segments_num : MODULE_SEGMENTS;
+	for (unsigned i = 0; i < count; ++i) {
+		const char *base = (const char *)(uintptr_t)segments[i].base;
+		size_t length = (size_t)segments[i].filesz;
+		if (base == NULL || length < (size_t)prefix_length)
+			continue;
+		for (size_t at = 0; at + (size_t)prefix_length <= length; ++at) {
+			if (base[at] != prefix[0] || memcmp(base + at, prefix, (size_t)prefix_length) != 0)
+				continue;
+			size_t used = 0;
+			for (size_t c = at + (size_t)prefix_length; c < length && base[c] != '\0' && used + 1 < version_size; ++c)
+				version[used++] = base[c];
+			version[used] = '\0';
+			return 1;
+		}
+	}
+	return 0;
 }
 
 /* ---- the PS3's side of the shared run (shared/app/check_run.c) ---- */
@@ -133,21 +161,25 @@ static int backend_open(char *text, size_t size)
 	return rc;
 }
 
-/* Which of vitals' modules this boot has, for the report as the Vita's keeps its own */
+/* Which of vitals' modules this process has, and their releases, for the report as the Vita's keeps its
+ * own */
 static int vitals_http = -1, vitals_tls = -1;
+static char http_release[16], tls_release[16];
 
 static void backend_parts(CheckParts *parts)
 {
-	vitals_http = parts->http = module_active(VITALS_LIBHTTP_ACTIVE);
-	vitals_tls = parts->tls = module_active(VITALS_LIBSSL_ACTIVE);
+	/* libhttp is loaded by now (backend_open), and libssl with it */
+	vitals_http = parts->http = vitals_module("cellHttp_Library", "libhttp", http_release, sizeof(http_release)) == 1;
+	vitals_tls = parts->tls = vitals_module("cellSsl_Library", "libssl", tls_release, sizeof(tls_release)) == 1;
 	parts->redirects_off = vitals_switch_is_off(VITALS_REDIRECTS_OFF);
 	parts->dns_off = vitals_switch_is_off(VITALS_DNS_OFF);
 	/* As on the Vita: vitals is running when either of its modules is */
 	parts->vitals = parts->http || parts->tls;
 	/* libhttp's own transaction says which host answered */
 	parts->http_outdated = 0;
-	app_log("vitals' libssl %s, libhttp %s%s%s", parts->tls ? "active" : "not active", parts->http ? "active" : "not active",
-	        parts->redirects_off ? ", redirects off" : "", parts->dns_off ? ", DNS rules off" : "");
+	app_log("libssl: %s%s, libhttp: %s%s%s%s", parts->tls ? "vitals' " : "Sony's", tls_release,
+	        parts->http ? "vitals' " : "Sony's", http_release, parts->redirects_off ? ", redirects off" : "",
+	        parts->dns_off ? ", DNS rules off" : "");
 }
 
 static void backend_protocol(unsigned test, char *body, CheckResult *r)
@@ -213,9 +245,14 @@ static void report_about(CheckReport *report, const CheckService *s)
 	check_report_add(report, "console=%s (%s)\n", console->text,
 	                 console->supported ? "supported" : "not supported: vitals is made for 4.93 CEX with Cobra");
 	(void)s;
-	check_report_add(report, "parts=HTTP: %s, TLS: %s this boot (the boot plugin's libhttp.active, libssl.active)\n",
-	                 vitals_http < 0 ? "?" : vitals_http ? "vitals' libhttp" : "Sony's libhttp",
-	                 vitals_tls < 0 ? "?" : vitals_tls ? "vitals' libssl" : "Sony's libssl");
+	check_report_add(report, "parts=HTTP: %s%s, TLS: %s%s in this process\n",
+	                 vitals_http < 0 ? "?" : vitals_http ? "vitals' libhttp " : "Sony's libhttp", http_release,
+	                 vitals_tls < 0 ? "?" : vitals_tls ? "vitals' libssl " : "Sony's libssl", tls_release);
+	/* A module from another release than the app's: the app's Install puts its own in place */
+	if ((vitals_http == 1 && strcmp(http_release, VITALS_VERSION) != 0) ||
+	    (vitals_tls == 1 && strcmp(tls_release, VITALS_VERSION) != 0))
+		check_report_add(report, "outdated=vitals' modules aren't this app's release (" VITALS_VERSION "): install it "
+		                         "again and reboot\n");
 }
 
 /* libssl's verify flags, protocol and cipher */

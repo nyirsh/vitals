@@ -3,6 +3,7 @@
  * which functions a game or the vitals app calls, in what order, and that the module loads in
  * libhttp's place. Written functions will replace these at link time, as in vitals-ssl/src/spike.c */
 
+#include "vitals_marker.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -56,8 +57,12 @@ static const VitalsXmbFunction k_functions[] = {
 #include "cellhttp_exports.h"
 };
 
+/* What tells this module from Sony's in the app's connection test (common/vitals_marker.h) */
+static const char k_marker[] = VITALS_MARKER("libhttp");
+
 int module_start(size_t args, void *argp)
 {
+	VITALS_KEEP_MARKER(k_marker);
 	VitalsXmbRequest *request = argp;
 	if (args == sizeof(*request) && request != NULL && request->magic == VITALS_XMB_MAGIC) {
 		uint32_t count = sizeof(k_functions) / sizeof(k_functions[0]);

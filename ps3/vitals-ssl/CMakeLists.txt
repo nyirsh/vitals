@@ -42,6 +42,9 @@ if(VITALS_SSL_UNVERIFIED)
 	message(WARNING "VITALS_SSL_UNVERIFIED: servers' certificates aren't checked")
 endif()
 target_include_directories(libssl PRIVATE src src/platform ../common ../../shared/include)
+# The release (../../VERSION) in the module's marker (common/vitals_marker.h)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../version.cmake)
+target_compile_definitions(libssl PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 target_compile_options(libssl PRIVATE -Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections)
 # No libc of its own: what Mbed TLS needs from one is liblv2's (src/platform/libc.c), as Sony's
 # libssl, so anything else it reaches for fails the link
