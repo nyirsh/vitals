@@ -1,8 +1,0 @@
-/build/
-__pycache__/
-*.o
-
-.*
-!.gitignore
-!.vscode
-!.env.example

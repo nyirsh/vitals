@@ -217,7 +217,7 @@ Every build includes all three levels; choose one on the console in the app's **
 
 ### Working with a Vita
 
-[tools/vita_comms.py](tools/vita_comms.py) talks to the Vita over VitaShell's FTP server (**SELECT** in VitaShell starts it). Put the Vita's address in `.env` first (`cp .env.example .env`, then set `VITA_HOST`), or pass it as `make status VITA_HOST=...`.
+[tools/vita_comms.py](tools/vita_comms.py) talks to the Vita over VitaShell's FTP server (**SELECT** in VitaShell starts it). Put the Vita's address in the repository's `.env` first (`cp ../.env.example ../.env` from `vita/`, then set `VITA_HOST`; the PS3's address goes there too), or pass it as `make status VITA_HOST=...`.
 
 - `make upload-app`: builds the app and puts `vitals-app.vpk` in `ux0:data/vitals/`, for VitaShell to install
 - `make fetch`: brings the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, leaving them on the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed

@@ -99,7 +99,8 @@ PACKAGES = "/dev_hdd0/packages"
 def load_env():
     """.env's KEY=VALUE lines into the environment, where they aren't set already (# comments)"""
     try:
-        with open(os.path.join(ROOT, ".env"), encoding="utf-8") as env:
+        # The repository's, both consoles' settings (.env.example)
+        with open(os.path.join(ROOT, "..", ".env"), encoding="utf-8") as env:
             lines = env.read().splitlines()
     except FileNotFoundError:
         return

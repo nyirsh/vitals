@@ -1,8 +1,16 @@
-# Each project ignores its own build output (vita/.gitignore, ps3/.gitignore); this is for the root
+# Both consoles' projects (vita/, ps3/) and the shared code: what's built, local settings and dumps
+# stay out
+/vita/build/
+/ps3/build/
+__pycache__/
+*.o
+
+# Dot files are local (.env, editors' folders), but for these
 .*
 !.gitignore
+!.gitattributes
 !.vscode
-__pycache__/
+!.env.example
 
 # Dumps from the consoles (firmware modules, CA files, memory segments): Sony's, never committed;
 # a folder per console and firmware (dumps/ps3/4.93-cex, dumps/vita/3.65), where the tools and tests read them

@@ -1,0 +1,5 @@
+# Certificate bundles kept byte for byte, without newline conversion: the apps carry them as they are
+vita/vitals-app/assets/certs.cer -text
+vita/vitals-app/assets/sony-certs.pem -text
+vita/vitals-app/assets/mozilla-certs.pem -text
+ps3/vitals-app/assets/mozilla-certs.pem -text

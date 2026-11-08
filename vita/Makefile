@@ -18,10 +18,10 @@
 #                           VitaShell to install (tools/vita_comms.py)
 #   make fetch              the app's test reports and the crash dumps, into build/vita-fetch/
 #   make status             what's on the Vita now
-# The Vita is VITA_HOST in .env (cp .env.example .env), or make's or the environment's VITA_HOST
+# The Vita is VITA_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's VITA_HOST
 COMPONENTS = common vitals-boot vitals-ssl vitals-browser vitals-http vitals-app
 
-# The Vita: on make's command line (make status VITA_HOST=...), else tools/vita_comms.py reads .env
+# The Vita: on make's command line (make status VITA_HOST=...), else tools/vita_comms.py reads ../.env
 $(foreach v,VITA_HOST VITA_PORT,$(if $($(v)),$(eval export $(v))))
 
 # The app builds the plugin, providers and redirect it packages, so they are not listed again

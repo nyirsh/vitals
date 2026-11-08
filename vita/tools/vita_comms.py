@@ -11,7 +11,7 @@
                                        the certificate store, the user's lists and the switches
 
 The Vita is VITA_HOST, port VITA_PORT (1337, VitaShell's), from the environment or else from .env at
-the top of vita/ (copy .env.example). Installing, uninstalling and the debug output are the app's: they
+the top of the repository (copy .env.example). Installing, uninstalling and the debug output are the app's: they
 need vs0: mounted for writing and a reboot, which the app takes care of.
 
 What fetch brings back can hold PSN details (the reports list each request): it stays in build/, which
@@ -63,7 +63,8 @@ FETCH = [
 def load_env():
     """.env's KEY=VALUE lines into the environment, where they aren't set already (# comments)"""
     try:
-        with open(os.path.join(ROOT, ".env"), encoding="utf-8") as env:
+        # The repository's, both consoles' settings (.env.example)
+        with open(os.path.join(ROOT, "..", ".env"), encoding="utf-8") as env:
             lines = env.read().splitlines()
     except FileNotFoundError:
         return

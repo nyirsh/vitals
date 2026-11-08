@@ -44,7 +44,7 @@
 #   make app-log            fetches the app's own log (vitals-app.log) into build/
 #   make upload-app [SIGNED=1]   builds the app and puts it in the console's /dev_hdd0/packages/
 #   make pull               pulls the newest published image (nyirsh/vitals-ps3-sdk:latest)
-# The console is PS3_HOST in .env (cp .env.example .env), or make's or the environment's PS3_HOST
+# The console is PS3_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's PS3_HOST
 
 DEBUG ?= 0
 SIGNED ?= 0
@@ -63,7 +63,7 @@ ifeq ($(filter 0 1 2,$(DEBUG)),)
 $(error DEBUG must be 0, 1 or 2)
 endif
 
-# The console: on make's command line (make reboot PS3_HOST=...), else tools/ps3_comms.py reads .env
+# The console: on make's command line (make reboot PS3_HOST=...), else tools/ps3_comms.py reads ../.env
 $(foreach v,PS3_HOST PS3_PORT PS3_HTTP_PORT,$(if $($(v)),$(eval export $(v))))
 
 SSL_DIR = build/vitals-ssl$(if $(filter-out 0,$(DEBUG)),-debug$(DEBUG))
