@@ -17,7 +17,7 @@
 
 #include <stdarg.h>
 
-#include "certificates.h"
+#include "ca_update.h"
 #include "config_edit.h"
 #include "install.h"
 #include "module_version.h"
@@ -28,6 +28,8 @@
 /* Progress messages go to the app's screen through install_note (see vitals_install_apply) */
 #define printf install_note
 static VitalsNote g_note;
+/* The apply is Update certificates alone: then curl's bundle must be downloaded, or nothing changes */
+static int g_updating_certificates;
 static void install_note(const char *format, ...) __attribute__((format(__printf__, 1, 2)));
 static void install_note(const char *format, ...)
 {
@@ -1075,21 +1077,44 @@ static int install_certificates(int requested_state)
         return result;
     }
 
-    VitalsCertificateBundle bundle;
-    printf("Fetching latest curl/Mozilla certificates...\n");
-    int online = vitals_install_network_ready();
-    result = vitals_prepare_certificates("app0:sony-certs.pem", "app0:mozilla-certs.pem",
-                                         online ? VITALS_CA_UPDATE_URL : NULL, 30, &bundle);
+    /* Sony's list and Mozilla's bundle as the app carries them */
+    char *sony = NULL, *mozilla = NULL;
+    SceSize sony_size = 0, mozilla_size = 0;
+    result = read_file("app0:sony-certs.pem", &sony, &sony_size);
+    if (result >= 0)
+        result = read_file("app0:mozilla-certs.pem", &mozilla, &mozilla_size);
     if (result < 0)
     {
-        printf("Certificate preparation failed: %s\n", bundle.failure_stage != NULL ? bundle.failure_stage : "invalid input");
-        printf("errno=%d crypto=0x%08lX\n", bundle.failure_errno, bundle.failure_crypto_error);
+        printf("Can't read the certificates the app carries (0x%08X)\n", (unsigned int)result);
+        free(sony);
+        free(mozilla);
         return result;
     }
-    printf(bundle.downloaded ? "Using downloaded Mozilla certificates.\n" : "Download unavailable; using embedded Mozilla certificates.\n");
-    printf("Sony: %u, Mozilla: %u (%u Sony's list lacks), combined: %u certificates.\n",
-           (unsigned int)bundle.sony_count, (unsigned int)bundle.mozilla_count,
-           (unsigned int)bundle.added_count, (unsigned int)bundle.combined_count);
+    /* curl's bundle when the network is there, checked and without Sony's (ca_update.h); an update
+     * that can't have it changes nothing, while an install takes the bundle the app carries */
+    VitalsCaBundle bundle;
+    int prepared = -1;
+    if (vitals_install_network_ready())
+        prepared = vitals_ca_download(mozilla, mozilla_size, "vitals/" VITALS_VERSION " (PS Vita)", NULL, sony,
+                                      sony_size, &bundle, g_note);
+    else
+        printf("No network connection\n");
+    if (prepared < 0 && g_updating_certificates)
+    {
+        printf("The certificates weren't changed\n");
+        free(sony);
+        free(mozilla);
+        return -1;
+    }
+    if (prepared < 0)
+    {
+        printf("Using the certificates the app carries\n");
+        prepared = vitals_ca_prepare(mozilla, mozilla_size, sony, sony_size, &bundle, g_note);
+    }
+    free(sony);
+    free(mozilla);
+    if (prepared < 0)
+        return -1;
     result = make_system_directory();
     /* Sony's, as the app carries it */
     if (result >= 0)
@@ -1107,7 +1132,7 @@ static int install_certificates(int requested_state)
         if (result >= 0 && close_result < 0)
             result = close_result;
     }
-    vitals_free_certificates(&bundle);
+    vitals_ca_free(&bundle);
     /* Mozilla's is replaced whole: the old one stays until the new one is complete */
     if (result >= 0)
         result = replace_file(temporary_path, VITALS_CA_MOZILLA_PATH);
@@ -1285,6 +1310,7 @@ int vitals_install_apply(enum VitalsOption option, int removing, VitalsNote note
     int result;
 
     g_note = note;
+    g_updating_certificates = option == VITALS_OPTION_CERTIFICATES && !removing;
     (void)vshIoUmount(0x300, 0, 0, 0);
     (void)vshIoUmount(0x300, 1, 0, 0);
     result = _vshIoMount(0x300, 0, 2, mount_data);
@@ -1301,5 +1327,6 @@ int vitals_install_apply(enum VitalsOption option, int removing, VitalsNote note
     if (result >= 0)
         result = vitals_execute_plan(&plan, apply_component, NULL);
     g_note = NULL;
+    g_updating_certificates = 0;
     return result;
 }

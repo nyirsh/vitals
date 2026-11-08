@@ -2,7 +2,7 @@
  * mapped onto a temporary folder, the removal of iTLS-Enso, tls_fixer and reAuth, and what
  * config.txt and the certificate store look like when any rename fails */
 #include "install.h"
-#include "certificates.h"
+#include "ca_update.h"
 #include "vita_files.h"
 
 #include <assert.h>
@@ -34,21 +34,38 @@
 #define BUNDLE "VITALS MERGED CERTIFICATES\n"
 #define ORIGINAL_CONFIG "# taiHEN config\n*KERNEL\nur0:tai/nonpdrm.skprx\n\n*main\nur0:tai/henkaku.suprx\n"
 
-/* ---- Stand-ins for the network and the (separately tested) certificate merge ---- */
-int vitals_install_network_ready(void) { return 0; }
-int vitals_prepare_certificates(const char *sony_path, const char *mozilla_path, const char *url,
-                                long timeout_seconds, VitalsCertificateBundle *bundle)
+/* ---- Stand-ins for the network and the (separately tested) certificate update, ca_update.c ---- */
+static int network = 1, download_fails, downloads, app_bundles;
+int vitals_install_network_ready(void) { return network; }
+static int prepared(VitalsCaBundle *bundle)
 {
-    assert(strcmp(sony_path, "app0:sony-certs.pem") == 0 && strcmp(mozilla_path, "app0:mozilla-certs.pem") == 0);
-    assert(url == NULL && timeout_seconds > 0);
     memset(bundle, 0, sizeof(*bundle));
     bundle->size = strlen(BUNDLE);
     bundle->data = malloc(bundle->size);
     memcpy(bundle->data, BUNDLE, bundle->size);
-    bundle->sony_count = bundle->mozilla_count = bundle->combined_count = 1;
     return 0;
 }
-void vitals_free_certificates(VitalsCertificateBundle *bundle) { free(bundle->data); bundle->data = NULL; }
+/* curl's bundle, trusting only the app's Mozilla bundle, Sony's list as the app carries it left out */
+int vitals_ca_download(const char *trust, size_t trust_length, const char *user_agent, void (*log)(const char *line),
+                       const char *sony, size_t sony_length, VitalsCaBundle *out, VitalsNote note)
+{
+    (void)user_agent, (void)log, (void)note;
+    ++downloads;
+    assert(trust_length == strlen("contents of mozilla-certs.pem\n") && strcmp(trust, "contents of mozilla-certs.pem\n") == 0);
+    assert(sony_length == strlen("contents of sony-certs.pem\n") && strcmp(sony, "contents of sony-certs.pem\n") == 0);
+    memset(out, 0, sizeof(*out));
+    return download_fails ? -1 : prepared(out);
+}
+/* The bundle the app carries, when there's no download */
+int vitals_ca_prepare(const char *bundle, size_t length, const char *sony, size_t sony_length, VitalsCaBundle *out,
+                      VitalsNote note)
+{
+    (void)length, (void)sony_length, (void)note;
+    ++app_bundles;
+    assert(strcmp(bundle, "contents of mozilla-certs.pem\n") == 0 && strcmp(sony, "contents of sony-certs.pem\n") == 0);
+    return prepared(out);
+}
+void vitals_ca_free(VitalsCaBundle *bundle) { free(bundle->data); bundle->data = NULL; }
 
 static void note(const char *line) { (void)line; }
 
@@ -342,10 +359,31 @@ static void test_install_reinstall_uninstall(void)
     expect_installed();
     assert(is(REDIRECTS, "my.old.host my.new.host\n") && is(DNS_RULES, "my.blocked.host block\n"));
 
-    /* Updating certificates replaces vitals' store and touches nothing else */
+    /* Updating certificates replaces vitals' store with curl's bundle and touches nothing else */
     put(STORE, "OLDER VITALS BUNDLE\n");
+    downloads = app_bundles = 0;
     assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) >= 0);
     expect_installed();
+    assert(downloads == 1 && app_bundles == 0);
+    /* An update that can't download changes nothing: no network, or the download fails */
+    put(STORE, "OLDER VITALS BUNDLE\n");
+    network = 0;
+    assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) < 0);
+    assert(is(STORE, "OLDER VITALS BUNDLE\n") && app_bundles == 0);
+    network = 1;
+    download_fails = 1;
+    assert(vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note) < 0);
+    assert(is(STORE, "OLDER VITALS BUNDLE\n") && downloads == 2 && app_bundles == 0);
+    /* An install takes the bundle the app carries instead, with or without a network */
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_installed();
+    assert(app_bundles == 1);
+    download_fails = 0;
+    network = 0;
+    assert(vitals_install_apply(VITALS_OPTION_FULL, 0, note) >= 0);
+    expect_installed();
+    assert(app_bundles == 2 && downloads == 3);
+    network = 1;
 
     /* Uninstalling restores taiHEN's config and Sony's certificates, and keeps the user's list */
     assert(vitals_install_apply(VITALS_OPTION_FULL, 1, note) >= 0);

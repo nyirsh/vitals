@@ -3,7 +3,7 @@
 
 Downloads curl's Mozilla bundle, checks it against the SHA-256 that curl publishes next to it,
 rebuilds certs.cer (the store as the kernel plugin reads it, without the user's own: Sony's list,
-then the Mozilla certificates it lacks, from the installer's own merge code compiled for the host)
+then the Mozilla certificates it lacks, with the app's own store filter compiled for the host)
 and updates certificate-sources.json. Nothing changes when the bundle is already current.
 """
 import argparse
@@ -14,7 +14,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -49,14 +48,11 @@ def mozilla_date(data):
 
 
 def build_merge_tool(directory):
-    """The installer's certificates.c with its host CLI, as the certificate tests build it."""
-    flags = subprocess.check_output(["pkg-config", "--cflags", "--libs", "libcurl", "openssl"], text=True)
-    tool = directory / "certificates"
-    shared = APP.parent.parent / "shared" / "app"
-    common = APP.parent.parent / "shared"
-    subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-O1", "-I", str(shared), "-I", str(common / "include"),
-                    str(shared / "download.c"), str(common / "src" / "store_certs.c"),
-                    str(APP / "certificates.c"), str(APP / "certificates_cli.c"), *shlex.split(flags), "-o", str(tool)],
+    """The app's store filter (../../../shared/src/store_certs.c) with its host CLI (store_certs_cli.c)."""
+    tool = directory / "store_certs"
+    shared = APP.parent.parent / "shared"
+    subprocess.run([os.environ.get("CC", "cc"), "-std=c11", "-O1", "-I", str(shared / "include"),
+                    str(shared / "src" / "store_certs.c"), str(APP / "tools" / "store_certs_cli.c"), "-o", str(tool)],
                    check=True)
     return tool
 
@@ -71,9 +67,9 @@ def update(assets, mozilla):
         directory = Path(temporary)
         (directory / "mozilla-certs.pem").write_bytes(mozilla)
         added = directory / "mozilla-added.pem"
-        # Offline mode: the Mozilla part exactly as the installer's fallback path writes it
+        # The Mozilla part as the app writes it from the bundle it carries
         result = subprocess.run([str(build_merge_tool(directory)), str(assets / "sony-certs.pem"),
-                                 str(directory / "mozilla-certs.pem"), "offline", str(added)],
+                                 str(directory / "mozilla-certs.pem"), str(added)],
                                 capture_output=True, text=True)
         if result.returncode != 0:
             raise SystemExit("Merging failed: " + (result.stderr or result.stdout).strip())

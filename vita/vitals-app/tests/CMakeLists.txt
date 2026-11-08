@@ -12,6 +12,14 @@ include_directories(AFTER ${SHARED_APP})
 # vitals/path.h: where the kernel plugin and the installer keep vitals' modules
 include_directories(AFTER ${APP_DIR}/../common/include)
 
+# Mbed TLS on this machine, as vitals-ssl builds it but with the host's defaults
+# (../../../shared/tests/psa_host_config.h), for the certificate update's test: added before this
+# folder's warnings and sanitizers, which aren't its
+include(${APP_DIR}/../dependencies.cmake)
+vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
+set(VITALS_PSA_USER_CONFIG "${APP_DIR}/../../shared/tests/psa_host_config.h")
+add_subdirectory(${APP_DIR}/../vitals-ssl/crypto mbedtls)
+
 option(VITALS_ENABLE_SANITIZERS "Build the tests with AddressSanitizer and UBSan" ON)
 if(VITALS_ENABLE_SANITIZERS)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
@@ -39,6 +47,15 @@ add_executable(vitals_app_check_run_tests ${SHARED_APP}/tests/test_check_run.c $
     ${SHARED_APP}/model.c ${APP_DIR}/../../shared/src/redirect_list.c ${APP_DIR}/../../shared/src/host_map.c)
 target_include_directories(vitals_app_check_run_tests PRIVATE ${APP_DIR} ${APP_DIR}/../../shared/include)
 add_test(NAME vitals_app_check_run COMMAND vitals_app_check_run_tests)
+
+# The certificate update's checks and download (shared with the PS3's tests), with curl's bundle as the
+# app carries it
+add_executable(vitals_app_ca_update_tests ${SHARED_APP}/tests/test_ca_update.c ${SHARED_APP}/ca_update.c
+    ${APP_DIR}/../../shared/src/store_certs.c)
+target_include_directories(vitals_app_ca_update_tests PRIVATE ${APP_DIR} ${APP_DIR}/../../shared/include)
+target_compile_definitions(vitals_app_ca_update_tests PRIVATE VITALS_TEST_BUNDLE="${APP_DIR}/assets/mozilla-certs.pem")
+target_link_libraries(vitals_app_ca_update_tests PRIVATE mbedx509 tfpsacrypto)
+add_test(NAME vitals_app_ca_update COMMAND vitals_app_ca_update_tests)
 
 # The connection test's lifecycle (shared with the PS3's tests): its thread, cancelling and saving
 find_package(Threads REQUIRED)
@@ -78,7 +95,7 @@ add_test(NAME vitals_app_config_edit COMMAND vitals_app_config_edit_tests)
 # The installer's file operations, on a console mapped onto a temporary folder (vita_files.c)
 add_executable(vitals_app_install_files_tests test_install_files.c vita_files.c ${APP_DIR}/install.c
     ${APP_DIR}/options.c ${APP_DIR}/config_edit.c ${APP_DIR}/module_version.c)
-target_include_directories(vitals_app_install_files_tests PRIVATE include ${APP_DIR})
+target_include_directories(vitals_app_install_files_tests PRIVATE include ${APP_DIR} ${APP_DIR}/../../shared/include)
 target_link_libraries(vitals_app_install_files_tests PRIVATE ZLIB::ZLIB)
 add_test(NAME vitals_app_install_files COMMAND vitals_app_install_files_tests)
 

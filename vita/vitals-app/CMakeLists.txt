@@ -40,6 +40,11 @@ endforeach()
 
 # libcurl, used to download the latest Mozilla CA bundle
 add_subdirectory(curl)
+# Mbed TLS, as vitals-ssl builds it (its crypto options and its platform: ../vitals-ssl/src), to read
+# each certificate of a bundle as vitals' libssl will (../../shared/app/ca_update.c)
+include(../dependencies.cmake)
+vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
+add_subdirectory(../vitals-ssl/crypto "${CMAKE_CURRENT_BINARY_DIR}/mbedtls")
 
 add_executable(vitals-app
     # The app itself, the same on the PS3 (../../shared/app)
@@ -57,6 +62,7 @@ add_executable(vitals-app
     ../../shared/app/release_check.c
     ../../shared/app/release_fetch.c
     ../../shared/app/download.c
+    ../../shared/app/ca_update.c
     # What's the Vita's under it: console.h, platform.h and check.h
     main.c
     console_vita.c
@@ -70,8 +76,8 @@ add_executable(vitals-app
     install.c
     options.c
     config_edit.c
-    certificates.c
     ../../shared/src/store_certs.c
+    ../vitals-ssl/src/platform_shims.c
     crypto_lock_vita.c
     module_version.c
     # The host redirect list is read as vitals' provider reads it
@@ -81,7 +87,8 @@ add_executable(vitals-app
 target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
 # With the app and the redirect list code shared with the PS3's (../../shared); this folder first, for
 # the Vita's own vitals_paths.h and check_result.h, which the shared headers include
-target_include_directories(vitals-app PRIVATE . ../common/include ../vitals-http/include ../../shared/include ../../shared/app)
+target_include_directories(vitals-app PRIVATE . ../common/include ../vitals-http/include ../../shared/include ../../shared/app
+    ../vitals-ssl/src)
 target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
 # OpenSSL's locking goes through the Vita's native locks (crypto_lock_vita.c)
 foreach(function CRYPTO_THREAD_lock_new CRYPTO_THREAD_read_lock CRYPTO_THREAD_write_lock
@@ -91,7 +98,7 @@ endforeach()
 # Keeps room for the tables vita-elf-create adds at the end of the code (sce_space.ld)
 target_link_options(vitals-app PRIVATE "-Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld")
 set_property(TARGET vitals-app APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld)
-target_link_libraries(vitals-app PRIVATE libcurl_static
+target_link_libraries(vitals-app PRIVATE libcurl_static mbedx509 tfpsacrypto
     ssl crypto pthread z zstd m
     ScePvf_stub SceHttp_stub SceSsl_stub SceNet_stub SceNetCtl_stub
     SceSysmodule_stub SceDisplay_stub SceCtrl_stub ScePower_stub SceVshBridge_stub SceRtc_stub

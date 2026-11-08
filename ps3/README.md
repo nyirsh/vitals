@@ -196,7 +196,9 @@ Its menu, as the Vita's:
 - **Update certificates**: downloads Mozilla's CA bundle as curl publishes it
   (`https://curl.se/ca/cacert.pem`) and writes the certificates in it that Sony's lack. Its "Last update" date turns red once it's more than three
   months old. The app downloads it with its own curl and Mbed TLS, as the Vita's app does, trusting
-  only the Mozilla bundle it carries, so it works with vitals' TLS switched off or not installed.
+  only the Mozilla bundle it carries, so it works with vitals' TLS switched off or not installed. Each
+  certificate is read with Mbed TLS, as vitals' libssl reads the store, and one it can't read is left
+  out; when the download fails, the store stays as it was (shared/app/ca_update.c, the Vita's too).
 - The menu shows when GitHub or GitLab has a newer release than the app, found the same way.
 - **Options**: TLS, HTTP (On, Redirects off, Off) and the DNS rules, and the debug output, applied with START (see
   [On the console](#on-the-console)).

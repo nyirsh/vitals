@@ -6,6 +6,7 @@
 #include "check_vita.h"
 #include "dates.h"
 #include "install.h"
+#include "crypto_platform.h"
 #include "network.h"
 #include "vitals_paths.h"
 
@@ -120,6 +121,19 @@ int vitals_update_certificates(VitalsNote note)
 {
     vitals_check_close();
     return vitals_install_apply(VITALS_OPTION_CERTIFICATES, 0, note);
+}
+
+/* Mbed TLS's mutexes, entropy and time, vitals-ssl's (../vitals-ssl/src/platform_shims.c) */
+int console_crypto_start(void)
+{
+    static int crypto_ready;
+    if (!crypto_ready)
+    {
+        if (vitals_crypto_platform_init() < 0)
+            return -1;
+        crypto_ready = 1;
+    }
+    return 0;
 }
 
 int vitals_install_network_ready(void)

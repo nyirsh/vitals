@@ -3,6 +3,8 @@
 
 #include "install.h"
 
+#include "ca_update.h"
+
 #include "app_log.h"
 #include "boot_plugins.h"
 #include "sony_cas.h"
@@ -18,8 +20,6 @@
 #include <sys/lv2_syscall.h>
 #include <time.h>
 
-#define CA_UPDATE_URL "https://curl.se/ca/cacert.pem"
-#define CA_BUNDLE_LIMIT (1024u * 1024u)
 #define COPY_CHUNK (64u * 1024u)
 
 static char source[256] = "/dev_hdd0/game/" VITALS_TITLE_ID "/USRDIR";
@@ -321,11 +321,11 @@ int vitals_install_run(int debug_level, VitalsNote note)
 	char *bundle = NULL;
 	if (kept) {
 		note("Kept Mozilla's certificates already in " VITALS_BUNDLE);
-		bundle = read_file(VITALS_BUNDLE, CA_BUNDLE_LIMIT, &bundle_length);
+		bundle = read_file(VITALS_BUNDLE, VITALS_CA_BUNDLE_LIMIT, &bundle_length);
 	} else {
 		char from[320];
 		snprintf(from, sizeof(from), "%s/" VITALS_APP_CA_BUNDLE, source);
-		bundle = read_file(from, CA_BUNDLE_LIMIT, &bundle_length);
+		bundle = read_file(from, VITALS_CA_BUNDLE_LIMIT, &bundle_length);
 	}
 	if (bundle == NULL) {
 		notef(note, "Can't read Mozilla's certificates (%s)", kept ? VITALS_BUNDLE : VITALS_APP_CA_BUNDLE);
@@ -477,33 +477,15 @@ static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date
 	return 0;
 }
 
-/* A downloaded bundle is used only when it looks like curl's: its header, and at least 100
- * certificates, each block ended */
-static int bundle_looks_right(const char *data, size_t length, unsigned *count)
-{
-	static const char begin[] = "-----BEGIN CERTIFICATE-----", end[] = "-----END CERTIFICATE-----";
-	*count = 0;
-	if (length == 0 || strstr(data, "Bundle of CA Root Certificates") == NULL)
-		return 0;
-	for (const char *at = strstr(data, begin); at != NULL; at = strstr(at, begin)) {
-		const char *close = strstr(at, end), *next = strstr(at + 1, begin);
-		if (close == NULL || (next != NULL && next < close))
-			return 0;
-		++*count;
-		at = close;
-	}
-	return *count >= 100;
-}
-
 /* curl's notes on the download, into the app's log */
 static void log_line(const char *line)
 {
 	app_log("%s", line);
 }
 
-/* The download, through curl on the app's own Mbed TLS (download.h), trusting only the Mozilla bundle
- * the app carries: it works whatever the console's TLS is, vitals' off or broken included. Then the
- * check */
+/* The update, through curl on the app's own Mbed TLS, trusting only the Mozilla bundle the app carries,
+ * checked and without Sony's CAs (ca_update.h): written over VITALS_BUNDLE only when all of that
+ * worked, so a failed update leaves the store as it was */
 static int download_certificates(VitalsNote note)
 {
 	note("Connecting to the network...");
@@ -513,41 +495,34 @@ static int download_certificates(VitalsNote note)
 		return rc;
 	}
 	char trust_path[320];
-	size_t trust_length = 0;
+	size_t trust_length = 0, sony_length = 0;
 	snprintf(trust_path, sizeof(trust_path), "%s/" VITALS_APP_CA_BUNDLE, vitals_install_source());
-	char *trust = read_file(trust_path, CA_BUNDLE_LIMIT, &trust_length);
+	char *trust = read_file(trust_path, VITALS_CA_BUNDLE_LIMIT, &trust_length);
 	if (trust == NULL) {
 		notef(note, "Can't read %s", trust_path);
 		return -1;
 	}
-	note("Downloading " CA_UPDATE_URL);
-	VitalsDownload request = {CA_UPDATE_URL, trust, trust_length, "vitals/" VITALS_VERSION " (PS3)", NULL, 30,
-	                          CA_BUNDLE_LIMIT, NULL, log_line};
-	VitalsDownloaded result;
-	rc = vitals_download(&request, &result);
+	char *sony = read_sony_cas(&sony_length);
+	if (sony == NULL)
+		note("Sony's certificates can't be read: Mozilla's are kept whole");
+	VitalsCaBundle bundle;
+	rc = vitals_ca_download(trust, trust_length, "vitals/" VITALS_VERSION " (PS3)", log_line, sony, sony_length,
+	                        &bundle, note);
 	free(trust);
-	unsigned count = 0;
+	free(sony);
 	if (rc < 0) {
-		if (result.status != 0 && result.status != 200)
-			notef(note, "The server answered HTTP %ld", result.status);
-		else
-			notef(note, "The download failed (%d): %s", result.error,
-			      result.message[0] != '\0' ? result.message : vitals_download_error(result.error));
-	} else if (!bundle_looks_right(result.data, result.size, &count)) {
-		notef(note, "The download isn't a CA bundle (%u certificates)", count);
-		rc = -1;
-	} else {
-		const char *dated = strstr(result.data, "Certificate data from Mozilla as of: ");
-		char when[48] = "";
-		if (dated != NULL)
-			sscanf(dated + 37, "%47[^\r\n]", when);
-		notef(note, "Received %u certificates, %u bytes%s%s", count, (unsigned)result.size,
-		      when[0] ? ", Mozilla's of " : "", when);
-		make_directories();
-		rc = write_mozilla(result.data, result.size, 0, note);
+		note("The certificates weren't changed");
+		return -1;
 	}
-	vitals_download_free(&result);
-	return rc;
+	make_directories();
+	rc = write_file(VITALS_BUNDLE, bundle.data, bundle.size);
+	vitals_ca_free(&bundle);
+	if (rc != CELL_FS_SUCCEEDED) {
+		notef(note, "Can't write " VITALS_BUNDLE " (0x%08X)", (unsigned)rc);
+		return -1;
+	}
+	note("Written to " VITALS_BUNDLE);
+	return 0;
 }
 
 void vitals_certificates_date(char *text, size_t size, int *stale)

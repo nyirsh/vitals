@@ -97,6 +97,9 @@ int console_flag_set(const char *path, int present);
 /* Starts the console's network and waits for it, and whatever curl needs under it: 0, or the error.
  * stop, when given, is asked while it waits, and 1 from it ends the wait */
 int console_network_start(int (*stop)(void));
+/* Mbed TLS's mutexes, entropy and time set up, once, before the app's own use of it (ca_update.c):
+ * 0, or -1 when they can't be (without the date, certificates can't be checked) */
+int console_crypto_start(void);
 
 /* ---- the rest ---- */
 

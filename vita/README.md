@@ -40,7 +40,7 @@ Once `vitals` is installed, from the same application you'll be able to:
 - **Installation**: **Update** (when the installed version differs), **Reinstall** and **Uninstall** share this item, and **Left** and **Right** pick one
   - **Update** or **Reinstall** installs this version over the existing one, to update `vitals` or repair an installation
   - **Uninstall** removes all of `vitals` files and configurations
-- **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current. The date next to it is when they were last updated, in red once they're more than three months old
+- **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current. Each certificate is read with Mbed TLS, as vitals-ssl reads the store, and one it can't read is left out; when the download fails, the store stays as it was. Installing uses the certificates the app carries when it can't download them. The date next to it is when they were last updated, in red once they're more than three months old
 - **Options**: turns TLS, HTTP and the DNS rules on or off, as on the PS3, and picks the debug output (see below); **START** applies them and reboots the Vita. Each is a file in `ux0:data/vitals/flags/` (`tls.off`, `http.off`, `redirects.off`, `dns.off`), there while that part is off, which the kernel plugin reads:
   - **TLS** Off: apps, games and the browser get Sony's TLS (and its old certificates); `vitals`' HTTP library stays, doing its TLS on Sony's as Sony's HTTP library does, so the host redirects and the User-Agent suffix still apply
   - **HTTP**: **On** is `vitals`' HTTP library with the host redirects; **Redirects off** (orange) keeps the library but doesn't apply `redirects.txt` (`redirects.off`); **Off** is Sony's HTTP library, still on `vitals`' TLS, so no host redirects or User-Agent suffix (`http.off`). The redirects are the HTTP library's, so they go with it
@@ -238,7 +238,7 @@ The installer downloads the latest certificates and checks them against this bun
 make update-certs
 ```
 
-This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` (the store as `vitals` reads it, without your own certificates) with the app's own merge code and updates `certificate-sources.json`, all in `vitals-app/assets/`. It needs `pkg-config` with `libcurl` and `OpenSSL development files` on the host.
+This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` (the store as `vitals` reads it, without your own certificates) with the app's own store filter and updates `certificate-sources.json`, all in `vitals-app/assets/`.
 
 ### Tests
 
@@ -255,7 +255,7 @@ This runs every component's host tests (`make -C <folder> test` runs one compone
 - `vitals-ssl/tests/`: the SSL library's connection and certificate functions, called as Sony's libhttp calls them, against a local TLS server: reading and writing, close_notify and dropped sockets, timeouts, certificate and host name checks, the error codes, and a verify callback that checks a CA's chain through the certificate functions and the CA store
 - `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
 
-The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them). A few certificate tests are skipped unless `pkg-config` and the libcurl and OpenSSL development files are installed: `pkg-config libcurl4-openssl-dev libssl-dev` on Debian/Ubuntu, `brew install pkgconf curl openssl` on macOS (the tests find Homebrew's copies themselves). The OpenSSL must be the one libcurl itself uses, as the code under test shares OpenSSL objects with curl.
+The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them). The release check's download tests are skipped unless `pkg-config` and the libcurl and OpenSSL development files are installed: `pkg-config libcurl4-openssl-dev libssl-dev` on Debian/Ubuntu, `brew install pkgconf curl openssl` on macOS (the tests find Homebrew's copies themselves). The OpenSSL must be the one libcurl itself uses, as the code under test shares OpenSSL objects with curl.
 
 Each normal build also checks that the kernel plugin contains no floating-point instructions.
 

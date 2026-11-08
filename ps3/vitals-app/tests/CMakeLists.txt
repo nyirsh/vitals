@@ -43,6 +43,17 @@ add_executable(vitals_app_check_run_tests ${SHARED}/app/tests/test_check_run.c $
 target_include_directories(vitals_app_check_run_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
 add_test(NAME vitals_app_check_run COMMAND vitals_app_check_run_tests)
 
+# The certificate update's checks and download (shared with the Vita's tests), with curl's bundle as
+# the app carries it, on the app's Mbed TLS with this machine's mutexes, entropy and time
+add_executable(vitals_app_ca_update_tests ${SHARED}/app/tests/test_ca_update.c ${SHARED}/app/ca_update.c
+    ${SHARED}/src/store_certs.c ${APP_DIR}/../tests/host/crypto_platform_posix.c ${VITALS_SSL}/src/platform/gmtime.c)
+target_include_directories(vitals_app_ca_update_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common
+    ${VITALS_SSL}/src/platform)
+target_compile_definitions(vitals_app_ca_update_tests PRIVATE VITALS_TEST_BUNDLE="${APP_DIR}/assets/mozilla-certs.pem"
+    VITALS_TEST_CRYPTO_PLATFORM=1 VITALS_MBEDTLS_PLATFORM=1)
+target_link_libraries(vitals_app_ca_update_tests PRIVATE mbedx509 tfpsacrypto Threads::Threads)
+add_test(NAME vitals_app_ca_update COMMAND vitals_app_ca_update_tests)
+
 # The connection test's lifecycle (shared with the Vita's tests): its thread, cancelling and saving
 find_package(Threads REQUIRED)
 add_executable(vitals_app_check_service_tests ${SHARED}/app/tests/test_check_service.c ${SHARED}/app/check_service.c)

@@ -85,7 +85,7 @@ int console_flag_set(const char *path, int present)
 /* ---- the network, for the app's own downloads ---- */
 
 /* curl's TLS is Mbed TLS (vitals-app/curl), whose mutexes are liblv2's: set once, before its first use */
-int console_network_start(int (*stop)(void))
+int console_crypto_start(void)
 {
 	static int crypto_ready;
 	if (!crypto_ready) {
@@ -93,6 +93,13 @@ int console_network_start(int (*stop)(void))
 			return -1;
 		crypto_ready = 1;
 	}
+	return 0;
+}
+
+int console_network_start(int (*stop)(void))
+{
+	if (console_crypto_start() < 0)
+		return -1;
 	return http_network_wait(stop);
 }
 
