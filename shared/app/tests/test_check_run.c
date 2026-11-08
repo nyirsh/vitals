@@ -13,7 +13,7 @@ static CheckParts parts;
 static int open_rc, stop_after = -1, requests, protocol_order[8], protocol_count, policy_after = -1;
 static unsigned rule_counts[2];
 static const char *reached_host = "new.example";
-static char last_reached[64], dns_names[4][64];
+static char dns_names[4][64];
 static unsigned dns_count;
 
 static int fake_open(char *notice, size_t size)
@@ -82,13 +82,6 @@ static void fake_badssl(const CheckBadssl *test, CheckResult *r)
 		r->error = -77;
 }
 
-static void fake_redirect(CheckResult *r, const char *reached, const char *expected)
-{
-	snprintf(last_reached, sizeof(last_reached), "%s", reached);
-	r->state = strcmp(reached, expected) == 0 ? CHECK_PASS : CHECK_FAIL;
-	snprintf(r->message, sizeof(r->message), "%s", r->state == CHECK_PASS ? "Reached" : "Answered by another");
-}
-
 static void fake_dns(const char *name, const char *target, CheckResult *r)
 {
 	(void)target;
@@ -109,8 +102,19 @@ static uint64_t fake_now(void)
 	return 1234;
 }
 
-static CheckBackend backend = {fake_open, fake_parts, fake_load, fake_protocol, fake_fetch, fake_badssl, fake_redirect,
-                               fake_dns, fake_stopped, NULL, NULL, fake_lock, fake_unlock, fake_now};
+static CheckBackend backend = {
+	.open = fake_open,
+	.parts = fake_parts,
+	.load = fake_load,
+	.protocol = fake_protocol,
+	.fetch = fake_fetch,
+	.judge_badssl = fake_badssl,
+	.dns = fake_dns,
+	.stopped = fake_stopped,
+	.lock = fake_lock,
+	.unlock = fake_unlock,
+	.now_ms = fake_now,
+};
 
 static CheckService service;
 static char notice[120];
@@ -128,6 +132,58 @@ static int read_list(unsigned int offset, void *buffer, unsigned int size)
 	unsigned n = (unsigned)(length - offset) < size ? (unsigned)(length - offset) : size;
 	memcpy(buffer, list_text + offset, n);
 	return (int)n;
+}
+
+static CheckResult answered(int http_code, int error, const char *message)
+{
+	CheckResult r = {0};
+	r.http_code = http_code;
+	r.error = error;
+	snprintf(r.message, sizeof(r.message), "%s", message);
+	return r;
+}
+
+/* The redirect judge, the same on both consoles: the host that answered against the new one */
+static void judge_redirects(void)
+{
+	char host[CHECK_HOST_MAX];
+	check_reached_host("https://SS.Pigna.casa:8443/x?y", host, sizeof(host));
+	assert(strcmp(host, "SS.Pigna.casa") == 0);
+	check_reached_host("ss.pigna.casa:443", host, sizeof(host));
+	assert(strcmp(host, "ss.pigna.casa") == 0);
+	check_reached_host("https:///path", host, sizeof(host));
+	assert(host[0] == '\0');
+	check_reached_host(NULL, host, sizeof(host));
+	assert(host[0] == '\0');
+	check_reached_host("https://ss.pigna.casa/", host, 5);
+	assert(host[0] == '\0');
+
+	/* Any final status passes from the new host, case aside */
+	CheckResult r = answered(404, 0, "Connected (HTTP 404)");
+	check_redirect_judge(&r, 0, "SS.pigna.casa", "ss.pigna.casa");
+	assert(r.state == CHECK_PASS && strcmp(r.message, "Reached ss.pigna.casa (HTTP 404)") == 0);
+	/* Another host, or one that only starts like it, fails */
+	r = answered(200, 0, "");
+	check_redirect_judge(&r, 0, "soundshapes.psvita.online.scea.com", "ss.pigna.casa");
+	assert(r.state == CHECK_FAIL &&
+	       strcmp(r.message, "Answered by soundshapes.psvita.online.scea.com, not ss.pigna.casa") == 0);
+	r = answered(200, 0, "");
+	check_redirect_judge(&r, 0, "ss.pigna.casa.example", "ss.pigna.casa");
+	assert(r.state == CHECK_FAIL);
+	/* A host the console can't tell */
+	r = answered(404, 0, "");
+	check_redirect_judge(&r, 0, "", "ss.pigna.casa");
+	assert(r.state == CHECK_PASS && strcmp(r.message, "Connected (HTTP 404); the host reached isn't known") == 0);
+	/* A failed request keeps the console's words, or says what failed */
+	r = answered(0, -5, "Name not resolved (0x80710101)");
+	check_redirect_judge(&r, -5, "", "ss.pigna.casa");
+	assert(r.state == CHECK_FAIL && strcmp(r.message, "Name not resolved (0x80710101)") == 0);
+	r = answered(0, (int)0x80431075, "");
+	check_redirect_judge(&r, -1, "", "ss.pigna.casa");
+	assert(r.state == CHECK_FAIL && strcmp(r.message, "Request failed (0x80431075)") == 0);
+	r = answered(101, 0, "");
+	check_redirect_judge(&r, -1, "", "ss.pigna.casa");
+	assert(r.state == CHECK_FAIL && strcmp(r.message, "Unexpected HTTP status 101") == 0);
 }
 
 static void read_rules(void)
@@ -164,6 +220,7 @@ static void run(void)
 int main(void)
 {
 	read_rules();
+	judge_redirects();
 
 	/* Everything on: the tiles TLS 1.3 first, then the report, badssl.com, the redirects (reached
 	 * the new host) and the DNS rules */
@@ -177,17 +234,19 @@ int main(void)
 	for (unsigned i = 0; i < CHECK_BADSSL_COUNT; ++i)
 		assert(strncmp(service.badssl[i].message, "judged ", 7) == 0);
 	assert(service.redirect_count == 2 && service.redirects[1].result.state == CHECK_PASS);
-	assert(strcmp(service.redirects[0].from, "old0.example") == 0 && strcmp(last_reached, "new.example") == 0);
+	assert(strcmp(service.redirects[0].from, "old0.example") == 0 &&
+	       strcmp(service.redirects[0].result.message, "Reached new.example (HTTP 404)") == 0);
 	assert(strcmp(service.redirects[1].reached, "new.example") == 0);
 	assert(service.dns_count == 1 && service.dns[0].result.state == CHECK_PASS && strcmp(dns_names[0], "old0.example") == 0);
 	assert(service.vitals_enabled == 1 && service.libhttp_active == 1 && !service.interrupted);
 	assert(requests == 5 + CHECK_BADSSL_COUNT + 2);
 
-	/* Another host answered a redirect: the console's judge says so, and the row shows that host,
+	/* Another host answered a redirect: the judge says so, and the row shows that host,
 	 * from a URL (the Vita's) as from a host (the PS3's) */
 	reached_host = "https://old0.example:443/x";
 	run();
 	assert(service.redirects[0].result.state == CHECK_FAIL && strcmp(service.redirects[0].reached, "old0.example") == 0);
+	assert(strcmp(service.redirects[0].result.message, "Answered by old0.example, not new.example") == 0);
 	reached_host = "new.example";
 
 	/* vitals' HTTP not here, or its redirects off, or the DNS rules off: not tested, and no request
@@ -248,6 +307,6 @@ int main(void)
 	assert(strcmp(notice, "No network connection") == 0 && requests == 0 && service.protocols[0].state == CHECK_WAIT);
 	open_rc = 0;
 
-	puts("connection test's run: order, what isn't tested, redirects' host, cancelling, policy failure, failed start, rule lists PASS");
+	puts("connection test's run: order, what isn't tested, redirects' host, cancelling, policy failure, failed start, rule lists, redirect judge PASS");
 	return 0;
 }

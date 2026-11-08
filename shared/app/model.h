@@ -122,6 +122,13 @@ enum {
 int check_follow(const CheckService *s, unsigned *item);
 /* The TLS report's JSON (tls.browserleaks.com); 0, or -1 when it isn't one */
 int check_parse_browserleaks(const char *body, size_t size, CheckHandshake *out);
+/* The host alone from what a console says a request reached: a URL (the Vita's) or a host, with or
+ * without its port (the PS3's); "" when it names none or doesn't fit */
+void check_reached_host(const char *reached, char *host, size_t size);
+/* A finished request to a redirect's old host, rc its fetch's: any final status passes when the
+ * host that answered (host, check_reached_host's) is the rule's new one, case aside, and fails when
+ * it's another; host "" when the console can't tell. A failed request keeps the fetch's words */
+void check_redirect_judge(CheckResult *result, int rc, const char *host, const char *expected);
 
 /* ---- each console's check_model.c: what ui.c shows of a request ---- */
 

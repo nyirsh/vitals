@@ -237,11 +237,14 @@ int main(int argc, char **argv)
 		} else
 			r->state = i == 8 ? CHECK_RUNNING : CHECK_WAIT;
 	}
-	/* Two redirects: one through, one whose new server doesn't answer, and one still waiting */
+	/* Redirects: one through, one another host answered, one whose new server doesn't answer, one
+	 * vitals is too old to test and one still waiting */
 	static const char *const redirect_hosts[][2] = {{"soundshapes.psvita.online.scea.com", "sound.ture.fish"},
 	                                                 {"old.game.example", "new.game.example"},
+	                                                 {"lobby.game.example", "lobby.revival.example"},
+	                                                 {"stats.old.example", "stats.new.example"},
 	                                                 {"motorstorm.example", "community.example"}};
-	s.redirect_count = 3;
+	s.redirect_count = 5;
 	s.libhttp_active = 1;
 	for (unsigned i = 0; i < s.redirect_count; ++i) {
 		snprintf(s.redirects[i].from, sizeof(s.redirects[i].from), "%s", redirect_hosts[i][0]);
@@ -249,10 +252,18 @@ int main(int argc, char **argv)
 	}
 	s.redirects[0].result.http_code = 200;
 	s.redirects[0].result.elapsed_ms = 512;
-	check_redirect_judge(&s.redirects[0].result);
-	s.redirects[1].result.error = (int)0x80710093;
-	s.redirects[1].result.elapsed_ms = 15003;
-	check_redirect_judge(&s.redirects[1].result);
+	snprintf(s.redirects[0].reached, sizeof(s.redirects[0].reached), "sound.ture.fish");
+	check_redirect_judge(&s.redirects[0].result, 0, s.redirects[0].reached, s.redirects[0].to);
+	s.redirects[1].result.http_code = 404;
+	s.redirects[1].result.elapsed_ms = 230;
+	snprintf(s.redirects[1].reached, sizeof(s.redirects[1].reached), "old.game.example");
+	check_redirect_judge(&s.redirects[1].result, 0, s.redirects[1].reached, s.redirects[1].to);
+	s.redirects[2].result.error = (int)0x80710093;
+	s.redirects[2].result.elapsed_ms = 15003;
+	check_request_failure(&s.redirects[2].result, "");
+	check_redirect_judge(&s.redirects[2].result, -1, "", s.redirects[2].to);
+	s.redirects[3].result.state = CHECK_WARNING;
+	snprintf(s.redirects[3].result.message, sizeof(s.redirects[3].result.message), "Couldn't test (outdated vitals)");
 	static const char *const dns_rules[][2] = {{"ads.example", "block"},
 	                                           {"lan.game.example", "192.168.1.20"},
 	                                           {"master.game.example", "revival.example"},

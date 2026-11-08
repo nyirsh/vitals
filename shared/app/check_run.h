@@ -46,9 +46,9 @@ typedef struct {
 	 * the error */
 	int (*fetch)(const char *url, int status_only, char *body, size_t *length, char *reached, size_t reached_size,
 	             CheckResult *result);
-	/* The console's judges of a finished request (its check_model.c) */
+	/* The console's judge of a finished badssl.com request (its check_model.c); a redirect's is
+	 * shared (check_redirect_judge) */
 	void (*judge_badssl)(const CheckBadssl *test, CheckResult *result);
-	void (*judge_redirect)(CheckResult *result, const char *reached, const char *expected);
 	/* A DNS rule's name looked up as a game would and judged against its target, timed; NULL on a
 	 * console whose test doesn't look them up */
 	void (*dns)(const char *name, const char *target, CheckResult *result);

@@ -112,19 +112,6 @@ int main(void) {
     r.vitals_tls = 0;
     assert(!check_expected_legacy_block(0, &r));
 
-    /* The host a request went to, against the redirect's new one */
-    char host[64];
-    assert(check_url_host("https://ss.pigna.casa/", "ss.pigna.casa", host, sizeof(host)) == 1 &&
-           strcmp(host, "ss.pigna.casa") == 0);
-    assert(check_url_host("https://SS.Pigna.casa:8443/x?y", "ss.pigna.casa", host, sizeof(host)) == 1);
-    assert(check_url_host("https://soundshapes.psvita.online.scea.com/", "ss.pigna.casa", host, sizeof(host)) == 0 &&
-           strcmp(host, "soundshapes.psvita.online.scea.com") == 0);
-    assert(check_url_host("https://ss.pigna.casa.evil.example/", "ss.pigna.casa", host, sizeof(host)) == 0);
-    assert(check_url_host("not a url", "ss.pigna.casa", host, sizeof(host)) == -1);
-    assert(check_url_host("https:///path", "ss.pigna.casa", host, sizeof(host)) == -1);
-    assert(check_url_host(NULL, "ss.pigna.casa", host, sizeof(host)) == -1);
-    assert(check_url_host("https://ss.pigna.casa/", "ss.pigna.casa", host, 5) == -1);
-
     /* Nor does a run whose certificate checks couldn't be restored */
     r = outcome((int)0x80431075, (int)0x80435060, 0);
     r.restore_error = -1;

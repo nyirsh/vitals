@@ -96,7 +96,7 @@ const char *check_error_name(int error, uint32_t verify)
 }
 
 /* A failure in words, with libhttp's code after it when it isn't the certificate's */
-static void failure(CheckResult *r, const char *prefix)
+void check_request_failure(CheckResult *r, const char *prefix)
 {
 	const char *name = check_error_name(r->error, r->verify_error);
 	/* A certificate's reason says enough: its flags are on the request page and in the report */
@@ -118,7 +118,7 @@ void check_protocol_judge(unsigned version, CheckResult *r)
 		snprintf(r->message, sizeof(r->message), "HTTP %d (no redirect followed)", r->http_code);
 	} else {
 		r->state = CHECK_FAIL;
-		failure(r, "");
+		check_request_failure(r, "");
 	}
 }
 
@@ -198,17 +198,17 @@ void check_badssl_judge(const CheckBadssl *test, CheckResult *r)
 			snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d)", r->http_code);
 		} else {
 			r->state = CHECK_FAIL;
-			failure(r, "");
+			check_request_failure(r, "");
 		}
 	} else if (r->http_code > 0 && r->error == 0) {
 		r->state = CHECK_FAIL;
 		snprintf(r->message, sizeof(r->message), "Loaded (HTTP %d), should be refused", r->http_code);
 	} else if (check_unreachable(r->error)) {
 		r->state = CHECK_FAIL;
-		failure(r, "Inconclusive: ");
+		check_request_failure(r, "Inconclusive: ");
 	} else {
 		r->state = CHECK_PASS;
-		failure(r, "Refused: ");
+		check_request_failure(r, "Refused: ");
 	}
 }
 
@@ -217,32 +217,6 @@ int check_timed_out(int error)
 	unsigned e = (unsigned)error, kind = e & 0xffffff00u;
 	return e == 0x80710093u || ((e & 0xffu) == 35 && (kind == 0x80710600u || kind == 0x80710700u ||
 	                                                  kind == 0x80710c00u || kind == 0x80710d00u));
-}
-
-static int same_host(const char *a, const char *b)
-{
-	for (; *a != '\0' && *b != '\0'; ++a, ++b)
-		if (tolower((unsigned char)*a) != tolower((unsigned char)*b))
-			return 0;
-	return *a == *b;
-}
-
-void check_redirect_judge(CheckResult *r, const char *reached, const char *expected)
-{
-	if (r->http_code >= 200 && r->http_code <= 599 && r->error == 0) {
-		r->state = CHECK_PASS;
-		if (reached == NULL || reached[0] == '\0' || expected == NULL)
-			snprintf(r->message, sizeof(r->message), "Connected (HTTP %d); the host reached isn't known", r->http_code);
-		else if (same_host(reached, expected))
-			snprintf(r->message, sizeof(r->message), "Reached %.96s (HTTP %d)", expected, r->http_code);
-		else {
-			r->state = CHECK_FAIL;
-			snprintf(r->message, sizeof(r->message), "Answered by %.50s, not %.50s", reached, expected);
-		}
-	} else {
-		r->state = CHECK_FAIL;
-		failure(r, "");
-	}
 }
 
 enum CheckDnsTarget check_dns_target(const char *target, unsigned char address[4])

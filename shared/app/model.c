@@ -294,3 +294,47 @@ int check_follow(const CheckService *s, unsigned *item)
 			return CHECK_FOLLOW_REQUESTS;
 	return -1;
 }
+
+void check_reached_host(const char *reached, char *host, size_t size)
+{
+	if (size == 0)
+		return;
+	const char *start = reached != NULL ? strstr(reached, "://") : NULL;
+	start = start != NULL ? start + 3 : reached != NULL ? reached : "";
+	size_t length = strcspn(start, ":/?#");
+	if (length >= size)
+		length = 0;
+	memcpy(host, start, length);
+	host[length] = '\0';
+}
+
+static int same_host(const char *a, const char *b)
+{
+	for (; *a != '\0' && *b != '\0'; ++a, ++b)
+		if (tolower((unsigned char)*a) != tolower((unsigned char)*b))
+			return 0;
+	return *a == *b;
+}
+
+void check_redirect_judge(CheckResult *r, int rc, const char *host, const char *expected)
+{
+	if (rc != 0 || r->error != 0 || r->http_code < 200 || r->http_code > 599) {
+		r->state = CHECK_FAIL;
+		if (r->message[0] == '\0') {
+			if (r->http_code != 0)
+				snprintf(r->message, sizeof(r->message), "Unexpected HTTP status %d", r->http_code);
+			else
+				snprintf(r->message, sizeof(r->message), "Request failed (0x%08X)", (unsigned)r->error);
+		}
+		return;
+	}
+	r->state = CHECK_PASS;
+	if (host == NULL || host[0] == '\0' || expected == NULL)
+		snprintf(r->message, sizeof(r->message), "Connected (HTTP %d); the host reached isn't known", r->http_code);
+	else if (same_host(host, expected))
+		snprintf(r->message, sizeof(r->message), "Reached %.96s (HTTP %d)", expected, r->http_code);
+	else {
+		r->state = CHECK_FAIL;
+		snprintf(r->message, sizeof(r->message), "Answered by %.50s, not %.50s", host, expected);
+	}
+}

@@ -88,19 +88,6 @@ static void publish_rule(Run *run, CheckRedirect *list, unsigned i, const CheckR
 	unlock(run);
 }
 
-/* The host alone from what the console says was reached: a URL (the Vita's) or a host, with or
- * without its port (the PS3's) */
-static void reached_host(const char *reached, char *host, size_t size)
-{
-	const char *start = strstr(reached, "://");
-	start = start != NULL ? start + 3 : reached;
-	size_t length = strcspn(start, ":/?#");
-	if (length >= size)
-		length = 0;
-	memcpy(host, start, length);
-	host[length] = '\0';
-}
-
 /* The TLS report: tls.browserleaks.com's JSON, with a fresh URL so no cache answers for the server */
 static void run_report(Run *run, char *body, CheckHandshake *handshake, CheckResult *r)
 {
@@ -210,12 +197,12 @@ static void run_redirects(Run *run, const CheckParts *parts, char *body)
 			snprintf(url, sizeof(url), "https://%s/", list[i].from);
 			reached[0] = '\0';
 			int rc = run->b->fetch(url, 1, body, &length, reached, sizeof(reached), &r);
-			run->b->judge_redirect(&r, reached, list[i].to);
-			cancelled_request(run, rc, &r);
-			after(run, list[i].from, &r);
 			/* Only a host that gave a final status answered */
 			if (rc == 0 && r.http_code > 0)
-				reached_host(reached, host, sizeof(host));
+				check_reached_host(reached, host, sizeof(host));
+			check_redirect_judge(&r, rc, host, list[i].to);
+			cancelled_request(run, rc, &r);
+			after(run, list[i].from, &r);
 			publish_rule(run, list, i, &r, host);
 			continue;
 		}

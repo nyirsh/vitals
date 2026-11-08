@@ -606,7 +606,6 @@ static const CheckBackend backend = {
     .protocol = backend_protocol,
     .fetch = backend_fetch,
     .judge_badssl = check_badssl_judge,
-    .judge_redirect = check_redirect_judge,
     /* The Vita's test doesn't look the DNS rules up yet */
     .dns = NULL,
     .stopped = stopped,

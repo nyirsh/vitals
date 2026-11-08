@@ -176,39 +176,6 @@ int check_ssl_module_active(const char *name, const char *path, unsigned state) 
         return 0;
     return same_file(path, VITALS_LIBSSL_PATH);
 }
-int check_url_host(const char *url, const char *expected, char *host, size_t size) {
-    if (size == 0)
-        return -1;
-    host[0] = '\0';
-    const char *start = url != NULL ? strstr(url, "://") : NULL;
-    if (start == NULL)
-        return -1;
-    start += 3;
-    size_t length = strcspn(start, ":/?#");
-    if (length == 0 || length >= size)
-        return -1;
-    memcpy(host, start, length);
-    host[length] = '\0';
-    if (expected == NULL || strlen(expected) != length)
-        return 0;
-    for (size_t i = 0; i < length; ++i)
-        if (tolower((unsigned char)host[i]) != tolower((unsigned char)expected[i]))
-            return 0;
-    return 1;
-}
-void check_redirect_judge(CheckResult *r, const char *reached, const char *expected) {
-    if (r->state != CHECK_PASS)
-        return;
-    char host[CHECK_HOST_MAX];
-    int found = reached != NULL && reached[0] != '\0' ? check_url_host(reached, expected, host, sizeof(host)) : -1;
-    if (found == 1)
-        snprintf(r->message, sizeof(r->message), "Reached %.96s (HTTP %d)", expected, r->http_code);
-    else if (found == 0) {
-        r->state = CHECK_FAIL;
-        snprintf(r->message, sizeof(r->message), "Answered by %.50s, not %.50s", host, expected);
-    } else
-        snprintf(r->message, sizeof(r->message), "Connected (HTTP %d); the host reached isn't known", r->http_code);
-}
 int check_protocol_body(unsigned version, const char *b, size_t n) {
     char expected[16];
     if (b == NULL || version > 3)

@@ -13,10 +13,9 @@ void check_protocol_judge(unsigned version, CheckResult *result);
 void check_badssl_judge(const CheckBadssl *test, CheckResult *result);
 /* A finished request to a redirect's old host: any final HTTP status passes, as on the Vita, since
  * only the new server's reachability through vitals is tested */
-/* A redirect's request: any final status passes, when the host it reached (cellHttpTransactionGetUri's,
- * after vitals' libhttp applied the redirect) is the rule's new one; reached NULL or empty when it
- * isn't known */
-void check_redirect_judge(CheckResult *result, const char *reached, const char *expected);
+/* A failed request in words, after prefix: its error's name, with its code unless a certificate's
+ * reason says enough */
+void check_request_failure(CheckResult *result, const char *prefix);
 /* A name's lookup through libnet: found, else the resolver's h_errno, and the IPv4 addresses */
 #define CHECK_DNS_ADDRESSES 8
 typedef struct {

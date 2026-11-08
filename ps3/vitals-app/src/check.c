@@ -173,7 +173,7 @@ static int backend_fetch(const char *url, int status_only, char *body, size_t *l
 	*length = h.length;
 	snprintf(reached, reached_size, "%s", h.reached);
 	if (rc < 0)
-		snprintf(r->message, sizeof(r->message), "%s", check_error_name(h.error, h.verify_error));
+		check_request_failure(r, "");
 	return rc;
 }
 
@@ -208,7 +208,6 @@ static const CheckBackend backend = {
     .protocol = backend_protocol,
     .fetch = backend_fetch,
     .judge_badssl = check_badssl_judge,
-    .judge_redirect = check_redirect_judge,
     .dns = backend_dns,
     .stopped = backend_stopped,
     .policy_failed = NULL,
