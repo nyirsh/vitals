@@ -44,6 +44,7 @@
 #   make fetch              the logs and the app's test reports, into ../fetched/ps3/
 #   make upload-app [SIGNED=1]   builds the app and puts it in the console's /dev_hdd0/packages/
 #   make pull               pulls the newest published image (nyirsh/vitals-ps3-sdk:latest)
+#   make editor             VS Code's navigation and errors with the image's headers (after make)
 # The console is PS3_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's PS3_HOST
 
 DEBUG ?= 0
@@ -86,13 +87,13 @@ INSTALL_FLAGS =$(if $(filter 1,$(SIGNED)),--signed) $(if $(filter-out 0,$(DEBUG)
 all: app
 
 ssl:
-	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-ssl -B $(SSL_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) \
+	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-ssl -B $(SSL_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DVITALS_DEBUG=$(DEBUG) && cmake --build $(SSL_DIR)'
 
 # libhttp rewritten (README, plan step 5), with DEBUG's log as libssl's (build/vitals-http-debugN);
 # what isn't written yet says it was called
 http:
-	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-http -B $(HTTP_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) \
+	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-http -B $(HTTP_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DVITALS_DEBUG=$(DEBUG) "-DVITALS_HTTP_USER_AGENT=$(USER_AGENT)" && cmake --build $(HTTP_DIR)'
 
 # vitals' DNS kernel plugin (vitals-dns/kernel): the raw image Cobra loads (tools/build_dns_plugin.sh)
@@ -107,7 +108,7 @@ http-probe:
 
 # The boot plugin, with DEBUG's log (build/vitals-boot-debugN)
 plugin:
-	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-boot -B $(BOOT_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) \
+	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-boot -B $(BOOT_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DVITALS_DEBUG=$(DEBUG) -DVITALS_XMB_DRY_RUN=$(if $(filter 1 keep watch,$(XMB_DRY_RUN)),ON,OFF) \
 		-DVITALS_XMB_KEEP_LOADED=$(if $(filter keep,$(XMB_DRY_RUN)),ON,OFF) \
 		-DVITALS_XMB_WATCH_ONLY=$(if $(filter watch,$(XMB_DRY_RUN)),ON,OFF) \
@@ -153,7 +154,7 @@ app:
 	cp ../THIRD_PARTY_NOTICES.md $(APP_STAGING)/USRDIR/THIRD_PARTY_NOTICES.md
 	cp ../licenses/*.txt $(APP_STAGING)/USRDIR/licenses/
 	cp vitals-app/pkg/PIC1.PNG $(APP_STAGING)/PIC1.PNG
-	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-app -B build/vitals-app -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) \
+	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-app -B build/vitals-app -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DSTAGING=/src/ps3/$(APP_STAGING) && cmake --build build/vitals-app'
 
 # The screens as BMPs and PNGs (sips), with CoreText's Helvetica Neue for the PS3's font
@@ -169,10 +170,10 @@ preview:
 	for f in build/preview/*.bmp; do sips -s format png "$$f" --out "$${f%.bmp}.png" >/dev/null; done
 
 test: build/ps3dk-include/cell/http.h
-	cmake -Wno-deprecated -S tests/host -B build/tests-host
+	cmake -Wno-deprecated -S tests/host -B build/tests-host -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 	cmake --build build/tests-host -j8
 	ctest --test-dir build/tests-host --output-on-failure
-	cmake -Wno-deprecated -S vitals-app/tests -B build/vitals-app-tests
+	cmake -Wno-deprecated -S vitals-app/tests -B build/vitals-app-tests -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 	cmake --build build/vitals-app-tests -j8
 	ctest --test-dir build/vitals-app-tests --output-on-failure
 	python3 -m unittest discover -s vitals-app/tests -p 'test_*.py'
@@ -198,6 +199,10 @@ app-log:
 uninstall reboot log status fetch:
 	python3 tools/ps3_comms.py $@
 
+# VS Code without the SDK on this machine: the image's headers, and each file's flags (after make)
+editor:
+	python3 ../shared/tools/editor_setup.py ps3 --image $(IMAGE)
+
 pull:
 	docker pull $(IMAGE)
 
@@ -214,4 +219,4 @@ build/ps3dk-include/cell/http.h:
 		tar cf - cell/http.h cell/http cell/ssl.h cell/ssl cell/rtc.h cell/error.h' | tar xf - -C build/ps3dk-include
 	docker run --rm $(IMAGE) cat /opt/ps3dk-src/LICENSE > build/ps3dk-include/LICENSE
 
-.PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log app-log status fetch pull clean
+.PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log app-log status fetch pull editor clean

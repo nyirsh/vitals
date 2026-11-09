@@ -18,6 +18,7 @@
 #                           VitaShell to install (tools/vita_comms.py)
 #   make plugin|ssl|http|browser|app [DEBUG=N]   one module (the PS3's names), with what it links first
 #   make pull               pulls the newest published image (vitasdk/vitasdk:latest)
+#   make editor             VS Code's navigation and errors with the image's headers (after make)
 #   make preview            the app's screens on this Mac with made-up data (../ps3/build/preview/)
 #   make log                prints vitals.log, and keeps it in ../fetched/vita/
 #   make app-log            prints the app's vitals-app.log, and keeps it in ../fetched/vita/
@@ -76,6 +77,10 @@ app: vitals-app
 preview:
 	$(MAKE) -C ../ps3 preview
 
+# VS Code without the SDK on this machine: the image's headers, and each file's flags (after make)
+editor:
+	python3 ../shared/tools/editor_setup.py vita --image $(IMAGE)
+
 pull:
 	docker pull $(IMAGE)
 
@@ -88,4 +93,4 @@ log app-log fetch status:
 clean:
 	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) clean;)
 
-.PHONY: all clean test update-certs upload-app log app-log fetch status preview pull plugin ssl http browser app stubs-plugin stubs-ssl $(COMPONENTS)
+.PHONY: all clean test update-certs upload-app log app-log fetch status preview pull editor plugin ssl http browser app stubs-plugin stubs-ssl $(COMPONENTS)
