@@ -1,4 +1,4 @@
-/* make update-certs' merge (tools/update_certs.py): Mozilla's bundle without the certificates Sony's
+/* make update-certs' merge (shared/tools/update_certs.py): Mozilla's bundle without the certificates Sony's
  * list already has, with the code the app writes the store with (../../../shared/src/store_certs.c).
  * Arguments: sony.pem mozilla.pem output; nothing is written when it fails */
 
