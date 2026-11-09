@@ -123,7 +123,7 @@ void vs_platform_run_on_large_stack(void (*function)(void *), void *argument)
     }
     if (thread >= 0)
         sceKernelDeleteThread(thread);
-    VITALS_LOG("handshake thread not started: on the caller's");
+    VITALS_VERBOSE("handshake thread not started: on the caller's");
     function(argument);
 }
 

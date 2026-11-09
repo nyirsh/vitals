@@ -529,11 +529,11 @@ static int host_matches(SonyCheck *check, void *cert, const char *host)
         if (info == 0 && (got = sceSslInternalExtensionInfo(extension, SONY_EXTENSION_VALUE, &value)) == 0 &&
             value.data != NULL)
             matched = san_matches(value.data, value.length, host);
-        VITALS_LOG("sony subjectAltName info=%08X value=%08X length=%u first=%02X matched=%d", (unsigned int)info,
+        VITALS_VERBOSE("sony subjectAltName info=%08X value=%08X length=%u first=%02X matched=%d", (unsigned int)info,
                    (unsigned int)got, value.length, value.data != NULL && value.length > 0 ? value.data[0] : 0u, matched);
         (void)sceSslInternalExtensionFree(extension);
     } else {
-        VITALS_LOG("sony extension object rc=%08X", (unsigned int)rc);
+        VITALS_VERBOSE("sony extension object rc=%08X", (unsigned int)rc);
     }
     if (matched >= 0)
         return matched;
@@ -570,7 +570,7 @@ static uint32_t check_times(SonyCheck *check, void *certificates[], int count)
     uint32_t found = 0;
     int rc = sceSslInternalTimeProvider(check->cert_c, 0, &provider);
     if (rc != 0 || provider == NULL) {
-        VITALS_LOG("sony time provider rc=%08X", (unsigned int)rc);
+        VITALS_VERBOSE("sony time provider rc=%08X", (unsigned int)rc);
         return VITALS_CERT_INTERNAL;
     }
     int step = 0;
@@ -581,7 +581,7 @@ static uint32_t check_times(SonyCheck *check, void *certificates[], int count)
         (++step, (void)sceSslInternalTimeNow(clock), rc = 0) != 0 ||
         (++step, rc = sceSslInternalTimeExport(clock, SONY_TIME_FORMAT, value, 8)) != 0 ||
         (++step, rc = sceSslInternalTimeImport(now, SONY_TIME_FORMAT, value, 8)) != 0) {
-        VITALS_LOG("sony time step=%d rc=%08X", step, (unsigned int)rc);
+        VITALS_VERBOSE("sony time step=%d rc=%08X", step, (unsigned int)rc);
         found = VITALS_CERT_INTERNAL;
     } else {
         for (int i = 0; i < count; ++i) {
@@ -610,11 +610,11 @@ uint32_t vh_sony_check_chain(void *ssl, void *certificates[], int count, const c
     int item = -1;
     if (ssl == NULL || certificates == NULL || count <= 0 || certificates[0] == NULL ||
         (item = sceSslInternalGetItem(ssl, SONY_ITEM_CERT_C, &check.cert_c)) != 0 || check.cert_c == NULL) {
-        VITALS_LOG("sony chain: no Cert-C context count=%d rc=%08X", count, (unsigned int)item);
+        VITALS_VERBOSE("sony chain: no Cert-C context count=%d rc=%08X", count, (unsigned int)item);
         return VITALS_CERT_INVALID | VITALS_CERT_UNKNOWN_CA;
     }
     if ((item = sceSslInternalGetItem(ssl, SONY_ITEM_CERT_PARSE, &check.parse_c)) != 0 || check.parse_c == NULL) {
-        VITALS_LOG("sony chain: no certificate context rc=%08X", (unsigned int)item);
+        VITALS_VERBOSE("sony chain: no certificate context rc=%08X", (unsigned int)item);
         check.parse_c = check.cert_c;
     }
     make_loaded(&check);
@@ -641,7 +641,7 @@ uint32_t vh_sony_check_chain(void *ssl, void *certificates[], int count, const c
     if (!trusted)
         found |= VITALS_CERT_UNKNOWN_CA;
     free_made(&check);
-    VITALS_LOG("sony chain host=%s count=%d found=%02X", host != NULL ? host : "-", count, (unsigned int)found);
+    VITALS_VERBOSE("sony chain host=%s count=%d found=%02X", host != NULL ? host : "-", count, (unsigned int)found);
     return found;
 }
 
@@ -688,7 +688,7 @@ static int verify(void *ssl, void *certificates[], int count, void *argument, in
     tls->check_result = accepted ? 0 : (int)0x80435806;
     tls->check_bits = detail;
     *reason = accepted ? 0 : SONY_REASON_REFUSED;
-    VITALS_LOG("sony certificate host=%s found=%02X detail=%02X callback=%d accepted=%d", connection->host,
+    VITALS_VERBOSE("sony certificate host=%s found=%02X detail=%02X callback=%d accepted=%d", connection->host,
                (unsigned int)found, detail, connection->ssl_callback != NULL, accepted);
     return accepted;
 }
@@ -750,7 +750,7 @@ static int client_certificate(void *ssl, void **certificate, void **key)
             (void)sceSslInternalNameFree(issuer);
         }
     }
-    VITALS_LOG("sony client certificate given=%d", given);
+    VITALS_VERBOSE("sony client certificate given=%d", given);
     if (!given) {
         if (cert != NULL)
             (void)sceSslInternalCertFree(cert);

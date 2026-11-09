@@ -2,13 +2,13 @@
 # console modules in the vitals-ps3-sdk Docker image, nyirsh/vitals-ps3-sdk from Docker Hub (docker
 # pulls it the first time; make pull gets a newer one; github.com/nyirsh/vitals-ps3-sdk builds it)
 #   make                    libssl and the boot plugin, release (build/vitals-ssl, build/vitals-boot)
-#   make DEBUG=1            libssl with a debug log of calls and what each connection does: the CA
-#                           store, the handshake, which CA the chain comes from or why it was
-#                           refused, the server's alerts and closing, the pool (build/vitals-ssl-debug1)
-#   make DEBUG=2            also every read and write and the HTTP headers that go by, secrets as
-#                           their length (build/vitals-ssl-debug2)
-#   make http [DEBUG=N] [USER_AGENT=...]   vitals' libhttp (build/vitals-http, or -debugN: 1 calls,
-#                           connections and handshakes, 2 also getters, reads and headers, secrets as
+#   make DEBUG=1            libssl with a debug log of the calls: the CA store, each handshake's
+#                           result, why a chain was refused, the server's alerts (build/vitals-ssl-debug1)
+#   make DEBUG=2            also the details: which CA the chain comes from, every read and write,
+#                           the pool and the HTTP headers that go by, secrets as their length
+#                           (build/vitals-ssl-debug2)
+#   make http [DEBUG=N] [USER_AGENT=...]   vitals' libhttp (build/vitals-http, or -debugN: 1 calls
+#                           and handshakes, 2 also sockets, cookies, reads and header values, secrets as
 #                           their length); USER_AGENT replaces "libhttp/4.9.3-000 (CellOS)" in the
 #                           default agent, as the Vita's (useragent.txt on the console overrides it)
 #   make plugin [DEBUG=N] [XMB=1] [XMB_DRY_RUN=1]

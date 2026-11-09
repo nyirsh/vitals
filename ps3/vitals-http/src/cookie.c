@@ -379,14 +379,14 @@ int vh_cookie_receive(VhTransaction *t, const char *header)
 		CellHttpCookieRecvCallback callback = (CellHttpCookieRecvCallback)client->callbacks[VH_CALLBACK_COOKIE_RECV];
 		int answer = callback((CellHttpTransId)t, &uri, header, client->callback_arguments[VH_CALLBACK_COOKIE_RECV]);
 		if (answer != 0) {
-			VITALS_LOG("transaction %p: the game's cookie callback said %d", (void *)t, answer);
+			VITALS_VERBOSE("transaction %p: the game's cookie callback said %d", (void *)t, answer);
 			vh_platform_cookie_lock();
 			cookie_free(cookie);
 			vh_platform_cookie_unlock();
 			return 0;
 		}
 	}
-	VITALS_LOG("transaction %p: cookie %s (%u bytes) for %s%s%s", (void *)t, cookie->name,
+	VITALS_VERBOSE("transaction %p: cookie %s (%u bytes) for %s%s%s", (void *)t, cookie->name,
 	       cookie->value != NULL ? (unsigned)strlen(cookie->value) : 0, cookie->domain, cookie->path,
 	       cookie->persistent ? ", persistent" : "");
 	cookie->owner = client;
@@ -485,7 +485,7 @@ int vh_cookie_header(VhTransaction *t, char **value)
 		for (int call = 0; call < 2; ++call) {
 			int answer = callback((CellHttpTransId)t, &uri, text, client->callback_arguments[VH_CALLBACK_COOKIE_SEND]);
 			if (answer < 0) {
-				VITALS_LOG("transaction %p: the game's cookie callback said %d", (void *)t, answer);
+				VITALS_VERBOSE("transaction %p: the game's cookie callback said %d", (void *)t, answer);
 				vh_free(text);
 				return answer;
 			}

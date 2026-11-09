@@ -86,7 +86,7 @@ const ConsoleInfo *console_info(void)
 		info->cobra = p1 == 0 && version != 0;
 		info->cobra_version = version;
 	}
-	VITALS_LOG_ALWAYS("console: version.txt %u.%02u, type %llu, hen %d (0x%X), cobra %d (0x%X)", info->major, info->minor,
+	VITALS_LOG("console: version.txt %u.%02u, type %llu, hen %d (0x%X), cobra %d (0x%X)", info->major, info->minor,
 	        (unsigned long long)type, info->hen, info->hen_revision, info->cobra, info->cobra_version);
 
 	char firmware[24], payload[32], version[16];

@@ -99,9 +99,7 @@ int vs_platform_run_with_stack(void (*function)(void *), void *argument, uint32_
 	int joined = sysThreadJoin(thread, &ignored);
 	if (joined != 0) {
 		/* Not seen yet: the helper may still be running on helper and argument, which are the caller's */
-		char line[96];
-		snprintf(line, sizeof(line), "the helper thread couldn't be joined (0x%08X)", (unsigned)joined);
-		vs_platform_log(line);
+		VITALS_LOG("the helper thread couldn't be joined (0x%08X)", (unsigned)joined);
 	}
 	return 0;
 }

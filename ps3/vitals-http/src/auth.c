@@ -190,7 +190,7 @@ int vh_auth_answer(VhTransaction *t, const char *challenge)
 		t->auth_tried_uri = 1;
 		snprintf(username, sizeof(username), "%s", t->username);
 		snprintf(password, sizeof(password), "%s", t->password != NULL ? t->password : "");
-		VITALS_LOG("transaction %p: %s for \"%s\" with the URI's credentials", (void *)t, digest ? "Digest" : "Basic", realm);
+		VITALS_VERBOSE("transaction %p: %s for \"%s\" with the URI's credentials", (void *)t, digest ? "Digest" : "Basic", realm);
 		vh_notify_state(t, CELL_HTTP_TRANSACTION_STATE_SETTING_AUTHENTICATION);
 	} else {
 		if (client->callbacks[VH_CALLBACK_AUTHENTICATION] == NULL) {
@@ -212,7 +212,7 @@ int vh_auth_answer(VhTransaction *t, const char *challenge)
 		int answer = callback((CellHttpTransId)t, realm, &uri, username, password, &save,
 		                      client->callback_arguments[VH_CALLBACK_AUTHENTICATION]);
 		username[sizeof(username) - 1] = password[sizeof(password) - 1] = '\0';
-		VITALS_LOG("transaction %p: %s for \"%s\", the game's callback said %d", (void *)t, digest ? "Digest" : "Basic", realm,
+		VITALS_VERBOSE("transaction %p: %s for \"%s\", the game's callback said %d", (void *)t, digest ? "Digest" : "Basic", realm,
 		       answer);
 		if (answer < 0)
 			return ERROR_CANNOT_AUTHENTICATE;

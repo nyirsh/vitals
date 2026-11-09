@@ -1,4 +1,5 @@
 #include "app_log.h"
+#include "installed.h"
 
 #include <cell/cell_fs.h>
 #include <stdarg.h>
@@ -8,6 +9,8 @@
 
 void app_log_start(void)
 {
+	if (vitals_debug_read() == 0)
+		return;
 	int fd;
 	/* Its folder, before anything is installed */
 	cellFsMkdir(VITALS_DIRECTORY, CELL_FS_S_IFDIR | 0777);
@@ -16,8 +19,11 @@ void app_log_start(void)
 		cellFsClose(fd);
 }
 
-void app_log(const char *format, ...)
+void app_log(int level, const char *format, ...)
 {
+	/* The level installed right now, as Options can change it while the app runs */
+	if (vitals_debug_read() < level)
+		return;
 	char line[256];
 	int used = snprintf(line, sizeof(line), "[%llu ms] ", (unsigned long long)(sys_time_get_system_time() / 1000));
 	va_list arguments;

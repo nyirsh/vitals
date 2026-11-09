@@ -54,7 +54,7 @@ static void copy_result(CheckResult *r, const HttpResult *h)
 /* A finished check, in the app's log */
 static void log_result(const char *what, const CheckResult *r)
 {
-	VITALS_LOG_ALWAYS("test %s: state %d, HTTP %d, error 0x%08X, flags 0x%04X, %s %s, %u ms, %s", what, r->state, r->http_code,
+	VITALS_LOG("test %s: state %d, HTTP %d, error 0x%08X, flags 0x%04X, %s %s, %u ms, %s", what, r->state, r->http_code,
 	        (unsigned)r->error, (unsigned)r->verify_error, http_protocol_name(r->ssl_version, r->cipher), r->cipher,
 	        r->elapsed_ms, r->message);
 }
@@ -83,7 +83,7 @@ static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned m
 	unsigned count = check_run_read_rules(read_redirects, list, max);
 	cellFsClose(redirect_fd);
 	redirect_fd = -1;
-	VITALS_LOG_ALWAYS("%s: %u rules", path, count);
+	VITALS_VERBOSE("%s: %u rules", path, count);
 	return count;
 }
 
@@ -177,7 +177,7 @@ static void backend_parts(CheckParts *parts)
 	parts->vitals = parts->http || parts->tls;
 	/* libhttp's own transaction says which host answered */
 	parts->http_outdated = 0;
-	VITALS_LOG_ALWAYS("libssl: %s%s, libhttp: %s%s%s%s", parts->tls ? "vitals' " : "Sony's", tls_release,
+	VITALS_LOG("libssl: %s%s, libhttp: %s%s%s%s", parts->tls ? "vitals' " : "Sony's", tls_release,
 	        parts->http ? "vitals' " : "Sony's", http_release, parts->redirects_off ? ", redirects off" : "",
 	        parts->dns_off ? ", DNS rules off" : "");
 }
@@ -295,7 +295,7 @@ static int save_report(const CheckService *s, char *path, size_t path_size)
 			cellFsUnlink(path);
 	}
 	free(report.data);
-	VITALS_LOG_ALWAYS("report: %s, 0x%08X", path, (unsigned)rc);
+	VITALS_LOG("report: %s, 0x%08X", path, (unsigned)rc);
 	return rc == CELL_FS_SUCCEEDED ? 0 : -1;
 }
 

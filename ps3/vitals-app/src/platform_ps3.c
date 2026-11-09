@@ -104,19 +104,19 @@ int platform_display_init(void)
 	sys_addr_t host = 0;
 	int rc = sys_memory_allocate(HOST_SIZE, SYS_MEMORY_PAGE_SIZE_1M, &host);
 	if (rc != 0) {
-		VITALS_LOG_ALWAYS("display: sys_memory_allocate 0x%08X", (unsigned)rc);
+		VITALS_LOG("display: sys_memory_allocate 0x%08X", (unsigned)rc);
 		return -1;
 	}
 	rsxInit(&context, CB_SIZE, HOST_SIZE, (void *)(uintptr_t)host);
 	if (context == NULL) {
-		VITALS_LOG_ALWAYS("display: rsxInit failed");
+		VITALS_LOG("display: rsxInit failed");
 		return -2;
 	}
 	videoState state;
 	videoResolution resolution;
 	rc = videoGetState(VIDEO_PRIMARY, 0, &state);
 	if (rc != 0 || state.state != 0) {
-		VITALS_LOG_ALWAYS("display: videoGetState 0x%08X, state %d", (unsigned)rc, state.state);
+		VITALS_LOG("display: videoGetState 0x%08X, state %d", (unsigned)rc, state.state);
 		return -3;
 	}
 	/* The console's own mode, as the XMB has it: switching the TV to 720p (the canvas's size) took
@@ -124,7 +124,7 @@ int platform_display_init(void)
 	uint8_t chosen = state.displayMode.resolution;
 	int got = videoGetResolution(chosen, &resolution);
 	if (got != 0) {
-		VITALS_LOG_ALWAYS("display: videoGetResolution(%d) 0x%08X", chosen, (unsigned)got);
+		VITALS_LOG("display: videoGetResolution(%d) 0x%08X", chosen, (unsigned)got);
 		return -4;
 	}
 	videoConfiguration configuration;
@@ -134,10 +134,10 @@ int platform_display_init(void)
 	configuration.pitch = resolution.width * sizeof(u32);
 	configuration.aspect = state.displayMode.aspect;
 	if (wait_rsx_idle() != 0)
-		VITALS_LOG_ALWAYS("display: the RSX didn't go idle within 2 seconds");
+		VITALS_LOG("display: the RSX didn't go idle within 2 seconds");
 	rc = videoConfigure(VIDEO_PRIMARY, &configuration, NULL, 0);
 	if (rc != 0) {
-		VITALS_LOG_ALWAYS("display: videoConfigure 0x%08X", (unsigned)rc);
+		VITALS_LOG("display: videoConfigure 0x%08X", (unsigned)rc);
 		return -5;
 	}
 	gcmSetFlipMode(GCM_FLIP_VSYNC);
@@ -151,7 +151,7 @@ int platform_display_init(void)
 		int mapped = buffers[i] != NULL ? rsxAddressToOffset(buffers[i], &offset) : -1;
 		int set = mapped == 0 ? gcmSetDisplayBuffer(i, offset, pitch, screen_width, screen_height) : -1;
 		if (mapped != 0 || set != 0) {
-			VITALS_LOG_ALWAYS("display: buffer %d at %p, rsxAddressToOffset 0x%08X, gcmSetDisplayBuffer 0x%08X", i,
+			VITALS_VERBOSE("display: buffer %d at %p, rsxAddressToOffset 0x%08X, gcmSetDisplayBuffer 0x%08X", i,
 			        (void *)buffers[i], (unsigned)mapped, (unsigned)set);
 			return -6;
 		}
@@ -170,19 +170,19 @@ int platform_display_init(void)
 		}
 		memset(mapped_canvas, 0, (size_t)canvas_width * canvas_height * sizeof(uint32_t));
 	} else {
-		VITALS_LOG_ALWAYS("display: the canvas can't be mapped for the RSX (0x%08X): scaled by the CPU", (unsigned)canvas_mapped);
+		VITALS_LOG("display: the canvas can't be mapped for the RSX (0x%08X): scaled by the CPU", (unsigned)canvas_mapped);
 		mapped_canvas = NULL;
 		frame = memalign(128, (size_t)screen_width * screen_height * sizeof(uint32_t));
 		if (frame == NULL) {
-			VITALS_LOG_ALWAYS("display: no memory for a %ux%u frame", screen_width, screen_height);
+			VITALS_LOG("display: no memory for a %ux%u frame", screen_width, screen_height);
 			return -7;
 		}
 		memset(frame, 0, (size_t)screen_width * screen_height * sizeof(uint32_t));
 	}
 	rc = cellSysutilRegisterCallback(0, on_system_event, NULL);
 	if (rc != 0)
-		VITALS_LOG_ALWAYS("display: cellSysutilRegisterCallback 0x%08X", (unsigned)rc);
-	VITALS_LOG_ALWAYS("display: %ux%u (video mode %d), drawn at %dx%d%s", screen_width, screen_height, chosen, canvas_width,
+		VITALS_LOG("display: cellSysutilRegisterCallback 0x%08X", (unsigned)rc);
+	VITALS_LOG("display: %ux%u (video mode %d), drawn at %dx%d%s", screen_width, screen_height, chosen, canvas_width,
 	        canvas_height, canvas_width == screen_width && canvas_height == screen_height ? "" : ", scaled");
 	return 0;
 }
@@ -371,7 +371,7 @@ void platform_present(const uint32_t *canvas)
 	if (show_frame() != 0) {
 		static int reported;
 		if (!reported)
-			VITALS_LOG_ALWAYS("present: the flip failed or timed out");
+			VITALS_LOG("present: the flip failed or timed out");
 		reported = 1;
 	}
 }

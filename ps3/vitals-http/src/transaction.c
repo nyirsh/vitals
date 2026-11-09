@@ -185,7 +185,7 @@ int cellHttpCreateTransaction(CellHttpTransId *id, CellHttpClientId client_id, c
 	char path[96];
 	VITALS_LOG("cellHttpCreateTransaction %p %s %s://%s:%u%s -> %p, 0x%08x", (void *)client_id, method != NULL ? method : "-",
 	       uri != NULL && uri->scheme != NULL ? uri->scheme : "-", uri != NULL && uri->hostname != NULL ? uri->hostname : "-",
-	       uri != NULL ? (unsigned)uri->port : 0, uri != NULL ? vh_log_path(uri->path, path, sizeof(path)) : "",
+	       uri != NULL ? (unsigned)uri->port : 0, VITALS_DEBUG >= 2 && uri != NULL ? vh_log_path(uri->path, path, sizeof(path)) : "",
 	       rc == 0 && id != NULL ? (void *)*id : NULL, (unsigned)rc);
 #endif
 	return rc;
@@ -278,9 +278,14 @@ int cellHttpRequestGetContentLength(CellHttpTransId id, uint64_t *length)
 #if VITALS_DEBUG >= 1
 static void log_header(const char *call, const void *id, const CellHttpHeader *header)
 {
+	/* The call and the header's name; its value only at level 2 */
+#if VITALS_DEBUG >= 2
 	char hidden[24];
-	VITALS_LOG("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
+	VITALS_VERBOSE("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
 	       header != NULL ? vh_log_header(header->name, header->value, hidden, sizeof(hidden)) : "-");
+#else
+	VITALS_LOG("%s %p %s", call, id, header != NULL && header->name != NULL ? header->name : "-");
+#endif
 }
 #else
 #define log_header(call, id, header) ((void)0)
@@ -427,7 +432,7 @@ static int tunnel(VhTransaction *t)
 	char text[600];
 	int length = snprintf(text, sizeof(text), "CONNECT %s:%u HTTP/%u.%u\r\nHost: %s:%u\r\nProxy-Connection: Keep-Alive\r\n\r\n",
 	                      t->host, t->port, (unsigned)t->client->major, (unsigned)t->client->minor, t->host, t->port);
-	VITALS_LOG("transaction %p: CONNECT %s:%u through the proxy", (void *)t, t->host, t->port);
+	VITALS_VERBOSE("transaction %p: CONNECT %s:%u through the proxy", (void *)t, t->host, t->port);
 	int rc = send_all(t, text, (size_t)length);
 	if (rc != 0)
 		return rc;
@@ -474,7 +479,7 @@ static int open_and_send_head(VhTransaction *t)
 			t->ssl = NULL;
 			return sent;
 		}
-		VITALS_LOG("transaction %p: the kept socket %d is gone, connecting again", (void *)t, fd);
+		VITALS_VERBOSE("transaction %p: the kept socket %d is gone, connecting again", (void *)t, fd);
 		vh_connection_closed(client, t, fd, ssl);
 		t->fd = -1;
 		t->ssl = NULL;
@@ -486,10 +491,11 @@ static int open_and_send_head(VhTransaction *t)
 	if (recv_timeout > 0 && recv_timeout < VH_REDIRECT_RECV_TIMEOUT && vh_redirect_is_target(t->host))
 		recv_timeout = VH_REDIRECT_RECV_TIMEOUT;
 	fd = vh_platform_connect(to, to_port, client->conn_timeout, client->send_timeout, recv_timeout);
-	VITALS_LOG(fd >= 0 ? "transaction %p connects to %s:%u: socket %d" : "transaction %p connects to %s:%u: error 0x%08x", (void *)t, t->host, t->port,
-	       fd);
-	if (fd < 0)
+	if (fd < 0) {
+		VITALS_LOG("transaction %p can't connect to %s:%u: 0x%08x", (void *)t, t->host, t->port, (unsigned)fd);
 		return fd;
+	}
+	VITALS_VERBOSE("transaction %p connects to %s:%u: socket %d", (void *)t, t->host, t->port, fd);
 	t->fd = fd;
 	int rc = t->https && t->via_proxy ? tunnel(t) : 0;
 	if (rc == 0 && t->https)
@@ -870,7 +876,7 @@ static int read_response(VhTransaction *t)
 			CellHttpRedirectCallback callback = (CellHttpRedirectCallback)client->callbacks[VH_CALLBACK_REDIRECT];
 			int answer = callback((CellHttpTransId)t, &line, &from, &to, client->callback_arguments[VH_CALLBACK_REDIRECT]);
 			if (answer != 0) {
-				VITALS_LOG("transaction %p: the game's redirect callback said %d", (void *)t, answer);
+				VITALS_VERBOSE("transaction %p: the game's redirect callback said %d", (void *)t, answer);
 				return VH_ERROR_REDIRECT_REFUSED;
 			}
 		}
@@ -896,7 +902,7 @@ static int read_response(VhTransaction *t)
 #if VITALS_DEBUG >= 1
 		{
 			char path[96];
-			VITALS_LOG("transaction %p: redirect %d to %s", (void *)t, (int)t->status, vh_log_path(target, path, sizeof(path)));
+			VITALS_VERBOSE("transaction %p: redirect %d to %s", (void *)t, (int)t->status, vh_log_path(target, path, sizeof(path)));
 		}
 #endif
 		if ((rc = follow(t, target)) != 0 || (rc = open_and_send_head(t)) != 0)

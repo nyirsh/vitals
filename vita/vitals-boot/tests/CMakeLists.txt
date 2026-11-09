@@ -46,7 +46,7 @@ plugin_test(vitals_post_start test_post_start.c post_start.c)
 # output on
 plugin_test(vitals_dns_watch ${DNS_DIR}/tests/test_dns_watch.c ../vitals-dns/dns_watch.c ../../shared/dns/dns_message.c)
 # As the debug builds are, so the query log is tested too
-target_compile_definitions(vitals_dns_watch_tests PRIVATE VITALS_DEBUG=1)
+target_compile_definitions(vitals_dns_watch_tests PRIVATE VITALS_DEBUG=2)
 # Reading the redirect list for games, which may not open it themselves
 plugin_test(vitals_redirects test_redirects.c redirects.c)
 # The debug output's file, as a debug build has it

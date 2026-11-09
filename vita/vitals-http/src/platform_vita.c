@@ -409,7 +409,7 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
         int value = (open->option14 & 1u) != 0 ? 0 : 8;
         int set = sceNetSetsockopt(socket, SCE_NET_SOL_SOCKET, VH_SO_PRIVATE_40000, &value, sizeof(value));
         if (set < 0)
-            VITALS_LOG("socket option 0x40000=%d refused rc=%08X", value, (unsigned int)set);
+            VITALS_VERBOSE("socket option 0x40000=%d refused rc=%08X", value, (unsigned int)set);
     }
     memset(&server, 0, sizeof(server));
     server.sin_len = sizeof(server);

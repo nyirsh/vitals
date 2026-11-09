@@ -5,7 +5,7 @@
 #include <string.h>
 
 static int legacy_configuration(size_t offset, int32_t value) {
-    VITALS_LOG("browser legacy option: offset=%u value=0x%08X",
+    VITALS_VERBOSE("browser legacy option: offset=%u value=0x%08X",
         (unsigned int)offset, (unsigned int)value);
     (void)offset;
     (void)value;
@@ -114,7 +114,7 @@ static int read_options(const void *connection, unsigned int socket_index,
             (callback_validator == NULL ? 2u : 0u) | (!verify_peer && !allow_unverified ? 4u : 0u) |
             (!verify_host && !allow_unverified ? 8u : 0u) | (ca_file != NULL ? 16u : 0u);
         /* Which of the callback's conditions failed, to tell a retry with verification off apart */
-        VITALS_LOG("browser ctx callback: policy=0x%X peer=%u host=%u cafile=%u",
+        VITALS_VERBOSE("browser ctx callback: policy=0x%X peer=%u host=%u cafile=%u",
             (unsigned int)policy, verify_peer, verify_host, ca_file != NULL ? 1u : 0u);
         if (policy != 0 || !callback_validator(ctx_callback, ctx_userdata)) {
             return legacy_configuration(VITALS_CURL_CTX_CALLBACK_OFFSET, 1);

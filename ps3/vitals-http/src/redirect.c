@@ -188,7 +188,7 @@ const char *vh_default_user_agent(void)
 		memcpy(g_agent, AGENT_PREFIX, sizeof(AGENT_PREFIX) - 1);
 		int read = vh_platform_file_read(USER_AGENT_PATH, 0, text, sizeof(text));
 		if (read > 0 && pick_line(text, (size_t)read))
-			VITALS_LOG("user agent from useragent.txt: %s", g_agent);
+			VITALS_VERBOSE("user agent from useragent.txt: %s", g_agent);
 		else {
 			if (read > 0)
 				VITALS_LOG("useragent.txt ignored: no usable line");

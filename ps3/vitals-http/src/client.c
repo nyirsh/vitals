@@ -105,7 +105,7 @@ void vh_connection_state(VhClient *client, int fd, const VhTransaction *t, uint3
 	if (client == NULL || fd < 0 || client->callbacks[VH_CALLBACK_CONNECTION_STATE] == NULL)
 		return;
 	ConnectionStateCallback callback = (ConnectionStateCallback)client->callbacks[VH_CALLBACK_CONNECTION_STATE];
-	VITALS_LOG("client %p: connection-state callback, socket %d, state %u", (void *)client, fd, (unsigned)state);
+	VITALS_VERBOSE("client %p: connection-state callback, socket %d, state %u", (void *)client, fd, (unsigned)state);
 	(void)callback(&g_connection_handles[(unsigned)fd % sizeof(g_connection_handles)], (CellHttpTransId)t, state,
 	               client->callback_arguments[VH_CALLBACK_CONNECTION_STATE]);
 }
@@ -118,7 +118,7 @@ void vh_connection_closed(VhClient *client, const VhTransaction *t, int fd, void
 
 void vh_connection_close(VhClient *client, int fd, void *ssl)
 {
-	VITALS_LOG("client %p closes socket %d%s", (void *)client, fd, ssl != NULL ? " (TLS)" : "");
+	VITALS_VERBOSE("client %p closes socket %d%s", (void *)client, fd, ssl != NULL ? " (TLS)" : "");
 	if (ssl != NULL && client != NULL && client->callbacks[VH_CALLBACK_SSL_ID_DESTROY] != NULL) {
 		CellHttpSslIdDestroyCallback callback = (CellHttpSslIdDestroyCallback)client->callbacks[VH_CALLBACK_SSL_ID_DESTROY];
 		(void)callback((CellHttpSslId)ssl, client->callback_arguments[VH_CALLBACK_SSL_ID_DESTROY]);
@@ -138,7 +138,7 @@ int vh_client_take_idle(VhClient *client, const char *host, unsigned port, int h
 			*at = idle->next;
 			fd = idle->fd;
 			*ssl = idle->ssl;
-			VITALS_LOG("client %p reuses socket %d to %s:%u%s", (void *)client, fd, host, port, *ssl != NULL ? " (TLS)" : "");
+			VITALS_VERBOSE("client %p reuses socket %d to %s:%u%s", (void *)client, fd, host, port, *ssl != NULL ? " (TLS)" : "");
 			vh_free(idle->host);
 			vh_free(idle);
 			break;
@@ -167,7 +167,7 @@ void vh_client_keep_idle(VhClient *client, const char *host, unsigned port, int 
 	idle->port = port;
 	idle->fd = fd;
 	idle->ssl = ssl;
-	VITALS_LOG("client %p keeps socket %d to %s:%u", (void *)client, fd, host, port);
+	VITALS_VERBOSE("client %p keeps socket %d to %s:%u", (void *)client, fd, host, port);
 	idle->next = client->idle;
 	client->idle = idle;
 	vh_unlock();
@@ -367,9 +367,14 @@ int cellHttpClientGetUserAgent(CellHttpClientId id, char *agent, size_t size, si
 #if VITALS_DEBUG >= 1
 static void log_header(const char *call, const void *id, const CellHttpHeader *header)
 {
+	/* The call and the header's name; its value only at level 2 */
+#if VITALS_DEBUG >= 2
 	char hidden[24];
-	VITALS_LOG("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
+	VITALS_VERBOSE("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
 	       header != NULL ? vh_log_header(header->name, header->value, hidden, sizeof(hidden)) : "-");
+#else
+	VITALS_LOG("%s %p %s", call, id, header != NULL && header->name != NULL ? header->name : "-");
+#endif
 }
 #else
 #define log_header(call, id, header) ((void)0)

@@ -200,7 +200,7 @@ static int own_identity(VhTls *tls, void *context)
     }
     vh_unlock();
     if (tls->has_own)
-        VITALS_LOG("client certificate host=%s rc=%08X", tls->host, (unsigned int)result);
+        VITALS_VERBOSE("client certificate host=%s rc=%08X", tls->host, (unsigned int)result);
     /* One that doesn't parse is left out, as no client certificate */
     if (result != 0 && !vitalsSslTlsErrorIsMemory(result)) {
         tls->has_own = 0;
@@ -308,8 +308,8 @@ static int sony_start(VhTls *tls, const VhOpen *open, int *ssl_error, unsigned i
     int refused = 0;
     int connected = vh_sony_tls_connect(tls->sony, &flags, &refused);
     if (connected == 1) {
-        VITALS_LOG("handshake ok host=%s on Sony's libssl options=%03X callback=%d", tls->host,
-                   (unsigned int)open->https_options, open->ssl_callback != NULL);
+        VITALS_LOG("handshake ok host=%s on Sony's libssl", tls->host);
+        VITALS_VERBOSE("  options=%03X callback=%d", (unsigned int)open->https_options, open->ssl_callback != NULL);
         return 0;
     }
     /* libssl gives the socket's error as it is when it failed, -1 when TLS did */
@@ -408,17 +408,18 @@ int vh_tls_start(VhTls **out, VhTransport *transport, const VhOpen *open, int *s
         void *const no_certificates[1] = {NULL};
         int accepted = open->ssl_callback != NULL &&
                        open->ssl_callback(detail, no_certificates, 0, open->ssl_argument) >= 0;
-        VITALS_LOG("certificate host=%s verify=%08X detail=%02X accepted=%d", tls->host, (unsigned int)verify,
+        VITALS_VERBOSE("certificate host=%s verify=%08X detail=%02X accepted=%d", tls->host, (unsigned int)verify,
                    (unsigned int)detail, accepted);
         if (!accepted) {
             vh_tls_close(tls);
             return store_outcome(VITALS_OUTCOME_CERTIFICATE, flags, ssl_error, ssl_detail);
         }
     }
-    VITALS_LOG("handshake ok host=%s %s %s profile=%s options=%03X callback=%d client_cert_asked=%s sent=%d",
-               tls->host, vitalsSslGetVersion(tls->ssl), vitalsSslGetCiphersuite(tls->ssl),
-               console ? "console" : "modern", (unsigned int)open->https_options, open->ssl_callback != NULL,
-               client_certificate_asked(tls), tls->has_own);
+    VITALS_LOG("handshake ok host=%s %s %s", tls->host, vitalsSslGetVersion(tls->ssl),
+               vitalsSslGetCiphersuite(tls->ssl));
+    VITALS_VERBOSE("  profile=%s options=%03X callback=%d client_cert_asked=%s sent=%d", console ? "console" : "modern",
+                   (unsigned int)open->https_options, open->ssl_callback != NULL, client_certificate_asked(tls),
+                   tls->has_own);
     /* The heap's peak, when it has grown */
     vitals_user_runtime_report("handshake", 0);
     *out = tls;
@@ -522,7 +523,7 @@ static int check_with(void *ssl, void *certificates[], int count, void *argument
     if (check != NULL && check->bits != NULL)
         *check->bits = bits;
     *reason = accepted ? 0 : VH_CERT_CHECK_REASON;
-    VITALS_LOG("cert check host=%s options=%08X found=%02X bits=%02X callback=%d accepted=%d",
+    VITALS_VERBOSE("cert check host=%s options=%08X found=%02X bits=%02X callback=%d accepted=%d",
                check != NULL && check->host != NULL ? check->host : "-", (unsigned int)options, (unsigned int)found, bits,
                check != NULL && check->callback != NULL, accepted);
     return accepted;

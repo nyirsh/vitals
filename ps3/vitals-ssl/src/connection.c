@@ -198,7 +198,7 @@ long SSL_CTX_ctrl(void *handle, int command, long value, void *pointer)
 		context->value_56 = value;
 		return old;
 	default:
-		VITALS_LOG("ctx ctrl %d ignored", command);
+		VITALS_VERBOSE("ctx ctrl %d ignored", command);
 		return 0;
 	}
 }
@@ -502,7 +502,7 @@ long BIO_ctrl(void *handle, int command, long value, void *pointer)
 	case 128:
 		return 1;
 	default:
-		VITALS_LOG("bio ctrl %d %ld ignored", command, value);
+		VITALS_VERBOSE("bio ctrl %d %ld ignored", command, value);
 		return 0;
 	}
 }
@@ -678,10 +678,11 @@ void SSL_free(void *handle)
 	VsSsl *ssl = handle;
 	if (!is_ssl(ssl))
 		return;
-#if VITALS_DEBUG >= 1
+	VITALS_LOG("SSL_free %p", (void *)ssl);
+#if VITALS_DEBUG >= 2
 	VitalsPoolUse use;
 	if (vitals_pool_use(&use) == 0)
-		VITALS_LOG("SSL_free %p; pool %u bytes free of %u, %u at the lowest, %u refused", (void *)ssl,
+		VITALS_VERBOSE("ssl %p: pool %u bytes free of %u, %u at the lowest, %u refused", (void *)ssl,
 		       (unsigned)use.free_now, (unsigned)use.size, (unsigned)use.lowest_free, (unsigned)use.refused);
 #endif
 	reset(ssl);
@@ -864,7 +865,7 @@ static void log_anchor(const VsSsl *ssl, const mbedtls_x509_crt *top, int accept
 	if (mbedtls_x509_dn_gets(issuer, sizeof(issuer), &top->issuer) < 0)
 		memcpy(issuer, "?", 2);
 	const char *source = vs_ca_store_source(top->issuer_raw.p, top->issuer_raw.len, text);
-	VITALS_LOG("ssl %p %s: issued by %s, %s%s", (const void *)ssl, accepted ? "trusted" : "not trusted", issuer,
+	VITALS_VERBOSE("ssl %p %s: issued by %s, %s%s", (const void *)ssl, accepted ? "trusted" : "not trusted", issuer,
 	       source != NULL ? "from " : "which neither Sony's CAs nor Mozilla's bundle has",
 	       source != NULL ? source : "");
 }
@@ -936,7 +937,7 @@ static int verify_with_callback(void *context, mbedtls_x509_crt *certificate, in
 	for (int i = 0; i < count; ++i)
 		vs_cert_return(&certs[i]);
 	VS_FREE(certs);
-	VITALS_LOG("ssl %p verify callback %d reason=%d chain=%d", (void *)ssl, accepted, ssl->verify_result, count);
+	VITALS_VERBOSE("ssl %p verify callback %d reason=%d chain=%d", (void *)ssl, accepted, ssl->verify_result, count);
 #if VITALS_DEBUG >= 1
 	if (count > 0)
 		log_anchor(ssl, top, accepted);
@@ -1052,7 +1053,7 @@ static int setup(VsSsl *ssl)
 		return result;
 	mbedtls_ssl_set_bio(&ssl->tls, ssl, tls_send, tls_recv, NULL);
 	ssl->ready = 1;
-	VITALS_LOG("ssl %p host=%s verify=%d%s", (void *)ssl, host != NULL ? host : "-", verify, console ? " profile=console" : "");
+	VITALS_VERBOSE("ssl %p host=%s verify=%d%s", (void *)ssl, host != NULL ? host : "-", verify, console ? " profile=console" : "");
 	return 0;
 }
 
@@ -1108,14 +1109,14 @@ static int failed(VsSsl *ssl, int result)
 		return -1;
 	if (result == MBEDTLS_ERR_SSL_CONN_EOF) {
 		if (!ssl->close_logged)
-			VITALS_LOG("ssl %p the server closed the connection without a close_notify", (void *)ssl);
+			VITALS_VERBOSE("ssl %p the server closed the connection without a close_notify", (void *)ssl);
 		ssl->close_logged = 1;
 		ssl->failure = VS_FAILED_EOF;
 		return 0;
 	}
 	if (result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
 		if (!ssl->close_logged)
-			VITALS_LOG("ssl %p the server closed the connection (close_notify)", (void *)ssl);
+			VITALS_VERBOSE("ssl %p the server closed the connection (close_notify)", (void *)ssl);
 		ssl->close_logged = 1;
 		ssl->failure = VS_FAILED_CLOSED;
 		ssl->close_notify = 1;
@@ -1230,7 +1231,7 @@ static int tls_io(VsSsl *ssl, unsigned char *data, size_t size, int op)
 	int rc = vs_platform_run_with_stack(io_on_this_thread, &io, VS_HELPER_STACK);
 	if (rc != 0) {
 		/* What may run off the caller's stack: the one case that hung PSN's writer before */
-		VITALS_LOG("ssl %p %s %u: no thread of its own (0x%08X), so on the caller's %u of %u bytes of stack left",
+		VITALS_VERBOSE("ssl %p %s %u: no thread of its own (0x%08X), so on the caller's %u of %u bytes of stack left",
 		       (void *)ssl, k_io_names[op], (unsigned)size, (unsigned)rc, (unsigned)stack_left,
 		       (unsigned)stack_size);
 		io_on_this_thread(&io);

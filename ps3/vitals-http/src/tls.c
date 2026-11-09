@@ -277,14 +277,14 @@ static int check(void *ssl, void *certificates[], int count, void *argument, int
 		*reason = flags & VERIFY_NO_MEMORY ? 17 : flags & VERIFY_NOT_YET_VALID ? 9 : flags & VERIFY_EXPIRED ? 10 : 0;
 	int accept = flags == 0;
 	VhClient *client = t != NULL ? t->client : NULL;
-	VITALS_LOG("transaction %p: %s's chain of %d, flags 0x%08x", (void *)t, t != NULL ? t->host : "-", count,
+	VITALS_VERBOSE("transaction %p: %s's chain of %d, flags 0x%08x", (void *)t, t != NULL ? t->host : "-", count,
 	       (unsigned)flags);
 	if (client != NULL && client->callbacks[VH_CALLBACK_SSL] != NULL) {
 		CellHttpsSslCallback callback = (CellHttpsSslCallback)client->callbacks[VH_CALLBACK_SSL];
 		int answer = callback(flags, (CellSslCert const *)certificates, count, t->host, (CellHttpSslId)ssl,
 		                      client->callback_arguments[VH_CALLBACK_SSL]);
 		accept = answer == 0;
-		VITALS_LOG("transaction %p: the game's SSL callback says %d", (void *)t, answer);
+		VITALS_VERBOSE("transaction %p: the game's SSL callback says %d", (void *)t, answer);
 	}
 	return accept;
 }
@@ -388,7 +388,7 @@ int vh_tls_send(void *ssl, const void *data, size_t size)
 {
 	int sent = SSL_write(ssl, data, size > 0x7fffffff ? 0x7fffffff : (int)size);
 	if (sent <= 0)
-		VITALS_LOG("ssl %p: SSL_write %d, SSL_get_error %d", ssl, sent, SSL_get_error(ssl, sent));
+		VITALS_VERBOSE("ssl %p: SSL_write %d, SSL_get_error %d", ssl, sent, SSL_get_error(ssl, sent));
 	return sent > 0 ? sent : VH_NET_ERROR(VH_NET_TLS_SEND, SSL_get_error(ssl, sent));
 }
 
@@ -398,7 +398,7 @@ int vh_tls_recv(void *ssl, void *data, size_t size)
 	if (got > 0)
 		return got;
 	int kind = SSL_get_error(ssl, got);
-	VITALS_LOG("ssl %p: SSL_read %d, SSL_get_error %d", ssl, got, kind);
+	VITALS_VERBOSE("ssl %p: SSL_read %d, SSL_get_error %d", ssl, got, kind);
 	/* The server's close_notify, or the connection simply ending: the end of a body read until close */
 	if (kind == 6 || (got == 0 && kind == 5))
 		return 0;

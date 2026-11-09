@@ -53,7 +53,7 @@ const char *vh_user_agent_suffix(void)
         g_loaded = 1;
         int read = vh_platform_useragent_read(text, sizeof(text));
         if (read > 0 && pick_line(text, (size_t)read))
-            VITALS_LOG("user agent suffix from file: %s", g_suffix);
+            VITALS_VERBOSE("user agent suffix from file: %s", g_suffix);
         else {
             if (read > 0)
                 VITALS_LOG("user agent file ignored: no usable line");

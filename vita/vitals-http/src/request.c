@@ -934,7 +934,7 @@ static int exchange(VhObject *object, VhObject *connection, const VhObject *temp
     unsigned short proxy_port = 0;
     int proxied = choose_proxy(object, template_, proxy_host, sizeof(proxy_host), &proxy_port);
     if (proxied)
-        VITALS_LOG("request %d through proxy %s:%u", object->id, proxy_host, (unsigned int)proxy_port);
+        VITALS_VERBOSE("request %d through proxy %s:%u", object->id, proxy_host, (unsigned int)proxy_port);
 
     vh_lock();
     request->proxied = proxied;
@@ -1259,7 +1259,7 @@ static int try_auth(VhObject *object, VhObject *connection, const unsigned char 
     unsigned int skip = digest ? 6u : 5u;
     if (basic || digest)
         challenge_parameter(value + skip, length - skip, "realm", realm, sizeof(realm));
-    VITALS_LOG("auth %s realm=%s callback=%d", digest ? "digest" : basic ? "basic" : "unknown", realm, callback != NULL);
+    VITALS_VERBOSE("auth %s realm=%s callback=%d", digest ? "digest" : basic ? "basic" : "unknown", realm, callback != NULL);
     if (callback == NULL || (!basic && !digest))
         return 0;
 
@@ -1269,7 +1269,7 @@ static int try_auth(VhObject *object, VhObject *connection, const unsigned char 
     int save = 0;
     int answer = callback(object->id, digest ? SCE_HTTP_AUTH_DIGEST : SCE_HTTP_AUTH_BASIC, realm, username, password,
                           0, &entity, &entity_size, &save, object->settings.auth_argument);
-    VITALS_LOG("auth callback rc=%08X", (unsigned int)answer);
+    VITALS_VERBOSE("auth callback rc=%08X", (unsigned int)answer);
     if (answer < 0)
         return 0;
     username[sizeof(username) - 1] = password[sizeof(password) - 1] = '\0';
@@ -1392,7 +1392,7 @@ void vh_request_sent(VhObject *object, int result)
 #endif
     /* A failed one, with how long it took and the timeouts it had */
     if (result < 0)
-        VITALS_LOG("  after %ums; timeouts resolve=%u connect=%u send=%u recv=%u us",
+        VITALS_VERBOSE("  after %ums; timeouts resolve=%u connect=%u send=%u recv=%u us",
                    (unsigned int)((vh_platform_clock_us() - request->started_us) / 1000u),
                    object->settings.resolve_timeout_us, object->settings.connect_timeout_us,
                    object->settings.send_timeout_us, object->settings.recv_timeout_us);

@@ -134,6 +134,6 @@ char *vh_redirect_url(const char *url)
         vh_free(copy);
         return NULL;
     }
-    VITALS_LOG("redirect %s -> %s", url, copy);
+    VITALS_VERBOSE("redirect %s -> %s", url, copy);
     return copy;
 }

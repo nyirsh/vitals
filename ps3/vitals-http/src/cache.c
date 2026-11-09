@@ -255,7 +255,7 @@ void vh_cache_store(VhTransaction *t)
 	g_first = entry;
 	g_used += (uint32_t)cost;
 	vh_unlock();
-	VITALS_LOG("transaction %p: response kept in the cache (%u bytes)", (void *)t, (unsigned)cost);
+	VITALS_VERBOSE("transaction %p: response kept in the cache (%u bytes)", (void *)t, (unsigned)cost);
 }
 
 /* At cellHttpEnd: the cache's memory is libhttp's heap's */

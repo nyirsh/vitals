@@ -63,7 +63,7 @@ int cellSslEnd(void)
 #if VITALS_DEBUG >= 1
 	VitalsPoolUse use;
 	if (vitals_pool_use(&use) == 0)
-		VITALS_LOG("cellSslEnd: pool of %u bytes, at most %u used, %u allocations refused", (unsigned)use.size,
+		VITALS_VERBOSE("cellSslEnd: pool of %u bytes, at most %u used, %u allocations refused", (unsigned)use.size,
 		       (unsigned)(use.size - use.lowest_free), (unsigned)use.refused);
 #endif
 	g_initialized = 0;

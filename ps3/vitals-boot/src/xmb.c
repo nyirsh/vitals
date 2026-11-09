@@ -212,7 +212,7 @@ static void free_now(const char *when)
 {
 	uint32_t total = 0, available = 0;
 	memory_size(&total, &available);
-	VITALS_LOG("%s %08X", when, (unsigned)(available));
+	VITALS_VERBOSE("%s %08X", when, (unsigned)(available));
 }
 #endif
 
@@ -305,10 +305,10 @@ static int load(const XmbLibrary *library, sysPrxId *id, VitalsXmbRequest *reque
 	VITALS_VERBOSE("xmb: started:" " %08X", (unsigned)((uint32_t)rc));
 	uint32_t total = 0, available = 0;
 	memory_size(&total, &available);
-	VITALS_LOG("xmb: free with it loaded (bytes):" " %08X", (unsigned)(available));
+	VITALS_VERBOSE("xmb: free with it loaded (bytes):" " %08X", (unsigned)(available));
 	if (rc != 0 || request->count < library->count) {
 		VITALS_LOG("xmb: it didn't give its functions:" " %08X", (unsigned)((uint32_t)rc));
-		VITALS_LOG("xmb: functions given:" " %08X", (unsigned)(request->count));
+		VITALS_VERBOSE("xmb: functions given:" " %08X", (unsigned)(request->count));
 		return XMB_FAILED;
 	}
 	for (uint32_t i = 0; i < library->count; ++i)
@@ -324,9 +324,9 @@ static void unload(sysPrxId id)
 {
 	s32 result = 0;
 	s32 rc = sysPrxStopModule(id, 0, NULL, &result, 0, NULL);
-	VITALS_LOG("xmb: stopped:" " %08X", (unsigned)((uint32_t)rc));
+	VITALS_VERBOSE("xmb: stopped:" " %08X", (unsigned)((uint32_t)rc));
 	rc = sysPrxUnloadModule(id, 0, NULL);
-	VITALS_LOG("xmb: unloaded:" " %08X", (unsigned)((uint32_t)rc));
+	VITALS_VERBOSE("xmb: unloaded:" " %08X", (unsigned)((uint32_t)rc));
 }
 
 /* What the thread did, for the popup; XMB_PENDING until it's done */
@@ -378,15 +378,15 @@ static void __attribute__((noreturn)) watch(const XmbLibrary *const *libraries, 
 {
 	uint32_t total = 0, last = 0, steps = 0;
 	memory_size(&total, &last);
-	VITALS_LOG("xmb: watching; free now (bytes):" " %08X", (unsigned)(last));
+	VITALS_VERBOSE("xmb: watching; free now (bytes):" " %08X", (unsigned)(last));
 	int code_ok[2] = {1, 1}, module_ok[2] = {1, 1};
 	for (;;) {
 		lv2syscall1(LV2_TIMER_USLEEP, WATCH_STEP_US);
 		uint32_t available = 0;
 		memory_size(&total, &available);
 		if (available + WATCH_MEMORY_STEP <= last || available >= last + WATCH_MEMORY_STEP) {
-			VITALS_LOG("xmb: watch: the XMB's free memory is now (bytes)" " %08X", (unsigned)(available));
-			VITALS_LOG("xmb: watch: of (bytes)" " %08X", (unsigned)(total));
+			VITALS_VERBOSE("xmb: watch: the XMB's free memory is now (bytes)" " %08X", (unsigned)(available));
+			VITALS_VERBOSE("xmb: watch: of (bytes)" " %08X", (unsigned)(total));
 			last = available;
 		}
 		for (unsigned l = 0; l < count && l < 2; ++l) {
@@ -496,7 +496,7 @@ static int load_and_patch(void)
 	}
 	uint32_t total = 0, available = 0;
 	memory_size(&total, &available);
-	VITALS_LOG("xmb: the XMB's memory, free before vitals' libssl (bytes):" " %08X", (unsigned)(available));
+	VITALS_VERBOSE("xmb: the XMB's memory, free before vitals' libssl (bytes):" " %08X", (unsigned)(available));
 #ifdef VITALS_XMB_WATCH_ONLY
 	VITALS_LOG("xmb: watch only: nothing loaded into the XMB");
 	return XMB_DRY_RUN;

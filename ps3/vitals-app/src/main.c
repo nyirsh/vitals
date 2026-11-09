@@ -17,7 +17,7 @@ SYS_PROCESS_PARAM(1001, 0x100000);
 int main(int argc, char **argv)
 {
 	app_log_start();
-	VITALS_LOG_ALWAYS("vitals app %s starting, argv[0] %s", VITALS_VERSION, argc > 0 && argv != NULL && argv[0] != NULL ? argv[0] : "-");
+	VITALS_LOG("vitals app %s starting, argv[0] %s", VITALS_VERSION, argc > 0 && argv != NULL && argv[0] != NULL ? argv[0] : "-");
 	if (argc > 0 && argv != NULL && argv[0] != NULL)
 		vitals_install_set_source(argv[0]);
 	CellFsStat status;

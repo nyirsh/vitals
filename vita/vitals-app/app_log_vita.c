@@ -6,7 +6,8 @@ void app_log_start(void)
 {
 }
 
-void app_log(const char *format, ...)
+void app_log(int level, const char *format, ...)
 {
+    (void)level;
     (void)format;
 }

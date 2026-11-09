@@ -449,7 +449,7 @@ static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date
 /* curl's notes on the download, into the app's log */
 static void log_line(const char *line)
 {
-	VITALS_LOG_ALWAYS("%s", line);
+	VITALS_LOG("%s", line);
 }
 
 /* The update, through curl on the app's own Mbed TLS, trusting only the Mozilla bundle the app carries,
@@ -534,7 +534,7 @@ int vitals_update_certificates(VitalsNote note)
 void vitals_reboot(void)
 {
 	int rc = cellFsUnlink(TURNOFF_MARKER);
-	VITALS_LOG_ALWAYS("reboot: %s 0x%08X", TURNOFF_MARKER, (unsigned)rc);
+	VITALS_LOG("reboot: %s 0x%08X", TURNOFF_MARKER, (unsigned)rc);
 	/* sys_sm_shutdown: 0x1200 is a hard reboot, as webMAN MOD's /restart.ps3?hard */
 	lv2syscall3(379, 0x1200, 0, 0);
 }

@@ -306,7 +306,7 @@ int sceHttpParseResponseHeader(const char *header, unsigned int headerLen, const
         return (int)SCE_HTTP_ERROR_PARSE_HTTP_INVALID_VALUE;
     int result = find_field(header, headerLen, fieldStr, &start, &finish);
     if (result < 0) {
-        VITALS_LOG("header %s not found", fieldStr);
+        VITALS_VERBOSE("header %s not found", fieldStr);
         return result;
     }
     *fieldValue = header + start;

@@ -9,6 +9,6 @@
 
 /* Starts the log afresh */
 void app_log_start(void);
-void app_log(const char *format, ...) __attribute__((format(printf, 1, 2)));
+void app_log(int level, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 #endif

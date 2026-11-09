@@ -141,7 +141,7 @@ static int ensure_library(void) {
     int result = sceSslInternalIsInitalized();
     if (result == 0) return 0;
     result = sceSslInit(VITALS_BROWSER_SSL_POOL_BYTES);
-    VITALS_LOG("browser libssl pool=%u rc=0x%08X", VITALS_BROWSER_SSL_POOL_BYTES, (unsigned int)result);
+    VITALS_VERBOSE("browser libssl pool=%u rc=0x%08X", VITALS_BROWSER_SSL_POOL_BYTES, (unsigned int)result);
     return result;
 }
 
