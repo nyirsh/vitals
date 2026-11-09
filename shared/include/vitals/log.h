@@ -1,8 +1,8 @@
 #ifndef VITALS_SHARED_LOG_H
 #define VITALS_SHARED_LOG_H
 
-/* The log of every part of vitals, on both consoles. A line is "<name>: <text>", name being the
- * component's: vitals-boot, vitals-dns, vitals-http, vitals-ssl, vitals-browser or vitals-app.
+/* The log of every part of vitals, on both consoles. A line is "<name>: [<ms> ms] <text>", ms counted
+ * from the console's boot on the same clock everywhere on that console, and name being the component's: vitals-boot, vitals-dns, vitals-http, vitals-ssl, vitals-browser or vitals-app.
  *
  * A build sets VITALS_LOG_NAME and VITALS_DEBUG (make DEBUG=<level>), then uses:
  *   VITALS_LOG(format, ...)      from level 1: the calls, with their results, start-up and failures

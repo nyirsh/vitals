@@ -9,6 +9,7 @@
 
 #include <ppu-lv2.h>
 
+#include "vitals_log_format.h"
 #include "vitals_paths.h"
 
 #define VITALS_LOG_PATH VITALS_LOG_FILE
@@ -53,10 +54,12 @@ static inline void vitals_log_close(int fd)
 	lv2syscall1(VITALS_LV2_FS_CLOSE, fd);
 }
 
-/* "<who>: <text>\n" */
+/* "<who>: [<ms> ms] <text>\n" */
 static inline void vitals_log(const char *who, const char *text)
 {
-	const char *parts[] = {who, ": ", text, "\n"};
+	char stamp[32];
+	vitals_log_stamp(stamp, sizeof(stamp), vitals_log_now_ms());
+	const char *parts[] = {who, ": ", stamp, text, "\n"};
 	int fd = vitals_log_open();
 	for (unsigned i = 0; i < sizeof(parts) / sizeof(parts[0]); ++i) {
 		uint32_t length = vitals_log_length(parts[i]);

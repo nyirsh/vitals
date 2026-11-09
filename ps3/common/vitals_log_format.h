@@ -8,6 +8,41 @@
 #include <stdarg.h>
 #include <stdint.h>
 
+/* "[<ms> ms] " into out, which always ends in a NUL; how many characters are in it */
+static inline uint32_t vitals_log_stamp(char *out, uint32_t size, uint64_t ms)
+{
+	char digits[21];
+	const char *const tail = " ms] ";
+	uint32_t count = 0, used = 0;
+	do {
+		digits[count++] = (char)('0' + ms % 10);
+		ms /= 10;
+	} while (ms != 0);
+	if (used + 1 < size)
+		out[used++] = '[';
+	while (count > 0 && used + 1 < size)
+		out[used++] = digits[--count];
+	for (const char *c = tail; *c != '\0' && used + 1 < size; ++c)
+		out[used++] = *c;
+	if (size > 0)
+		out[used] = '\0';
+	return used;
+}
+
+#if defined(__powerpc64__)
+/* Milliseconds since boot, from the CPU's timebase (79.8 MHz on every PS3): needs no call, so the
+ * kernel plugin, the boot plugin and the modules all read the one clock. Cell's mftb can read 0 at
+ * the moment its low half carries, hence the loop */
+static inline uint64_t vitals_log_now_ms(void)
+{
+	uint64_t ticks;
+	do {
+		__asm__ volatile("mftb %0" : "=r"(ticks));
+	} while (ticks == 0);
+	return ticks / 79800;
+}
+#endif
+
 static inline uint32_t vitals_log_vformat(char *out, uint32_t size, const char *format, va_list arguments)
 {
 	uint32_t used = 0;

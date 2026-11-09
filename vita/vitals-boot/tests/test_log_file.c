@@ -14,6 +14,7 @@
 #include <string.h>
 
 int syscall_depth;
+long long ksceKernelGetSystemTimeWide(void) { return 1234000; }
 static int mounted, flag, console_lines, opens;
 static char file[0x40000], old_file[0x40000], console[1024];
 static size_t file_size, old_size;
@@ -142,8 +143,8 @@ int main(void)
 	vitals_log_file_start();
 
 	/* ux0: not there yet: the console has the line, and the ring keeps it */
-	vitals_log_kernel("vitals-boot: first %d\n", 1);
-	assert(console_lines == 1 && strcmp(console, "vitals-boot: first 1\n") == 0);
+	vitals_log_kernel("vitals-boot", "first %d\n", 1);
+	assert(console_lines == 1 && strcmp(console, "vitals-boot: [1234 ms] first 1\n") == 0);
 	assert(vitals_log_write("vitals-http: early\n", 19) == 0);
 	vitals_log_file_step();
 	assert(file_size == 0 && opens == 0);
@@ -156,15 +157,15 @@ int main(void)
 	file_size = 12;
 	vitals_log_file_step();
 	assert(old_size == 12 && memcmp(old_file, "last boot's\n", 12) == 0);
-	assert(in_file("vitals-boot: first 1\n") && in_file("vitals-http: early\n") && !in_file("last boot's"));
+	assert(in_file("vitals-boot: [1234 ms] first 1\n") && in_file("vitals-http: early\n") && !in_file("last boot's"));
 
 	/* From now on the file alone takes them */
 	console_lines = 0;
-	vitals_log_kernel("vitals-dns: query %s\n", "a.example");
+	vitals_log_kernel("vitals-dns", "query %s\n", "a.example");
 	assert(vitals_log_write("vitals-ssl: hello\n", 18) == 1);
 	assert(console_lines == 0);
 	vitals_log_file_step();
-	assert(in_file("vitals-dns: query a.example\n") && in_file("vitals-ssl: hello\n"));
+	assert(in_file("vitals-dns: [1234 ms] query a.example\n") && in_file("vitals-ssl: hello\n"));
 	/* Kept once per boot only */
 	assert(old_size == 12);
 
@@ -173,7 +174,7 @@ int main(void)
 	memset(big, 'x', sizeof(big) - 1);
 	big[sizeof(big) - 1] = '\0';
 	size_t before = file_size;
-	vitals_log_kernel("%s\n", big);
+	vitals_log_kernel("vitals-boot", "%s\n", big);
 	vitals_log_file_step();
 	assert(file_size - before == VITALS_LOG_LINE_MAX - 1 && file[file_size - 1] == '\n');
 
@@ -185,7 +186,7 @@ int main(void)
 	for (int i = 0; i < 400; ++i)
 		vitals_log_file_put(line, 200);
 	vitals_log_file_step();
-	assert(in_file("vitals-boot: 73 lines lost, too many at once\n"));
+	assert(in_file("vitals-boot: [1234 ms] 73 lines lost, too many at once\n"));
 	puts("log file: waits for ux0:, keeps the last boot's, takes lines, cuts long ones, counts lost ones PASS");
 	return 0;
 }

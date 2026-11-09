@@ -1,6 +1,7 @@
 /* The screen, pads and XMB callbacks, as PS3DK's hello-ppu-font-render sets the RSX up: two display
  * buffers in RSX memory, flipped on vertical blank */
 
+#include "vitals_log_format.h"
 #include "platform.h"
 
 #include "vitals/log.h"
@@ -452,7 +453,8 @@ void platform_sleep_ms(unsigned ms)
 
 uint64_t platform_now_ms(void)
 {
-	return (uint64_t)sys_time_get_system_time() / 1000;
+	/* The clock the modules' log lines use (vitals_log_format.h) */
+	return vitals_log_now_ms();
 }
 
 

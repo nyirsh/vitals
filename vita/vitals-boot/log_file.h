@@ -14,7 +14,7 @@ void vitals_log_file_stop(void);
 /* One pass of the thread: find out the choice, write what's waiting; for the host tests too */
 void vitals_log_file_step(void);
 /* The kernel plugin's own lines (vitals_log_sink.h) */
-void vitals_log_kernel(const char *format, ...) __attribute__((format(printf, 1, 2)));
+void vitals_log_kernel(const char *name, const char *format, ...) __attribute__((format(printf, 2, 3)));
 /* The line (with its line break) kept for the file: 1 when the file alone takes it */
 int vitals_log_file_put(const char *text, unsigned int length);
 

@@ -55,6 +55,14 @@ int main(void)
 	/* A NULL string doesn't crash the plugin */
 	const char *none = NULL;
 	assert(into(sizeof(ours), "[%s]", none) == 8 && strcmp(ours, "[(null)]") == 0);
+
+	char stamp[32];
+	assert(vitals_log_stamp(stamp, sizeof(stamp), 0) == 7);
+	assert(strcmp(stamp, "[0 ms] ") == 0);
+	vitals_log_stamp(stamp, sizeof(stamp), 18446744073709551615ULL);
+	assert(strcmp(stamp, "[18446744073709551615 ms] ") == 0);
+	/* Cut to the room there is, still ended */
+	assert(vitals_log_stamp(stamp, 4, 12345) == 3 && strcmp(stamp, "[12") == 0);
 	puts("log format: printf's output for the plugins' formats, sizes PASS");
 	return 0;
 }

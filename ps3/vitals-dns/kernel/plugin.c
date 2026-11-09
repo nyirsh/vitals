@@ -238,6 +238,7 @@ void vitals_log_plain(const char *format, ...)
 	uint32_t used = 0;
 	for (const char *name = VITALS_LOG_NAME ": "; *name != '\0'; ++name)
 		line[used++] = *name;
+	used += vitals_log_stamp(line + used, sizeof(line) - used, vitals_log_now_ms());
 	va_list arguments;
 	va_start(arguments, format);
 	used += vitals_log_vformat(line + used, sizeof(line) - used - 1, format, arguments);

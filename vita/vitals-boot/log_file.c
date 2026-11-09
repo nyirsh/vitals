@@ -74,15 +74,25 @@ int vitals_log_file_put(const char *text, unsigned int length)
     return g_mode == MODE_FILE;
 }
 
-void vitals_log_kernel(const char *format, ...)
+/* Milliseconds since boot, the clock the app's and the modules' lines use */
+static unsigned int now_ms(void)
+{
+    return (unsigned int)((unsigned long long)ksceKernelGetSystemTimeWide() / 1000u);
+}
+
+void vitals_log_kernel(const char *name, const char *format, ...)
 {
     char line[VITALS_LOG_LINE_MAX];
+    int used = snprintf(line, sizeof(line), "%s: [%u ms] ", name, now_ms());
+    if (used < 0)
+        return;
     va_list arguments;
     va_start(arguments, format);
-    int length = vsnprintf(line, sizeof(line), format, arguments);
+    int length = vsnprintf(line + used, sizeof(line) - (size_t)used, format, arguments);
     va_end(arguments);
     if (length < 0)
         return;
+    length += used;
     if ((unsigned int)length >= sizeof(line))
     {
         /* Cut, still a line */
@@ -163,7 +173,7 @@ static void write_waiting(void)
         if (dropped != 0)
         {
             char note[64];
-            int length = snprintf(note, sizeof(note), "vitals-boot: %u lines lost, too many at once\n", dropped);
+            int length = snprintf(note, sizeof(note), "vitals-boot: [%u ms] %u lines lost, too many at once\n", now_ms(), dropped);
             if (length > 0)
                 (void)ksceIoWrite(fd, note, (unsigned int)length);
         }
