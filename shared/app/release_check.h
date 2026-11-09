@@ -21,6 +21,8 @@ void release_check_start(void);
 /* The latest release's number once the check found one ("2.2"), NULL until then and when it found
  * none */
 const char *release_check_latest(void);
+/* 1 from the app's start until the check has ended, with a release or without one, stopped included */
+int release_check_searching(void);
 /* Ends the check at once and waits for its thread, before anything else uses the network: the test,
  * an operation, the app exiting. Nothing when it isn't running */
 void release_check_stop(void);

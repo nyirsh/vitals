@@ -80,7 +80,7 @@ static AppStatus status(void)
 {
 	AppStatus s = {installed, outdated, installed_version,
 	               installed && !outdated && debug_level > 0 ? debug_names[debug_level] : NULL, console_system_text(),
-	               newer_release()};
+	               newer_release(), release_check_searching()};
 	return s;
 }
 
@@ -559,6 +559,7 @@ static void run_menu(void)
 	 * the menu is drawn again when it finds one */
 	int release_check = 0;
 	const char *shown_release = NULL;
+	int shown_searching = 1;
 	for (;;) {
 		if (refresh) {
 			refresh_state();
@@ -631,8 +632,9 @@ static void run_menu(void)
 			release_check_start();
 			release_check = 1;
 		}
-		if (newer_release() != shown_release) {
+		if (newer_release() != shown_release || release_check_searching() != shown_searching) {
 			shown_release = newer_release();
+			shown_searching = release_check_searching();
 			redraw = 1;
 		}
 		int direction = check_scroll_direction(pad.buttons & PAD_UP, pad.buttons & PAD_DOWN, pad.left_y, pad.right_y);

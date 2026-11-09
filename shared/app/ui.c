@@ -434,17 +434,19 @@ static void header(uint32_t *p, const AppStatus *s)
 	rect(p, 0, 0, CHECK_WIDTH, CHECK_HEIGHT, bg);
 	text(p, X(28), Y(17), "vitals", white, 32);
 	/* The version beside the name, on its baseline */
-	text(p, X(28) + width("vitals", 32) + 12, Y(33), VITALS_VERSION, muted, 17);
-	/* The console under them, then a newer release when there is one */
-	int has_console = s->console != NULL && s->console[0] != '\0', left = X(30);
-	if (has_console) {
-		text(p, left, Y(58), s->console, muted, 17);
-		left += width(s->console, 17);
-	}
+	int left = X(28) + width("vitals", 32) + 12;
+	text(p, left, Y(33), VITALS_VERSION, muted, 17);
+	/* After it, the check for a newer release: going, or what it found */
+	left += width(VITALS_VERSION, 17) + 8;
 	if (s->latest_release != NULL) {
-		snprintf(line, sizeof(line), "%s%s available on GitHub / GitLab", has_console ? "  -  " : "", s->latest_release);
-		text(p, left, Y(58), line, amber, 17);
+		snprintf(line, sizeof(line), "(Version %s available)", s->latest_release);
+		text(p, left, Y(33), line, amber, 17);
+	} else if (s->searching_release) {
+		text(p, left, Y(33), "(Looking for updates...)", muted, 17);
 	}
+	/* The console under them */
+	if (s->console != NULL && s->console[0] != '\0')
+		text(p, X(30), Y(58), s->console, muted, 17);
 	char status[48];
 	int known = s->installed_version != NULL && s->installed_version[0] != '\0';
 	if (s->outdated && known && strcmp(s->installed_version, VITALS_VERSION) != 0)

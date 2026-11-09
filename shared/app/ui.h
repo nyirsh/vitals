@@ -77,8 +77,10 @@ typedef struct {
 	const char *debug_output;
 	/* What the console runs ("4.93 CEX, Cobra 8.5"), after the version; NULL when unknown */
 	const char *console;
-	/* A newer published release than this app ("2.2"), shown after the console; NULL for none */
+	/* A newer published release than this app ("2.2"), shown after the version; NULL for none */
 	const char *latest_release;
+	/* The check for one is still going, which the same place says */
+	int searching_release;
 } AppStatus;
 
 typedef struct {

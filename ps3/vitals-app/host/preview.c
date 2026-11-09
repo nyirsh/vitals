@@ -82,12 +82,12 @@ int main(int argc, char **argv)
 	    {"Changelog", "What changed in each version of vitals", NULL, 0, 0, 0, APP_TONE_USUAL, NULL, 0},
 	    {"Exit", "", NULL, 0, 0, 0, APP_TONE_USUAL, NULL, 0},
 	};
-	AppHome home = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5", NULL}, NULL, NULL, fresh, 4, 0, NULL, 0};
+	AppHome home = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5", NULL, 0}, NULL, NULL, fresh, 4, 0, NULL, 0};
 	app_draw_home(canvas, &home);
 	save(out, "home-not-installed");
 
 	/* An unsupported system: nothing to install */
-	AppHome unsupported = {{0, 0, "", NULL, "4.92 CEX, PS3HEN 3.4.1", NULL},
+	AppHome unsupported = {{0, 0, "", NULL, "4.92 CEX, PS3HEN 3.4.1", NULL, 0},
 	                       "This system isn't supported",
 	                       "4.92 CEX, PS3HEN 3.4.1. vitals is made for 4.93 CEX with Cobra, so it can't be installed here",
 	                       fresh + 1, 3, 0, NULL, 0};
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 	    {APP_GLYPH_CONFIRM, APP_GLYPH_NONE, "Select"},
 	    {APP_GLYPH_BACK, APP_GLYPH_NONE, "Exit"},
 	};
-	AppHome home2 = {{1, 0, "2.0", "Basic debug", "4.93 CEX, Cobra 8.5", NULL}, NULL, NULL, installed, 7, 0, operating, 3};
+	AppHome home2 = {{1, 0, "2.0", "Basic debug", "4.93 CEX, Cobra 8.5", NULL, 0}, NULL, NULL, installed, 7, 0, operating, 3};
 	app_draw_home(canvas, &home2);
 	save(out, "home-installed");
 
@@ -117,6 +117,12 @@ int main(int argc, char **argv)
 	newer.status.latest_release = "2.2";
 	app_draw_home(canvas, &newer);
 	save(out, "home-newer-release");
+
+	/* Still looking for one */
+	AppHome searching = home2;
+	searching.status.searching_release = 1;
+	app_draw_home(canvas, &searching);
+	save(out, "home-searching-release");
 
 	static const AppMenuItem options[] = {
 	    {"TLS", "vitals TLS enabled", "On", 1, 1, 0, APP_TONE_USUAL, NULL, 0},
@@ -131,7 +137,7 @@ int main(int argc, char **argv)
 	    {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"},
 	};
 
-	AppOptions screen = {{1, 0, "2.0", "Basic debug", "4.93 CEX, Cobra 8.5", NULL}, options, 5, 0, switching, 3};
+	AppOptions screen = {{1, 0, "2.0", "Basic debug", "4.93 CEX, Cobra 8.5", NULL, 0}, options, 5, 0, switching, 3};
 	app_draw_options(canvas, &screen);
 	save(out, "options");
 	screen.selected = 4;
@@ -145,7 +151,7 @@ int main(int argc, char **argv)
 	                                       "Copied vitals_dns-debug2.bin to /dev_hdd0/vitals/system/vitals_dns.bin",
 	                                       "The log will be /dev_hdd0/vitals/logs/vitals.log"};
 	static const AppHint rebooting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "The console reboots by itself."};
-	AppTask apply = {{1, 0, "2.0", "Full debug", "4.93 CEX, Cobra 8.5", NULL}, "Applying options", applying, 7, CHECK_PASS, "Done. Rebooting in 3 seconds...",
+	AppTask apply = {{1, 0, "2.0", "Full debug", "4.93 CEX, Cobra 8.5", NULL, 0}, "Applying options", applying, 7, CHECK_PASS, "Done. Rebooting in 3 seconds...",
 	                 &rebooting, 1};
 	app_draw_task(canvas, &apply);
 	save(out, "options-applying");
@@ -155,11 +161,11 @@ int main(int argc, char **argv)
 	                                    "Copying Mozilla's certificates to /dev_hdd0/vitals/system/mozilla-certs.pem",
 	                                    "Adding vitals to /dev_hdd0/boot_plugins.txt"};
 	static const AppHint waiting = {APP_GLYPH_NONE, APP_GLYPH_NONE, "Please wait and keep your PS3 turned on."};
-	AppTask task = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5", NULL}, "Installing vitals", lines, 4, CHECK_RUNNING, "Working...", &waiting, 1};
+	AppTask task = {{0, 0, "", NULL, "4.93 CEX, Cobra 8.5", NULL, 0}, "Installing vitals", lines, 4, CHECK_RUNNING, "Working...", &waiting, 1};
 	app_draw_task(canvas, &task);
 	save(out, "task-running");
 	static const AppHint done[] = {{APP_GLYPH_START, APP_GLYPH_NONE, "Reboot now"}, {APP_GLYPH_BACK, APP_GLYPH_NONE, "Later"}};
-	AppTask finished = {{1, 0, "2.0", NULL, "4.93 CEX, Cobra 8.5", NULL}, "Installing vitals", lines, 4, CHECK_PASS,
+	AppTask finished = {{1, 0, "2.0", NULL, "4.93 CEX, Cobra 8.5", NULL, 0}, "Installing vitals", lines, 4, CHECK_PASS,
 	                    "Done. Reboot the console to start vitals.", done, 2};
 	app_draw_task(canvas, &finished);
 	save(out, "task-done");
@@ -175,7 +181,7 @@ int main(int argc, char **argv)
 		static ChangelogLine laid[128];
 		size_t count = vitals_changelog_layout(text, length, measure, APP_CHANGELOG_WIDTH, APP_CHANGELOG_ITEM_WIDTH,
 		                                       laid, 128);
-		AppChangelog view = {{1, 0, "2.0", NULL, "4.93 CEX, Cobra 8.5", NULL}, "Changelog", laid, (unsigned)count, 0};
+		AppChangelog view = {{1, 0, "2.0", NULL, "4.93 CEX, Cobra 8.5", NULL, 0}, "Changelog", laid, (unsigned)count, 0};
 		app_draw_changelog(canvas, &view);
 		save(out, "changelog");
 	}
@@ -190,7 +196,7 @@ int main(int argc, char **argv)
 		static ChangelogLine credit_lines[128];
 		size_t credit_count = vitals_changelog_layout(text, length, measure, APP_CHANGELOG_WIDTH, APP_CHANGELOG_ITEM_WIDTH,
 		                                              credit_lines, 128);
-		AppChangelog credits = {{1, 0, "2.0", NULL, "4.93 CEX, Cobra 8.5", NULL}, "Credits", credit_lines, (unsigned)credit_count, 0};
+		AppChangelog credits = {{1, 0, "2.0", NULL, "4.93 CEX, Cobra 8.5", NULL, 0}, "Credits", credit_lines, (unsigned)credit_count, 0};
 		app_draw_changelog(canvas, &credits);
 		save(out, "credits");
 	}

@@ -43,6 +43,14 @@ void release_check_start(void)
 	cancel = 0;
 	/* curl's TLS handshake runs deep */
 	thread = platform_thread_start("vitals release check", run, NULL, 256 * 1024);
+	/* No thread, no check: nothing is being looked for */
+	if (thread == NULL)
+		__atomic_store_n(&done, 1, __ATOMIC_RELEASE);
+}
+
+int release_check_searching(void)
+{
+	return !__atomic_load_n(&done, __ATOMIC_ACQUIRE);
 }
 
 const char *release_check_latest(void)
