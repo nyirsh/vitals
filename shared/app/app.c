@@ -147,6 +147,8 @@ static void draw_task(void)
 
 static void task_note(const char *line)
 {
+	/* What an operation shows on the screen, step by step, as the log's details */
+	VITALS_VERBOSE("step: %s", line);
 	if (task.count == TASK_MAX_LINES) {
 		memmove(task_lines[0], task_lines[1], sizeof(task_lines[0]) * (TASK_MAX_LINES - 1));
 		--task.count;

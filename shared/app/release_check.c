@@ -3,6 +3,7 @@
 
 #include "release_check.h"
 
+#include "vitals/log.h"
 #include "console.h"
 #include "platform.h"
 #include "vitals_paths.h"
@@ -32,6 +33,7 @@ static void run(void *argument)
 	if (length > 0 && (size_t)length < CA_BUNDLE_LIMIT && console_network_start(stopped) == 0 &&
 	    vitals_release_fetch(ca, (size_t)length, "vitals/" VITALS_VERSION, &cancel, version, sizeof(version)) == 0)
 		memcpy(latest, version, sizeof(latest));
+	VITALS_VERBOSE("release check: %s", latest[0] != '\0' ? latest : "no answer");
 	free(ca);
 	__atomic_store_n(&done, 1, __ATOMIC_RELEASE);
 }
