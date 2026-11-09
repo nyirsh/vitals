@@ -433,14 +433,16 @@ static void header(uint32_t *p, const AppStatus *s)
 	char line[112];
 	rect(p, 0, 0, CHECK_WIDTH, CHECK_HEIGHT, bg);
 	text(p, X(28), Y(17), "vitals", white, 32);
-	if (s->console != NULL && s->console[0] != '\0')
-		snprintf(line, sizeof(line), "Version %s, on %s", VITALS_VERSION, s->console);
-	else
-		snprintf(line, sizeof(line), "Version %s", VITALS_VERSION);
-	text(p, X(30), Y(58), line, muted, 17);
+	/* The version beside the name, on its baseline */
+	text(p, X(28) + width("vitals", 32) + 12, Y(33), VITALS_VERSION, muted, 17);
+	/* The console under them, then a newer release when there is one */
+	int has_console = s->console != NULL && s->console[0] != '\0', left = X(30);
+	if (has_console) {
+		text(p, left, Y(58), s->console, muted, 17);
+		left += width(s->console, 17);
+	}
 	if (s->latest_release != NULL) {
-		int left = X(30) + width(line, 17);
-		snprintf(line, sizeof(line), "  -  %s available on GitHub / GitLab", s->latest_release);
+		snprintf(line, sizeof(line), "%s%s available on GitHub / GitLab", has_console ? "  -  " : "", s->latest_release);
 		text(p, left, Y(58), line, amber, 17);
 	}
 	char status[48];
