@@ -1,5 +1,6 @@
 #ifndef VITALS_KERNEL_MOCK_H
 #define VITALS_KERNEL_MOCK_H
+#include <stdio.h>
 #include <vita_mock.h>
 #include <assert.h>
 #include <psp2common/kernel/modulemgr.h>
@@ -29,6 +30,10 @@ SceUID ksceIoOpenForPid(SceUID, const char *, int, unsigned int);
 int ksceIoGetstatByFd(SceUID, SceIoStat *);
 int ksceIoRead(int, void *, unsigned int);
 int ksceIoClose(int);
+int ksceIoWrite(int, const void *, unsigned int);
+int ksceIoMkdir(const char *, int);
+int ksceIoRemove(const char *);
+int ksceIoRename(const char *, const char *);
 int ksceIoGetstat(const char *, SceIoStat *);
 int ksceIoPwrite(SceUID, const void *, SceSize, SceOff);
 int ksceIoPread(SceUID, void *, SceSize, SceOff);

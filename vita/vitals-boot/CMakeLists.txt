@@ -29,6 +29,7 @@ add_executable(vitals.elf
 	hook_guard.c
 	post_start.c
 	redirects.c
+	log_file.c
 	../vitals-dns/dns_watch.c
 	../../shared/dns/dns_message.c
 	tls13_loader.c

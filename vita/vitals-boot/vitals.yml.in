@@ -19,3 +19,7 @@ vitals_kernel:
       syscall: true
       functions:
         - vitals_ca_read
+    vitals_log:
+      syscall: true
+      functions:
+        - vitals_log_write

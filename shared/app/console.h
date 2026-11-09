@@ -87,6 +87,9 @@ typedef struct {
 /* How many there are (none on a console without them) */
 unsigned console_switch_count(void);
 const ConsoleSwitch *console_switch(unsigned index);
+/* Where the debug output's lines go: its own switch, which the Options show only while the debug
+ * output isn't Off */
+const ConsoleSwitch *console_log_switch(void);
 /* A flag file: 1 when it's there; and writing it (empty, its folders too) or deleting it: 0, or the
  * error */
 int console_flag_exists(const char *path);

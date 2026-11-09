@@ -220,7 +220,8 @@ static int run_operation(enum Action action)
  * then the debug output's builds when the level changed; when all of it worked, the console reboots
  * after APPLY_REBOOT_SECONDS. Returns -1 when the system asks the app to quit, else 0 (after a
  * failure, once Back is pressed) */
-static int run_apply_options(unsigned switch_count, const unsigned *state, const unsigned *saved)
+static int run_apply_options(unsigned switch_count, const unsigned *state, const unsigned *saved, unsigned log_state,
+                             unsigned log_saved)
 {
 	for (unsigned i = 0; i < TASK_MAX_LINES; ++i)
 		task_line_pointers[i] = task_lines[i];
@@ -239,6 +240,12 @@ static int run_apply_options(unsigned switch_count, const unsigned *state, const
 		VITALS_LOG_ALWAYS("options: %s (0x%08X)", line, (unsigned)rc);
 		if (rc != 0)
 			result = rc;
+	}
+	if (result >= 0 && log_state != log_saved) {
+		changed = 1;
+		result = switch_apply(console_log_switch(), log_state, console_flag_set, line, sizeof(line));
+		task_note(line);
+		VITALS_LOG_ALWAYS("options: %s (0x%08X)", line, (unsigned)result);
 	}
 	if (result >= 0 && debug_choice != debug_level) {
 		changed = 1;
@@ -288,9 +295,10 @@ static int run_options(void)
 	unsigned switch_count = console_switch_count();
 	if (switch_count > SWITCH_MAX)
 		switch_count = SWITCH_MAX;
-	/* The switches, then the debug output */
-	const unsigned option_count = switch_count + 1, debug_option = switch_count;
-	unsigned selected = 0;
+	/* The switches, then the debug output, then where its lines go while it isn't Off */
+	const ConsoleSwitch *logs = console_log_switch();
+	const unsigned debug_option = switch_count, log_option = switch_count + 1;
+	unsigned selected = 0, log_saved = switch_state(logs, console_flag_exists), log_state = log_saved;
 	int redraw = 1;
 	CheckScrollRepeat repeat = {0};
 	/* What the console has (saved) and what this screen has chosen (state) */
@@ -298,7 +306,8 @@ static int run_options(void)
 	for (unsigned i = 0; i < switch_count; ++i)
 		saved[i] = state[i] = switch_state(console_switch(i), console_flag_exists);
 	for (;;) {
-		AppMenuItem items[SWITCH_MAX + 1];
+		const unsigned option_count = debug_choice != 0 ? log_option + 1 : log_option;
+		AppMenuItem items[SWITCH_MAX + 2];
 		for (unsigned i = 0; i < switch_count; ++i) {
 			const ConsoleSwitch *s = console_switch(i);
 			const ConsoleSwitchState *chosen = &s->states[state[i]];
@@ -316,6 +325,9 @@ static int run_options(void)
 		                                    : debug_choice == 1 ? APP_TONE_ORANGE
 		                                                        : APP_TONE_USUAL,
 		                                    NULL, 0};
+		const ConsoleSwitchState *log_chosen = &logs->states[log_state];
+		items[log_option] = (AppMenuItem){logs->label, log_chosen->meaning, log_chosen->name, log_state == log_saved, log_state == 0,
+		                                  log_state + 1 == logs->state_count, APP_TONE_USUAL, NULL, 0};
 		if (redraw) {
 			static const AppHint hints[] = {
 			    {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Choose"},
@@ -355,12 +367,21 @@ static int run_options(void)
 			++debug_choice;
 			redraw = 1;
 		}
+		if (selected == log_option && (pressed & PAD_LEFT) && log_state > 0) {
+			--log_state;
+			redraw = 1;
+		}
+		if (selected == log_option && (pressed & PAD_RIGHT) && log_state + 1 < logs->state_count) {
+			++log_state;
+			redraw = 1;
+		}
 		if (pressed & PAD_START) {
-			if (run_apply_options(switch_count, state, saved) < 0)
+			if (run_apply_options(switch_count, state, saved, log_state, log_saved) < 0)
 				return -1;
 			/* After a failure: what the console has now */
 			for (unsigned i = 0; i < switch_count; ++i)
 				saved[i] = state[i] = switch_state(console_switch(i), console_flag_exists);
+			log_saved = log_state = switch_state(logs, console_flag_exists);
 			redraw = 1;
 		}
 		if (pressed & back_button) {

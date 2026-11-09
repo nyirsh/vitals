@@ -15,6 +15,8 @@ if(VITALS_ENABLE_SANITIZERS)
     add_link_options(-fsanitize=address,undefined)
 endif()
 enable_testing()
+# No kernel plugin behind the log here: lines go straight to the mock
+add_compile_definitions(VITALS_LOG_CONSOLE_ONLY)
 
 # The plugin builds against vitals' common headers and core code (../../common), and so do its tests
 # (with the redirect lists' code and the DNS messages shared with the PS3, ../../../shared)
@@ -36,7 +38,7 @@ function(plugin_test name test_source plugin_source)
     add_test(NAME ${name} COMMAND ${name}_tests)
 endfunction()
 
-plugin_test(vitals_kernel_route test_route.c post_start.c)
+plugin_test(vitals_kernel_route test_route.c post_start.c log_file.c)
 plugin_test(vitals_hook_guard test_hook_guard.c hook_guard.c)
 plugin_test(vitals_native_module_api test_native_module_api.c native_module_api.c)
 plugin_test(vitals_post_start test_post_start.c post_start.c)
@@ -47,5 +49,8 @@ plugin_test(vitals_dns_watch ${DNS_DIR}/tests/test_dns_watch.c ../vitals-dns/dns
 target_compile_definitions(vitals_dns_watch_tests PRIVATE VITALS_DEBUG=1)
 # Reading the redirect list for games, which may not open it themselves
 plugin_test(vitals_redirects test_redirects.c redirects.c)
+# The debug output's file, as a debug build has it
+plugin_test(vitals_log_file test_log_file.c log_file.c)
+target_compile_definitions(vitals_log_file_tests PRIVATE VITALS_DEBUG=1)
 # The production loader path: name lookups on a dedicated native stack
 plugin_test(vitals_production_context test_production_context.c tls13_loader.c)

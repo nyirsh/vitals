@@ -198,6 +198,18 @@ static const ConsoleSwitch switches[] = {
     {"DNS rules", {VITALS_DNS_OFF, NULL, NULL}, dns_states, 2},
 };
 
+/* The debug console, which a network logger (catlog) reads, or a file */
+static const ConsoleSwitchState log_states[] = {
+    {"Network", "Debug output goes to a network logger", CONSOLE_TONE_USUAL, 0},
+    {"File", "Debug output goes to ux0:data/vitals/logs/vitals.log", CONSOLE_TONE_USUAL, 1},
+};
+static const ConsoleSwitch log_switch = {"Logs", {VITALS_LOG_TO_FILE, NULL, NULL}, log_states, 2};
+
+const ConsoleSwitch *console_log_switch(void)
+{
+    return &log_switch;
+}
+
 unsigned console_switch_count(void)
 {
     return sizeof(switches) / sizeof(switches[0]);

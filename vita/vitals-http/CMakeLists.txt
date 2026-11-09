@@ -55,6 +55,10 @@ add_executable(vitals_libhttp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/host_map.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/redirect_list.c
 )
+# The debug builds' log lines (vitals_log_sink.h)
+if(VITALS_DEBUG GREATER 0)
+    target_sources(vitals_libhttp PRIVATE ${VITALS_COMMON_DIR}/runtime/log_user.c)
+endif()
 target_include_directories(vitals_libhttp PRIVATE src include ${VITALS_SSL_DIR}/include ${VITALS_COMMON_DIR}/runtime
     ${VITALS_COMMON_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libhttp PRIVATE

@@ -31,6 +31,10 @@ add_executable(vitals_libssl
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/ca_scan.c
     ${VITALS_COMMON_DIR}/runtime/user_runtime.c
 )
+# The debug builds' log lines (vitals_log_sink.h)
+if(VITALS_DEBUG GREATER 0)
+    target_sources(vitals_libssl PRIVATE ${VITALS_COMMON_DIR}/runtime/log_user.c)
+endif()
 target_include_directories(vitals_libssl PRIVATE src include ${VITALS_COMMON_DIR}/runtime ${VITALS_COMMON_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libssl PRIVATE

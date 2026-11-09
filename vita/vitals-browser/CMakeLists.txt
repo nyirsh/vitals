@@ -26,6 +26,9 @@ add_executable(vitals
     webkit_callback.c
 )
 # Messages printed by the linked code are shown only at debug level 2
+if(VITALS_DEBUG GREATER 0)
+    target_sources(vitals PRIVATE ${VITALS_COMMON_DIR}/runtime/log_user.c)
+endif()
 if(VITALS_DEBUG LESS 2)
     target_sources(vitals PRIVATE quiet_output.c)
     target_link_options(vitals PRIVATE -Wl,--wrap=printf -Wl,--wrap=puts)

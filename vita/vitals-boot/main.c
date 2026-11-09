@@ -6,6 +6,7 @@
 #define VITALS_LOG_NAME "vitals-boot"
 #define VITALS_LOG_KERNEL
 #include "vitals/log.h"
+#include "log_file.h"
 #include <psp2kern/kernel/debug.h>
 #include <psp2kern/kernel/modulemgr.h>
 #include <psp2kern/kernel/processmgr.h>
@@ -190,6 +191,8 @@ int module_start(SceSize argc, const void *args)
     (void)argc;
     (void)args;
 
+    /* First, as every line from here on goes through it */
+    vitals_log_file_start();
     VITALS_LOG_ALWAYS("module loaded");
     /* The hooks go in whatever is there now: vitals' modules are looked for at each load */
 
@@ -237,5 +240,6 @@ int module_stop(SceSize argc, const void *args)
     vitals_dns_watch_stop();
     (void)vitals_post_start_destroy();
     vitals_kernel_loader_destroy();
+    vitals_log_file_stop();
     return SCE_KERNEL_STOP_SUCCESS;
 }

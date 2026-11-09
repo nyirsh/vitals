@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	    {"DNS rules", "vitals DNS rules disabled", "Off", 0, 0, 1, APP_TONE_RED, NULL, 0},
 	    {"Redirects", "vitals redirects enabled", "On", 1, 1, 0, APP_TONE_USUAL, NULL, 0},
 	    {"Debug output", "Logs calls and connections to /dev_hdd0/vitals/logs/vitals.log", "Basic debug", 1, 0, 0, APP_TONE_ORANGE, NULL, 0},
+	    {"Logs", "Debug output goes to /dev_hdd0/vitals/logs/vitals.log", "File", 1, 1, 1, APP_TONE_USUAL, NULL, 0},
 	};
 	static const AppHint switching[] = {
 	    {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Choose"},
@@ -137,7 +138,7 @@ int main(int argc, char **argv)
 	    {APP_GLYPH_BACK, APP_GLYPH_NONE, "Back"},
 	};
 
-	AppOptions screen = {{1, 0, "2.0", "Basic debug", "4.93 CEX, Cobra 8.5", NULL, 0}, options, 5, 0, switching, 3};
+	AppOptions screen = {{1, 0, "2.0", "Basic debug", "4.93 CEX, Cobra 8.5", NULL, 0}, options, 6, 0, switching, 3};
 	app_draw_options(canvas, &screen);
 	save(out, "options");
 	screen.selected = 4;

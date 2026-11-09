@@ -16,5 +16,7 @@
 #define VITALS_HTTP_OFF VITALS_FLAGS_DIRECTORY "/http.off"
 #define VITALS_DNS_OFF VITALS_FLAGS_DIRECTORY "/dns.off"
 #define VITALS_REDIRECTS_OFF VITALS_FLAGS_DIRECTORY "/redirects.off"
+/* The debug output's lines go to a file rather than the debug console while it's there */
+#define VITALS_LOG_TO_FILE VITALS_FLAGS_DIRECTORY "/log.file"
 
 #endif

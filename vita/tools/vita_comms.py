@@ -6,7 +6,7 @@
     tools/vita_comms.py fetch          copies the app's test reports (ux0:data/vitals/reports, and
                                        ux0:data/vitals from earlier versions), the crash dumps from
                                        ux0:data and any SceWebKit dumps from ux0:data/vitals-dump into
-                                       build/vita-fetch/, leaving them on the Vita
+                                       build/vita-fetch/, leaving them on the Vita; the debug output's log files too
     tools/vita_comms.py status         what's on the Vita now: config.txt, vitals' plugin and modules,
                                        the certificate store, the user's lists and the switches
 
@@ -53,6 +53,8 @@ SWITCHES = [VITALS + "/flags/" + name for name in ("tls.off", "http.off", "dns.o
 FETCH = [
     (VITALS + "/reports", ("connection-test-",), True),
     # Where earlier versions saved them, until the installer moves them to reports/
+    # The debug output's file (Options, Logs: File) and the last boot's
+    (VITALS + "/logs", ("vitals.log",), True),
     (VITALS, ("vitals-testresults-", "browserleaks-"), False),
     ("/ux0:/data", ("psp2core-",), False),
     # A temporary SceWebKit dump, when the folder is there

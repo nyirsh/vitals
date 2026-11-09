@@ -62,6 +62,17 @@ static const ConsoleSwitch switches[] = {
     {"DNS rules", {VITALS_DNS_OFF, NULL, NULL}, dns_states, 2},
 };
 
+/* Only a file here: the PS3 has no way to send its lines over the network */
+static const ConsoleSwitchState log_states[] = {
+    {"File", "Debug output goes to " VITALS_LOG_FILE, CONSOLE_TONE_USUAL, 0},
+};
+static const ConsoleSwitch log_switch = {"Logs", {NULL, NULL, NULL}, log_states, 1};
+
+const ConsoleSwitch *console_log_switch(void)
+{
+	return &log_switch;
+}
+
 unsigned console_switch_count(void)
 {
 	return sizeof(switches) / sizeof(switches[0]);
