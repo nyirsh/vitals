@@ -76,8 +76,8 @@ TOOLCHAIN = /opt/ps3dk-src/cmake/ps3-ppu-toolchain.cmake
 # and ../version.cmake
 DOCKER = docker run --rm -v "$(abspath $(CURDIR)/..)":/src -w /src/ps3 $(IMAGE) bash -c
 ENV = source /opt/ps3dk-src/scripts/env.sh >/dev/null
-# Mozilla's CA bundle: VITALS_BUNDLE, else the app's own copy
-BUNDLE = $(or $(VITALS_BUNDLE),../shared/assets/mozilla-certs.pem)
+# Mozilla's CA bundle, both apps' (make update-certs)
+BUNDLE = ../shared/assets/mozilla-certs.pem
 SPRX = $(if $(filter 1,$(SIGNED)),.sprx,.fake.sprx)
 APP_STAGING = build/vitals-app/pkg_files
 VERSION = $(shell cat ../VERSION)
@@ -128,7 +128,6 @@ app:
 	$(MAKE) dns-plugin DEBUG=0
 	$(MAKE) dns-plugin DEBUG=1
 	$(MAKE) dns-plugin DEBUG=2
-	@[ -f "$(BUNDLE)" ] || { echo "$(BUNDLE) is missing: set VITALS_BUNDLE to Mozilla's CA bundle" >&2; exit 1; }
 	rm -rf build/vitals-app/pkg_files
 	@# The package's rule doesn't see the staged files change: without the old package, it's built again
 	rm -f build/vitals-app/vitals-app*.pkg

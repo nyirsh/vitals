@@ -25,6 +25,10 @@
 # The Vita is VITA_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's VITA_HOST
 COMPONENTS = common vitals-boot vitals-ssl vitals-browser vitals-http vitals-app
 
+ifeq ($(filter 0 1 2,$(or $(DEBUG),0)),)
+$(error DEBUG must be 0, 1 or 2)
+endif
+
 # The Vita: on make's command line (make status VITA_HOST=...), else tools/vita_comms.py reads ../.env
 $(foreach v,VITA_HOST VITA_PORT,$(if $($(v)),$(eval export $(v))))
 

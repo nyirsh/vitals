@@ -17,8 +17,8 @@ rpcs3=${RPCS3:-/Applications/RPCS3.app/Contents/MacOS/rpcs3}
 external="$HOME/Library/Application Support/rpcs3/dev_flash/sys/external"
 logs="$HOME/Library/Caches/rpcs3"
 config="$HOME/Library/Application Support/rpcs3/config.yml"
-# Mozilla's CA bundle, where vitals' libssl reads it (VITALS_BUNDLE, else the Vita's, in ../vita)
-bundle=${VITALS_BUNDLE:-$(dirname "$0")/../../shared/assets/mozilla-certs.pem}
+# Mozilla's CA bundle, both apps', where vitals' libssl reads it
+bundle="$(dirname "$0")/../../shared/assets/mozilla-certs.pem"
 hdd="$HOME/Library/Application Support/rpcs3/dev_hdd0"
 
 [ -f "$external/libssl.sprx" ] || { echo "no libssl.sprx in RPCS3's dev_flash (install the firmware first)" >&2; exit 1; }

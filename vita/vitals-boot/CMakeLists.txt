@@ -38,6 +38,9 @@ add_executable(vitals.elf
 	../../shared/src/redirect_list.c
 )
 set(VITALS_DEBUG 0 CACHE STRING "Debug output: 0, 1 or 2 (1 and up log every DNS query)")
+if(NOT VITALS_DEBUG MATCHES "^[012]$")
+	message(FATAL_ERROR "VITALS_DEBUG must be 0, 1 or 2")
+endif()
 target_compile_definitions(vitals.elf PRIVATE
 	VITALS_DEBUG=${VITALS_DEBUG}
 )

@@ -21,7 +21,7 @@ the repository (copy .env.example). install uploads the fake-signed containers u
 asks for the real-signed ones (don't, on a console: the PlayStation Store app hangs on a black
 screen loading the real-signed libssl and libhttp), the release builds of libssl, libhttp, the boot plugin and the DNS
 plugin (build/vitals-ssl, build/vitals-http, build/vitals-boot, build/vitals-dns) unless --debug 1 or
-2 asks for debug ones (build/vitals-ssl-debugN and the like, make install DEBUG=N builds them), and Mozilla's CA bundle (VITALS_BUNDLE, else the app's,
+2 asks for debug ones (build/vitals-ssl-debugN and the like, make install DEBUG=N builds them), and Mozilla's CA bundle (both apps',
 shared/assets/mozilla-certs.pem) when the console has none, so the app's Update certificates
 isn't undone, without Sony's CAs (read from the console's flash) as the app writes it; the
 example redirects.txt and dns.txt likewise only when the console has none, so the user's lists stay. The boot plugin maps libssl and libhttp at every boot, and loads the DNS
@@ -201,8 +201,8 @@ def remove_line(ftp, path, entry):
 
 
 def bundle_source():
-    """Mozilla's CA bundle: VITALS_BUNDLE, else the app's (curl's cacert.pem, make update-certs)"""
-    return os.environ.get("VITALS_BUNDLE", os.path.join(SHARED_ASSETS, "mozilla-certs.pem"))
+    """Mozilla's CA bundle, both apps' (curl's cacert.pem, make update-certs)"""
+    return os.path.join(SHARED_ASSETS, "mozilla-certs.pem")
 
 
 PEM_BEGIN, PEM_END = b"-----BEGIN CERTIFICATE-----", b"-----END CERTIFICATE-----"
@@ -325,7 +325,7 @@ def install(ftp, signed, debug):
         if not os.path.isfile(source):
             sys.exit(f"{source} is missing: build the modules first")
     if not os.path.isfile(bundle_source()):
-        sys.exit(f"{bundle_source()} is missing: set VITALS_BUNDLE to Mozilla's CA bundle")
+        sys.exit(f"{bundle_source()} is missing: make update-certs brings it")
     for folder in (VITALS, SYSTEM, FLAGS, LOGS, REPORTS, "/dev_hdd0/plugins"):
         make_directory(ftp, folder)
     move_earlier_layout(ftp)
