@@ -58,20 +58,9 @@
  * 2 also every getter, every read and write, and the request's and response's headers. Secrets
  * are logged as their length only: Cookie, Set-Cookie, Authorization and any header whose name
  * says token, session, ticket, key, secret, password, signature or auth; a URL's query too */
-#ifndef VITALS_DEBUG
-#define VITALS_DEBUG 0
-#endif
-#if VITALS_DEBUG >= 1
-void vh_log(const char *format, ...) __attribute__((format(printf, 1, 2)));
-#define VH_LOG(...) vh_log(__VA_ARGS__)
-#else
-#define VH_LOG(...) ((void)0)
-#endif
-#if VITALS_DEBUG >= 2
-#define VH_LOG2(...) vh_log(__VA_ARGS__)
-#else
-#define VH_LOG2(...) ((void)0)
-#endif
+/* Its log (vitals/log.h), through vh_log, as vitals.log and the TTY take whole lines */
+#define VITALS_LOG_PRINTF vh_log
+#include "vitals/log.h"
 /* What a log line may show of a header's value (into buffer, as "(N bytes)" for a secret) and of
  * a path (its query as "?(N bytes)") */
 const char *vh_log_header(const char *name, const char *value, char *buffer, size_t size);

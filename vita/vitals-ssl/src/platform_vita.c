@@ -1,6 +1,6 @@
 #include "vs.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "user_runtime.h"
 #include "vitals/ca_store.h"
 

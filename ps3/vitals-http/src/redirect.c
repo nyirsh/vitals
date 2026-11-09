@@ -91,7 +91,7 @@ static void load(void)
 		return;
 	g_loaded = 1;
 	if (vh_platform_stat(VITALS_REDIRECTS_OFF) == 0) {
-		VH_LOG("redirects.off is there: no host redirects");
+		VITALS_LOG("redirects.off is there: no host redirects");
 		return;
 	}
 	ListReader *reader = vh_alloc(sizeof(*reader));
@@ -105,14 +105,14 @@ static void load(void)
 	int result = vitals_redirect_list_read(read_redirects, work, keep_rule, reader);
 	vh_free(work);
 	if (result < 0)
-		VH_LOG("redirect list not read: 0x%08x", (unsigned)result);
+		VITALS_LOG("redirect list not read: 0x%08x", (unsigned)result);
 	if (result >= 0 && !reader->failed && reader->count > 0) {
 		for (size_t i = 0; i < reader->count; ++i)
 			g_map.rules[i] = (VitalsHostRule){reader->names + reader->from[i], reader->names + reader->to[i],
 			                                  reader->from_length[i], reader->to_length[i]};
 		g_map.count = reader->count;
 		g_names = reader->names;
-		VH_LOG("redirects: %u", (unsigned)g_map.count);
+		VITALS_LOG("redirects: %u", (unsigned)g_map.count);
 	} else
 		vh_free(reader->names);
 	vh_free(reader);
@@ -131,7 +131,7 @@ const char *vh_redirect_host(const char *host)
 	vh_unlock();
 	if (rule == NULL)
 		return host;
-	VH_LOG("redirect host %s -> %s", rule->from, rule->to);
+	VITALS_LOG("redirect host %s -> %s", rule->from, rule->to);
 	return rule->to;
 }
 
@@ -188,10 +188,10 @@ const char *vh_default_user_agent(void)
 		memcpy(g_agent, AGENT_PREFIX, sizeof(AGENT_PREFIX) - 1);
 		int read = vh_platform_file_read(USER_AGENT_PATH, 0, text, sizeof(text));
 		if (read > 0 && pick_line(text, (size_t)read))
-			VH_LOG("user agent from useragent.txt: %s", g_agent);
+			VITALS_LOG("user agent from useragent.txt: %s", g_agent);
 		else {
 			if (read > 0)
-				VH_LOG("useragent.txt ignored: no usable line");
+				VITALS_LOG("useragent.txt ignored: no usable line");
 			memcpy(g_agent + sizeof(AGENT_PREFIX) - 1, VH_DEFAULT_SUFFIX, sizeof(VH_DEFAULT_SUFFIX));
 		}
 	}

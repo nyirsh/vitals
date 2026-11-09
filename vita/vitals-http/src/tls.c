@@ -1,6 +1,6 @@
 #include "vh.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "tls_sony.h"
 #include "user_runtime.h"
 #include "vitals/error_map.h"

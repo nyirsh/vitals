@@ -1,5 +1,5 @@
 #include "webkit_callback.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 
 #include <psp2/kernel/modulemgr.h>
 #include <psp2/kernel/sysmem.h>

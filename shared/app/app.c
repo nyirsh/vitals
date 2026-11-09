@@ -5,7 +5,7 @@
 
 #include "app.h"
 
-#include "app_log.h"
+#include "vitals/log.h"
 #include "changelog.h"
 #include "check.h"
 #include "console.h"
@@ -94,7 +94,7 @@ static void refresh_state(void)
 	}
 	outdated = installed && strcmp(installed_version, VITALS_VERSION) != 0;
 	debug_level = installed ? level : -1;
-	app_log("state: installed %d, version \"%s\", outdated %d, debug %d", installed, installed_version, outdated, level);
+	VITALS_LOG_ALWAYS("state: installed %d, version \"%s\", outdated %d, debug %d", installed, installed_version, outdated, level);
 	/* An install, reinstall or update keeps the debug output the console has, whenever it's known,
 	 * also for an install the app doesn't count as complete */
 	known_level = known ? level : 0;
@@ -191,7 +191,7 @@ static int run_operation(enum Action action)
 		task.state = CHECK_FAIL;
 		task.status_line = status_line;
 	}
-	app_log("%s: %d", titles[action], result);
+	VITALS_LOG_ALWAYS("%s: %d", titles[action], result);
 	refresh_state();
 	draw_task();
 	for (;;) {
@@ -236,14 +236,14 @@ static int run_apply_options(unsigned switch_count, const unsigned *state, const
 		changed = 1;
 		int rc = switch_apply(console_switch(i), state[i], console_flag_set, line, sizeof(line));
 		task_note(line);
-		app_log("options: %s (0x%08X)", line, (unsigned)rc);
+		VITALS_LOG_ALWAYS("options: %s (0x%08X)", line, (unsigned)rc);
 		if (rc != 0)
 			result = rc;
 	}
 	if (result >= 0 && debug_choice != debug_level) {
 		changed = 1;
 		result = vitals_install_set_debug_level(debug_choice, task_note);
-		app_log("options: debug output %d: %d", debug_choice, result);
+		VITALS_LOG_ALWAYS("options: debug output %d: %d", debug_choice, result);
 	}
 	if (!changed)
 		task_note("Nothing changed");
@@ -275,7 +275,7 @@ static int run_apply_options(unsigned switch_count, const unsigned *state, const
 			return -1;
 		platform_sleep_ms(50);
 	}
-	app_log("options: reboot");
+	VITALS_LOG_ALWAYS("options: reboot");
 	vitals_reboot();
 	return 0;
 }
@@ -400,7 +400,7 @@ static int run_test(int autotest)
 				vitals_check_cancel();
 		}
 		if (autotest && !busy && view.complete) {
-			app_log("autotest: done, report %d", vitals_check_save_report());
+			VITALS_LOG_ALWAYS("autotest: done, report %d", vitals_check_save_report());
 			leaving = 1;
 		}
 		if (leaving && !busy)
@@ -545,7 +545,7 @@ static void run_menu(void)
 		snprintf(warning_text, sizeof(warning_text), "%s. vitals is made for %s%s", console_system_text(),
 		         console_words()->made_for, allowed ? ": for testing only" : ", so it can't be installed here");
 	}
-	app_log("console: %s, %s%s", console_system_text(), supported ? "supported" : "not supported",
+	VITALS_LOG_ALWAYS("console: %s, %s%s", console_system_text(), supported ? "supported" : "not supported",
 	        allowed ? ", unsupported.ok there" : "");
 	unsigned selected = 0;
 	/* Install, Update, Reinstall and Uninstall are one item, its choice the operation: those that
@@ -657,7 +657,7 @@ static void run_menu(void)
 			break;
 		if (pressed & confirm_button) {
 			enum Action action = actions[selected];
-			app_log("menu: %s", action_items[action].label);
+			VITALS_LOG_ALWAYS("menu: %s", action_items[action].label);
 			int rc = 0;
 			if (action == ACTION_EXIT)
 				break;
@@ -687,12 +687,12 @@ int app_main(int autotest)
 {
 	canvas = malloc(CHECK_WIDTH * CHECK_HEIGHT * sizeof(*canvas));
 	if (canvas == NULL) {
-		app_log("no memory for the canvas");
+		VITALS_LOG_ALWAYS("no memory for the canvas");
 		return 1;
 	}
 	int rc = platform_display_init();
 	if (rc < 0) {
-		app_log("the display didn't start (%d)", rc);
+		VITALS_LOG_ALWAYS("the display didn't start (%d)", rc);
 		return 1;
 	}
 	/* Drawn where the console shows it from, when it can: nothing to scale or copy. Its size may be
@@ -706,23 +706,23 @@ int app_main(int autotest)
 	}
 	rc = check_font_init();
 	if (rc < 0) {
-		app_log("the font didn't start (0x%08X)", (unsigned)rc);
+		VITALS_LOG_ALWAYS("the font didn't start (0x%08X)", (unsigned)rc);
 		return 1;
 	}
 	rc = platform_pad_init();
 	if (rc != 0)
-		app_log("pads: 0x%08X", (unsigned)rc);
+		VITALS_LOG_ALWAYS("pads: 0x%08X", (unsigned)rc);
 	if (platform_circle_confirms()) {
 		confirm_button = PAD_CIRCLE;
 		back_button = PAD_CROSS;
 		app_set_circle_confirms(1);
 	}
 	if (autotest) {
-		app_log("autotest: running the connection test");
+		VITALS_LOG_ALWAYS("autotest: running the connection test");
 		run_test(1);
 	} else
 		run_menu();
-	app_log("exiting%s", platform_exit_requested() ? ", as the system asked" : "");
+	VITALS_LOG_ALWAYS("exiting%s", platform_exit_requested() ? ", as the system asked" : "");
 	release_check_stop();
 	vitals_check_stop();
 	console_close();

@@ -585,7 +585,7 @@ void *cellSsl_9447404F(const unsigned char *start, const unsigned char *end, int
 				*used = (int)(offset + at);
 			return cert;
 		}
-		VS_LOG("ca list: a certificate Mbed TLS can't read, %u bytes in, stepped over", (unsigned)offset);
+		VITALS_LOG("ca list: a certificate Mbed TLS can't read, %u bytes in, stepped over", (unsigned)offset);
 		offset += at;
 	}
 }

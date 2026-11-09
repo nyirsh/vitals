@@ -1,6 +1,6 @@
 #include "vh.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 
 #include <stdio.h>
 #include <string.h>

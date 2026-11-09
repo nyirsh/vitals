@@ -1,7 +1,7 @@
 #include "vs.h"
 
 #include "ca_index.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 
 #include <mbedtls/asn1.h>
 #include <mbedtls/base64.h>

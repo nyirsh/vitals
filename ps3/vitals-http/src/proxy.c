@@ -123,9 +123,9 @@ void vh_proxy_end(void)
 static void log_proxy(const char *call, const void *id, const CellHttpUri *proxy)
 {
 	if (proxy == NULL)
-		VH_LOG("%s %p none", call, id);
+		VITALS_LOG("%s %p none", call, id);
 	else
-		VH_LOG("%s %p %s://%s:%u", call, id, proxy->scheme != NULL ? proxy->scheme : "-",
+		VITALS_LOG("%s %p %s://%s:%u", call, id, proxy->scheme != NULL ? proxy->scheme : "-",
 		       proxy->hostname != NULL ? proxy->hostname : "-", (unsigned)proxy->port);
 }
 #else
@@ -145,7 +145,7 @@ int cellHttpSetProxy(const CellHttpUri *proxy)
 
 int cellHttpGetProxy(CellHttpUri *proxy, void *pool, size_t size, size_t *required)
 {
-	VH_LOG2("cellHttpGetProxy %p %u", pool, (unsigned)size);
+	VITALS_VERBOSE("cellHttpGetProxy %p %u", pool, (unsigned)size);
 	if (!vh_initialized())
 		return VH_ERROR_NOT_INITIALIZED;
 	vh_lock();
@@ -170,7 +170,7 @@ int cellHttpClientSetProxy(CellHttpClientId id, const CellHttpUri *proxy)
 
 int cellHttpClientGetProxy(CellHttpClientId id, CellHttpUri *proxy, void *pool, size_t size, size_t *required)
 {
-	VH_LOG2("cellHttpClientGetProxy %p", (void *)id);
+	VITALS_VERBOSE("cellHttpClientGetProxy %p", (void *)id);
 	if (!vh_initialized())
 		return VH_ERROR_NOT_INITIALIZED;
 	VhClient *client = vh_client((void *)id);

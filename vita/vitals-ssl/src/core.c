@@ -2,7 +2,7 @@
 
 #include "ca_index.h"
 #include "crypto_platform.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 
 #include <mbedtls/platform_util.h>
 #include <psa/crypto.h>

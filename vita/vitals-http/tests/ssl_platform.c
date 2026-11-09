@@ -1,6 +1,6 @@
 #include "vh.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "vs.h"
 #include "ca_index.h"
 

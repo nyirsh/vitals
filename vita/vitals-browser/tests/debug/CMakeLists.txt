@@ -10,7 +10,7 @@ foreach(level 1 2)
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../vitals-ssl/include)
     target_link_libraries(vitals_debug_${level}_build PRIVATE vitals_core mbedtls vitals_vita_mock)
     target_compile_definitions(vitals_debug_${level}_build PRIVATE VITALS_DEBUG=${level}
-        VITALS_LOG_PREFIX="vitals_test" VITALS_HTTP_HEAP_BYTES=131072u)
+        VITALS_LOG_NAME="vitals_test" VITALS_HTTP_HEAP_BYTES=131072u)
     target_compile_options(vitals_debug_${level}_build PRIVATE -Wall -Wextra -Werror)
 
     # The runtime has its own host stand-ins

@@ -1,6 +1,6 @@
 #include "vh.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "vitals/host_map.h"
 #include "vitals/redirect_list.h"
 

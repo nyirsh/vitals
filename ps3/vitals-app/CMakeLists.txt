@@ -65,7 +65,8 @@ target_include_directories(vitals-app PRIVATE src ../common ../../shared/include
 target_compile_features(vitals-app PRIVATE c_std_11)
 # Optimised: the PPU is in order, and the screens are drawn and scaled to 1080p in software
 target_compile_options(vitals-app PRIVATE -O2 -Wall -Wextra -Werror)
-target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}" VITALS_TITLE_ID="${VITALS_TITLE_ID}")
+target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}" VITALS_TITLE_ID="${VITALS_TITLE_ID}"
+	VITALS_LOG_NAME="vitals-app" VITALS_LOG_APP)
 target_link_libraries(vitals-app PRIVATE
 	libcurl_static mbedtls mbedx509 tfpsacrypto
 	http_stub ssl_stub rtc_stub netctl_stub net_stub fontFT_stub font_stub fs_stub sysmodule_stub io_stub

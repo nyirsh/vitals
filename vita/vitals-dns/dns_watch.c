@@ -1,3 +1,6 @@
+#define VITALS_LOG_NAME "vitals-dns"
+#define VITALS_LOG_KERNEL
+#include "vitals/log.h"
 #include "dns_watch.h"
 #include "vitals/switches.h"
 #include "dns_message.h"
@@ -269,7 +272,7 @@ static int prepare_send(void *argument)
     SceUID pid = ksceKernelGetProcessId();
     process_title(pid, title);
 #if VITALS_DEBUG >= 1
-    ksceDebugPrintf("vitals: dns query pid=0x%X title=%s name=%s type=%u\n", pid, title, name, type);
+    VITALS_LOG("query pid=0x%X title=%s name=%s type=%u", pid, title, name, type);
 #endif
     if (!g_redirect || type != VITALS_DNS_TYPE_A)
         return 0;
@@ -304,7 +307,7 @@ static int prepare_send(void *argument)
         SceUID block = length == 0 ? -1 : place_renamed(pid, parameter, renamed, length, &sending->argument);
         if (block < 0)
         {
-            ksceDebugPrintf("vitals: dns redirect pid=0x%X title=%s %s -> %s failed rc=0x%08X\n", pid, title, name,
+            VITALS_LOG_ALWAYS("redirect pid=0x%X title=%s %s -> %s failed rc=0x%08X", pid, title, name,
                             target, block);
             return 0;
         }
@@ -314,7 +317,7 @@ static int prepare_send(void *argument)
     (void)ksceKernelLockMutex(g_lock, 1, NULL);
     add_pending(&entry);
     (void)ksceKernelUnlockMutex(g_lock, 1);
-    ksceDebugPrintf("vitals: dns redirect pid=0x%X title=%s %s -> %s\n", pid, title, name, target);
+    VITALS_LOG_ALWAYS("redirect pid=0x%X title=%s %s -> %s", pid, title, name, target);
     return 0;
 }
 
@@ -380,15 +383,15 @@ static int rewrite_received(void *argument)
     char title[16];
     process_title(pid, title);
     if (entry.blocked)
-        ksceDebugPrintf("vitals: dns blocked pid=0x%X title=%s name=%s\n", pid, title, entry.name);
+        VITALS_LOG_ALWAYS("blocked pid=0x%X title=%s name=%s", pid, title, entry.name);
     else if (count > 0)
     {
         const unsigned char *first = addresses[0].octets;
-        ksceDebugPrintf("vitals: dns redirect answered pid=0x%X title=%s name=%s address=%u.%u.%u.%u count=%d\n", pid,
+        VITALS_LOG_ALWAYS("redirect answered pid=0x%X title=%s name=%s address=%u.%u.%u.%u count=%d", pid,
                         title, entry.name, first[0], first[1], first[2], first[3], count);
     }
     else
-        ksceDebugPrintf("vitals: dns redirect answered pid=0x%X title=%s name=%s with no address rcode=%u\n", pid,
+        VITALS_LOG_ALWAYS("redirect answered pid=0x%X title=%s name=%s with no address rcode=%u", pid,
                         title, entry.name, response[3] & 0x0fu);
     return 0;
 }
@@ -467,7 +470,7 @@ SceUID vitals_dns_watch_start(void)
     g_redirect = g_receive_hook >= 0;
     g_send_hook = taiHookFunctionExportForKernel(KERNEL_PID, &g_send_ref, "SceNetPs", SCE_NET_PS_SYSCALLS_NID,
                                                  SCE_NET_SYSCALL_SENDTO_NID, sendto_patched);
-    ksceDebugPrintf("vitals: dns hooks send=0x%08X receive=0x%08X\n", g_send_hook, g_receive_hook);
+    VITALS_LOG_ALWAYS("hooks send=0x%08X receive=0x%08X", g_send_hook, g_receive_hook);
     return g_send_hook;
 }
 

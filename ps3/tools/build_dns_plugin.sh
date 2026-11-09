@@ -21,7 +21,7 @@ watch-only) out=build/vitals-dns-watch; variant=(-DVITALS_DNS_WATCH_ONLY) ;;
 *) echo "usage: tools/build_dns_plugin.sh [0 | 1 | 2 | pass-through | watch-only]" >&2; exit 1 ;;
 esac
 mkdir -p "$out"
-cflags=(-mlp64 -O2 -ffreestanding -fno-builtin -nostdlib -fno-stack-protector -fno-asynchronous-unwind-tables
+cflags=(-mlp64 -O2 -ffreestanding -fno-builtin -fno-jump-tables -nostdlib -fno-stack-protector -fno-asynchronous-unwind-tables
 	-fno-unwind-tables -ffunction-sections -fdata-sections -fno-zero-initialized-in-bss -Wall -Wextra -Werror
 	-fno-tree-loop-distribute-patterns -Ivitals-dns/src -I../shared/dns -I../shared/include -Icommon)
 powerpc64-ps3-elf-gcc "${cflags[@]}" -c vitals-dns/kernel/entry.S -o "$out/entry.o"

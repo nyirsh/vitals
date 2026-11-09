@@ -67,13 +67,15 @@ int vitals_user_runtime_stats(VitalsRuntimeStats *stats) {
 }
 
 #if VITALS_DEBUG >= 1 && !defined(VITALS_RUNTIME_HOST_TEST)
+#include "vitals/log.h"
+
 void vitals_user_runtime_report(const char *tag, int force) {
     static uint32_t reported_peak;
     VitalsRuntimeStats stats = {0};
     if (vitals_user_runtime_stats(&stats) != 0) return;
     if (!force && stats.peak <= reported_peak) return;
     reported_peak = stats.peak;
-    sceClibPrintf("vitals_http: mem %s capacity=%u used=%u peak=%u allocs=%u\n",
+    VITALS_LOG("mem %s capacity=%u used=%u peak=%u allocs=%u",
         tag != NULL ? tag : "?", stats.capacity, stats.used, stats.peak, stats.outstanding);
 }
 #endif

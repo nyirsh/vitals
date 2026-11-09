@@ -19,7 +19,7 @@
 #define MAX_REDIRECTS 10
 
 #define WITH_TRANSACTION(id, t)                         \
-	VH_LOG2("%s %p", __func__, (void *)(id));       \
+	VITALS_VERBOSE("%s %p", __func__, (void *)(id));       \
 	if (!vh_initialized())                          \
 		return VH_ERROR_NOT_INITIALIZED;        \
 	VhTransaction *t = vh_transaction((void *)(id)); \
@@ -183,7 +183,7 @@ int cellHttpCreateTransaction(CellHttpTransId *id, CellHttpClientId client_id, c
 	int rc = create_transaction(id, client_id, method, uri);
 #if VITALS_DEBUG >= 1
 	char path[96];
-	VH_LOG("cellHttpCreateTransaction %p %s %s://%s:%u%s -> %p, 0x%08x", (void *)client_id, method != NULL ? method : "-",
+	VITALS_LOG("cellHttpCreateTransaction %p %s %s://%s:%u%s -> %p, 0x%08x", (void *)client_id, method != NULL ? method : "-",
 	       uri != NULL && uri->scheme != NULL ? uri->scheme : "-", uri != NULL && uri->hostname != NULL ? uri->hostname : "-",
 	       uri != NULL ? (unsigned)uri->port : 0, uri != NULL ? vh_log_path(uri->path, path, sizeof(path)) : "",
 	       rc == 0 && id != NULL ? (void *)*id : NULL, (unsigned)rc);
@@ -236,7 +236,7 @@ static void release_connection(VhTransaction *t, int keep)
 
 int cellHttpDestroyTransaction(CellHttpTransId id)
 {
-	VH_LOG("cellHttpDestroyTransaction %p", (void *)id);
+	VITALS_LOG("cellHttpDestroyTransaction %p", (void *)id);
 	WITH_TRANSACTION(id, t);
 	release_connection(t, t->response_read && t->body_done);
 	free_transaction(t);
@@ -247,7 +247,7 @@ int cellHttpDestroyTransaction(CellHttpTransId id)
 
 int cellHttpRequestSetContentLength(CellHttpTransId id, uint64_t length)
 {
-	VH_LOG("cellHttpRequestSetContentLength %p %llu", (void *)id, (unsigned long long)length);
+	VITALS_LOG("cellHttpRequestSetContentLength %p %llu", (void *)id, (unsigned long long)length);
 	WITH_TRANSACTION(id, t);
 	char text[24];
 	snprintf(text, sizeof(text), "%llu", (unsigned long long)length);
@@ -279,7 +279,7 @@ int cellHttpRequestGetContentLength(CellHttpTransId id, uint64_t *length)
 static void log_header(const char *call, const void *id, const CellHttpHeader *header)
 {
 	char hidden[24];
-	VH_LOG("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
+	VITALS_LOG("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
 	       header != NULL ? vh_log_header(header->name, header->value, hidden, sizeof(hidden)) : "-");
 }
 #else
@@ -311,7 +311,7 @@ int cellHttpRequestAddHeader(CellHttpTransId id, const CellHttpHeader *header)
 
 int cellHttpRequestDeleteHeader(CellHttpTransId id, const char *name)
 {
-	VH_LOG("cellHttpRequestDeleteHeader %p %s", (void *)id, name != NULL ? name : "-");
+	VITALS_LOG("cellHttpRequestDeleteHeader %p %s", (void *)id, name != NULL ? name : "-");
 	WITH_TRANSACTION(id, t);
 	return vh_headers_delete(&t->request, name);
 }
@@ -397,20 +397,20 @@ static int send_head(VhTransaction *t)
 	if (t->cache_revalidating)
 		used += snprintf(text + used, size - (size_t)used, "If-Modified-Since: %s\r\n", condition);
 	if (t->cache_revalidating)
-		VH_LOG2("transaction %p > If-Modified-Since: %s", (void *)t, condition);
+		VITALS_VERBOSE("transaction %p > If-Modified-Since: %s", (void *)t, condition);
 	used += snprintf(text + used, size - (size_t)used, "\r\n");
 #if VITALS_DEBUG >= 2
 	{
 		char path[96], hidden[24];
-		VH_LOG2("transaction %p sends %s %s HTTP/%u.%u", (void *)t, t->method, vh_log_path(t->path, path, sizeof(path)),
+		VITALS_VERBOSE("transaction %p sends %s %s HTTP/%u.%u", (void *)t, t->method, vh_log_path(t->path, path, sizeof(path)),
 		        (unsigned)t->client->major, (unsigned)t->client->minor);
 		for (unsigned i = 0; i < t->request.count; ++i)
-			VH_LOG2("transaction %p > %s: %s", (void *)t, t->request.items[i].name,
+			VITALS_VERBOSE("transaction %p > %s: %s", (void *)t, t->request.items[i].name,
 			        vh_log_header(t->request.items[i].name, t->request.items[i].value, hidden, sizeof(hidden)));
 	}
 #endif
 	if (cookie != NULL)
-		VH_LOG2("transaction %p > Cookie: (%u bytes)", (void *)t, (unsigned)strlen(cookie));
+		VITALS_VERBOSE("transaction %p > Cookie: (%u bytes)", (void *)t, (unsigned)strlen(cookie));
 	vh_free(cookie);
 	notify(t, CELL_HTTP_TRANSACTION_STATE_SENDING_REQUEST);
 	rc = send_all(t, text, (size_t)used);
@@ -427,7 +427,7 @@ static int tunnel(VhTransaction *t)
 	char text[600];
 	int length = snprintf(text, sizeof(text), "CONNECT %s:%u HTTP/%u.%u\r\nHost: %s:%u\r\nProxy-Connection: Keep-Alive\r\n\r\n",
 	                      t->host, t->port, (unsigned)t->client->major, (unsigned)t->client->minor, t->host, t->port);
-	VH_LOG("transaction %p: CONNECT %s:%u through the proxy", (void *)t, t->host, t->port);
+	VITALS_LOG("transaction %p: CONNECT %s:%u through the proxy", (void *)t, t->host, t->port);
 	int rc = send_all(t, text, (size_t)length);
 	if (rc != 0)
 		return rc;
@@ -442,7 +442,7 @@ static int tunnel(VhTransaction *t)
 	} while (line[0] != '\0');
 	t->have = t->at = 0;
 	if (!ok) {
-		VH_LOG("transaction %p: the proxy refused the tunnel", (void *)t);
+		VITALS_LOG("transaction %p: the proxy refused the tunnel", (void *)t);
 		return VH_ERROR_SSL_REFUSED;
 	}
 	return 0;
@@ -474,7 +474,7 @@ static int open_and_send_head(VhTransaction *t)
 			t->ssl = NULL;
 			return sent;
 		}
-		VH_LOG("transaction %p: the kept socket %d is gone, connecting again", (void *)t, fd);
+		VITALS_LOG("transaction %p: the kept socket %d is gone, connecting again", (void *)t, fd);
 		vh_connection_closed(client, t, fd, ssl);
 		t->fd = -1;
 		t->ssl = NULL;
@@ -486,7 +486,7 @@ static int open_and_send_head(VhTransaction *t)
 	if (recv_timeout > 0 && recv_timeout < VH_REDIRECT_RECV_TIMEOUT && vh_redirect_is_target(t->host))
 		recv_timeout = VH_REDIRECT_RECV_TIMEOUT;
 	fd = vh_platform_connect(to, to_port, client->conn_timeout, client->send_timeout, recv_timeout);
-	VH_LOG(fd >= 0 ? "transaction %p connects to %s:%u: socket %d" : "transaction %p connects to %s:%u: error 0x%08x", (void *)t, t->host, t->port,
+	VITALS_LOG(fd >= 0 ? "transaction %p connects to %s:%u: socket %d" : "transaction %p connects to %s:%u: error 0x%08x", (void *)t, t->host, t->port,
 	       fd);
 	if (fd < 0)
 		return fd;
@@ -564,7 +564,7 @@ static int send_request(CellHttpTransId id, const void *data, size_t size, size_
 int cellHttpSendRequest(CellHttpTransId id, const void *data, size_t size, size_t *sent)
 {
 	int rc = send_request(id, data, size, sent);
-	VH_LOG("cellHttpSendRequest %p %u bytes: 0x%08x", (void *)id, (unsigned)size, (unsigned)rc);
+	VITALS_LOG("cellHttpSendRequest %p %u bytes: 0x%08x", (void *)id, (unsigned)size, (unsigned)rc);
 	return rc;
 }
 
@@ -582,7 +582,7 @@ static int fill(VhTransaction *t)
 	unsigned char *at = t->buffer + t->have;
 	size_t room = sizeof(t->buffer) - t->have;
 	int got = t->ssl != NULL ? vh_tls_recv(t->ssl, at, room) : vh_platform_recv(t->fd, at, room);
-	VH_LOG2("transaction %p read %d of %u", (void *)t, got, (unsigned)room);
+	VITALS_VERBOSE("transaction %p read %d of %u", (void *)t, got, (unsigned)room);
 	if (got > 0)
 		t->have += (unsigned)got;
 	return got;
@@ -675,12 +675,12 @@ static int read_head(VhTransaction *t)
 				return rc;
 		}
 #if VITALS_DEBUG >= 1
-		VH_LOG("transaction %p: HTTP %u.%u %d, %u headers", (void *)t, (unsigned)t->major, (unsigned)t->minor,
+		VITALS_LOG("transaction %p: HTTP %u.%u %d, %u headers", (void *)t, (unsigned)t->major, (unsigned)t->minor,
 		       (int)t->status, t->response.count);
 #if VITALS_DEBUG >= 2
 		for (unsigned i = 0; i < t->response.count; ++i) {
 			char hidden[24];
-			VH_LOG2("transaction %p < %s: %s", (void *)t, t->response.items[i].name,
+			VITALS_VERBOSE("transaction %p < %s: %s", (void *)t, t->response.items[i].name,
 			        vh_log_header(t->response.items[i].name, t->response.items[i].value, hidden, sizeof(hidden)));
 		}
 #endif
@@ -870,7 +870,7 @@ static int read_response(VhTransaction *t)
 			CellHttpRedirectCallback callback = (CellHttpRedirectCallback)client->callbacks[VH_CALLBACK_REDIRECT];
 			int answer = callback((CellHttpTransId)t, &line, &from, &to, client->callback_arguments[VH_CALLBACK_REDIRECT]);
 			if (answer != 0) {
-				VH_LOG("transaction %p: the game's redirect callback said %d", (void *)t, answer);
+				VITALS_LOG("transaction %p: the game's redirect callback said %d", (void *)t, answer);
 				return VH_ERROR_REDIRECT_REFUSED;
 			}
 		}
@@ -896,7 +896,7 @@ static int read_response(VhTransaction *t)
 #if VITALS_DEBUG >= 1
 		{
 			char path[96];
-			VH_LOG("transaction %p: redirect %d to %s", (void *)t, (int)t->status, vh_log_path(target, path, sizeof(path)));
+			VITALS_LOG("transaction %p: redirect %d to %s", (void *)t, (int)t->status, vh_log_path(target, path, sizeof(path)));
 		}
 #endif
 		if ((rc = follow(t, target)) != 0 || (rc = open_and_send_head(t)) != 0)
@@ -967,7 +967,7 @@ static int ensure_response(VhTransaction *t)
 {
 	int rc = read_response(t);
 	if (rc != 0)
-		VH_LOG("transaction %p: no response, 0x%08x", (void *)t, (unsigned)rc);
+		VITALS_LOG("transaction %p: no response, 0x%08x", (void *)t, (unsigned)rc);
 	return rc;
 }
 
@@ -1093,10 +1093,10 @@ int cellHttpRecvResponse(CellHttpTransId id, void *data, size_t size, size_t *re
 		*received = got;
 #if VITALS_DEBUG >= 1
 	if (rc != 0 || got == 0)
-		VH_LOG("cellHttpRecvResponse %p: %u bytes, 0x%08x%s", (void *)id, (unsigned)got, (unsigned)rc,
+		VITALS_LOG("cellHttpRecvResponse %p: %u bytes, 0x%08x%s", (void *)id, (unsigned)got, (unsigned)rc,
 		       rc == 0 ? " (the end)" : "");
 	else
-		VH_LOG2("cellHttpRecvResponse %p: %u of %u bytes", (void *)id, (unsigned)got, (unsigned)size);
+		VITALS_VERBOSE("cellHttpRecvResponse %p: %u of %u bytes", (void *)id, (unsigned)got, (unsigned)size);
 #endif
 	return rc;
 }
@@ -1194,7 +1194,7 @@ static void close_own_connection(VhTransaction *t)
 
 int cellHttpTransactionCloseConnection(CellHttpTransId id)
 {
-	VH_LOG("cellHttpTransactionCloseConnection %p", (void *)id);
+	VITALS_LOG("cellHttpTransactionCloseConnection %p", (void *)id);
 	WITH_TRANSACTION(id, t);
 	close_own_connection(t);
 	return 0;
@@ -1202,7 +1202,7 @@ int cellHttpTransactionCloseConnection(CellHttpTransId id)
 
 int cellHttpTransactionAbortConnection(CellHttpTransId id)
 {
-	VH_LOG("cellHttpTransactionAbortConnection %p", (void *)id);
+	VITALS_LOG("cellHttpTransactionAbortConnection %p", (void *)id);
 	WITH_TRANSACTION(id, t);
 	t->aborted = 1;
 	release_connection(t, 0);
@@ -1250,7 +1250,7 @@ int cellHttpRequestGetChunkedTransferStatus(CellHttpTransId id, bool *enable)
  * it, right after Connection; each send is then a chunk, and a send of nothing ends the body */
 int cellHttpRequestSetChunkedTransferStatus(CellHttpTransId id, bool enable)
 {
-	VH_LOG("cellHttpRequestSetChunkedTransferStatus %p %d", (void *)id, enable ? 1 : 0);
+	VITALS_LOG("cellHttpRequestSetChunkedTransferStatus %p %d", (void *)id, enable ? 1 : 0);
 	WITH_TRANSACTION(id, t);
 	if (t->head_sent)
 		return VH_ERROR_ALREADY_SENT;
@@ -1272,7 +1272,7 @@ int cellHttpRequestSetChunkedTransferStatus(CellHttpTransId id, bool enable)
  * was sent (0x80710020 before), once (0x80710054 again) */
 int cellHttpTransactionReleaseConnection(CellHttpTransId id, int *sid)
 {
-	VH_LOG("cellHttpTransactionReleaseConnection %p", (void *)id);
+	VITALS_LOG("cellHttpTransactionReleaseConnection %p", (void *)id);
 	WITH_TRANSACTION(id, t);
 	if (sid == NULL)
 		return VH_ERROR_NO_BUFFER;
@@ -1317,7 +1317,7 @@ int cellHttp_DCD9D484(CellHttpTransId id, const void *data, size_t size, size_t 
  * transaction's connection closed, a kept one included; 0x80710054 a second time */
 int cellHttp_3E30440C(CellHttpTransId id)
 {
-	VH_LOG("cellHttp_3E30440C %p", (void *)id);
+	VITALS_LOG("cellHttp_3E30440C %p", (void *)id);
 	WITH_TRANSACTION(id, t);
 	if (t->released)
 		return VH_ERROR_RELEASED;

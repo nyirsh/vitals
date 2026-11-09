@@ -35,7 +35,7 @@ target_include_directories(vitals_libssl PRIVATE src include ${VITALS_COMMON_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libssl PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
-    VITALS_LOG_PREFIX="vitals-ssl"
+    VITALS_LOG_NAME="vitals-ssl"
 )
 target_compile_options(vitals_libssl PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -Os)

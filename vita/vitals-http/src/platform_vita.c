@@ -1,6 +1,6 @@
 #include "vh.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "user_runtime.h"
 #include "vitals/path.h"
 #include "vitals/redirects.h"

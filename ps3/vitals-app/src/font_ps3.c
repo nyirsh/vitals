@@ -4,7 +4,7 @@
 
 #include "font.h"
 
-#include "app_log.h"
+#include "vitals/log.h"
 
 #include <cell/font.h>
 #include <cell/fontFT.h>
@@ -54,7 +54,7 @@ int check_font_backend_init(void)
 	int rc;
 	if ((rc = cellSysmoduleLoadModule(CELL_SYSMODULE_FONT)) < 0 || (rc = cellSysmoduleLoadModule(CELL_SYSMODULE_FREETYPE)) < 0 ||
 	    (rc = cellSysmoduleLoadModule(CELL_SYSMODULE_FONTFT)) < 0) {
-		app_log("font: cellSysmoduleLoadModule 0x%08X", (unsigned)rc);
+		VITALS_LOG_ALWAYS("font: cellSysmoduleLoadModule 0x%08X", (unsigned)rc);
 		return rc;
 	}
 	file_cache = memalign(128, 1024 * 1024);
@@ -66,7 +66,7 @@ int check_font_backend_init(void)
 	config.FileCache.size = 1024 * 1024;
 	rc = cellFontInit(&config);
 	if (rc != CELL_OK) {
-		app_log("font: cellFontInit 0x%08X", (unsigned)rc);
+		VITALS_LOG_ALWAYS("font: cellFontInit 0x%08X", (unsigned)rc);
 		return rc;
 	}
 	CellFontLibraryConfigFT ft;
@@ -77,7 +77,7 @@ int check_font_backend_init(void)
 	ft.MemoryIF.Calloc = allocate_zeroed;
 	rc = cellFontInitLibraryFreeType(&ft, &library);
 	if (rc != CELL_OK) {
-		app_log("font: cellFontInitLibraryFreeType 0x%08X", (unsigned)rc);
+		VITALS_LOG_ALWAYS("font: cellFontInitLibraryFreeType 0x%08X", (unsigned)rc);
 		return rc;
 	}
 	CellFontType type;
@@ -85,7 +85,7 @@ int check_font_backend_init(void)
 	type.map = CELL_FONT_MAP_UNICODE;
 	rc = cellFontOpenFontset(library, &type, &font);
 	if (rc != CELL_OK) {
-		app_log("font: cellFontOpenFontset 0x%08X", (unsigned)rc);
+		VITALS_LOG_ALWAYS("font: cellFontOpenFontset 0x%08X", (unsigned)rc);
 		return rc;
 	}
 	opened = 1;
@@ -96,7 +96,7 @@ int check_font_backend_init(void)
 	CellFontRendererConfig_setAllocateBuffer(&renderer_config, 64 * 1024, 512 * 1024);
 	if ((rc = cellFontCreateRenderer(library, &renderer_config, &renderer)) != CELL_OK ||
 	    (rc = cellFontBindRenderer(&font, &renderer)) != CELL_OK) {
-		app_log("font: renderer 0x%08X", (unsigned)rc);
+		VITALS_LOG_ALWAYS("font: renderer 0x%08X", (unsigned)rc);
 		return rc;
 	}
 	bound = 1;

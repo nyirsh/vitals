@@ -59,7 +59,7 @@ The kernel plugin's `module_start` ([vitals-boot/main.c](../vitals-boot/main.c))
    browser target ([tls13_loader.c](../vitals-boot/tls13_loader.c)): the provider
    at `ux0:data/vitals/system/vitals.suprx` must exist, and the replacement module's SHA-256 must
    equal `g_expected_browser_sha256` ([tls13_loader.c](../vitals-boot/tls13_loader.c)).
-   Only then is the loader ready (`browser=1` in `vitals: loader init=…`). When the provider isn't
+   Only then is the loader ready (`browser=1` in `vitals-boot: loader init=…`). When the provider isn't
    there yet at boot (`ux0:` not mapped), `vitals_kernel_browser_loader_ready` looks again at each
    engine load.
 3. **The module manager hooks**: the load and start hooks every replacement goes through.
@@ -79,12 +79,12 @@ The kernel plugin's `module_start` ([vitals-boot/main.c](../vitals-boot/main.c))
    browser's process sees its files through a view of its own, without `ux0:`, so there it fails
    (`0x80010013`, no such device; naming the process instead of the caller fails the same way).
    The kernel then loads vitals' engine with its own call, `ksceKernelLoadModuleForPid`, as it loads
-   the provider (`load_engine_for_process`; logged as `vitals: browser engine: kernel load for
+   the provider (`load_engine_for_process`; logged as `vitals-boot: browser engine: kernel load for
    pid=…`). That call's ID differs between 3.60 and 3.63 and later, so it's looked up at start
    ([native_module_api.c](../vitals-boot/native_module_api.c)) rather than imported, which would keep
    the plugin from loading at all on the other family. It loads the engine private, which the
    browser runs with. If that fails too, Sony's engine is loaded and nothing is injected, so the
-   browser still opens with its own TLS (`vitals: browser engine from … failed`).
+   browser still opens with its own TLS (`vitals-boot: browser engine from … failed`).
 4. **Queue the injection** ([main.c](../vitals-boot/main.c)): when the loader is ready,
    `vitals_post_start_defer(pid, module, VITALS_BROWSER_PROVIDER_BOOT_PATH)`
    ([post_start.c](../vitals-boot/post_start.c)) records the provider to inject once the engine
@@ -122,11 +122,11 @@ for the queued module, through `inject_target`
    turns into vitals-ssl, then started (`ensure_libssl`, [tls13_loader.c](../vitals-boot/tls13_loader.c)).
    It has to be **shared**: the shared libhttp there imports from it, and the kernel refuses a
    private module exporting to a shared one (`0x8002D018`). Logged as
-   `vitals: libssl for the browser pid=… modid=… start=… status=…`. Without it the provider isn't
+   `vitals-boot: libssl for the browser pid=… modid=… start=… status=…`. Without it the provider isn't
    loaded, and the browser keeps its own TLS.
 8. **Load and start** — `ksceKernelLoadStartModuleForPid`
    ([tls13_loader.c](../vitals-boot/tls13_loader.c)); unloaded again if its start fails.
-   Logged as `vitals: inject browser provider pid=… rc=…`.
+   Logged as `vitals-boot: inject browser provider pid=… rc=…`.
 
 ## 6. The provider starts: checks and hooks
 
@@ -265,18 +265,18 @@ vitals ships, whose hash the kernel checks: `d2i_X509` at `0x48d64` and `X509_fr
 
 | Line                                                               | Printed by         | Meaning                                           |
 | ------------------------------------------------------------------ | ------------------ | ------------------------------------------------- |
-| `vitals: loader init=… browser=…`                                  | kernel, boot       | `browser=1`: the browser provider can be injected |
-| `vitals: post_start pid=… http=0 …`                                | kernel, start hook | the engine module started; injection follows      |
-| `vitals: libssl for the browser pid=… modid=… start=… status=…`    | kernel             | libssl loaded into the browser engine's process   |
-| `vitals: inject browser provider pid=… rc=…`                       | kernel             | the browser provider's load result                |
-| `vitals_browser: browser libssl pool=… rc=…`                       | provider           | libssl set up, on the first connection            |
-| `vitals_browser: browser TLS active: compat=… text=…`              | provider           | hooks in place                                    |
-| `vitals_browser: browser handshake complete: … version=… cipher=…` | provider           | one connection's TLS, with debug output on        |
-| `vitals_browser: browser connection uses legacy TLS: …`            | provider           | a connection left to the engine's own TLS         |
-| `vitals_browser: browser connect rejected: socket=… code=…`        | provider           | a connection refused (60, 51: the certificate)    |
-| `vitals_browser: browser certificate reported: certificates=… error=…` | provider       | the refusal reported to WebKit, which asks the user |
-| `vitals_browser: browser unverified retry the user allowed`        | provider           | the retry after the user's yes                    |
-| `vitals_browser: browser refused unverified retry: code=…`         | provider           | a retry without verification nobody asked about   |
+| `vitals-boot: loader init=… browser=…`                                  | kernel, boot       | `browser=1`: the browser provider can be injected |
+| `vitals-boot: post_start pid=… http=0 …`                                | kernel, start hook | the engine module started; injection follows      |
+| `vitals-boot: libssl for the browser pid=… modid=… start=… status=…`    | kernel             | libssl loaded into the browser engine's process   |
+| `vitals-boot: inject browser provider pid=… rc=…`                       | kernel             | the browser provider's load result                |
+| `vitals-browser: browser libssl pool=… rc=…`                       | provider           | libssl set up, on the first connection            |
+| `vitals-browser: browser TLS active: compat=… text=…`              | provider           | hooks in place                                    |
+| `vitals-browser: browser handshake complete: … version=… cipher=…` | provider           | one connection's TLS, with debug output on        |
+| `vitals-browser: browser connection uses legacy TLS: …`            | provider           | a connection left to the engine's own TLS         |
+| `vitals-browser: browser connect rejected: socket=… code=…`        | provider           | a connection refused (60, 51: the certificate)    |
+| `vitals-browser: browser certificate reported: certificates=… error=…` | provider       | the refusal reported to WebKit, which asks the user |
+| `vitals-browser: browser unverified retry the user allowed`        | provider           | the retry after the user's yes                    |
+| `vitals-browser: browser refused unverified retry: code=…`         | provider           | a retry without verification nobody asked about   |
 
 ## 11. Files
 

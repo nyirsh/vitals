@@ -6,7 +6,7 @@
 #include "ca_update.h"
 #include "installed.h"
 
-#include "app_log.h"
+#include "vitals/log.h"
 #include "boot_plugins.h"
 #include "sony_cas.h"
 #include "vitals/store_certs.h"
@@ -311,8 +311,8 @@ int vitals_install_run(int debug_level, VitalsNote note)
 			return -1;
 	if (edit_boot_plugins(1, note) < 0 || write_installed(debug_level) < 0)
 		return -1;
-	if (cellFsUnlink(VITALS_LOG) == CELL_FS_SUCCEEDED)
-		note("Deleted the old log, " VITALS_LOG);
+	if (cellFsUnlink(VITALS_LOG_FILE) == CELL_FS_SUCCEEDED)
+		note("Deleted the old log, " VITALS_LOG_FILE);
 	return 0;
 }
 
@@ -329,7 +329,7 @@ int vitals_uninstall_run(VitalsNote note)
 	static const char *const files[] = {VITALS_PLUGIN,      VITALS_LIBSSL,  VITALS_LIBHTTP,
 	                                    VITALS_DNS_PLUGIN,  VITALS_BUNDLE,  VITALS_BUNDLE_EARLIER, VITALS_INSTALLED,
 	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins.txt.bak",
-	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins_kernel.txt.bak", VITALS_LOG,
+	                                    VITALS_SYSTEM_DIRECTORY "/boot_plugins_kernel.txt.bak", VITALS_LOG_FILE,
 	                                    VITALS_APP_LOG};
 	for (unsigned i = 0; i < sizeof(files) / sizeof(files[0]); ++i)
 		if (cellFsUnlink(files[i]) == CELL_FS_SUCCEEDED)
@@ -351,7 +351,7 @@ int vitals_install_set_debug_level(int debug_level, VitalsNote note)
 	if (copy_builds(debug_level, note) < 0 || write_installed(debug_level) < 0)
 		return -1;
 	if (debug_level != 0)
-		note("The log will be " VITALS_LOG);
+		note("The log will be " VITALS_LOG_FILE);
 	return 0;
 }
 
@@ -449,7 +449,7 @@ static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date
 /* curl's notes on the download, into the app's log */
 static void log_line(const char *line)
 {
-	app_log("%s", line);
+	VITALS_LOG_ALWAYS("%s", line);
 }
 
 /* The update, through curl on the app's own Mbed TLS, trusting only the Mozilla bundle the app carries,
@@ -534,7 +534,7 @@ int vitals_update_certificates(VitalsNote note)
 void vitals_reboot(void)
 {
 	int rc = cellFsUnlink(TURNOFF_MARKER);
-	app_log("reboot: %s 0x%08X", TURNOFF_MARKER, (unsigned)rc);
+	VITALS_LOG_ALWAYS("reboot: %s 0x%08X", TURNOFF_MARKER, (unsigned)rc);
 	/* sys_sm_shutdown: 0x1200 is a hard reboot, as webMAN MOD's /restart.ps3?hard */
 	lv2syscall3(379, 0x1200, 0, 0);
 }

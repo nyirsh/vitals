@@ -59,7 +59,7 @@ target_include_directories(vitals_libhttp PRIVATE src include ${VITALS_SSL_DIR}/
     ${VITALS_COMMON_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
 target_compile_definitions(vitals_libhttp PRIVATE
     VITALS_DEBUG=${VITALS_DEBUG}
-    VITALS_LOG_PREFIX="vitals-http"
+    VITALS_LOG_NAME="vitals-http"
     VITALS_HTTP_HEAP_BYTES=${VITALS_HTTP_TLS_HEAP_BYTES}u
     VH_DEFAULT_SUFFIX="${VITALS_HTTP_USER_AGENT}"
 )

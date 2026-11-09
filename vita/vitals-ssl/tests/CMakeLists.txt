@@ -41,7 +41,7 @@ add_executable(vitals_ssl_tests
 )
 target_include_directories(vitals_ssl_tests BEFORE PRIVATE ${CMAKE_BINARY_DIR}/sdk)
 # With the debug log compiled in, so its lines run too
-target_compile_definitions(vitals_ssl_tests PRIVATE VITALS_DEBUG=1 VITALS_LOG_PREFIX="vitals-ssl")
+target_compile_definitions(vitals_ssl_tests PRIVATE VITALS_DEBUG=1 VITALS_LOG_NAME="vitals-ssl")
 target_include_directories(vitals_ssl_tests PRIVATE ${ROOT}/src ${ROOT}/include ${VITALS_COMMON_DIR}/runtime
     ${VITALS_COMMON_DIR}/include ${SHARED_DIR}/include)
 target_compile_options(vitals_ssl_tests PRIVATE -std=gnu11 -g -Wall -Wextra -Werror

@@ -66,7 +66,7 @@ Like every load, it reaches `load_for_pid_patched` ([main.c](../vitals-boot/main
 
 1. **Path swap:** `vs0:sys/external/libhttp.suprx`, `vs0:/sys/external/libhttp.suprx` and reAuth's
    `ur0:data/reAuth/libhttp.suprx` all become `ux0:data/vitals/system/libhttp.suprx`. The load is
-   logged as `vitals: libhttp load pid=… path=…`.
+   logged as `vitals-boot: libhttp load pid=… path=…`.
 2. **Flags left alone:** the loader's shared mapping is kept, so one copy of the code serves every
    process, each with its own data, exactly as with Sony's library.
 3. **Nothing queued:** nothing is injected after it. `vitals-http` exports libhttp's own library and
@@ -237,7 +237,7 @@ app's **Debug output** option.
 
 | Line                                                      | Printed by    | Meaning                                                 |
 | --------------------------------------------------------- | ------------- | ------------------------------------------------------- |
-| `vitals: libhttp load pid=… path=…`                       | kernel plugin | a process loaded libhttp; vitals-http is what it gets   |
+| `vitals-boot: libhttp load pid=… path=…`                       | kernel plugin | a process loaded libhttp; vitals-http is what it gets   |
 | `redirects loaded=<n>`                                    | vitals-http   | the redirect list was read, on the first use after init |
 | `redirect host <old> -> <new>`, `redirect <url> -> <url>` | vitals-http   | a host or URL on the list was rewritten                 |
 | `user agent suffix from file: …`                          | vitals-http   | `useragent.txt` gave the suffix                         |

@@ -368,7 +368,7 @@ int vh_cookie_receive(VhTransaction *t, const char *header)
 	int rc = parse_cookie(header, t->host, t->path, &cookie);
 	vh_platform_cookie_unlock();
 	if (rc == ERROR_COOKIE_INVALID_DOMAIN || rc == VH_ERROR_NO_BUFFER) {
-		VH_LOG("transaction %p: a cookie refused for %s (0x%08x)", (void *)t, t->host, (unsigned)rc);
+		VITALS_LOG("transaction %p: a cookie refused for %s (0x%08x)", (void *)t, t->host, (unsigned)rc);
 		return 0;
 	}
 	if (rc != 0)
@@ -379,14 +379,14 @@ int vh_cookie_receive(VhTransaction *t, const char *header)
 		CellHttpCookieRecvCallback callback = (CellHttpCookieRecvCallback)client->callbacks[VH_CALLBACK_COOKIE_RECV];
 		int answer = callback((CellHttpTransId)t, &uri, header, client->callback_arguments[VH_CALLBACK_COOKIE_RECV]);
 		if (answer != 0) {
-			VH_LOG("transaction %p: the game's cookie callback said %d", (void *)t, answer);
+			VITALS_LOG("transaction %p: the game's cookie callback said %d", (void *)t, answer);
 			vh_platform_cookie_lock();
 			cookie_free(cookie);
 			vh_platform_cookie_unlock();
 			return 0;
 		}
 	}
-	VH_LOG("transaction %p: cookie %s (%u bytes) for %s%s%s", (void *)t, cookie->name,
+	VITALS_LOG("transaction %p: cookie %s (%u bytes) for %s%s%s", (void *)t, cookie->name,
 	       cookie->value != NULL ? (unsigned)strlen(cookie->value) : 0, cookie->domain, cookie->path,
 	       cookie->persistent ? ", persistent" : "");
 	cookie->owner = client;
@@ -485,7 +485,7 @@ int vh_cookie_header(VhTransaction *t, char **value)
 		for (int call = 0; call < 2; ++call) {
 			int answer = callback((CellHttpTransId)t, &uri, text, client->callback_arguments[VH_CALLBACK_COOKIE_SEND]);
 			if (answer < 0) {
-				VH_LOG("transaction %p: the game's cookie callback said %d", (void *)t, answer);
+				VITALS_LOG("transaction %p: the game's cookie callback said %d", (void *)t, answer);
 				vh_free(text);
 				return answer;
 			}
@@ -499,7 +499,7 @@ int vh_cookie_header(VhTransaction *t, char **value)
 
 int cellHttpInitCookie(void *pool, size_t size)
 {
-	VH_LOG("cellHttpInitCookie pool %p of %u bytes%s", pool, (unsigned)size, g_cookies ? ": already" : "");
+	VITALS_LOG("cellHttpInitCookie pool %p of %u bytes%s", pool, (unsigned)size, g_cookies ? ": already" : "");
 	if (pool == NULL || size == 0)
 		return VH_ERROR_NO_BUFFER;
 	if (g_cookies)
@@ -513,7 +513,7 @@ int cellHttpInitCookie(void *pool, size_t size)
 
 int cellHttpEndCookie(void)
 {
-	VH_LOG("cellHttpEndCookie%s", g_cookies ? "" : ": not initialized");
+	VITALS_LOG("cellHttpEndCookie%s", g_cookies ? "" : ": not initialized");
 	if (!g_cookies)
 		return VH_ERROR_NOT_INITIALIZED;
 	vh_platform_cookie_lock();
@@ -526,7 +526,7 @@ int cellHttpEndCookie(void)
 
 int cellHttpCookieFlush(void)
 {
-	VH_LOG("cellHttpCookieFlush%s", g_cookies ? "" : ": not initialized");
+	VITALS_LOG("cellHttpCookieFlush%s", g_cookies ? "" : ": not initialized");
 	if (!g_cookies)
 		return VH_ERROR_NOT_INITIALIZED;
 	vh_platform_cookie_lock();
@@ -538,7 +538,7 @@ int cellHttpCookieFlush(void)
 /* Sony's doesn't check the client, nor that the store is there */
 int cellHttpSessionCookieFlush(CellHttpClientId id)
 {
-	VH_LOG("cellHttpSessionCookieFlush %p", (void *)id);
+	VITALS_LOG("cellHttpSessionCookieFlush %p", (void *)id);
 	(void)id;
 	if (!g_cookies)
 		return 0;
@@ -551,7 +551,7 @@ int cellHttpSessionCookieFlush(CellHttpClientId id)
 /* The cookie as a Set-Cookie for uri; the client isn't checked, as Sony's */
 int cellHttpAddCookieWithClientId(const CellHttpUri *uri, const char *cookie, CellHttpClientId id)
 {
-	VH_LOG("cellHttpAddCookieWithClientId %p %s", (void *)id, uri != NULL && uri->hostname != NULL ? uri->hostname : "-");
+	VITALS_LOG("cellHttpAddCookieWithClientId %p %s", (void *)id, uri != NULL && uri->hostname != NULL ? uri->hostname : "-");
 	(void)id;
 	if (!g_cookies)
 		return VH_ERROR_NO_MEMORY;
@@ -574,7 +574,7 @@ int cellHttpAddCookieWithClientId(const CellHttpUri *uri, const char *cookie, Ce
  * and puts a NUL on the last ';'); *required is all of it. 0x80710041 without any */
 int cellHttpGetCookie(const CellHttpUri *uri, char *buffer, size_t size, size_t *required)
 {
-	VH_LOG2("cellHttpGetCookie %s", uri != NULL && uri->hostname != NULL ? uri->hostname : "-");
+	VITALS_VERBOSE("cellHttpGetCookie %s", uri != NULL && uri->hostname != NULL ? uri->hostname : "-");
 	if (uri == NULL || uri->hostname == NULL)
 		return VH_ERROR_NO_BUFFER;
 	if (!g_cookies)
@@ -646,7 +646,7 @@ static size_t export_records(unsigned char *out, const void *owner)
  * answer is Sony's (0, *exported the export's size). Under 20 bytes: 0x80710006 */
 int cellHttpCookieExportWithClientId(void *buffer, size_t size, size_t *exported, CellHttpClientId id)
 {
-	VH_LOG("cellHttpCookieExportWithClientId %p %u", (void *)id, (unsigned)size);
+	VITALS_LOG("cellHttpCookieExportWithClientId %p %u", (void *)id, (unsigned)size);
 	if (buffer != NULL && size <= 19)
 		return VH_ERROR_INSUFFICIENT;
 	if (!g_cookies)
@@ -739,7 +739,7 @@ static void import_records(const unsigned char *data, size_t size, const void *o
 
 int cellHttpCookieImportWithClientId(const void *buffer, size_t size, CellHttpClientId id)
 {
-	VH_LOG("cellHttpCookieImportWithClientId %p %u", (void *)id, (unsigned)size);
+	VITALS_LOG("cellHttpCookieImportWithClientId %p %u", (void *)id, (unsigned)size);
 	if (!g_cookies)
 		return VH_ERROR_NOT_INITIALIZED;
 	vh_platform_cookie_lock();

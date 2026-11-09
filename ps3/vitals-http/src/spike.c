@@ -10,6 +10,8 @@
 #include <sys/prx_module.h>
 
 #include "vitals_log.h"
+#define VITALS_LOG_PRINTF vh_log
+#include "vitals/log.h"
 #include "vitals_xmb.h"
 
 /* Calls so far: written on every call, so a run also proves the module's data segment can be
@@ -23,16 +25,9 @@ static void say(const char *name)
 	(void)name;
 	++g_calls;
 #else
-	char line[96], count[9];
-	uint32_t at = 0;
+	char count[9];
 	vitals_log_hex(++g_calls, count);
-	for (const char *part = count; *part != '\0'; ++part)
-		line[at++] = *part;
-	line[at++] = ' ';
-	for (; *name != '\0' && at < sizeof(line) - 1; ++name)
-		line[at++] = *name;
-	line[at] = '\0';
-	vitals_log("vitals-http spike", line);
+	VITALS_LOG("not written yet: call %s of %s", count, name);
 #endif
 }
 

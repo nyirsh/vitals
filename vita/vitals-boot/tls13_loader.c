@@ -1,3 +1,6 @@
+#define VITALS_LOG_NAME "vitals-boot"
+#define VITALS_LOG_KERNEL
+#include "vitals/log.h"
 #include "tls13_loader.h"
 #include "native_module_api.h"
 
@@ -226,7 +229,7 @@ static int ensure_libssl(SceUID pid, QueryWorkspace *workspace)
         return -1;
     int status = SCE_KERNEL_START_FAILED, started = -1;
     SceUID modid = vitals_kernel_load_system_libssl(pid, &started, &status);
-    ksceDebugPrintf("vitals: libssl for the browser pid=0x%X modid=0x%08X start=0x%08X status=%d\n", pid, modid,
+    VITALS_LOG_ALWAYS("libssl for the browser pid=0x%X modid=0x%08X start=0x%08X status=%d", pid, modid,
                     started, status);
     if (modid <= 0)
         return modid < 0 ? modid : -1;
@@ -352,7 +355,7 @@ static int inject_target(SceUID pid, SceUID module_id, const char *provider_path
     {
         /* The provider never unloads, so a browser engine loaded again in the same process keeps
          * the first one's */
-        ksceDebugPrintf("vitals: provider already resident pid=0x%X\n", pid);
+        VITALS_LOG_ALWAYS("provider already resident pid=0x%X", pid);
         result = 0;
         goto cleanup;
     }
@@ -483,7 +486,7 @@ static int prepare_on_native_stack(void *opaque)
     PreparationCall *call = opaque;
     call->called = 1;
     call->result = inject_target(call->pid, call->module_id, call->provider_path);
-    ksceDebugPrintf("vitals: inject browser provider pid=0x%X rc=0x%08X\n", call->pid, call->result);
+    VITALS_LOG_ALWAYS("inject browser provider pid=0x%X rc=0x%08X", call->pid, call->result);
     return 0;
 }
 

@@ -116,7 +116,7 @@ void vh_clients_remove(VhClient *client)
  * be made there */
 int cellHttpInit(void *pool, size_t size)
 {
-	VH_LOG("cellHttpInit pool %p of %u bytes%s", pool, (unsigned)size, g_initialized ? ": already" : "");
+	VITALS_LOG("cellHttpInit pool %p of %u bytes%s", pool, (unsigned)size, g_initialized ? ": already" : "");
 	if (g_initialized)
 		return VH_ERROR_ALREADY_INITIALIZED;
 	if (pool == NULL || size == 0)
@@ -125,7 +125,7 @@ int cellHttpInit(void *pool, size_t size)
 		return VH_ERROR_NO_MEMORY;
 	if (vh_platform_pool_create(pool, size) != 0) {
 		vh_platform_lock_destroy();
-		VH_LOG("cellHttpInit: no heap on the pool");
+		VITALS_LOG("cellHttpInit: no heap on the pool");
 		return VH_ERROR_NO_MEMORY;
 	}
 	g_clients = NULL;
@@ -137,7 +137,7 @@ int cellHttpInit(void *pool, size_t size)
  * cellHttpInit */
 int cellHttpEnd(void)
 {
-	VH_LOG("cellHttpEnd%s", g_initialized ? "" : ": not initialized");
+	VITALS_LOG("cellHttpEnd%s", g_initialized ? "" : ": not initialized");
 	if (!g_initialized)
 		return VH_ERROR_NOT_INITIALIZED;
 	vh_lock();
@@ -160,7 +160,7 @@ int cellHttpEnd(void)
  * the heap's mallinfo, 10 words. Any may be NULL */
 int cellHttpGetMemoryInfo(uint32_t *free_size, uint32_t *first, uint32_t *info)
 {
-	VH_LOG2("cellHttpGetMemoryInfo");
+	VITALS_VERBOSE("cellHttpGetMemoryInfo");
 	uint32_t numbers[10];
 	vh_platform_pool_mallinfo(numbers);
 	if (free_size != NULL)

@@ -1,6 +1,6 @@
 #include "vs.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 
 #include <mbedtls/oid.h>
 

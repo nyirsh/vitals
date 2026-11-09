@@ -26,7 +26,7 @@ static int g_error_count;
 
 int cellSslInit(void *pool, uint32_t size)
 {
-	VS_LOG("cellSslInit: pool of %u bytes", (unsigned)size);
+	VITALS_LOG("cellSslInit: pool of %u bytes", (unsigned)size);
 
 	if (g_initialized)
 		return VITALS_SSL_ERROR_ALREADY_INITIALIZED;
@@ -42,7 +42,7 @@ int cellSslInit(void *pool, uint32_t size)
 
 	int rc = vitals_crypto_platform_init();
 	psa_status_t status = rc == 0 ? psa_crypto_init() : PSA_ERROR_GENERIC_ERROR;
-	VS_LOG("cellSslInit: platform %d, psa_crypto_init %d", rc, (int)status);
+	VITALS_LOG("cellSslInit: platform %d, psa_crypto_init %d", rc, (int)status);
 	if (status != PSA_SUCCESS) {
 		if (rc == 0)
 			vitals_crypto_platform_free();
@@ -57,13 +57,13 @@ int cellSslInit(void *pool, uint32_t size)
 
 int cellSslEnd(void)
 {
-	VS_LOG("cellSslEnd");
+	VITALS_LOG("cellSslEnd");
 	if (!g_initialized)
 		return VITALS_SSL_ERROR_NOT_INITIALIZED;
 #if VITALS_DEBUG >= 1
 	VitalsPoolUse use;
 	if (vitals_pool_use(&use) == 0)
-		VS_LOG("cellSslEnd: pool of %u bytes, at most %u used, %u allocations refused", (unsigned)use.size,
+		VITALS_LOG("cellSslEnd: pool of %u bytes, at most %u used, %u allocations refused", (unsigned)use.size,
 		       (unsigned)(use.size - use.lowest_free), (unsigned)use.refused);
 #endif
 	g_initialized = 0;

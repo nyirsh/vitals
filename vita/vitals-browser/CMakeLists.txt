@@ -45,7 +45,7 @@ endif()
 target_include_directories(vitals PRIVATE . ${VITALS_COMMON_DIR}/runtime ${VITALS_SSL_DIR}/include)
 target_compile_features(vitals PRIVATE c_std_11)
 target_compile_definitions(vitals PRIVATE VITALS_DEBUG=${VITALS_DEBUG}
-    VITALS_LOG_PREFIX="vitals_browser")
+    VITALS_LOG_NAME="vitals-browser")
 target_compile_options(vitals PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
     -Wstrict-prototypes -ffunction-sections -fdata-sections -O2)
 target_link_options(vitals PRIVATE -nostdlib -Wl,--gc-sections

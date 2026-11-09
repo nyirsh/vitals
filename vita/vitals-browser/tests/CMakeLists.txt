@@ -68,7 +68,7 @@ add_library(vitals_ssl_host STATIC
 target_include_directories(vitals_ssl_host BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/sdk)
 target_include_directories(vitals_ssl_host PRIVATE ${VITALS_SSL_ROOT}/src ../../common/runtime ../../../shared/include
     PUBLIC ${VITALS_SSL_ROOT}/include)
-target_compile_definitions(vitals_ssl_host PRIVATE VITALS_DEBUG=0 VITALS_LOG_PREFIX="vitals-ssl")
+target_compile_definitions(vitals_ssl_host PRIVATE VITALS_DEBUG=0 VITALS_LOG_NAME="vitals-ssl")
 target_compile_options(vitals_ssl_host PRIVATE -std=gnu11 -fno-pie)
 target_link_libraries(vitals_ssl_host PUBLIC vitals_core mbedtls mbedx509 tfpsacrypto vitals_vita_mock)
 

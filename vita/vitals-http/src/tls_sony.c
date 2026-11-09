@@ -1,6 +1,6 @@
 #include "tls_sony.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "vitals/error_map.h"
 
 #include <stddef.h>

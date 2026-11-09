@@ -126,7 +126,7 @@ static int read_sony_ca(const SonyCa *ca, char *buffer, size_t size, uint32_t *r
 			result = VS_ERROR_UNKNOWN_LOAD_CERT;
 	}
 	vs_platform_file_close(fd);
-	VS_LOG2("ca store: %s %u bytes, %d", file, (unsigned)length, result);
+	VITALS_VERBOSE("ca store: %s %u bytes, %d", file, (unsigned)length, result);
 	return result;
 }
 
@@ -165,7 +165,7 @@ static int load_cas(uint64_t flags, char *buffer, size_t size, size_t *required,
 	}
 	if (required != NULL)
 		*required = total;
-	VS_LOG("%s: %u bytes, 0x%08X", name, (unsigned)total, (unsigned)result);
+	VITALS_LOG("%s: %u bytes, 0x%08X", name, (unsigned)total, (unsigned)result);
 	return result;
 }
 
@@ -225,7 +225,7 @@ int cellSsl_86C38810(uint64_t *flags, void *bio, char *buffer, uint32_t size)
 			done += count;
 	}
 	vs_platform_file_close(fd);
-	VS_LOG("cellSsl_86C38810: %s %d bytes, 0x%08X", file, (int)length, (unsigned)result);
+	VITALS_LOG("cellSsl_86C38810: %s %d bytes, 0x%08X", file, (int)length, (unsigned)result);
 	if (result == 0)
 		*flags &= ~mask_of(ca);
 	return result;
@@ -364,7 +364,7 @@ static int bundle_ready(void)
 		g_bundle_state = index_bundle() == 0 ? 1 : -1;
 		if (g_bundle_state < 0)
 			forget_bundle();
-		VS_LOG("ca store: %u roots in Mozilla's file and custom-certs.pem", (unsigned)g_root_count);
+		VITALS_LOG("ca store: %u roots in Mozilla's file and custom-certs.pem", (unsigned)g_root_count);
 	}
 	return g_bundle_state > 0;
 }
@@ -437,7 +437,7 @@ done:
 		vs_platform_file_close(fd);
 	VS_FREE(block);
 	vs_unlock();
-	VS_LOG2("ca store: bundle root %08X, 0x%08X", (unsigned)hash, (unsigned)result);
+	VITALS_VERBOSE("ca store: bundle root %08X, 0x%08X", (unsigned)hash, (unsigned)result);
 	return result;
 }
 

@@ -22,6 +22,7 @@
  * It's all in memory: a boot without it is the XMB as Sony made it. Built with VITALS_XMB_DRY_RUN,
  * it does 1 and 2, logs what it found, unloads libssl again and writes nothing. */
 
+#include "vitals/log.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -37,11 +38,6 @@
 #define VITALS_DEBUG 0
 #endif
 
-#define say(level, text)                                                                                              \
-	do {                                                                                                               \
-		if (VITALS_DEBUG >= (level))                                                                                   \
-			vitals_log("vitals-boot", (text));                                                                         \
-	} while (0)
 
 #define XMB_IS_INITD_NID 0x23F0FD4Eu
 #define LV2_GET_PID 1
@@ -59,13 +55,6 @@
 #define WRITE_PIECE 16u
 
 extern const uint32_t vitals_xmb_bridge[];
-
-static void log_value(int level, const char *text, uint32_t value)
-{
-	char hex[9];
-	say(level, text);
-	say(level, vitals_log_hex(value, hex));
-}
 
 static int file_exists(const char *path)
 {
@@ -136,13 +125,13 @@ static int write_code(uint32_t address, const void *data, uint32_t size)
 	if (g_writer == 2)
 		return ps3mapi_write(address, data, size);
 	int rc = dbg_write(address, data, size);
-	log_value(2, "xmb: lv2's debug write answered", (uint32_t)rc);
+	VITALS_VERBOSE("xmb: lv2's debug write answered" " %08X", (unsigned)((uint32_t)rc));
 	if (rc == 0) {
 		g_writer = 1;
 		return 0;
 	}
 	rc = ps3mapi_write(address, data, size);
-	log_value(2, "xmb: PS3MAPI's write answered", (uint32_t)rc);
+	VITALS_VERBOSE("xmb: PS3MAPI's write answered" " %08X", (unsigned)((uint32_t)rc));
 	if (rc == 0)
 		g_writer = 2;
 	return rc;
@@ -201,8 +190,8 @@ static int xmb_is_493(const XmbLibrary *library)
 		const XmbFunction *f = &library->table[i];
 		if (xmb_export(k_library_names[f->library], f->nid) != f->descriptor || word_at(f->descriptor) != f->code ||
 		    word_at(f->code) != f->first) {
-			say(1, library->name);
-			log_value(1, "xmb: not 4.93's XMB, at NID", f->nid);
+			VITALS_LOG("%s", library->name);
+			VITALS_LOG("xmb: not 4.93's XMB, at NID" " %08X", (unsigned)(f->nid));
 			return 0;
 		}
 	}
@@ -210,8 +199,8 @@ static int xmb_is_493(const XmbLibrary *library)
 	for (uint32_t i = 0; i < library->area_size; ++i)
 		hash = (hash ^ *(volatile const uint8_t *)(uintptr_t)(library->area + i)) * 0x01000193u;
 	if (hash != library->area_fnv1a) {
-		say(1, library->name);
-		log_value(1, "xmb: not 4.93's XMB, the island area's checksum is", hash);
+		VITALS_LOG("%s", library->name);
+		VITALS_LOG("xmb: not 4.93's XMB, the island area's checksum is" " %08X", (unsigned)(hash));
 		return 0;
 	}
 	return 1;
@@ -223,7 +212,7 @@ static void free_now(const char *when)
 {
 	uint32_t total = 0, available = 0;
 	memory_size(&total, &available);
-	log_value(1, when, available);
+	VITALS_LOG("%s %08X", when, (unsigned)(available));
 }
 #endif
 
@@ -250,7 +239,7 @@ static int patch(const XmbLibrary *library, const VitalsXmbRequest *request, int
 	for (uint32_t i = 0; i < library->count; ++i) {
 		uint32_t target = vitals_descriptor(request, library->table[i].nid);
 		if (target == 0) {
-			log_value(1, "xmb: vitals' module has no function for NID", library->table[i].nid);
+			VITALS_LOG("xmb: vitals' module has no function for NID" " %08X", (unsigned)(library->table[i].nid));
 			return XMB_FAILED;
 		}
 		uint32_t *island = &islands[i * XMB_ISLAND_WORDS];
@@ -262,23 +251,23 @@ static int patch(const XmbLibrary *library, const VitalsXmbRequest *request, int
 		island[5] = BCTR;
 	}
 	if (dry) {
-		say(2, library->name);
-		log_value(2, "xmb: dry run: the first function, at", library->table[0].code);
-		log_value(2, "xmb: dry run: would branch with", BRANCH(library->table[0].code, library->area));
+		VITALS_VERBOSE("%s", library->name);
+		VITALS_VERBOSE("xmb: dry run: the first function, at" " %08X", (unsigned)(library->table[0].code));
+		VITALS_VERBOSE("xmb: dry run: would branch with" " %08X", (unsigned)(BRANCH(library->table[0].code, library->area)));
 		for (uint32_t i = 0; i < XMB_ISLAND_WORDS; ++i)
-			log_value(2, "xmb: dry run: to its island's instruction", islands[i]);
+			VITALS_VERBOSE("xmb: dry run: to its island's instruction" " %08X", (unsigned)(islands[i]));
 		return XMB_DRY_RUN;
 	}
 	uint32_t words = library->count * XMB_ISLAND_WORDS;
 	int rc = write_code(library->area, islands, words * 4);
 	if (rc != 0) {
 		/* Nothing calls the island area yet: the XMB's functions are still its own */
-		say(1, "xmb: the islands couldn't be written");
+		VITALS_LOG("xmb: the islands couldn't be written");
 		return XMB_FAILED;
 	}
 	for (uint32_t i = 0; i < words; ++i)
 		if (word_at(library->area + 4 * i) != islands[i]) {
-			log_value(1, "xmb: written, but the islands read back otherwise, at word", i);
+			VITALS_LOG("xmb: written, but the islands read back otherwise, at word" " %08X", (unsigned)(i));
 			return XMB_FAILED;
 		}
 	for (uint32_t i = 0; i < library->count; ++i) {
@@ -288,7 +277,7 @@ static int patch(const XmbLibrary *library, const VitalsXmbRequest *request, int
 		if (rc == 0 && word_at(code) != branch)
 			rc = -1;
 		if (rc != 0) {
-			log_value(1, "xmb: a branch didn't take, at", code);
+			VITALS_LOG("xmb: a branch didn't take, at" " %08X", (unsigned)(code));
 			for (uint32_t j = 0; j < i; ++j)
 				(void)write_code(library->table[j].code, &library->table[j].first, sizeof(library->table[j].first));
 			return XMB_FAILED;
@@ -302,29 +291,29 @@ static int patch(const XmbLibrary *library, const VitalsXmbRequest *request, int
 static int load(const XmbLibrary *library, sysPrxId *id, VitalsXmbRequest *request)
 {
 	const char *path = file_exists(library->copy) ? library->copy : library->module;
-	say(1, path);
+	VITALS_LOG("%s", path);
 	*id = sysPrxLoadModule(path, 0, NULL);
-	log_value(2, "xmb: loaded, id", (uint32_t)*id);
+	VITALS_VERBOSE("xmb: loaded, id" " %08X", (unsigned)((uint32_t)*id));
 	if (*id < 0) {
-		log_value(1, "xmb: can't load it:", (uint32_t)*id);
+		VITALS_LOG("xmb: can't load it:" " %08X", (unsigned)((uint32_t)*id));
 		return XMB_FAILED;
 	}
 	request->magic = VITALS_XMB_MAGIC;
 	request->count = 0;
 	s32 result = 0;
 	s32 rc = sysPrxStartModule(*id, sizeof(*request), request, &result, 0, NULL);
-	log_value(2, "xmb: started:", (uint32_t)rc);
+	VITALS_VERBOSE("xmb: started:" " %08X", (unsigned)((uint32_t)rc));
 	uint32_t total = 0, available = 0;
 	memory_size(&total, &available);
-	log_value(1, "xmb: free with it loaded (bytes):", available);
+	VITALS_LOG("xmb: free with it loaded (bytes):" " %08X", (unsigned)(available));
 	if (rc != 0 || request->count < library->count) {
-		log_value(1, "xmb: it didn't give its functions:", (uint32_t)rc);
-		log_value(1, "xmb: functions given:", request->count);
+		VITALS_LOG("xmb: it didn't give its functions:" " %08X", (unsigned)((uint32_t)rc));
+		VITALS_LOG("xmb: functions given:" " %08X", (unsigned)(request->count));
 		return XMB_FAILED;
 	}
 	for (uint32_t i = 0; i < library->count; ++i)
 		if (vitals_descriptor(request, library->table[i].nid) == 0) {
-			log_value(1, "xmb: it has no function for NID", library->table[i].nid);
+			VITALS_LOG("xmb: it has no function for NID" " %08X", (unsigned)(library->table[i].nid));
 			return XMB_FAILED;
 		}
 	return 0;
@@ -335,9 +324,9 @@ static void unload(sysPrxId id)
 {
 	s32 result = 0;
 	s32 rc = sysPrxStopModule(id, 0, NULL, &result, 0, NULL);
-	log_value(1, "xmb: stopped:", (uint32_t)rc);
+	VITALS_LOG("xmb: stopped:" " %08X", (unsigned)((uint32_t)rc));
 	rc = sysPrxUnloadModule(id, 0, NULL);
-	log_value(1, "xmb: unloaded:", (uint32_t)rc);
+	VITALS_LOG("xmb: unloaded:" " %08X", (unsigned)((uint32_t)rc));
 }
 
 /* What the thread did, for the popup; XMB_PENDING until it's done */
@@ -389,15 +378,15 @@ static void __attribute__((noreturn)) watch(const XmbLibrary *const *libraries, 
 {
 	uint32_t total = 0, last = 0, steps = 0;
 	memory_size(&total, &last);
-	log_value(1, "xmb: watching; free now (bytes):", last);
+	VITALS_LOG("xmb: watching; free now (bytes):" " %08X", (unsigned)(last));
 	int code_ok[2] = {1, 1}, module_ok[2] = {1, 1};
 	for (;;) {
 		lv2syscall1(LV2_TIMER_USLEEP, WATCH_STEP_US);
 		uint32_t available = 0;
 		memory_size(&total, &available);
 		if (available + WATCH_MEMORY_STEP <= last || available >= last + WATCH_MEMORY_STEP) {
-			log_value(1, "xmb: watch: the XMB's free memory is now (bytes)", available);
-			log_value(1, "xmb: watch: of (bytes)", total);
+			VITALS_LOG("xmb: watch: the XMB's free memory is now (bytes)" " %08X", (unsigned)(available));
+			VITALS_LOG("xmb: watch: of (bytes)" " %08X", (unsigned)(total));
 			last = available;
 		}
 		for (unsigned l = 0; l < count && l < 2; ++l) {
@@ -411,23 +400,21 @@ static void __attribute__((noreturn)) watch(const XmbLibrary *const *libraries, 
 					bad = island;
 			}
 			if ((bad == 0) != code_ok[l]) {
-				say(1, library->name);
-				log_value(1, bad ? "xmb: watch: the code written here changed, at" : "xmb: watch: the code is ours again",
-				          bad);
+				VITALS_LOG("%s", library->name);
+				VITALS_LOG("%s %08X", bad ? "xmb: watch: the code written here changed, at" : "xmb: watch: the code is ours again", (unsigned)(bad));
 				code_ok[l] = bad == 0;
 			}
 			uint32_t target = island_target(library->islands);
 			int present = readable(target) && readable(word_at(target));
 			if (present != module_ok[l]) {
-				say(1, library->name);
-				log_value(1, present ? "xmb: watch: vitals' module is back, its first descriptor at"
-				                     : "xmb: watch: vitals' module is gone, its first descriptor at",
-				          target);
+				VITALS_LOG("%s", library->name);
+				VITALS_LOG("%s %08X", present ? "xmb: watch: vitals' module is back, its first descriptor at"
+				                     : "xmb: watch: vitals' module is gone, its first descriptor at", (unsigned)(target));
 				module_ok[l] = present;
 			}
 		}
 		if (++steps % WATCH_HEARTBEAT_STEPS == 0)
-			log_value(2, "xmb: watch: still here; free (bytes)", available);
+			VITALS_VERBOSE("xmb: watch: still here; free (bytes)" " %08X", (unsigned)(available));
 	}
 }
 #endif
@@ -464,7 +451,7 @@ extern int32_t sysThreadCreate(uint32_t *thread, void (*entry)(void *), void *ar
 static int http_wanted(void)
 {
 	if (file_exists(VITALS_XMB_HTTP_OFF)) {
-		say(1, "xmb: xmb-http.off is there: the XMB keeps its own libhttp");
+		VITALS_LOG("xmb: xmb-http.off is there: the XMB keeps its own libhttp");
 		return XMB_OFF;
 	}
 	if (!file_exists(VITALS_LIBHTTP))
@@ -476,13 +463,13 @@ int vitals_xmb_start(int cut_short)
 {
 	/* xmb.off, an earlier build's, counts as xmb-tls.off until an install renames it */
 	if (file_exists(VITALS_XMB_TLS_OFF) || file_exists(VITALS_XMB_OLD_OFF)) {
-		say(1, "xmb: xmb-tls.off is there: the XMB keeps its own SSL and libhttp");
+		VITALS_LOG("xmb: xmb-tls.off is there: the XMB keeps its own SSL and libhttp");
 		/* Why the XMB's HTTP is Sony's, unless Options turned that off too */
 		g_http_state = file_exists(VITALS_XMB_HTTP_OFF) ? XMB_OFF : XMB_NEEDS_TLS;
 		return g_state = XMB_OFF;
 	}
 	if (cut_short) {
-		say(1, "xmb: the last boot didn't end properly: the XMB keeps its own SSL and libhttp this boot");
+		VITALS_LOG("xmb: the last boot didn't end properly: the XMB keeps its own SSL and libhttp this boot");
 		g_http_state = XMB_LEFT_OUT;
 		return XMB_LEFT_OUT;
 	}
@@ -493,7 +480,7 @@ int vitals_xmb_start(int cut_short)
 	uint32_t thread = 0;
 	int32_t rc = sysThreadCreate(&thread, xmb_thread, 0, 1000, 0x10000, 0, (char *)"vitals_xmb");
 	if (rc != 0) {
-		log_value(1, "xmb: no thread:", (uint32_t)rc);
+		VITALS_LOG("xmb: no thread:" " %08X", (unsigned)((uint32_t)rc));
 		g_http_state = XMB_NONE;
 		return g_state = XMB_FAILED;
 	}
@@ -504,29 +491,29 @@ static int load_and_patch(void)
 {
 	int (*is_initd)(void) = (int (*)(void))(uintptr_t)xmb_export("cellSsl", XMB_IS_INITD_NID);
 	if (is_initd() != 0) {
-		say(1, "xmb: the XMB has started its SSL already: it keeps it this boot");
+		VITALS_LOG("xmb: the XMB has started its SSL already: it keeps it this boot");
 		return XMB_TOO_LATE;
 	}
 	uint32_t total = 0, available = 0;
 	memory_size(&total, &available);
-	log_value(1, "xmb: the XMB's memory, free before vitals' libssl (bytes):", available);
+	VITALS_LOG("xmb: the XMB's memory, free before vitals' libssl (bytes):" " %08X", (unsigned)(available));
 #ifdef VITALS_XMB_WATCH_ONLY
-	say(1, "xmb: watch only: nothing loaded into the XMB");
+	VITALS_LOG("xmb: watch only: nothing loaded into the XMB");
 	return XMB_DRY_RUN;
 #endif
-	log_value(2, "xmb: of (bytes):", total);
+	VITALS_VERBOSE("xmb: of (bytes):" " %08X", (unsigned)(total));
 	static VitalsXmbRequest request;
 	sysPrxId id = 0;
 	if (load(&k_ssl, &id, &request) != 0)
 		return XMB_FAILED;
 #ifdef VITALS_XMB_DRY_RUN
 	(void)patch(&k_ssl, &request, 1);
-	say(1, "xmb: dry run: 4.93's XMB, SSL not started, vitals' libssl loaded with all 114 functions; "
+	VITALS_LOG("xmb: dry run: 4.93's XMB, SSL not started, vitals' libssl loaded with all 114 functions; "
 	       "nothing written");
 #ifdef VITALS_XMB_KEEP_LOADED
 	/* Left loaded, unused: the XMB's SSL is still its own, with vitals' memory taken */
 	(void)id;
-	say(1, "xmb: dry run: vitals' libssl stays loaded, unused");
+	VITALS_LOG("xmb: dry run: vitals' libssl stays loaded, unused");
 #else
 	unload(id);
 	free_now("xmb: dry run: free after libssl");
@@ -536,11 +523,11 @@ static int load_and_patch(void)
 	/* The XMB may have started SSL while libssl loaded: then no object of SSL-C's may reach vitals' */
 	int done = XMB_TOO_LATE;
 	if (is_initd() != 0)
-		say(1, "xmb: the XMB started its SSL while vitals' loaded: it keeps it this boot");
+		VITALS_LOG("xmb: the XMB started its SSL while vitals' loaded: it keeps it this boot");
 	else
 		done = patch(&k_ssl, &request, 0);
 	if (done == XMB_ON) {
-		say(1, "xmb: the XMB's 114 SSL functions go to vitals' libssl");
+		VITALS_LOG("xmb: the XMB's 114 SSL functions go to vitals' libssl");
 		return done;
 	}
 	unload(id);
@@ -558,7 +545,7 @@ static int load_and_patch_http(void)
 	int (*get_proxy)(void *, void *, uint32_t, uint32_t *) =
 	    (int (*)(void *, void *, uint32_t, uint32_t *))(uintptr_t)xmb_export("cellHttp", XMB_HTTP_GET_PROXY_NID);
 	if (get_proxy(NULL, NULL, 0, NULL) != HTTP_NOT_INITIALIZED) {
-		say(1, "xmb: the XMB has started its libhttp already: it keeps it this boot");
+		VITALS_LOG("xmb: the XMB has started its libhttp already: it keeps it this boot");
 		return XMB_TOO_LATE;
 	}
 	static VitalsXmbRequest request;
@@ -567,18 +554,18 @@ static int load_and_patch_http(void)
 		return XMB_FAILED;
 #ifdef VITALS_XMB_DRY_RUN
 	(void)patch(&k_http, &request, 1);
-	say(1, "xmb: dry run: vitals' libhttp loaded with all 201 functions; nothing written");
+	VITALS_LOG("xmb: dry run: vitals' libhttp loaded with all 201 functions; nothing written");
 	unload(id);
 	free_now("xmb: dry run: free after libhttp");
 	return XMB_DRY_RUN;
 #else
 	int done = XMB_TOO_LATE;
 	if (get_proxy(NULL, NULL, 0, NULL) != HTTP_NOT_INITIALIZED)
-		say(1, "xmb: the XMB started its libhttp while vitals' loaded: it keeps it this boot");
+		VITALS_LOG("xmb: the XMB started its libhttp while vitals' loaded: it keeps it this boot");
 	else
 		done = patch(&k_http, &request, 0);
 	if (done == XMB_ON) {
-		say(1, "xmb: the XMB's 201 HTTP functions go to vitals' libhttp");
+		VITALS_LOG("xmb: the XMB's 201 HTTP functions go to vitals' libhttp");
 		return done;
 	}
 	unload(id);

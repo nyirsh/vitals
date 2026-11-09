@@ -207,7 +207,7 @@ Available build options:
 | `TLS_HEAP_KIB` | `64`                     | memory (KiB) `vitals-http` keeps for TLS state, in a process's first https use                                                                                                                |
 | `USER_AGENT`   | `libhttp/3.74 (PS Vita)` | what `vitals-http` puts after each app's own User-Agent, unless `useragent.txt` gives another; up to 127 printable ASCII characters, without quotes, backslashes, backticks, `#`, `$` or `;` |
 
-Debug output levels, for `vitals-http` and the browser provider (lines start with `vitals-http:` for apps and games, `vitals_browser:` for the browser):
+Debug output levels, for `vitals-http` and the browser provider (every line starts with its component's name, the same on both consoles: `vitals-boot:`, `vitals-dns:`, `vitals-http:` for apps and games, `vitals-ssl:`, `vitals-browser:` for the browser, and `vitals-app:`; [shared/include/vitals/log.h](../shared/include/vitals/log.h)):
 
 - **Off (0):** nothing, the default
 - **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for

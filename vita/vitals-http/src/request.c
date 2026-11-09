@@ -1,7 +1,7 @@
 #include "vh.h"
 #include "vitals_http.h"
 
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "md5.h"
 
 #include <stdio.h>

@@ -1,3 +1,6 @@
+#define VITALS_LOG_NAME "vitals-boot"
+#define VITALS_LOG_KERNEL
+#include "vitals/log.h"
 #include "post_start.h"
 #include "tls13_loader.h"
 
@@ -109,7 +112,7 @@ int vitals_post_start_complete(SceUID pid, SceUID module, int native_result)
         return -1;
     if (!found)
         return 0;
-    ksceDebugPrintf("vitals: post_start pid=0x%X mod=0x%X native=0x%08X\n", pid, module, native_result);
+    VITALS_LOG_ALWAYS("post_start pid=0x%X mod=0x%X native=0x%08X", pid, module, native_result);
 
     /* The browser engine must finish native import linking and startup before injection */
     if (native_result != 0)

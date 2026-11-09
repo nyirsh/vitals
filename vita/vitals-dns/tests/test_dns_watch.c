@@ -450,7 +450,7 @@ static void test_log(void) {
     size_t length = query(message, "auth.api.np.ac.playstation.net", 1);
 
     assert(send_to(message, length, 53, 16));
-    assert(strcmp(last_log, "vitals: dns query pid=0x4321 title=NPXS10000 name=auth.api.np.ac.playstation.net type=1\n") == 0);
+    assert(strcmp(last_log, "vitals-dns: query pid=0x4321 title=NPXS10000 name=auth.api.np.ac.playstation.net type=1\n") == 0);
     /* A connected socket sends with no address; the query is still recognised */
     assert(send_to(message, length, 0, 0));
     /* Game traffic on a connected socket is not mistaken for a query */
@@ -495,12 +495,12 @@ static void test_redirect(void) {
     unsigned type;
     assert(vitals_dns_query_name(sent, sent_length, name, sizeof(name), &type) == 0);
     assert(strcmp(name, "activity.ture.fish") == 0 && sent[0] == 0x02 && sent[1] == 0x01);
-    assert(strcmp(last_log, "vitals: dns redirect pid=0x4321 title=NPXS10000 "
+    assert(strcmp(last_log, "vitals-dns: redirect pid=0x4321 title=NPXS10000 "
                             "activity01.ww.np.community.playstation.net -> activity.ture.fish\n") == 0);
     server_answers(2);
     int result = receive(3, buffer, sizeof(buffer), 0);
     assert(received_addresses(buffer, result, 0x0201, old_name, addresses) == 2 && addresses[1].octets[3] == 35);
-    assert(strcmp(last_log, "vitals: dns redirect answered pid=0x4321 title=NPXS10000 "
+    assert(strcmp(last_log, "vitals-dns: redirect answered pid=0x4321 title=NPXS10000 "
                             "name=activity01.ww.np.community.playstation.net address=93.184.216.34 count=2\n") == 0);
     /* Only that answer: the next one passes unchanged */
     assert(receive(3, buffer, sizeof(buffer), 0) == (int)network_length && last_log[0] == '\0');
@@ -534,7 +534,7 @@ static void test_redirect(void) {
     result = receive(3, buffer, sizeof(buffer), 0);
     assert(result >= 12 && (buffer[3] & 0x0f) == 3 && buffer[6] == 0 && buffer[7] == 0);
     assert(received_addresses(buffer, result, 0x0302, "ads.example", addresses) == 0);
-    assert(strstr(last_log, "dns blocked") != NULL && strstr(last_log, "name=ads.example") != NULL);
+    assert(strstr(last_log, "vitals-dns: blocked") != NULL && strstr(last_log, "name=ads.example") != NULL);
 
     /* Only the socket and process that asked get it, only the answer to that query, never a
      * peek, and only when it fits */
@@ -560,7 +560,7 @@ static void test_redirect(void) {
     assert(strstr(last_log, "failed rc=0x80024303") != NULL);
     block_failures = 0;
     /* Only A queries are redirected */
-    assert(!send_query(3, 0x0601, old_name, 28) && strstr(last_log, "dns query") != NULL);
+    assert(!send_query(3, 0x0601, old_name, 28) && strstr(last_log, "vitals-dns: query") != NULL);
 
     /* Many queries at once each keep their answer, up to the table's size */
     for (int socket = 10; socket < 18; ++socket) {

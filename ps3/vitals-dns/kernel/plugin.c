@@ -22,6 +22,10 @@
  * webMAN's unload of its slot would free code the table points at.
  * Kernel code: no libc, lv2's functions through lv2_call (entry.S) */
 
+#define VITALS_LOG_NAME "vitals-dns"
+#define VITALS_LOG_PLAIN
+#include "vitals/log.h"
+#include "vitals_log_format.h"
 #include <stdint.h>
 
 #include "dns_message.h"
@@ -45,7 +49,7 @@ uint64_t lv2_call(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a
 #define FS_O_TRUNC 01000
 #define FS_O_APPEND 02000
 
-#define LOG VITALS_LOG
+#define LOG VITALS_LOG_FILE
 
 /* A DNS query: a 12-byte header, at least a one-letter name, and the type and class */
 #define DNS_MESSAGE_MIN 17u
@@ -222,59 +226,31 @@ static void fs_close(int fd)
 }
 
 
-/* ---- the log, from plugin_main only: lines built by hand (no libc), appended to vitals.log ---- */
-
-typedef struct Line {
-	char text[160];
-	uint64_t used;
-} Line;
-
-static void add_text(Line *line, const char *text)
-{
-	while (*text != '\0' && line->used < sizeof(line->text) - 1)
-		line->text[line->used++] = *text++;
-}
-
-static void add_hex(Line *line, uint64_t value)
-{
-	static const char hex[] = "0123456789abcdef";
-	add_text(line, "0x");
-	for (int i = 0; i < 16 && line->used < sizeof(line->text) - 1; ++i)
-		line->text[line->used++] = hex[(value >> (60 - 4 * i)) & 0xf];
-}
+/* ---- the log, from plugin_main only: appended to vitals.log (vitals/log.h, vitals_log_format.h) ---- */
 
 /* The debug log, a build of its own per level as libssl's and libhttp's (make dns-plugin DEBUG=N,
  * build/vitals-dns-debugN; the app installs the one the user picks): 0 writes nothing, 1 (Basic
  * debug) what plugin_main did, 2 (Full debug) also where it is */
-#ifndef VITALS_DEBUG
-#define VITALS_DEBUG 0
-#endif
-
-static void write_line_at(uint64_t level, Line *line)
+#if VITALS_DEBUG >= 1
+void vitals_log_plain(const char *format, ...)
 {
-	if (VITALS_DEBUG < level)
-		return;
+	char line[160];
+	uint32_t used = 0;
+	for (const char *name = VITALS_LOG_NAME ": "; *name != '\0'; ++name)
+		line[used++] = *name;
+	va_list arguments;
+	va_start(arguments, format);
+	used += vitals_log_vformat(line + used, sizeof(line) - used - 1, format, arguments);
+	va_end(arguments);
+	line[used++] = '\n';
 	int fd = -1;
 	uint64_t written = 0;
-	line->text[line->used++] = '\n';
 	if (fs_open(LOG, FS_O_WRONLY | FS_O_CREAT | FS_O_APPEND, &fd) != 0)
 		return;
-	(void)CALL(LV2_CELLFS_WRITE, fd, line->text, line->used, &written, 0, 0);
+	(void)CALL(LV2_CELLFS_WRITE, fd, line, used, &written, 0, 0);
 	fs_close(fd);
 }
-
-static void write_line(Line *line)
-{
-	write_line_at(1, line);
-}
-
-static void log_text_now(const char *text)
-{
-	Line line;
-	line.used = 0;
-	add_text(&line, text);
-	write_line(&line);
-}
+#endif
 
 /* ---- the hooks ---- */
 
@@ -457,27 +433,6 @@ static int verify_lv2_files(void)
 	return 1;
 }
 
-static void log_status_now(const char *text, uint64_t status)
-{
-	Line line;
-	line.used = 0;
-	add_text(&line, text);
-	add_hex(&line, status);
-	write_line(&line);
-}
-
-/* Each line only in the builds of its level, its text with it */
-#define log_text(text)                                                                                                \
-	do {                                                                                                               \
-		if (VITALS_DEBUG >= 1)                                                                                         \
-			log_text_now(text);                                                                                        \
-	} while (0)
-#define log_status(text, status)                                                                                      \
-	do {                                                                                                               \
-		if (VITALS_DEBUG >= 1)                                                                                         \
-			log_status_now((text), (status));                                                                          \
-	} while (0)
-
 /* 1 when there's a file at path (opened and closed again) */
 static int file_exists(const char *path)
 {
@@ -503,24 +458,17 @@ int plugin_main(uint64_t base, uint64_t sendto_entry, uint64_t recvfrom_entry)
 		/* The log needs cellFs: only when its four functions are the ones expected (indices 0 to 3) */
 		if (mismatch >= STATUS_SIGNATURE + 4 || mismatch < STATUS_SIGNATURE)
 			if (verify_lv2_files()) {
-				log_status("vitals-dns: not 4.93's lv2, nothing hooked; status ", mismatch);
+				VITALS_LOG("not 4.93's lv2, nothing hooked; status 0x%016llx", (unsigned long long)mismatch);
 			}
 		return 0;
 	}
 	uint64_t toc;
 	__asm__("mr %0, 2" : "=r"(toc));
-	Line line;
-	if (VITALS_DEBUG >= 2) {
-		line.used = 0;
-		add_text(&line, "vitals-dns: kernel plugin loaded at ");
-		add_hex(&line, base);
-		add_text(&line, ", counts at ");
-		add_hex(&line, (uint64_t)&g_state);
-		write_line_at(2, &line);
-	}
+	VITALS_VERBOSE("kernel plugin loaded at 0x%016llx, counts at 0x%016llx", (unsigned long long)base,
+	               (unsigned long long)(uint64_t)&g_state);
 	if (file_exists(OFF_FLAG)) {
 		g_state.status = STATUS_OFF;
-		log_text("vitals-dns: dns.off is there: nothing hooked");
+		VITALS_LOG("dns.off is there: nothing hooked");
 		return 0;
 	}
 
@@ -537,16 +485,10 @@ int plugin_main(uint64_t base, uint64_t sendto_entry, uint64_t recvfrom_entry)
 	vitals_dns_rules_init(&g_rules, 0);
 	g_rules.rename = 1;
 	g_state.rules = vitals_dns_rules_load_text(&g_rules, g_list, g_list_length, now_us());
-	if (VITALS_DEBUG >= 1) {
-		line.used = 0;
-		add_text(&line, g_list_length == LIST_MAX ? "vitals-dns: dns.txt cut at 16 KB; rules: " : "vitals-dns: rules: ");
-		line.text[line.used++] = (char)('0' + g_state.rules / 10 % 10);
-		line.text[line.used++] = (char)('0' + g_state.rules % 10);
-		write_line(&line);
-	}
+	VITALS_LOG("%srules: %02u", g_list_length == LIST_MAX ? "dns.txt cut at 16 KB; " : "", (unsigned)g_state.rules);
 	if (g_state.rules == 0) {
 		g_state.status = STATUS_NO_RULES;
-		log_text("vitals-dns: no rules in dns.txt: nothing hooked");
+		VITALS_LOG("no rules in dns.txt: nothing hooked");
 		return 0;
 	}
 
@@ -556,7 +498,7 @@ int plugin_main(uint64_t base, uint64_t sendto_entry, uint64_t recvfrom_entry)
 	    ((const Lv2Descriptor *)table[LV2_SYSCALL_NET_SENDTO])->function != LV2(LV2_HANDLER_NET_SENDTO) ||
 	    ((const Lv2Descriptor *)table[LV2_SYSCALL_NET_RECVFROM])->function != LV2(LV2_HANDLER_NET_RECVFROM)) {
 		g_state.status = STATUS_TABLE_CHANGED;
-		log_text("vitals-dns: not hooked: the syscall table doesn't hold lv2's own sendto and recvfrom");
+		VITALS_LOG("not hooked: the syscall table doesn't hold lv2's own sendto and recvfrom");
 		return 0;
 	}
 	const Lv2Descriptor *sendto = (const Lv2Descriptor *)table[LV2_SYSCALL_NET_SENDTO];
@@ -571,15 +513,11 @@ int plugin_main(uint64_t base, uint64_t sendto_entry, uint64_t recvfrom_entry)
 	g_recvfrom_hook.toc = toc;
 	/* The descriptors are whole before the table points at them */
 	sync_memory();
-	if (VITALS_DEBUG >= 2) {
-		line.used = 0;
-		add_text(&line, "vitals-dns: swapping the table's entries");
-		write_line_at(2, &line);
-	}
+	VITALS_VERBOSE("swapping the table's entries");
 	table[LV2_SYSCALL_NET_SENDTO] = (uint64_t)&g_sendto_hook;
 	table[LV2_SYSCALL_NET_RECVFROM] = (uint64_t)&g_recvfrom_hook;
 	sync_memory();
 	g_state.status = STATUS_HOOKED;
-	log_text("vitals-dns: sendto and recvfrom hooked");
+	VITALS_LOG("sendto and recvfrom hooked");
 	return 0;
 }

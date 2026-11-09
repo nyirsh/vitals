@@ -1,6 +1,6 @@
 #include "vitals/browser_abi.h"
 #include "vitals/sony_abi.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 
 #include <string.h>
 

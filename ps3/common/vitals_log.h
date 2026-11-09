@@ -11,7 +11,7 @@
 
 #include "vitals_paths.h"
 
-#define VITALS_LOG_PATH VITALS_LOG
+#define VITALS_LOG_PATH VITALS_LOG_FILE
 
 /* lv2: sys_tty_write 403, sys_fs_open 801, sys_fs_write 803, sys_fs_close 804 */
 #define VITALS_LV2_TTY_WRITE 403

@@ -1,5 +1,5 @@
 #include "ca_index.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "vitals/ca_scan.h"
 
 #include <mbedtls/platform.h>

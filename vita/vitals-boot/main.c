@@ -3,6 +3,9 @@
     All Rights Reserved
 */
 
+#define VITALS_LOG_NAME "vitals-boot"
+#define VITALS_LOG_KERNEL
+#include "vitals/log.h"
 #include <psp2kern/kernel/debug.h>
 #include <psp2kern/kernel/modulemgr.h>
 #include <psp2kern/kernel/processmgr.h>
@@ -92,9 +95,9 @@ static int path_is(const char *path, const char *a, const char *b)
  * the error */
 static SceUID load_engine_for_process(SceUID target_pid, const char *path, SceUID failed)
 {
-    ksceDebugPrintf("vitals: browser engine: the process's load failed (0x%08X)\n", failed);
+    VITALS_LOG_ALWAYS("browser engine: the process's load failed (0x%08X)", failed);
     SceUID res = ksceKernelLoadModuleForPid(target_pid, path, 0, NULL);
-    ksceDebugPrintf("vitals: browser engine: kernel load for pid=0x%X: 0x%08X\n", target_pid, res);
+    VITALS_LOG_ALWAYS("browser engine: kernel load for pid=0x%X: 0x%08X", target_pid, res);
     return res;
 }
 
@@ -109,13 +112,13 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
          path_is(path, "ur0:data/reAuth/libhttp.suprx", NULL)) &&
         replace_libhttp())
     {
-        ksceDebugPrintf("vitals: libhttp load pid=0x%X flags=0x%08X path=%s\n", target_pid, flags, path);
+        VITALS_LOG_ALWAYS("libhttp load pid=0x%X flags=0x%08X path=%s", target_pid, flags, path);
         module = MODULE_LIBHTTP;
         path = g_replacement_modules[module];
     }
     else if (path_is(path, "vs0:sys/external/libssl.suprx", "vs0:/sys/external/libssl.suprx") && replace_libssl())
     {
-        ksceDebugPrintf("vitals: libssl load pid=0x%X flags=0x%08X\n", target_pid, flags);
+        VITALS_LOG_ALWAYS("libssl load pid=0x%X flags=0x%08X", target_pid, flags);
         module = MODULE_LIBSSL;
         path = g_replacement_modules[module];
     }
@@ -136,7 +139,7 @@ static SceUID load_for_pid_patched(SceUID pid, const char *path, uint32_t flags,
     {
         /* vitals' engine didn't load for this process: Sony's, so the browser still opens, without
          * vitals' TLS (nothing is injected into it) */
-        ksceDebugPrintf("vitals: browser engine from %s failed (0x%08X), Sony's instead: %s\n", path, res, requested);
+        VITALS_LOG_ALWAYS("browser engine from %s failed (0x%08X), Sony's instead: %s", path, res, requested);
         module = -1;
         res = TAI_CONTINUE(SceUID, g_loader_hook_ref, pid, requested, flags, ptr_to_four);
     }
@@ -187,7 +190,7 @@ int module_start(SceSize argc, const void *args)
     (void)argc;
     (void)args;
 
-    ksceDebugPrintf("vitals module loaded\n");
+    VITALS_LOG_ALWAYS("module loaded");
     /* The hooks go in whatever is there now: vitals' modules are looked for at each load */
 
 #if defined(__arm__)
@@ -198,7 +201,7 @@ int module_start(SceSize argc, const void *args)
     /* The browser provider, injected after vitals' browser engine starts; ready once it and the
      * engine are found, now or at an engine load */
     int init = vitals_kernel_loader_init();
-    ksceDebugPrintf("vitals: loader init=%d browser=%d\n", init, vitals_kernel_browser_loader_ready());
+    VITALS_LOG_ALWAYS("loader init=%d browser=%d", init, vitals_kernel_browser_loader_ready());
 
     SceUID modid = ksceKernelSearchModuleByName("SceKernelModulemgr");
     if (modid <= 0 || vitals_validate_loader_hook(modid) < 0 || vitals_post_start_init() < 0)
@@ -211,13 +214,13 @@ int module_start(SceSize argc, const void *args)
                                                       VITALS_MODULEMGR_LOAD_OFFSET, 1, load_for_pid_patched);
     /* The start hook may already be running on another thread; its code must stay mapped */
     if (g_loader_hook_id < 0)
-        ksceDebugPrintf("vitals: loader hook failed: 0x%08X\n", g_loader_hook_id);
+        VITALS_LOG_ALWAYS("loader hook failed: 0x%08X", g_loader_hook_id);
     /* The DNS rules (ux0:data/vitals/dns.txt), for every lookup in every process */
     (void)vitals_dns_watch_start();
     return SCE_KERNEL_START_SUCCESS;
 
 failed:
-    ksceDebugPrintf("vitals: startup failed before hooking\n");
+    VITALS_LOG_ALWAYS("startup failed before hooking");
     (void)vitals_post_start_destroy();
     vitals_kernel_loader_destroy();
     return SCE_KERNEL_START_FAILED;

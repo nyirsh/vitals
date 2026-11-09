@@ -20,7 +20,8 @@ option(VITALS_XMB "Put vitals' libssl in the XMB's own SSL-C's place" OFF)
 # The XMB's own TLS checked and vitals' libssl loaded into it, nothing written (src/xmb.c): for a
 # first boot with it (make plugin XMB_DRY_RUN=1)
 option(VITALS_XMB_DRY_RUN "Check the XMB and load vitals' libssl into it, without patching it" OFF)
-set(VITALS_BOOT_DEFINITIONS VITALS_DEBUG=${VITALS_DEBUG} VITALS_VERSION="${VITALS_VERSION}")
+set(VITALS_BOOT_DEFINITIONS VITALS_DEBUG=${VITALS_DEBUG} VITALS_VERSION="${VITALS_VERSION}"
+	VITALS_LOG_NAME="vitals-boot" VITALS_LOG_PLAIN)
 if(VITALS_XMB_DRY_RUN)
 	list(APPEND VITALS_BOOT_DEFINITIONS VITALS_XMB_DRY_RUN)
 endif()

@@ -59,7 +59,7 @@ int cellHttpCreateClient(CellHttpClientId *id)
 	vh_clients_add(client);
 	vh_unlock();
 	*id = (CellHttpClientId)client;
-	VH_LOG("cellHttpCreateClient -> %p", (void *)client);
+	VITALS_LOG("cellHttpCreateClient -> %p", (void *)client);
 	return 0;
 }
 
@@ -83,7 +83,7 @@ void vh_client_free(VhClient *client)
 
 int cellHttpDestroyClient(CellHttpClientId id)
 {
-	VH_LOG("cellHttpDestroyClient %p", (void *)id);
+	VITALS_LOG("cellHttpDestroyClient %p", (void *)id);
 	WITH_CLIENT(id, client);
 	vh_lock();
 	vh_clients_remove(client);
@@ -105,7 +105,7 @@ void vh_connection_state(VhClient *client, int fd, const VhTransaction *t, uint3
 	if (client == NULL || fd < 0 || client->callbacks[VH_CALLBACK_CONNECTION_STATE] == NULL)
 		return;
 	ConnectionStateCallback callback = (ConnectionStateCallback)client->callbacks[VH_CALLBACK_CONNECTION_STATE];
-	VH_LOG("client %p: connection-state callback, socket %d, state %u", (void *)client, fd, (unsigned)state);
+	VITALS_LOG("client %p: connection-state callback, socket %d, state %u", (void *)client, fd, (unsigned)state);
 	(void)callback(&g_connection_handles[(unsigned)fd % sizeof(g_connection_handles)], (CellHttpTransId)t, state,
 	               client->callback_arguments[VH_CALLBACK_CONNECTION_STATE]);
 }
@@ -118,7 +118,7 @@ void vh_connection_closed(VhClient *client, const VhTransaction *t, int fd, void
 
 void vh_connection_close(VhClient *client, int fd, void *ssl)
 {
-	VH_LOG("client %p closes socket %d%s", (void *)client, fd, ssl != NULL ? " (TLS)" : "");
+	VITALS_LOG("client %p closes socket %d%s", (void *)client, fd, ssl != NULL ? " (TLS)" : "");
 	if (ssl != NULL && client != NULL && client->callbacks[VH_CALLBACK_SSL_ID_DESTROY] != NULL) {
 		CellHttpSslIdDestroyCallback callback = (CellHttpSslIdDestroyCallback)client->callbacks[VH_CALLBACK_SSL_ID_DESTROY];
 		(void)callback((CellHttpSslId)ssl, client->callback_arguments[VH_CALLBACK_SSL_ID_DESTROY]);
@@ -138,7 +138,7 @@ int vh_client_take_idle(VhClient *client, const char *host, unsigned port, int h
 			*at = idle->next;
 			fd = idle->fd;
 			*ssl = idle->ssl;
-			VH_LOG("client %p reuses socket %d to %s:%u%s", (void *)client, fd, host, port, *ssl != NULL ? " (TLS)" : "");
+			VITALS_LOG("client %p reuses socket %d to %s:%u%s", (void *)client, fd, host, port, *ssl != NULL ? " (TLS)" : "");
 			vh_free(idle->host);
 			vh_free(idle);
 			break;
@@ -167,7 +167,7 @@ void vh_client_keep_idle(VhClient *client, const char *host, unsigned port, int 
 	idle->port = port;
 	idle->fd = fd;
 	idle->ssl = ssl;
-	VH_LOG("client %p keeps socket %d to %s:%u", (void *)client, fd, host, port);
+	VITALS_LOG("client %p keeps socket %d to %s:%u", (void *)client, fd, host, port);
 	idle->next = client->idle;
 	client->idle = idle;
 	vh_unlock();
@@ -176,7 +176,7 @@ void vh_client_keep_idle(VhClient *client, const char *host, unsigned port, int 
 /* The kept connections to the URI's host and port; nothing for no URI, as Sony's */
 int cellHttpClientCloseConnections(CellHttpClientId id, const CellHttpUri *uri)
 {
-	VH_LOG("cellHttpClientCloseConnections %p %s", (void *)id, uri != NULL && uri->hostname != NULL ? uri->hostname : "-");
+	VITALS_LOG("cellHttpClientCloseConnections %p %s", (void *)id, uri != NULL && uri->hostname != NULL ? uri->hostname : "-");
 	WITH_CLIENT(id, client);
 	if (uri == NULL || uri->hostname == NULL)
 		return 0;
@@ -201,7 +201,7 @@ int cellHttpClientCloseConnections(CellHttpClientId id, const CellHttpUri *uri)
  * 0x80710012 when none is waiting for one, 0x80710093 when none came in time */
 int cellHttpClientPollConnections(CellHttpClientId id, CellHttpTransId *out, int64_t usec)
 {
-	VH_LOG2("cellHttpClientPollConnections %p", (void *)id);
+	VITALS_VERBOSE("cellHttpClientPollConnections %p", (void *)id);
 	WITH_CLIENT(id, client);
 	if (out == NULL)
 		return VH_ERROR_NO_BUFFER;
@@ -234,7 +234,7 @@ int cellHttpClientPollConnections(CellHttpClientId id, CellHttpTransId *out, int
 
 int cellHttpClientCloseAllConnections(CellHttpClientId id)
 {
-	VH_LOG("cellHttpClientCloseAllConnections %p", (void *)id);
+	VITALS_LOG("cellHttpClientCloseAllConnections %p", (void *)id);
 	WITH_CLIENT(id, client);
 	vh_lock();
 	while (client->idle != NULL) {
@@ -253,14 +253,14 @@ int cellHttpClientCloseAllConnections(CellHttpClientId id)
 #define FLAG(Name, field)                                                \
 	int cellHttpClientSet##Name(CellHttpClientId id, bool enable)    \
 	{                                                                \
-		VH_LOG("cellHttpClientSet" #Name " %p %d", (void *)id, enable ? 1 : 0); \
+		VITALS_LOG("cellHttpClientSet" #Name " %p %d", (void *)id, enable ? 1 : 0); \
 		WITH_CLIENT(id, client);                                 \
 		client->field = enable ? 1 : 0;                          \
 		return 0;                                                \
 	}                                                                \
 	int cellHttpClientGet##Name(CellHttpClientId id, bool *enable)   \
 	{                                                                \
-		VH_LOG2("cellHttpClientGet" #Name " %p", (void *)id);  \
+		VITALS_VERBOSE("cellHttpClientGet" #Name " %p", (void *)id);  \
 		WITH_CLIENT(id, client);                                 \
 		if (enable == NULL)                                      \
 			return VH_ERROR_NO_BUFFER;                       \
@@ -279,7 +279,7 @@ FLAG(ConnectionWaitStatus, connection_wait)
 #define VALUE_MAX(Name, field, type, max)                                \
 	int cellHttpClientSet##Name(CellHttpClientId id, type value)     \
 	{                                                                \
-		VH_LOG("cellHttpClientSet" #Name " %p %ld", (void *)id, (long)value); \
+		VITALS_LOG("cellHttpClientSet" #Name " %p %ld", (void *)id, (long)value); \
 		WITH_CLIENT(id, client);                                 \
 		if ((max) != 0 && (uint64_t)value > (uint64_t)(max))     \
 			return VH_ERROR_INVALID_VALUE;                   \
@@ -288,7 +288,7 @@ FLAG(ConnectionWaitStatus, connection_wait)
 	}                                                                \
 	int cellHttpClientGet##Name(CellHttpClientId id, type *value)    \
 	{                                                                \
-		VH_LOG2("cellHttpClientGet" #Name " %p", (void *)id);  \
+		VITALS_VERBOSE("cellHttpClientGet" #Name " %p", (void *)id);  \
 		WITH_CLIENT(id, client);                                 \
 		if (value == NULL)                                       \
 			return VH_ERROR_NO_BUFFER;                       \
@@ -312,7 +312,7 @@ VALUE(MinSslVersion, min_ssl_version, int32_t)
 
 int cellHttpClientSetVersion(CellHttpClientId id, uint32_t major, uint32_t minor)
 {
-	VH_LOG("cellHttpClientSetVersion %p %u.%u", (void *)id, (unsigned)major, (unsigned)minor);
+	VITALS_LOG("cellHttpClientSetVersion %p %u.%u", (void *)id, (unsigned)major, (unsigned)minor);
 	WITH_CLIENT(id, client);
 	client->major = major;
 	client->minor = minor;
@@ -321,7 +321,7 @@ int cellHttpClientSetVersion(CellHttpClientId id, uint32_t major, uint32_t minor
 
 int cellHttpClientGetVersion(CellHttpClientId id, uint32_t *major, uint32_t *minor)
 {
-	VH_LOG2("cellHttpClientGetVersion %p", (void *)id);
+	VITALS_VERBOSE("cellHttpClientGetVersion %p", (void *)id);
 	WITH_CLIENT(id, client);
 	if (major == NULL || minor == NULL)
 		return VH_ERROR_NO_BUFFER;
@@ -332,7 +332,7 @@ int cellHttpClientGetVersion(CellHttpClientId id, uint32_t *major, uint32_t *min
 
 int cellHttpClientSetUserAgent(CellHttpClientId id, const char *agent)
 {
-	VH_LOG("cellHttpClientSetUserAgent %p \"%s\"", (void *)id, agent != NULL ? agent : "-");
+	VITALS_LOG("cellHttpClientSetUserAgent %p \"%s\"", (void *)id, agent != NULL ? agent : "-");
 	WITH_CLIENT(id, client);
 	if (agent == NULL)
 		return VH_ERROR_NO_BUFFER;
@@ -348,7 +348,7 @@ int cellHttpClientSetUserAgent(CellHttpClientId id, const char *agent)
  * small (the probe) */
 int cellHttpClientGetUserAgent(CellHttpClientId id, char *agent, size_t size, size_t *required)
 {
-	VH_LOG2("cellHttpClientGetUserAgent %p", (void *)id);
+	VITALS_VERBOSE("cellHttpClientGetUserAgent %p", (void *)id);
 	WITH_CLIENT(id, client);
 	size_t need = strlen(client->user_agent) + 1;
 	if (required != NULL)
@@ -368,7 +368,7 @@ int cellHttpClientGetUserAgent(CellHttpClientId id, char *agent, size_t size, si
 static void log_header(const char *call, const void *id, const CellHttpHeader *header)
 {
 	char hidden[24];
-	VH_LOG("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
+	VITALS_LOG("%s %p %s: %s", call, id, header != NULL && header->name != NULL ? header->name : "-",
 	       header != NULL ? vh_log_header(header->name, header->value, hidden, sizeof(hidden)) : "-");
 }
 #else
@@ -395,7 +395,7 @@ int cellHttpClientAddHeader(CellHttpClientId id, const CellHttpHeader *header)
 
 int cellHttpClientDeleteHeader(CellHttpClientId id, const char *name)
 {
-	VH_LOG("cellHttpClientDeleteHeader %p %s", (void *)id, name != NULL ? name : "-");
+	VITALS_LOG("cellHttpClientDeleteHeader %p %s", (void *)id, name != NULL ? name : "-");
 	WITH_CLIENT(id, client);
 	return vh_headers_delete(&client->headers, name);
 }
@@ -403,7 +403,7 @@ int cellHttpClientDeleteHeader(CellHttpClientId id, const char *name)
 int cellHttpClientGetHeader(CellHttpClientId id, CellHttpHeader *header, const char *name, void *pool, size_t size,
                             size_t *required)
 {
-	VH_LOG2("cellHttpClientGetHeader %p", (void *)id);
+	VITALS_VERBOSE("cellHttpClientGetHeader %p", (void *)id);
 	WITH_CLIENT(id, client);
 	return vh_headers_get(&client->headers, header, name, pool, size, required);
 }
@@ -411,7 +411,7 @@ int cellHttpClientGetHeader(CellHttpClientId id, CellHttpHeader *header, const c
 int cellHttpClientGetAllHeaders(CellHttpClientId id, CellHttpHeaderPtr *headers, size_t *items, void *pool,
                                 size_t size, size_t *required)
 {
-	VH_LOG2("cellHttpClientGetAllHeaders %p", (void *)id);
+	VITALS_VERBOSE("cellHttpClientGetAllHeaders %p", (void *)id);
 	WITH_CLIENT(id, client);
 	return vh_headers_get_all(&client->headers, headers, items, pool, size, required);
 }
@@ -421,7 +421,7 @@ int cellHttpClientGetAllHeaders(CellHttpClientId id, CellHttpHeaderPtr *headers,
 #define CALLBACK(Name, type, slot)                                                         \
 	int cellHttpClientSet##Name(CellHttpClientId id, type callback, void *argument)     \
 	{                                                                                  \
-		VH_LOG("cellHttpClientSet" #Name " %p %p", (void *)id, (void *)callback);   \
+		VITALS_LOG("cellHttpClientSet" #Name " %p %p", (void *)id, (void *)callback);   \
 		WITH_CLIENT(id, client);                                                   \
 		client->callbacks[slot] = (void *)callback;                                \
 		client->callback_arguments[slot] = argument;                               \

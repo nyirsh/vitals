@@ -209,19 +209,8 @@ int vs_bio_write(void *handle, const void *data, size_t length);
  * server's alerts and closing, the pool's use, calls this libssl ignores); 2 also every read and
  * write (one-byte reads in a row as one line) and the HTTP headers that go by (secrets as their
  * length), and the details under level 1's lines */
-#ifndef VITALS_DEBUG
-#define VITALS_DEBUG 0
-#endif
-#if VITALS_DEBUG >= 1
-void vs_log(const char *format, ...) __attribute__((format(printf, 1, 2)));
-#define VS_LOG(...) vs_log(__VA_ARGS__)
-#else
-#define VS_LOG(...) ((void)0)
-#endif
-#if VITALS_DEBUG >= 2
-#define VS_LOG2(...) vs_log(__VA_ARGS__)
-#else
-#define VS_LOG2(...) ((void)0)
-#endif
+/* Its log (vitals/log.h), through vs_log, as vitals.log and the TTY take whole lines */
+#define VITALS_LOG_PRINTF vs_log
+#include "vitals/log.h"
 
 #endif

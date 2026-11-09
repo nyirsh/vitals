@@ -44,7 +44,7 @@ static void flush_one_byte_reads(VsSsl *ssl)
 {
 #if VITALS_DEBUG >= 2
 	if (ssl->one_byte_reads > 0)
-		VS_LOG2("ssl %p read %d byte%s, one at a time", (void *)ssl, ssl->one_byte_reads,
+		VITALS_VERBOSE("ssl %p read %d byte%s, one at a time", (void *)ssl, ssl->one_byte_reads,
 		        ssl->one_byte_reads == 1 ? "" : "s");
 #endif
 	ssl->one_byte_reads = 0;
@@ -126,7 +126,7 @@ void *SSL_CTX_new(const void *method)
 	context->cache_mode = 2;
 	context->cache_size = 20480;
 	context->value_55 = context->value_56 = 1;
-	VS_LOG("SSL_CTX_new %p", (void *)context);
+	VITALS_LOG("SSL_CTX_new %p", (void *)context);
 	return context;
 }
 
@@ -153,7 +153,7 @@ static void context_release(VsContext *context)
 void SSL_CTX_free(void *handle)
 {
 	if (is_context(handle)) {
-		VS_LOG("SSL_CTX_free %p", handle);
+		VITALS_LOG("SSL_CTX_free %p", handle);
 		context_release(handle);
 	}
 }
@@ -198,7 +198,7 @@ long SSL_CTX_ctrl(void *handle, int command, long value, void *pointer)
 		context->value_56 = value;
 		return old;
 	default:
-		VS_LOG("ctx ctrl %d ignored", command);
+		VITALS_LOG("ctx ctrl %d ignored", command);
 		return 0;
 	}
 }
@@ -502,7 +502,7 @@ long BIO_ctrl(void *handle, int command, long value, void *pointer)
 	case 128:
 		return 1;
 	default:
-		VS_LOG("bio ctrl %d %ld ignored", command, value);
+		VITALS_LOG("bio ctrl %d %ld ignored", command, value);
 		return 0;
 	}
 }
@@ -630,7 +630,7 @@ void *SSL_new(void *handle)
 	ssl->info_callback = context->info_callback;
 	mbedtls_ssl_init(&ssl->tls);
 	mbedtls_ssl_config_init(&ssl->config);
-	VS_LOG("SSL_new %p from %p", (void *)ssl, (void *)context);
+	VITALS_LOG("SSL_new %p from %p", (void *)ssl, (void *)context);
 	return ssl;
 }
 
@@ -681,7 +681,7 @@ void SSL_free(void *handle)
 #if VITALS_DEBUG >= 1
 	VitalsPoolUse use;
 	if (vitals_pool_use(&use) == 0)
-		VS_LOG("SSL_free %p; pool %u bytes free of %u, %u at the lowest, %u refused", (void *)ssl,
+		VITALS_LOG("SSL_free %p; pool %u bytes free of %u, %u at the lowest, %u refused", (void *)ssl,
 		       (unsigned)use.free_now, (unsigned)use.size, (unsigned)use.lowest_free, (unsigned)use.refused);
 #endif
 	reset(ssl);
@@ -864,7 +864,7 @@ static void log_anchor(const VsSsl *ssl, const mbedtls_x509_crt *top, int accept
 	if (mbedtls_x509_dn_gets(issuer, sizeof(issuer), &top->issuer) < 0)
 		memcpy(issuer, "?", 2);
 	const char *source = vs_ca_store_source(top->issuer_raw.p, top->issuer_raw.len, text);
-	VS_LOG("ssl %p %s: issued by %s, %s%s", (const void *)ssl, accepted ? "trusted" : "not trusted", issuer,
+	VITALS_LOG("ssl %p %s: issued by %s, %s%s", (const void *)ssl, accepted ? "trusted" : "not trusted", issuer,
 	       source != NULL ? "from " : "which neither Sony's CAs nor Mozilla's bundle has",
 	       source != NULL ? source : "");
 }
@@ -902,7 +902,7 @@ static void log_refusal(VsSsl *ssl, mbedtls_x509_crt *chain)
 			break;
 		used += (size_t)n;
 	}
-	VS_LOG("ssl %p refused: libhttp's reason %d (%s); Mbed TLS finds %s (host %s)", (void *)ssl,
+	VITALS_LOG("ssl %p refused: libhttp's reason %d (%s); Mbed TLS finds %s (host %s)", (void *)ssl,
 	       ssl->verify_result, verify_reason(ssl->verify_result), used != 0 ? text : "nothing else wrong",
 	       host != NULL ? host : "-");
 }
@@ -930,13 +930,13 @@ static int verify_with_callback(void *context, mbedtls_x509_crt *certificate, in
 		++count;
 	}
 	ssl->verify_result = 0;
-	VS_LOG2("ssl %p verify callback with a chain of %d", (void *)ssl, count);
+	VITALS_VERBOSE("ssl %p verify callback with a chain of %d", (void *)ssl, count);
 	int accepted = ssl->context->verify_callback(ssl, handles, count, ssl->context->verify_argument,
 	                                             &ssl->verify_result);
 	for (int i = 0; i < count; ++i)
 		vs_cert_return(&certs[i]);
 	VS_FREE(certs);
-	VS_LOG("ssl %p verify callback %d reason=%d chain=%d", (void *)ssl, accepted, ssl->verify_result, count);
+	VITALS_LOG("ssl %p verify callback %d reason=%d chain=%d", (void *)ssl, accepted, ssl->verify_result, count);
 #if VITALS_DEBUG >= 1
 	if (count > 0)
 		log_anchor(ssl, top, accepted);
@@ -1052,7 +1052,7 @@ static int setup(VsSsl *ssl)
 		return result;
 	mbedtls_ssl_set_bio(&ssl->tls, ssl, tls_send, tls_recv, NULL);
 	ssl->ready = 1;
-	VS_LOG("ssl %p host=%s verify=%d%s", (void *)ssl, host != NULL ? host : "-", verify, console ? " profile=console" : "");
+	VITALS_LOG("ssl %p host=%s verify=%d%s", (void *)ssl, host != NULL ? host : "-", verify, console ? " profile=console" : "");
 	return 0;
 }
 
@@ -1108,14 +1108,14 @@ static int failed(VsSsl *ssl, int result)
 		return -1;
 	if (result == MBEDTLS_ERR_SSL_CONN_EOF) {
 		if (!ssl->close_logged)
-			VS_LOG("ssl %p the server closed the connection without a close_notify", (void *)ssl);
+			VITALS_LOG("ssl %p the server closed the connection without a close_notify", (void *)ssl);
 		ssl->close_logged = 1;
 		ssl->failure = VS_FAILED_EOF;
 		return 0;
 	}
 	if (result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
 		if (!ssl->close_logged)
-			VS_LOG("ssl %p the server closed the connection (close_notify)", (void *)ssl);
+			VITALS_LOG("ssl %p the server closed the connection (close_notify)", (void *)ssl);
 		ssl->close_logged = 1;
 		ssl->failure = VS_FAILED_CLOSED;
 		ssl->close_notify = 1;
@@ -1126,7 +1126,7 @@ static int failed(VsSsl *ssl, int result)
 	/* SSL-C's library, Mbed TLS's error as the reason */
 	vs_error_push((unsigned long)VS_ERR_LIB_SSL << 24 | ((unsigned long)-result & 0xFFF));
 	if (result == MBEDTLS_ERR_SSL_FATAL_ALERT_MESSAGE)
-		VS_LOG("ssl %p the server sent a fatal alert: %d, %s", (void *)ssl,
+		VITALS_LOG("ssl %p the server sent a fatal alert: %d, %s", (void *)ssl,
 		       (int)ssl->tls.MBEDTLS_PRIVATE(in_msg)[1], alert_name(ssl->tls.MBEDTLS_PRIVATE(in_msg)[1]));
 	/* An alert from the server, for the info callback */
 	if (result == MBEDTLS_ERR_SSL_FATAL_ALERT_MESSAGE && ssl->info_callback != NULL)
@@ -1148,19 +1148,19 @@ static int connect_now(VsSsl *ssl)
 	 * check and the game's SSL callback then run on the game's thread, under its locks, as they
 	 * expect */
 	int handshake = mbedtls_ssl_handshake(&ssl->tls);
-	VS_LOG2("ssl %p handshake -0x%04X", (void *)ssl, (unsigned)-handshake);
+	VITALS_VERBOSE("ssl %p handshake -0x%04X", (void *)ssl, (unsigned)-handshake);
 	if (ssl->failure == VS_FAILED_WANT_READ || ssl->failure == VS_FAILED_WANT_WRITE ||
 	    ssl->failure == VS_FAILED_SOCKET)
 		vs_platform_set_net_errno(ssl->socket_errno);
 	if (handshake != 0) {
 		int returned = failed(ssl, handshake);
 		if (ssl->failure == VS_FAILED_TLS)
-			VS_LOG("ssl %p handshake failed -0x%04X flags=%08X", (void *)ssl, (unsigned)-handshake,
+			VITALS_LOG("ssl %p handshake failed -0x%04X flags=%08X", (void *)ssl, (unsigned)-handshake,
 			       (unsigned int)mbedtls_ssl_get_verify_result(&ssl->tls));
 		return returned;
 	}
 	ssl->handshake_done = 1;
-	VS_LOG("ssl %p connected %s %s", (void *)ssl, mbedtls_ssl_get_version(&ssl->tls),
+	VITALS_LOG("ssl %p connected %s %s", (void *)ssl, mbedtls_ssl_get_version(&ssl->tls),
 	       mbedtls_ssl_get_ciphersuite(&ssl->tls));
 	return 1;
 }
@@ -1230,13 +1230,13 @@ static int tls_io(VsSsl *ssl, unsigned char *data, size_t size, int op)
 	int rc = vs_platform_run_with_stack(io_on_this_thread, &io, VS_HELPER_STACK);
 	if (rc != 0) {
 		/* What may run off the caller's stack: the one case that hung PSN's writer before */
-		VS_LOG("ssl %p %s %u: no thread of its own (0x%08X), so on the caller's %u of %u bytes of stack left",
+		VITALS_LOG("ssl %p %s %u: no thread of its own (0x%08X), so on the caller's %u of %u bytes of stack left",
 		       (void *)ssl, k_io_names[op], (unsigned)size, (unsigned)rc, (unsigned)stack_left,
 		       (unsigned)stack_size);
 		io_on_this_thread(&io);
 		return io.result;
 	}
-	VS_LOG2("ssl %p %s %u ran on a thread of its own: the caller had %u of %u bytes of stack left", (void *)ssl,
+	VITALS_VERBOSE("ssl %p %s %u ran on a thread of its own: the caller had %u of %u bytes of stack left", (void *)ssl,
 	        k_io_names[op], (unsigned)size, (unsigned)stack_left, (unsigned)stack_size);
 	if (ssl->failure == VS_FAILED_WANT_READ || ssl->failure == VS_FAILED_WANT_WRITE ||
 	    ssl->failure == VS_FAILED_SOCKET)
@@ -1328,7 +1328,7 @@ static void log_transfer(VsSsl *ssl, const char *what, int size, int result)
 #endif
 	/* With the socket's own error when it failed: a timeout (EAGAIN) reads as WANT_READ, anything else
 	 * as SYSCALL (kind 5), and which it was tells a server's reset from a quiet connection */
-	VS_LOG2("ssl %p %s %d of %d: kind %d, tls -0x%04X, socket errno %d", (const void *)ssl, what, result, size,
+	VITALS_VERBOSE("ssl %p %s %d of %d: kind %d, tls -0x%04X, socket errno %d", (const void *)ssl, what, result, size,
 	       result > 0 ? 0 : SSL_get_error(ssl, result), (unsigned)-(is_ssl(ssl) ? ssl->tls_result : 0),
 	       result > 0 || !is_ssl(ssl) ? 0 : ssl->socket_errno);
 }
@@ -1411,7 +1411,7 @@ static void log_request_line(const VsSsl *ssl, const char *direction, const char
 		}
 		append(line, &used, text + end, length - end);
 	}
-	VS_LOG2("ssl %p %s %s", (const void *)ssl, direction, line);
+	VITALS_VERBOSE("ssl %p %s %s", (const void *)ssl, direction, line);
 }
 
 static void log_header_line(const VsSsl *ssl, const char *direction, const char *text, int length)
@@ -1431,7 +1431,7 @@ static void log_header_line(const VsSsl *ssl, const char *direction, const char 
 	} else {
 		append(line, &used, text, length);
 	}
-	VS_LOG2("ssl %p %s %s", (const void *)ssl, direction, line);
+	VITALS_VERBOSE("ssl %p %s %s", (const void *)ssl, direction, line);
 }
 
 /* The headers gathered, line by line; the first sent line is the request line */
@@ -1572,7 +1572,7 @@ int SSL_shutdown(void *handle)
 			(void)tls_io(ssl, NULL, 0, VS_IO_CLOSE_NOTIFY);
 	}
 	flush_one_byte_reads(ssl);
-	VS_LOG("ssl %p shutdown, the server's close_notify %d", (void *)ssl, ssl->close_notify);
+	VITALS_LOG("ssl %p shutdown, the server's close_notify %d", (void *)ssl, ssl->close_notify);
 	return ssl->close_notify ? 1 : 0;
 }
 

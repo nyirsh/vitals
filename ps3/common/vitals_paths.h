@@ -60,7 +60,7 @@
 #define VITALS_XMB_OLD_OFF VITALS_FLAGS_DIRECTORY "/xmb.off"
 
 /* logs/ */
-#define VITALS_LOG VITALS_LOGS_DIRECTORY "/vitals.log"
+#define VITALS_LOG_FILE VITALS_LOGS_DIRECTORY "/vitals.log"
 #define VITALS_APP_LOG VITALS_LOGS_DIRECTORY "/vitals-app.log"
 
 /* The boot plugin, where Cobra's boot_plugins.txt lists it */

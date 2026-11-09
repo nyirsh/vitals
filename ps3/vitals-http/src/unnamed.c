@@ -26,7 +26,7 @@
 #define FLAG(setter, getter, field, check)                                \
 	int setter(CellHttpClientId id, bool enable)                      \
 	{                                                                 \
-		VH_LOG(#setter " %p %d", (void *)id, enable ? 1 : 0);     \
+		VITALS_LOG(#setter " %p %d", (void *)id, enable ? 1 : 0);     \
 		WITH_CLIENT(id, client);                                  \
 		int refused = (check);                                    \
 		if (enable && refused != 0)                               \
@@ -47,7 +47,7 @@
 #define VALUE(setter, getter, field, max)                                 \
 	int setter(CellHttpClientId id, size_t value)                     \
 	{                                                                 \
-		VH_LOG(#setter " %p %u", (void *)id, (unsigned)value);    \
+		VITALS_LOG(#setter " %p %u", (void *)id, (unsigned)value);    \
 		WITH_CLIENT(id, client);                                  \
 		if ((max) != 0 && value > (size_t)(max))                  \
 			return VH_ERROR_INVALID_VALUE;                    \
@@ -176,7 +176,7 @@ int vh_subsystem_initialized(void)
 
 int cellHttpInitDiskCache(void *block, uint32_t size)
 {
-	VH_LOG("cellHttpInitDiskCache %p %u (nothing is kept on disk)", block, (unsigned)size);
+	VITALS_LOG("cellHttpInitDiskCache %p %u (nothing is kept on disk)", block, (unsigned)size);
 	(void)block;
 	if (g_disk)
 		return ERROR_SUBSYSTEM_ALREADY;
@@ -199,7 +199,7 @@ int cellHttpEndDiskCache(void)
 
 int cellHttpOpenDiskCache(const char *path, uint32_t a, uint32_t b)
 {
-	VH_LOG("cellHttpOpenDiskCache %s", path != NULL ? path : "-");
+	VITALS_LOG("cellHttpOpenDiskCache %s", path != NULL ? path : "-");
 	(void)a, (void)b;
 	if (!g_disk)
 		return ERROR_SUBSYSTEM_NOT_INITIALIZED;

@@ -68,7 +68,7 @@ static int read_block(const unsigned char *start, size_t size)
  * that as a list with no CAs */
 int cellHttpsInit(size_t count, const CellHttpsData *list)
 {
-	VH_LOG("cellHttpsInit %u blocks%s", (unsigned)count, g_https ? ": already" : "");
+	VITALS_LOG("cellHttpsInit %u blocks%s", (unsigned)count, g_https ? ": already" : "");
 	if (!vh_initialized())
 		return VH_ERROR_NOT_INITIALIZED;
 	if (g_https)
@@ -80,7 +80,7 @@ int cellHttpsInit(size_t count, const CellHttpsData *list)
 			continue;
 		int rc = read_block((const unsigned char *)list[i].ptr, list[i].size);
 		if (rc != 0) {
-			VH_LOG("cellHttpsInit: block %u of %u bytes has no certificate it can read", (unsigned)i,
+			VITALS_LOG("cellHttpsInit: block %u of %u bytes has no certificate it can read", (unsigned)i,
 			       (unsigned)list[i].size);
 			while (g_ca_count > 0)
 				SSLCERT_free(g_cas[--g_ca_count]);
@@ -88,14 +88,14 @@ int cellHttpsInit(size_t count, const CellHttpsData *list)
 		}
 	}
 	(void)cellSsl_CC6A0CB5(&g_mask);
-	VH_LOG("cellHttpsInit: %u CAs", g_ca_count);
+	VITALS_LOG("cellHttpsInit: %u CAs", g_ca_count);
 	g_https = 1;
 	return 0;
 }
 
 int cellHttpsEnd(void)
 {
-	VH_LOG("cellHttpsEnd%s", g_https ? "" : ": not initialized");
+	VITALS_LOG("cellHttpsEnd%s", g_https ? "" : ": not initialized");
 	if (!g_https)
 		return VH_ERROR_NOT_INITIALIZED;
 	while (g_ca_count > 0)
@@ -277,14 +277,14 @@ static int check(void *ssl, void *certificates[], int count, void *argument, int
 		*reason = flags & VERIFY_NO_MEMORY ? 17 : flags & VERIFY_NOT_YET_VALID ? 9 : flags & VERIFY_EXPIRED ? 10 : 0;
 	int accept = flags == 0;
 	VhClient *client = t != NULL ? t->client : NULL;
-	VH_LOG("transaction %p: %s's chain of %d, flags 0x%08x", (void *)t, t != NULL ? t->host : "-", count,
+	VITALS_LOG("transaction %p: %s's chain of %d, flags 0x%08x", (void *)t, t != NULL ? t->host : "-", count,
 	       (unsigned)flags);
 	if (client != NULL && client->callbacks[VH_CALLBACK_SSL] != NULL) {
 		CellHttpsSslCallback callback = (CellHttpsSslCallback)client->callbacks[VH_CALLBACK_SSL];
 		int answer = callback(flags, (CellSslCert const *)certificates, count, t->host, (CellHttpSslId)ssl,
 		                      client->callback_arguments[VH_CALLBACK_SSL]);
 		accept = answer == 0;
-		VH_LOG("transaction %p: the game's SSL callback says %d", (void *)t, answer);
+		VITALS_LOG("transaction %p: the game's SSL callback says %d", (void *)t, answer);
 	}
 	return accept;
 }
@@ -352,13 +352,13 @@ int vh_tls_open(VhTransaction *t)
 	SSL_set_connect_state(ssl);
 	int rc = SSL_do_handshake(ssl);
 	if (rc != 1) {
-		VH_LOG("transaction %p: handshake with %s failed (SSL_get_error %d)", (void *)t, t->host, SSL_get_error(ssl, rc));
+		VITALS_LOG("transaction %p: handshake with %s failed (SSL_get_error %d)", (void *)t, t->host, SSL_get_error(ssl, rc));
 		SSL_free(ssl);
 		return VH_ERROR_SSL_REFUSED;
 	}
 	t->ssl = ssl;
 	snapshot(t);
-	VH_LOG("transaction %p: TLS with %s, %s", (void *)t, t->host, t->cipher_name);
+	VITALS_LOG("transaction %p: TLS with %s, %s", (void *)t, t->host, t->cipher_name);
 	return 0;
 }
 
@@ -388,7 +388,7 @@ int vh_tls_send(void *ssl, const void *data, size_t size)
 {
 	int sent = SSL_write(ssl, data, size > 0x7fffffff ? 0x7fffffff : (int)size);
 	if (sent <= 0)
-		VH_LOG("ssl %p: SSL_write %d, SSL_get_error %d", ssl, sent, SSL_get_error(ssl, sent));
+		VITALS_LOG("ssl %p: SSL_write %d, SSL_get_error %d", ssl, sent, SSL_get_error(ssl, sent));
 	return sent > 0 ? sent : VH_NET_ERROR(VH_NET_TLS_SEND, SSL_get_error(ssl, sent));
 }
 
@@ -398,7 +398,7 @@ int vh_tls_recv(void *ssl, void *data, size_t size)
 	if (got > 0)
 		return got;
 	int kind = SSL_get_error(ssl, got);
-	VH_LOG("ssl %p: SSL_read %d, SSL_get_error %d", ssl, got, kind);
+	VITALS_LOG("ssl %p: SSL_read %d, SSL_get_error %d", ssl, got, kind);
 	/* The server's close_notify, or the connection simply ending: the end of a body read until close */
 	if (kind == 6 || (got == 0 && kind == 5))
 		return 0;
@@ -408,7 +408,7 @@ int vh_tls_recv(void *ssl, void *data, size_t size)
 /* ---- the getters ---- */
 
 #define WITH_SSL(id, t)                                  \
-	VH_LOG2("%s %p", __func__, (void *)(id));        \
+	VITALS_VERBOSE("%s %p", __func__, (void *)(id));        \
 	if (!vh_initialized())                           \
 		return VH_ERROR_NOT_INITIALIZED;         \
 	VhTransaction *t = vh_transaction((void *)(id)); \

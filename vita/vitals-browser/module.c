@@ -1,6 +1,6 @@
 #include "backend.h"
 #include "module_descriptor.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "webkit_callback.h"
 #include "vitals/path.h"
 

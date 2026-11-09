@@ -31,6 +31,7 @@
  * redirects redirects.txt has, with a check mark when all is on, a caution sign when something is
  * off and an error sign when something failed (the icon code is webMAN MOD's way, credited below). The plugin stays loaded (resident) for that thread's code. */
 
+#include "vitals/log.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -38,6 +39,7 @@
 
 #include "vitals/host_map.h"
 #include "vitals_log.h"
+#include "vitals_log_format.h"
 #include "vitals_paths.h"
 #ifdef VITALS_XMB
 #include "xmb.h"
@@ -54,11 +56,6 @@
 #define VITALS_VERSION ""
 #endif
 
-#define say(level, text)                                                                                              \
-	do {                                                                                                               \
-		if (VITALS_DEBUG >= (level))                                                                                   \
-			vitals_log("vitals-boot", (text));                                                                         \
-	} while (0)
 
 /* vitals' files (common/vitals_paths.h): the modules in /dev_hdd0/vitals/system, the switches in
  * /dev_hdd0/vitals/flags */
@@ -69,6 +66,19 @@
 #define COBRA_MAP_PATH 35
 #define VITALS_LV2_FS_OPEN 801
 #define VITALS_FS_READ_ONLY 0
+
+#if VITALS_DEBUG >= 1
+/* The log's sink here (vitals_log_sink.h): no C library, and vitals_log for the line */
+void vitals_log_plain(const char *format, ...)
+{
+	char line[200];
+	va_list arguments;
+	va_start(arguments, format);
+	vitals_log_vformat(line, sizeof(line), format, arguments);
+	va_end(arguments);
+	vitals_log(VITALS_LOG_NAME, line);
+}
+#endif
 
 static int map_path(const char *from, const char *to)
 {
@@ -95,16 +105,16 @@ static int map_libssl(void)
 {
 	char hex[9];
 	if (file_exists(VITALS_TLS_OFF)) {
-		say(1, "tls.off is there: Sony's libssl stays");
+		VITALS_LOG("tls.off is there: Sony's libssl stays");
 		return OFF_BY_FLAG;
 	}
 	if (!file_exists(VITALS_LIBSSL)) {
-		say(1, "no " VITALS_LIBSSL ": Sony's libssl stays");
+		VITALS_LOG("no " VITALS_LIBSSL ": Sony's libssl stays");
 		return OFF_MISSING;
 	}
 	int result = map_path(SONY_LIBSSL, VITALS_LIBSSL);
-	say(1, "map " SONY_LIBSSL " -> " VITALS_LIBSSL);
-	say(1, vitals_log_hex((uint32_t)result, hex));
+	VITALS_LOG("map " SONY_LIBSSL " -> " VITALS_LIBSSL);
+	VITALS_LOG("%s", vitals_log_hex((uint32_t)result, hex));
 	return result == 0 ? ON : OFF_FAILED;
 }
 
@@ -113,16 +123,16 @@ static int map_libhttp(void)
 {
 	char hex[9];
 	if (file_exists(VITALS_HTTP_OFF)) {
-		say(1, "http.off is there: Sony's libhttp stays");
+		VITALS_LOG("http.off is there: Sony's libhttp stays");
 		return OFF_BY_FLAG;
 	}
 	if (!file_exists(VITALS_LIBHTTP)) {
-		say(1, "no " VITALS_LIBHTTP ": Sony's libhttp stays");
+		VITALS_LOG("no " VITALS_LIBHTTP ": Sony's libhttp stays");
 		return OFF_MISSING;
 	}
 	int result = map_path(SONY_LIBHTTP, VITALS_LIBHTTP);
-	say(1, "map " SONY_LIBHTTP " -> " VITALS_LIBHTTP);
-	say(1, vitals_log_hex((uint32_t)result, hex));
+	VITALS_LOG("map " SONY_LIBHTTP " -> " VITALS_LIBHTTP);
+	VITALS_LOG("%s", vitals_log_hex((uint32_t)result, hex));
 	return result == 0 ? ON : OFF_FAILED;
 }
 
@@ -232,13 +242,6 @@ static int run_payload(uint64_t payload, uint64_t size, uint64_t *residence)
 	return (int)p1;
 }
 
-static void log_value(int level, const char *text, uint32_t value)
-{
-	char hex[9];
-	say(level, text);
-	say(level, vitals_log_hex(value, hex));
-}
-
 /* lv2's stat, packed: mode, uid, gid, then atime, mtime and ctime (64-bit), size and block size */
 typedef struct __attribute__((packed)) Lv2Stat {
 	uint32_t mode;
@@ -254,8 +257,8 @@ static int last_boot_cut_short(void)
 	if (fs_stat(TURNOFF, &stat) != 0)
 		return 0;
 	int64_t now = time_now();
-	log_value(2, "turnoff is there, written at", (uint32_t)stat.mtime);
-	log_value(2, "time now:", (uint32_t)now);
+	VITALS_VERBOSE("turnoff is there, written at" " %08X", (unsigned)((uint32_t)stat.mtime));
+	VITALS_VERBOSE("time now:" " %08X", (unsigned)((uint32_t)now));
 	return stat.mtime < now - TURNOFF_STALE_SECONDS;
 }
 
@@ -272,13 +275,13 @@ static uint64_t g_dns_at;
 static int load_dns(void)
 {
 	if (file_exists(DNS_OFF)) {
-		say(1, "dns: dns.off is there: not loaded");
+		VITALS_LOG("dns: dns.off is there: not loaded");
 		return DNS_SWITCHED_OFF;
 	}
 	uint32_t buffer = 0;
 	int rc = memory_allocate(DNS_PLUGIN_MAX, &buffer);
 	if (rc != 0) {
-		log_value(1, "dns: no memory for the plugin:", (uint32_t)rc);
+		VITALS_LOG("dns: no memory for the plugin:" " %08X", (unsigned)((uint32_t)rc));
 		return DNS_FAILED;
 	}
 	int loaded = DNS_FAILED;
@@ -287,23 +290,23 @@ static int load_dns(void)
 	int64_t size = -1;
 	rc = fs_open(DNS_PLUGIN, VITALS_FS_READ_ONLY, &fd);
 	if (rc != 0) {
-		log_value(1, "dns: can't open " DNS_PLUGIN ":", (uint32_t)rc);
+		VITALS_LOG("dns: can't open " DNS_PLUGIN ":" " %08X", (unsigned)((uint32_t)rc));
 	} else {
 		rc = fs_read(fd, (void *)(uintptr_t)buffer, DNS_PLUGIN_MAX, &got);
 		vitals_log_close(fd);
 		if (rc != 0)
-			log_value(1, "dns: can't read " DNS_PLUGIN ":", (uint32_t)rc);
+			VITALS_LOG("dns: can't read " DNS_PLUGIN ":" " %08X", (unsigned)((uint32_t)rc));
 		else
 			size = (int64_t)got;
 	}
 	if (size <= 0x230 || size >= (int64_t)DNS_PLUGIN_MAX || (size & 7) != 0) {
-		log_value(1, "dns: can't use " DNS_PLUGIN ", size", (uint32_t)size);
+		VITALS_LOG("dns: can't use " DNS_PLUGIN ", size" " %08X", (unsigned)((uint32_t)size));
 	} else {
 		uint64_t residence = 0;
-		say(1, "dns: loading " DNS_PLUGIN);
+		VITALS_LOG("dns: loading " DNS_PLUGIN);
 		rc = run_payload(buffer, (uint64_t)size, &residence);
-		log_value(2, "dns: loaded:", (uint32_t)rc);
-		log_value(2, "dns: at (low 32 bits)", (uint32_t)residence);
+		VITALS_VERBOSE("dns: loaded:" " %08X", (unsigned)((uint32_t)rc));
+		VITALS_VERBOSE("dns: at (low 32 bits)" " %08X", (unsigned)((uint32_t)residence));
 		if (rc != 0 && residence != 0) {
 			g_dns_at = residence;
 			loaded = DNS_LOADED;
@@ -486,13 +489,13 @@ static int notify_with_icon(int level, const char *message)
 	uint32_t find = vsh_export("paf", PAF_VIEW_FIND), load = vsh_export("paf", PAF_LOAD_RCO_TEXTURE),
 	         show = vsh_export("vshcommon", VSHCOMMON_NOTIFY_WITH_TEXTURE);
 	if (find == 0 || load == 0 || show == 0) {
-		say(1, "no XMB notification with an icon: shown without");
+		VITALS_LOG("no XMB notification with an icon: shown without");
 		return -1;
 	}
 	const Icon *icon = &k_icons[level];
 	uint32_t plugin = ((uint32_t(*)(const char *))(uintptr_t)find)(icon->plugin);
 	if (plugin == 0) {
-		say(1, "the icon's XMB plugin isn't there: shown without");
+		VITALS_LOG("the icon's XMB plugin isn't there: shown without");
 		return -1;
 	}
 	int32_t texture = 0, dummy = 0;
@@ -505,7 +508,7 @@ static int notify_with_icon(int level, const char *message)
 	typedef uint32_t (*NotifyWithTexture)(int32_t, const char *, int32_t, int32_t *, int32_t *, const char *, const char *,
 	                                      float, const uint16_t *, int32_t, int32_t, int32_t);
 	uint32_t rc = ((NotifyWithTexture)(uintptr_t)show)(0, icon->texture, 0, &texture, &dummy, "", "", 0.0f, wide, 0, 0, 0);
-	log_value(2, "shown with an icon:", rc);
+	VITALS_VERBOSE("shown with an icon:" " %08X", (unsigned)(rc));
 	return 0;
 }
 
@@ -665,9 +668,9 @@ static void notify_thread(void *arg)
 	if (notify != 0) {
 		int (*show)(int, const char *) = (int (*)(int, const char *))(uintptr_t)notify;
 		uint32_t shown = (uint32_t)show(0, text.text);
-		log_value(2, "shown:", shown);
+		VITALS_VERBOSE("shown:" " %08X", (unsigned)(shown));
 	}
-	say(1, text.text);
+	VITALS_LOG("%s", text.text);
 	thread_exit();
 }
 
@@ -680,7 +683,7 @@ static int start_notify(void)
 	uint32_t thread = 0;
 	int32_t rc = sysThreadCreate(&thread, notify_thread, 0, 3000, 0x4000, 0, (char *)"vitals_notify");
 	if (rc != 0) {
-		log_value(1, "no notification thread:", (uint32_t)rc);
+		VITALS_LOG("no notification thread:" " %08X", (unsigned)((uint32_t)rc));
 		return 0;
 	}
 	return 1;
@@ -689,7 +692,7 @@ static int start_notify(void)
 int module_start(size_t args, void *argp)
 {
 	(void)args, (void)argp;
-	say(1, "start");
+	VITALS_LOG("start");
 	int cut_short = last_boot_cut_short();
 	g_ssl = map_libssl();
 	/* vitals' libhttp on whichever libssl games get: it calls libssl through Sony's exports, as Sony's
@@ -704,7 +707,7 @@ int module_start(size_t args, void *argp)
 	if (file_exists(DNS_PLUGIN)) {
 		if (cut_short) {
 			/* This boot only: the next one after a proper shutdown loads it again */
-			say(1, "dns: the last boot didn't end properly (the system's turnoff marker is "
+			VITALS_LOG("dns: the last boot didn't end properly (the system's turnoff marker is "
 			                          "still there): not loaded this boot");
 			g_dns = DNS_LEFT_OUT;
 		} else {

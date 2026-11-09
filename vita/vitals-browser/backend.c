@@ -1,5 +1,5 @@
 #include "backend.h"
-#include "diagnostics.h"
+#include "vitals/log.h"
 #include "vitals/ca_store.h"
 #include "vitals/error_map.h"
 #include "vitals/registry.h"

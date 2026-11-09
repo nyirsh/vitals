@@ -255,7 +255,7 @@ void vh_cache_store(VhTransaction *t)
 	g_first = entry;
 	g_used += (uint32_t)cost;
 	vh_unlock();
-	VH_LOG("transaction %p: response kept in the cache (%u bytes)", (void *)t, (unsigned)cost);
+	VITALS_LOG("transaction %p: response kept in the cache (%u bytes)", (void *)t, (unsigned)cost);
 }
 
 /* At cellHttpEnd: the cache's memory is libhttp's heap's */
@@ -269,7 +269,7 @@ void vh_cache_end(void)
 
 int cellHttpInitCache(uint32_t size)
 {
-	VH_LOG("cellHttpInitCache %u", (unsigned)size);
+	VITALS_LOG("cellHttpInitCache %u", (unsigned)size);
 	if (g_cache)
 		return ERROR_CACHE_ALREADY;
 	g_size = size;
@@ -281,7 +281,7 @@ int cellHttpInitCache(uint32_t size)
 
 int cellHttpEndCache(void)
 {
-	VH_LOG("cellHttpEndCache");
+	VITALS_LOG("cellHttpEndCache");
 	if (!g_cache)
 		return ERROR_CACHE_NOT_INITIALIZED;
 	vh_lock();
@@ -293,7 +293,7 @@ int cellHttpEndCache(void)
 
 int cellHttpFlushCache(void)
 {
-	VH_LOG("cellHttpFlushCache");
+	VITALS_LOG("cellHttpFlushCache");
 	if (!g_cache)
 		return ERROR_CACHE_NOT_INITIALIZED;
 	vh_lock();
@@ -324,7 +324,7 @@ int cellHttpEndExternalCache(void)
 
 int cellHttpClientSetCacheStatus(CellHttpClientId id, bool enable)
 {
-	VH_LOG("cellHttpClientSetCacheStatus %p %d", (void *)id, enable ? 1 : 0);
+	VITALS_LOG("cellHttpClientSetCacheStatus %p %d", (void *)id, enable ? 1 : 0);
 	if (!vh_initialized())
 		return VH_ERROR_NOT_INITIALIZED;
 	VhClient *client = vh_client((void *)id);
@@ -353,7 +353,7 @@ int cellHttpClientGetCacheStatus(CellHttpClientId id, bool *enable)
 /* Kept: what Sony's calls it with isn't worked out */
 int cellHttpClientSetCacheCallback(CellHttpClientId id, void *callback, void *argument)
 {
-	VH_LOG("cellHttpClientSetCacheCallback %p %p", (void *)id, callback);
+	VITALS_LOG("cellHttpClientSetCacheCallback %p %p", (void *)id, callback);
 	if (!vh_initialized())
 		return VH_ERROR_NOT_INITIALIZED;
 	VhClient *client = vh_client((void *)id);
@@ -381,7 +381,7 @@ int vh_external_cache_initialized(void)
 
 int cellHttpInitExternalCache(void *block, uint32_t size)
 {
-	VH_LOG("cellHttpInitExternalCache %p %u", block, (unsigned)size);
+	VITALS_LOG("cellHttpInitExternalCache %p %u", block, (unsigned)size);
 	(void)block;
 	if (g_external)
 		return ERROR_CACHE_ALREADY;

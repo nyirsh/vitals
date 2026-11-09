@@ -91,7 +91,7 @@ target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
 # the Vita's own vitals_paths.h and check_result.h, which the shared headers include
 target_include_directories(vitals-app PRIVATE . ../common/include ../vitals-http/include ../../shared/include ../../shared/app
     ../vitals-ssl/src)
-target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}")
+target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}" VITALS_LOG_NAME="vitals-app" VITALS_LOG_APP)
 # Keeps room for the tables vita-elf-create adds at the end of the code (sce_space.ld)
 target_link_options(vitals-app PRIVATE "-Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld")
 set_property(TARGET vitals-app APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld)

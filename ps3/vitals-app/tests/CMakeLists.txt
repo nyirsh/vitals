@@ -73,6 +73,11 @@ add_executable(vitals_app_check_report_tests ${SHARED}/app/tests/test_check_repo
 target_include_directories(vitals_app_check_report_tests PRIVATE ${APP_DIR}/src ${APP_DIR}/../common)
 add_test(NAME vitals_app_check_report COMMAND vitals_app_check_report_tests)
 
+# The formatter of the plugins with no C library, against printf
+add_executable(vitals_app_log_format_tests test_log_format.c)
+target_include_directories(vitals_app_log_format_tests PRIVATE ${APP_DIR}/../common)
+add_test(NAME vitals_app_log_format COMMAND vitals_app_log_format_tests)
+
 # boot_plugins.txt's editing, which install.c writes over the console's own list
 add_executable(vitals_app_boot_plugins_tests test_boot_plugins.c ${APP_DIR}/src/boot_plugins.c)
 target_include_directories(vitals_app_boot_plugins_tests PRIVATE ${APP_DIR}/src)
