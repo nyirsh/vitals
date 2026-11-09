@@ -13,11 +13,11 @@ if(NOT VITALS_DEBUG MATCHES "^[012]$")
 	message(FATAL_ERROR "VITALS_DEBUG is 0, 1 or 2")
 endif()
 
-# vitals' TLS for the XMB itself (src/xmb.c), off: vitals' libssl in the XMB, even unused, takes the
+# vitals' TLS for the XMB itself (../vitals-xmb/src/xmb.c), off: vitals' libssl in the XMB, even unused, takes the
 # system down when a game starts. For working on it only (make plugin XMB=1); the
 # dry runs below build it too
 option(VITALS_XMB "Put vitals' libssl in the XMB's own SSL-C's place" OFF)
-# The XMB's own TLS checked and vitals' libssl loaded into it, nothing written (src/xmb.c): for a
+# The XMB's own TLS checked and vitals' libssl loaded into it, nothing written (../vitals-xmb/src/xmb.c): for a
 # first boot with it (make plugin XMB_DRY_RUN=1)
 option(VITALS_XMB_DRY_RUN "Check the XMB and load vitals' libssl into it, without patching it" OFF)
 set(VITALS_BOOT_DEFINITIONS VITALS_DEBUG=${VITALS_DEBUG} VITALS_VERSION="${VITALS_VERSION}"
@@ -40,14 +40,14 @@ endif()
 set(VITALS_BOOT_SOURCES src/boot.c ../../shared/src/host_map.c)
 if(VITALS_XMB OR VITALS_XMB_DRY_RUN)
 	list(APPEND VITALS_BOOT_DEFINITIONS VITALS_XMB)
-	list(APPEND VITALS_BOOT_SOURCES src/xmb.c src/xmb_bridge.S)
+	list(APPEND VITALS_BOOT_SOURCES ../vitals-xmb/src/xmb.c ../vitals-xmb/src/xmb_bridge.S)
 endif()
 
 # The boot plugin Cobra loads into the XMB: redirects Sony's libssl to vitals' (src/boot.c), and
-# gives the XMB vitals' TLS (src/xmb.c, src/xmb_bridge.S)
+# gives the XMB vitals' TLS (../vitals-xmb/src/xmb.c, xmb_bridge.S)
 # With the redirect list's parser, for the boot notification's count (../../shared/src/host_map.c)
 add_executable(vitals_boot ${VITALS_BOOT_SOURCES})
-target_include_directories(vitals_boot PRIVATE ../common ../../shared/include)
+target_include_directories(vitals_boot PRIVATE ../common ../../shared/include ../vitals-xmb/src)
 target_compile_options(vitals_boot PRIVATE -Os -Wall -Wextra -Werror)
 target_compile_definitions(vitals_boot PRIVATE ${VITALS_BOOT_DEFINITIONS})
 
@@ -59,7 +59,7 @@ vitals_add_prx(vitals_boot
 
 # The same plugin staying loaded once started, for checking that the loader takes it (see boot.c)
 add_executable(vitals_boot_stay ${VITALS_BOOT_SOURCES})
-target_include_directories(vitals_boot_stay PRIVATE ../common ../../shared/include)
+target_include_directories(vitals_boot_stay PRIVATE ../common ../../shared/include ../vitals-xmb/src)
 target_compile_definitions(vitals_boot_stay PRIVATE VITALS_BOOT_STAY ${VITALS_BOOT_DEFINITIONS})
 target_compile_options(vitals_boot_stay PRIVATE -Os -Wall -Wextra -Werror)
 vitals_add_prx(vitals_boot_stay

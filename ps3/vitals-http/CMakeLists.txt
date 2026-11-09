@@ -50,7 +50,7 @@ add_executable(libhttp
 	src/libc.c
 	src/platform/platform_ps3.c
 	src/exports.S)
-target_include_directories(libhttp PRIVATE src ../common ../../shared/include)
+target_include_directories(libhttp PRIVATE src ../common ../../shared/include ../vitals-xmb/src)
 target_compile_definitions(libhttp PRIVATE VITALS_DEBUG=${VITALS_DEBUG} VH_DEFAULT_SUFFIX="${VITALS_HTTP_USER_AGENT}")
 # The release (../../VERSION) in the module's marker (common/vitals_marker.h)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../../version.cmake)

@@ -43,7 +43,7 @@ static void say(const char *name)
 #include "cellssl_exports.h"
 
 /* Every function's NID and descriptor, in cellssl_exports.h's order: what the boot plugin asks for
- * when it loads this module into the XMB (common/vitals_xmb.h) */
+ * when it loads this module into the XMB (vitals-xmb/src/vitals_xmb.h) */
 #undef CELLSSL_EXPORT
 #define CELLSSL_EXPORT(nid, name) {nid, (uint32_t)(uintptr_t)name},
 static const VitalsXmbFunction k_functions[] = {

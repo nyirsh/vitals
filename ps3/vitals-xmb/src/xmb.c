@@ -5,11 +5,11 @@
  * on vitals' libssl), unless xmb-http.off is there:
  *
  * 1. Checks, writing nothing: xmb-tls.off isn't there and the last boot ended properly; the XMB is 4.93's
- *    as tools/vsh_ssl.py read it (each function's descriptor in its export table, its code, its first
+ *    as vitals-xmb/tools/vsh_ssl.py read it (each function's descriptor in its export table, its code, its first
  *    instruction, and the island area's checksum, xmb_493.h); and the XMB hasn't started SSL yet
  *    (_cellSslIsInitd), so no object of SSL-C's is ever handed to vitals'.
  * 2. vitals' libssl (system/libssl.sprx, the one games load) is loaded into the XMB and asked for its
- *    114 functions (common/vitals_xmb.h).
+ *    114 functions (vitals-xmb/src/vitals_xmb.h).
  * 3. Written with Cobra's PS3MAPI (the XMB's code isn't writable from inside it), first the islands,
  *    6 instructions each in an SSL-C function only SSL-C reaches (dead once nothing calls SSL-C):
  *    vitals' descriptor into r11 and a jump to the bridge (xmb_bridge.S); then over each function's

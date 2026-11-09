@@ -43,7 +43,7 @@ static void say(const char *name)
 #include "cellhttp_exports.h"
 
 /* Every function's NID and descriptor, cellHttp's then cellHttpUtil's: what the boot plugin asks for
- * when it loads this module into the XMB (common/vitals_xmb.h) */
+ * when it loads this module into the XMB (vitals-xmb/src/vitals_xmb.h) */
 #undef CELLHTTP_EXPORT
 #undef CELLHTTPUTIL_EXPORT
 #define CELLHTTP_EXPORT(nid, name) {nid, (uint32_t)(uintptr_t)name},

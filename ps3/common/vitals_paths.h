@@ -31,7 +31,7 @@
 #define VITALS_LIBSSL VITALS_SYSTEM_DIRECTORY "/libssl.sprx"
 #define VITALS_LIBHTTP VITALS_SYSTEM_DIRECTORY "/libhttp.sprx"
 /* The XMB's own copies, when there: the boot plugin loads these into the XMB instead, so the XMB and
- * games never load one file (vitals-boot/src/xmb.c) */
+ * games never load one file (vitals-xmb/src/xmb.c) */
 #define VITALS_LIBSSL_XMB VITALS_SYSTEM_DIRECTORY "/libssl-xmb.sprx"
 #define VITALS_LIBHTTP_XMB VITALS_SYSTEM_DIRECTORY "/libhttp-xmb.sprx"
 #define VITALS_DNS_PLUGIN VITALS_SYSTEM_DIRECTORY "/vitals_dns.bin"
@@ -51,7 +51,7 @@
 /* The app installs on a system vitals isn't made for (vitals-app/src/console.h), for testers */
 #define VITALS_UNSUPPORTED_OK VITALS_FLAGS_DIRECTORY "/unsupported.ok"
 /* The XMB's own TLS (the browser, PSN, the Store) stays Sony's, and so its HTTP too (vitals' libhttp
- * works on vitals' libssl): vitals-boot/src/xmb.c */
+ * works on vitals' libssl): vitals-xmb/src/xmb.c */
 #define VITALS_XMB_TLS_OFF VITALS_FLAGS_DIRECTORY "/xmb-tls.off"
 /* The XMB's own HTTP stays Sony's (its TLS can still be vitals') */
 #define VITALS_XMB_HTTP_OFF VITALS_FLAGS_DIRECTORY "/xmb-http.off"

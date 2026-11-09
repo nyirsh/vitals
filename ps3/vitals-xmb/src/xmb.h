@@ -7,7 +7,7 @@ enum {
 	XMB_ON,        /* the XMB's 114 SSL functions go to vitals' libssl */
 	XMB_OFF,       /* xmb-tls.off is there (xmb-http.off, for the HTTP state) */
 	XMB_LEFT_OUT,  /* the last boot didn't end properly */
-	XMB_OTHER,     /* not 4.93's XMB, as tools/vsh_ssl.py read it: nothing written */
+	XMB_OTHER,     /* not 4.93's XMB, as vitals-xmb/tools/vsh_ssl.py read it: nothing written */
 	XMB_TOO_LATE,  /* the XMB had started SSL already: nothing written */
 	XMB_FAILED,    /* see vitals.log; the XMB's own SSL-C stays */
 	XMB_DRY_RUN,   /* built with VITALS_XMB_DRY_RUN: checked and loaded, nothing written */
