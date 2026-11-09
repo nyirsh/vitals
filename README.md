@@ -28,6 +28,8 @@ The releases pages on [GitHub](https://github.com/nyirsh/vitals/releases) and
 - `ps3/`: the PS3's libssl, libhttp, boot plugin, DNS kernel plugin and app, built in the
   [vitals-ps3-sdk](https://github.com/nyirsh/vitals-ps3-sdk) Docker image (`make` in `ps3/`).
 
+`make` at the top builds both consoles. Name one to work on just that console (`make ps3`, `make psv`), and add a command to run it: `make clean` for both, `make ps3 clean` or `make psv test` for one.
+
 Both consoles share one version and one changelog, at the root: [VERSION](VERSION), which
 [version.cmake](version.cmake) turns into each build's version numbers, and
 [CHANGELOG.md](CHANGELOG.md), which both apps carry and show as it is. A change for one console
