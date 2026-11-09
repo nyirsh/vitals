@@ -181,24 +181,17 @@ Seriously tho, devnoname120 is a legend and you'll find out that, out of respect
 
 ## Building
 
-The first build downloads the pinned `Mbed TLS` and `curl` releases, so it needs internet access. The easiest way is VitaSDK's Docker image:
+The first build downloads the pinned `Mbed TLS` and `curl` releases, so it needs internet access. Everything is built in VitaSDK's Docker image, `vitasdk/vitasdk:latest`, as the PS3's builds are in theirs, so all you need is Docker:
 
 ```sh
-docker run --rm -v "$PWD":"$PWD" -w "$PWD" vitasdk/vitasdk:latest sh -lc 'make'
-```
-
-This produces `build/vitals-app/vitals-app.vpk`. Everything is built under `build/`.
-
-To build without Docker, install [VitaSDK](https://vitasdk.org) (make sure to add the sdk to your `PATH`) and the Vita libraries the app links, then run `make`:
-
-```sh
-vdpm install zlib
 make
 ```
 
+This produces `build/vitals-app/vitals-app.vpk`. Everything is built under `build/`. Docker pulls the image the first time, `make pull` gets a newer one, and `make IMAGE=...` builds with another tag.
+
 The app's own TLS, for its downloads and its certificate checks, is the Mbed TLS vitals-ssl builds, as on the PS3; its curl is built with it (`../shared/curl`).
 
-Each component folder has its own Makefile that also works on its own (`make -C <folder>`), and `make plugin`, `ssl`, `http`, `browser` or `app` (with `DEBUG=N`) build one with what it links, by the same names as the PS3's; the root Makefile only calls them. `vitals-app/` builds `vitals-boot/`, `vitals-ssl/`, `vitals-http/` and `vitals-browser/` first, because the vpk bundles them. `vitals-dns/` is built as part of `vitals-boot/`, and `common/` as part of each module that uses it.
+Each component folder has its own Makefile, which runs inside the image; `make plugin`, `ssl`, `http`, `browser` or `app` (with `DEBUG=N`) build one with what it links, by the same names as the PS3's; the root Makefile only calls them. `vitals-app/` builds `vitals-boot/`, `vitals-ssl/`, `vitals-http/` and `vitals-browser/` first, because the vpk bundles them. `vitals-dns/` is built as part of `vitals-boot/`, and `common/` as part of each module that uses it.
 
 Available build options:
 

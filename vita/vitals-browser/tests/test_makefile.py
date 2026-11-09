@@ -24,8 +24,10 @@ class BrowserMakefileTests(unittest.TestCase):
         self.assertIn("--target vitals.suprx-self", output)
 
     def test_root_options_reach_the_providers(self):
+        # The root Makefile runs the component's inside the Docker image, with the option on its command line
         output = dry_run(ROOT, "vitals-browser", "DEBUG=2")
-        self.assertIn("-DVITALS_DEBUG=2", output)
+        self.assertIn("docker run", output)
+        self.assertIn("make -C vitals-browser DEBUG=2", output)
 
     def test_each_debug_level_builds_apart(self):
         # The app carries every level, so they must not overwrite each other

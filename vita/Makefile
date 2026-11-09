@@ -17,6 +17,7 @@
 #   make upload-app         builds the app and puts its VPK in the Vita's ux0:data/vitals/, for
 #                           VitaShell to install (tools/vita_comms.py)
 #   make plugin|ssl|http|browser|app [DEBUG=N]   one module (the PS3's names), with what it links first
+#   make pull               pulls the newest published image (vitasdk/vitasdk:latest)
 #   make preview            the app's screens on this Mac with made-up data (../ps3/build/preview/)
 #   make log                prints vitals.log, and keeps it in ../fetched/vita/
 #   make app-log            prints the app's vitals-app.log, and keeps it in ../fetched/vita/
@@ -24,6 +25,15 @@
 #   make status             what's on the Vita now
 # The Vita is VITA_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's VITA_HOST
 COMPONENTS = common vitals-boot vitals-ssl vitals-browser vitals-http vitals-app
+
+# Built in VitaSDK's Docker image, as the PS3's is in its own (docker pulls it the first time; make
+# pull gets a newer one; IMAGE= for another tag). The host tests and the console tools run here
+IMAGE ?= vitasdk/vitasdk:latest
+REPOSITORY = $(abspath $(CURDIR)/..)
+# The repository at the same path inside, so compile_commands.json stays right for .vscode
+DOCKER = docker run --rm -v "$(REPOSITORY)":"$(REPOSITORY)" -w "$(CURDIR)" $(IMAGE) sh -lc
+# The options that reach the components, as the container has no make above it to inherit them from
+OPTIONS = $(if $(DEBUG),DEBUG=$(DEBUG)) $(if $(TLS_HEAP_KIB),TLS_HEAP_KIB=$(TLS_HEAP_KIB)) $(if $(USER_AGENT),"USER_AGENT=$(USER_AGENT)") $(if $(BUILD_DIR),BUILD_DIR=$(BUILD_DIR))
 
 ifeq ($(filter 0 1 2,$(or $(DEBUG),0)),)
 $(error DEBUG must be 0, 1 or 2)
@@ -36,9 +46,9 @@ $(foreach v,VITA_HOST VITA_PORT,$(if $($(v)),$(eval export $(v))))
 all: vitals-app
 
 $(COMPONENTS):
-	$(MAKE) -C $@
+	$(DOCKER) 'make -C $@ $(OPTIONS)'
 
-# Runs every component's host tests; it stops at the first failure and needs no VitaSDK
+# Runs every component's host tests, on this machine; it stops at the first failure and needs no VitaSDK
 test:
 	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) test &&) true
 
@@ -48,23 +58,26 @@ update-certs:
 
 # One module, by the PS3's names. At any level they link the release builds' stubs, built first
 stubs-plugin:
-	$(MAKE) -C vitals-boot DEBUG=0
+	$(DOCKER) 'make -C vitals-boot $(OPTIONS) DEBUG=0'
 stubs-ssl: stubs-plugin
-	$(MAKE) -C vitals-ssl DEBUG=0
+	$(DOCKER) 'make -C vitals-ssl $(OPTIONS) DEBUG=0'
 
 plugin:
-	$(MAKE) -C vitals-boot
+	$(DOCKER) 'make -C vitals-boot $(OPTIONS)'
 ssl: stubs-plugin
-	$(MAKE) -C vitals-ssl
+	$(DOCKER) 'make -C vitals-ssl $(OPTIONS)'
 http: stubs-ssl
-	$(MAKE) -C vitals-http
+	$(DOCKER) 'make -C vitals-http $(OPTIONS)'
 browser: stubs-ssl
-	$(MAKE) -C vitals-browser
+	$(DOCKER) 'make -C vitals-browser $(OPTIONS)'
 app: vitals-app
 
 # Drawn by the PS3's preview, which has the Vita's size too
 preview:
 	$(MAKE) -C ../ps3 preview
+
+pull:
+	docker pull $(IMAGE)
 
 upload-app: vitals-app
 	python3 tools/vita_comms.py app
@@ -75,4 +88,4 @@ log app-log fetch status:
 clean:
 	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) clean;)
 
-.PHONY: all clean test update-certs upload-app log app-log fetch status preview plugin ssl http browser app stubs-plugin stubs-ssl $(COMPONENTS)
+.PHONY: all clean test update-certs upload-app log app-log fetch status preview pull plugin ssl http browser app stubs-plugin stubs-ssl $(COMPONENTS)

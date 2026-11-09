@@ -23,8 +23,8 @@ The releases pages on [GitHub](https://github.com/nyirsh/vitals/releases) and
 
 ## Layout
 
-- `vita/`: the Vita's kernel plugin, libssl, libhttp, browser TLS provider and app, built with
-  VitaSDK (`make` in `vita/`).
+- `vita/`: the Vita's kernel plugin, libssl, libhttp, browser TLS provider and app, built in
+  VitaSDK's Docker image (`make` in `vita/`).
 - `ps3/`: the PS3's libssl, libhttp, boot plugin, DNS kernel plugin and app, built in the
   [vitals-ps3-sdk](https://github.com/nyirsh/vitals-ps3-sdk) Docker image (`make` in `ps3/`).
 
