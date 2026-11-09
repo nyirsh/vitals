@@ -25,7 +25,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "shared" / "assets"
-VITA_APP = ROOT / "vita" / "vitals-app"
+VITA_APP = ROOT / "psv" / "vitals-app"
 SOURCE_URL = "https://curl.se/ca/cacert.pem"
 # The apps refuse a downloaded bundle with fewer
 MINIMUM_CERTIFICATES = 100
@@ -113,7 +113,7 @@ def main():
         print(f"The bundled Mozilla certificates are already current (Mozilla data of {source_date}).")
         return 0
     print(f"Updated to Mozilla data of {source_date}: {count} certificates. Review and commit shared/assets "
-          "and vita/vitals-app/assets.")
+          "and psv/vitals-app/assets.")
     return 0
 
 

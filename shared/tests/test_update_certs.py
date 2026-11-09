@@ -24,13 +24,13 @@ class UpdateCertsTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         base = Path(self.temporary.name)
         self.shared = base / "shared"
-        self.vita = base / "vita"
+        self.vita = base / "psv"
         self.shared.mkdir()
         self.vita.mkdir()
         for name in ("mozilla-certs.pem", "certificate-sources.json"):
             shutil.copy(ROOT / "shared" / "assets" / name, self.shared / name)
         for name in ("sony-certs.pem", "certs.cer"):
-            shutil.copy(ROOT / "vita" / "vitals-app" / "assets" / name, self.vita / name)
+            shutil.copy(ROOT / "psv" / "vitals-app" / "assets" / name, self.vita / name)
         self.bundle = (self.shared / "mozilla-certs.pem").read_bytes()
 
     def tearDown(self):

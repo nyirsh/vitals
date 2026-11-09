@@ -20,9 +20,9 @@
 #   make pull               pulls the newest published image (vitasdk/vitasdk:latest)
 #   make editor             VS Code's navigation and errors with the image's headers (after make)
 #   make preview            the app's screens on this Mac with made-up data (../ps3/build/preview/)
-#   make log                prints vitals.log, and keeps it in ../fetched/vita/
-#   make app-log            prints the app's vitals-app.log, and keeps it in ../fetched/vita/
-#   make fetch              the logs, the app's test reports and the crash dumps, into ../fetched/vita/
+#   make log                prints vitals.log, and keeps it in ../fetched/psv/
+#   make app-log            prints the app's vitals-app.log, and keeps it in ../fetched/psv/
+#   make fetch              the logs, the app's test reports and the crash dumps, into ../fetched/psv/
 #   make status             what's on the Vita now
 # The Vita is VITA_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's VITA_HOST
 COMPONENTS = common vitals-boot vitals-ssl vitals-browser vitals-http vitals-app
@@ -79,7 +79,7 @@ preview:
 
 # VS Code without the SDK on this machine: the image's headers, and each file's flags (after make)
 editor:
-	python3 ../shared/tools/editor_setup.py vita --image $(IMAGE)
+	python3 ../shared/tools/editor_setup.py psv --image $(IMAGE)
 
 pull:
 	docker pull $(IMAGE)

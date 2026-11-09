@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 /* Mbed TLS's mutexes (liblv2's), before its first use; 0, or negative without the date (as vitals'
- * vita/vitals-ssl/src/crypto_platform.h) */
+ * psv/vitals-ssl/src/crypto_platform.h) */
 int vitals_crypto_platform_init(void);
 void vitals_crypto_platform_free(void);
 /* The time in seconds since 1970, or -1; Mbed TLS's time (MBEDTLS_PLATFORM_TIME_MACRO) */

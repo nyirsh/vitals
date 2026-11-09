@@ -1,4 +1,4 @@
-"""What both consoles' FTP tools do the same way (vita/tools/vita_comms.py, ps3/tools/ps3_comms.py):
+"""What both consoles' FTP tools do the same way (psv/tools/vita_comms.py, ps3/tools/ps3_comms.py):
 the settings in .env, connecting, and copying files off the console without touching them."""
 
 import ftplib

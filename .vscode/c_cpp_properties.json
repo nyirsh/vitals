@@ -3,14 +3,14 @@
         {
             "name": "vitals",
             "compileCommands": [
-                "${workspaceFolder}/vita/build/editor/compile_commands.json",
+                "${workspaceFolder}/psv/build/editor/compile_commands.json",
                 "${workspaceFolder}/ps3/build/editor/compile_commands.json",
-                "${workspaceFolder}/vita/build/common-tests/compile_commands.json",
-                "${workspaceFolder}/vita/build/vitals-boot-tests/compile_commands.json",
-                "${workspaceFolder}/vita/build/vitals-ssl-tests/compile_commands.json",
-                "${workspaceFolder}/vita/build/vitals-browser-tests/compile_commands.json",
-                "${workspaceFolder}/vita/build/vitals-http-tests/compile_commands.json",
-                "${workspaceFolder}/vita/build/vitals-app-tests/compile_commands.json",
+                "${workspaceFolder}/psv/build/common-tests/compile_commands.json",
+                "${workspaceFolder}/psv/build/vitals-boot-tests/compile_commands.json",
+                "${workspaceFolder}/psv/build/vitals-ssl-tests/compile_commands.json",
+                "${workspaceFolder}/psv/build/vitals-browser-tests/compile_commands.json",
+                "${workspaceFolder}/psv/build/vitals-http-tests/compile_commands.json",
+                "${workspaceFolder}/psv/build/vitals-app-tests/compile_commands.json",
                 "${workspaceFolder}/ps3/build/tests-host/compile_commands.json",
                 "${workspaceFolder}/ps3/build/vitals-app-tests/compile_commands.json"
             ],
@@ -18,8 +18,8 @@
             "includePath": [
                 "${workspaceFolder}/shared/include",
                 "${workspaceFolder}/shared/app",
-                "${workspaceFolder}/vita/common/include",
-                "${workspaceFolder}/vita/vitals-app",
+                "${workspaceFolder}/psv/common/include",
+                "${workspaceFolder}/psv/vitals-app",
                 "${workspaceFolder}/ps3/common",
                 "${workspaceFolder}/ps3/vitals-app/src"
             ],

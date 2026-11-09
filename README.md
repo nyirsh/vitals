@@ -1,4 +1,4 @@
-![vitals](vita/vitals-app/sce_sys/icon0.png)
+![vitals](psv/vitals-app/sce_sys/icon0.png)
 
 # vitals - TLS Toolkit
 
@@ -10,7 +10,7 @@ the same functions, so they work unchanged.
 
 | Console | Folder | Runs on | What it covers |
 |---|---|---|---|
-| PS Vita | [vita/](vita/) | firmware 3.60 or 3.65, taiHEN | the browser, apps and games |
+| PS Vita | [psv/](psv/) | firmware 3.60 or 3.65, taiHEN | the browser, apps and games |
 | PlayStation 3 | [ps3/](ps3/) | firmware 4.93 CEX, Evilnat's Cobra CFW | games and apps (the XMB, with PSN and the browser, keeps Sony's) |
 
 Each folder's README covers installing, using and building that console's vitals.
@@ -23,8 +23,8 @@ The releases pages on [GitHub](https://github.com/nyirsh/vitals/releases) and
 
 ## Layout
 
-- `vita/`: the Vita's kernel plugin, libssl, libhttp, browser TLS provider and app, built in
-  VitaSDK's Docker image (`make` in `vita/`).
+- `psv/`: the Vita's kernel plugin, libssl, libhttp, browser TLS provider and app, built in
+  VitaSDK's Docker image (`make` in `psv/`).
 - `ps3/`: the PS3's libssl, libhttp, boot plugin, DNS kernel plugin and app, built in the
   [vitals-ps3-sdk](https://github.com/nyirsh/vitals-ps3-sdk) Docker image (`make` in `ps3/`).
 

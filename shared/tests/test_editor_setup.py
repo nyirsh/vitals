@@ -10,7 +10,7 @@ import editor_setup  # noqa: E402
 REPO = str(editor_setup.REPOSITORY)
 SDK = Path("/here/sdk")
 PS3 = editor_setup.CONSOLES["ps3"]
-VITA = editor_setup.CONSOLES["vita"]
+VITA = editor_setup.CONSOLES["psv"]
 
 
 class EditorSetupTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class EditorSetupTests(unittest.TestCase):
     def test_paths_on_this_machine(self):
         self.assertEqual(editor_setup.mapped("/src/ps3/a.c", "/src", SDK), REPO + "/ps3/a.c")
         self.assertEqual(editor_setup.mapped("/opt/sdk/x/../inc", "/src", SDK), "/here/sdk/opt/sdk/inc")
-        self.assertEqual(editor_setup.mapped(REPO + "/vita/a.c", None, SDK), REPO + "/vita/a.c")
+        self.assertEqual(editor_setup.mapped(REPO + "/psv/a.c", None, SDK), REPO + "/psv/a.c")
         self.assertEqual(editor_setup.mapped("relative/inc", "/src", SDK), "relative/inc")
 
     def test_a_ps3_entry(self):
@@ -49,9 +49,9 @@ class EditorSetupTests(unittest.TestCase):
         self.assertIn(f'-DCONFIG="{REPO}/ps3/config.h"', editor_setup.rewritten(entry, PS3, SDK, [], [])["arguments"])
 
     def test_a_vita_entry_keeps_its_paths(self):
-        entry = {"directory": REPO + "/vita/build/x", "file": REPO + "/vita/a.c", "arguments": ["gcc", "-I" + REPO + "/vita/inc", "-c", "a.c"]}
+        entry = {"directory": REPO + "/psv/build/x", "file": REPO + "/psv/a.c", "arguments": ["gcc", "-I" + REPO + "/psv/inc", "-c", "a.c"]}
         result = editor_setup.rewritten(entry, VITA, SDK, [], [])
-        self.assertIn(REPO + "/vita/inc", result["arguments"])
+        self.assertIn(REPO + "/psv/inc", result["arguments"])
         self.assertIn("--target=arm-none-eabi", result["arguments"])
 
     def test_an_entry_can_have_its_own_target(self):

@@ -1,6 +1,6 @@
-# Both consoles' projects (vita/, ps3/) and the shared code: what's built, local settings and dumps
+# Both consoles' projects (psv/, ps3/) and the shared code: what's built, local settings and dumps
 # stay out
-/vita/build/
+/psv/build/
 /ps3/build/
 __pycache__/
 *.o
@@ -16,5 +16,5 @@ __pycache__/
 /fetched/
 
 # Dumps from the consoles (firmware modules, CA files, memory segments): Sony's, never committed;
-# a folder per console and firmware (dumps/ps3/4.93-cex, dumps/vita/3.65), where the tools and tests read them
+# a folder per console and firmware (dumps/ps3/4.93-cex, dumps/psv/3.65), where the tools and tests read them
 /dumps/

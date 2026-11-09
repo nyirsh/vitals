@@ -8,7 +8,7 @@ include folders, pointing at those headers, for this machine's clang to stand in
 compiler (its target, and the SDK compiler's own defines, as the real one has them). Then it checks
 that every file of the project finds its headers.
 
-    shared/tools/editor_setup.py vita|ps3 [--image IMAGE]
+    shared/tools/editor_setup.py psv|ps3 --image IMAGE
 
 Run it after building (make), and again after a new SDK image or new source files."""
 import argparse
@@ -27,7 +27,7 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 ENTRIES_FILE = "compile_commands.json"
 
 CONSOLES = {
-    "vita": {
+    "psv": {
         "compiler": "arm-vita-eabi-gcc",
         "shell": ["sh", "-lc"],
         "environment": "",

@@ -3,12 +3,12 @@
 
     tools/vita_comms.py app [VPK]      uploads the vitals app (make, build/vitals-app/vitals-app.vpk, or
                                        VPK) to ux0:data/vitals/vitals-app.vpk, for VitaShell to install
-    tools/vita_comms.py log            prints vitals.log (Options, Logs: File), and keeps it in fetched/vita/
-    tools/vita_comms.py app-log        prints the app's vitals-app.log, and keeps it in fetched/vita/
+    tools/vita_comms.py log            prints vitals.log (Options, Logs: File), and keeps it in fetched/psv/
+    tools/vita_comms.py app-log        prints the app's vitals-app.log, and keeps it in fetched/psv/
     tools/vita_comms.py fetch          copies the app's test reports (ux0:data/vitals/reports, and
                                        ux0:data/vitals from earlier versions), the crash dumps from
                                        ux0:data and any SceWebKit dumps from ux0:data/vitals-dump into
-                                       ../fetched/vita/, leaving them on the Vita; the debug output's log files too
+                                       ../fetched/psv/, leaving them on the Vita; the debug output's log files too
     tools/vita_comms.py status         what's on the Vita now: config.txt, vitals' plugin and modules,
                                        the certificate store, the user's lists and the switches
 
@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(ROOT, "..", "shared", "tools"))
 import console_ftp  # noqa: E402
 from console_ftp import listing, load_env, make_directory  # noqa: E402
 BUILD = os.path.join(ROOT, "build")
-FETCHED = console_ftp.fetched_folder("vita")
+FETCHED = console_ftp.fetched_folder("psv")
 APP_VPK = os.path.join(BUILD, "vitals-app", "vitals-app.vpk")
 
 # VitaShell's FTP paths: each device is a folder at the top, named with its colon
@@ -99,7 +99,7 @@ def upload_app(ftp, source):
 
 
 def fetch_log(ftp, path):
-    """The log at path saved in fetched/vita/ and printed, left on the Vita"""
+    """The log at path saved in fetched/psv/ and printed, left on the Vita"""
     data = io.BytesIO()
     try:
         ftp.retrbinary("RETR " + enter(ftp, path), data.write)
