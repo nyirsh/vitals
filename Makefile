@@ -3,7 +3,8 @@
 #   make ps3, make psv    builds that one
 #   make clean            runs a command on both; make ps3 clean, make psv test: on that one
 # What both have: test clean upload-app log app-log fetch status pull editor plugin ssl http app
-# update-certs and preview do the same for both, so they run once.
+# update-certs and preview do the same for both, so they run once. make art redraws both apps' art
+# (shared/tools/make_app_art.py).
 # What only one has (make ps3 install, make psv browser) needs that console named. Options such as
 # DEBUG=1 reach the console's Makefile. It stops at the first failure, so with a console off use
 # make ps3 fetch or make psv fetch.
@@ -19,7 +20,7 @@ ACTIONS := $(filter-out $(CONSOLES),$(MAKECMDGOALS))
 .DEFAULT_GOAL := all
 
 ifeq ($(CHOSEN),)
-ONE_ONLY := $(filter-out all $(SHARED) $(ONCE),$(ACTIONS))
+ONE_ONLY := $(filter-out all art $(SHARED) $(ONCE),$(ACTIONS))
 ifneq ($(ONE_ONLY),)
 $(error $(ONE_ONLY): not a command both consoles have, so name the console: make ps3 $(firstword $(ONE_ONLY)) or make psv $(firstword $(ONE_ONLY)), whichever has it)
 endif
@@ -35,10 +36,14 @@ $(CONSOLES):
 $(ONCE):
 	$(MAKE) -C $(firstword $(TARGETS)) $@
 
-EACH := $(filter-out all $(ONCE),$(ACTIONS))
+EACH := $(filter-out all art $(ONCE),$(ACTIONS))
 ifneq ($(EACH),)
 $(EACH):
 	$(foreach console,$(TARGETS),$(MAKE) -C $(console) $@ &&) true
 endif
 
-.PHONY: all $(CONSOLES) $(ONCE) $(EACH)
+# Both apps' art, from one design: run it, then review and commit the images
+art:
+	python3 shared/tools/make_app_art.py
+
+.PHONY: all art $(CONSOLES) $(ONCE) $(EACH)

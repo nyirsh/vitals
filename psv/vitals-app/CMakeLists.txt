@@ -121,7 +121,9 @@ vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
     VERSION ${VITALS_APP_VERSION}
     NAME ${VITALS_TITLE}
     FILE sce_sys/icon0.png sce_sys/icon0.png
+         sce_sys/pic0.png sce_sys/pic0.png
          sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+         sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
          sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
          ${VITALS_KERNEL_MODULE} vitals.skprx
          assets/compat.suprx compat.suprx

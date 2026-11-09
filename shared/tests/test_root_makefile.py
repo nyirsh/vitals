@@ -55,6 +55,11 @@ class RootMakefileTests(unittest.TestCase):
         self.assertIn("make ps3 install or make psv install", result.stderr)
         self.assertEqual(consoles(run("ps3", "install").stdout, "install"), ["ps3"])
 
+    def test_art_runs_once_at_the_top(self):
+        output = run("art").stdout
+        self.assertIn("shared/tools/make_app_art.py", output)
+        self.assertEqual(consoles(output, "art"), [])
+
     def test_options_reach_the_console(self):
         self.assertIn("DEBUG=1", run("psv", "ssl", "DEBUG=1").stdout)
 

@@ -2,3 +2,4 @@
 psv/vitals-app/assets/certs.cer -text
 psv/vitals-app/assets/sony-certs.pem -text
 shared/assets/mozilla-certs.pem -text
+shared/assets/fonts/*.otf binary
