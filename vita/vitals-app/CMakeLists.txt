@@ -72,6 +72,7 @@ add_executable(vitals-app
     files_vita.c
     font_vita.c
     app_log_vita.c
+    ../../shared/app/app_log.c
     network.c
     check.c
     check_model.c

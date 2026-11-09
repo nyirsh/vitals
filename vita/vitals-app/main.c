@@ -1,6 +1,7 @@
 /* vitals on the Vita: the shared app (shared/app/app.c), over the Vita's console_vita.c and
  * platform_vita.c */
 
+#include "vitals/log.h"
 #include "app.h"
 
 #include <psp2/kernel/processmgr.h>
@@ -11,6 +12,8 @@ unsigned int _newlib_heap_size_user = 32u * 1024u * 1024u;
 
 int main(void)
 {
+    app_log_start();
+    VITALS_LOG("vitals app %s starting", VITALS_VERSION);
     int exit_code = app_main(0);
     sceKernelExitProcess(exit_code);
     return exit_code;

@@ -65,6 +65,11 @@ add_executable(vitals_app_installed_tests ${SHARED_APP}/tests/test_installed.c $
 target_include_directories(vitals_app_installed_tests PRIVATE ${APP_DIR})
 add_test(NAME vitals_app_installed COMMAND vitals_app_installed_tests)
 
+# The app's log (shared with the other console's tests): what each debug level keeps
+add_executable(vitals_app_log_tests ${SHARED_APP}/tests/test_app_log.c ${SHARED_APP}/app_log.c)
+target_include_directories(vitals_app_log_tests PRIVATE ${APP_DIR})
+add_test(NAME vitals_app_log COMMAND vitals_app_log_tests)
+
 # The connection test's lifecycle (shared with the PS3's tests): its thread, cancelling and saving
 find_package(Threads REQUIRED)
 add_executable(vitals_app_check_service_tests ${SHARED_APP}/tests/test_check_service.c ${SHARED_APP}/check_service.c)

@@ -42,7 +42,8 @@ add_executable(vitals-app
 	src/main.c
 	src/console_ps3.c
 	src/firmware.c
-	src/app_log.c
+	src/app_log_ps3.c
+	../../shared/app/app_log.c
 	src/platform_ps3.c
 	src/files_ps3.c
 	src/font_ps3.c

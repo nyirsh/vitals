@@ -1,6 +1,7 @@
 #include "check.h"
 #include "check_vita.h"
 #include "check_report.h"
+#include "vitals/log.h"
 #include "check_run.h"
 #include "network.h"
 #include "probe.h"
@@ -339,6 +340,7 @@ static unsigned load_redirects(const char *path, CheckRedirect *list, unsigned m
     unsigned count = check_run_read_rules(read_redirects, list, max);
     fclose(redirect_file);
     redirect_file = NULL;
+    VITALS_VERBOSE("%s: %u rules", path, count);
     return count;
 }
 /* A name looked up through sceNetResolver, as a game would: its query goes out through sendto,
@@ -475,6 +477,7 @@ static int save_report(const CheckService *s, char *path, size_t path_size)
         }
     }
     free(report.data);
+    VITALS_LOG("report: %s, %d", path, failed);
     return failed ? -1 : 0;
 }
 
@@ -561,6 +564,8 @@ static void backend_parts(CheckParts *parts)
     parts->vitals = enabled != 0;
     /* A vitals-http without vitalsHttpGetUrl can't say which host answered */
     parts->http_outdated = vitals_http && get_url() == NULL;
+    VITALS_LOG("libssl: %s, libhttp: %s%s%s", parts->tls ? "vitals'" : "Sony's", parts->http ? "vitals'" : "Sony's",
+               parts->redirects_off ? ", redirects off" : "", parts->dns_off ? ", DNS rules off" : "");
 }
 
 static void backend_protocol(unsigned test, char *body, CheckResult *r)
@@ -582,6 +587,13 @@ static int backend_policy_failed(const CheckResult *r)
     return r->restore_error < 0;
 }
 
+/* A finished check, in the app's log */
+static void log_result(const char *what, const CheckResult *r)
+{
+    VITALS_LOG("test %s: state %d, HTTP %d, error 0x%08X, ssl 0x%08X, detail 0x%04X, %u ms, %s", what, r->state,
+               r->http_code, (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail, r->elapsed_ms, r->message);
+}
+
 static const CheckBackend backend = {
     .open = backend_open,
     .parts = backend_parts,
@@ -591,7 +603,7 @@ static const CheckBackend backend = {
     .lookup = look_up,
     .stopped = stopped,
     .policy_failed = backend_policy_failed,
-    .log = NULL,
+    .log = log_result,
     .lock = lock,
     .unlock = unlock,
     .now_ms = now_ms,

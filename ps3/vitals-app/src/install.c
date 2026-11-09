@@ -446,12 +446,6 @@ static int write_mozilla(const char *bundle, size_t bundle_length, int keep_date
 	return 0;
 }
 
-/* curl's notes on the download, into the app's log */
-static void log_line(const char *line)
-{
-	VITALS_LOG("%s", line);
-}
-
 /* The update, through curl on the app's own Mbed TLS, trusting only the Mozilla bundle the app carries,
  * checked and without Sony's CAs (ca_update.h): written over VITALS_BUNDLE only when all of that
  * worked, so a failed update leaves the store as it was */
@@ -475,7 +469,7 @@ static int download_certificates(VitalsNote note)
 	if (sony == NULL)
 		note("Sony's certificates can't be read: Mozilla's are kept whole");
 	VitalsCaBundle bundle;
-	rc = vitals_ca_download(trust, trust_length, "vitals/" VITALS_VERSION " (PS3)", log_line, sony, sony_length,
+	rc = vitals_ca_download(trust, trust_length, "vitals/" VITALS_VERSION " (PS3)", app_log_download, sony, sony_length,
 	                        &bundle, note);
 	free(trust);
 	free(sony);

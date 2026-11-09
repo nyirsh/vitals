@@ -17,6 +17,7 @@
 #include <stdarg.h>
 
 #include "ca_update.h"
+#include "app_log.h"
 #include "installed.h"
 #include "config_edit.h"
 #include "install.h"
@@ -933,6 +934,11 @@ static int install_http_modules(int requested_state)
             result = remove_old_layout();
         if (result >= 0 && path_exists(VITALS_SYSTEM_DIRECTORY))
             (void)sceIoRmdir(VITALS_SYSTEM_DIRECTORY);
+        /* The app's log, as the PS3's uninstall; its folder goes only when empty */
+        if (result >= 0)
+            (void)remove_if_exists(VITALS_APP_LOG);
+        if (result >= 0 && path_exists(VITALS_LOGS_DIRECTORY))
+            (void)sceIoRmdir(VITALS_LOGS_DIRECTORY);
         /* The reports are the user's: their folder goes only when empty */
         if (result >= 0 && path_exists(VITALS_REPORTS_DIRECTORY))
             (void)sceIoRmdir(VITALS_REPORTS_DIRECTORY);
@@ -1064,7 +1070,7 @@ static int install_certificates(int requested_state)
     VitalsCaBundle bundle;
     int prepared = -1;
     if (vitals_install_network_ready())
-        prepared = vitals_ca_download(mozilla, mozilla_size, "vitals/" VITALS_VERSION " (PS Vita)", NULL, sony,
+        prepared = vitals_ca_download(mozilla, mozilla_size, "vitals/" VITALS_VERSION " (PS Vita)", app_log_download, sony,
                                       sony_size, &bundle, g_note);
     else
         printf("No network connection\n");

@@ -6,6 +6,8 @@
  * with, the connection test's reports and the Options' switches */
 #define VITALS_DIRECTORY "ux0:data/vitals"
 #define VITALS_REPORTS_DIRECTORY VITALS_DIRECTORY "/reports"
+#define VITALS_LOGS_DIRECTORY VITALS_DIRECTORY "/logs"
+#define VITALS_APP_LOG VITALS_LOGS_DIRECTORY "/vitals-app.log"
 /* The Mozilla CA bundle the app carries (app0:), which its own downloads trust */
 #define VITALS_APP_CA_BUNDLE "mozilla-certs.pem"
 /* Each part's switch, as on the PS3, which the kernel plugin reads (vitals/switches.h) */

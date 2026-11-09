@@ -3,6 +3,8 @@
 
 #include "console.h"
 
+#include "vitals/log.h"
+
 #include "check_vita.h"
 #include "dates.h"
 #include "install.h"
@@ -168,6 +170,7 @@ void vitals_certificates_date(char *text, size_t size, int *stale)
 
 void vitals_reboot(void)
 {
+    VITALS_LOG("reboot");
     scePowerRequestColdReset();
     for (;;)
         sceKernelDelayThread(1000 * 1000);

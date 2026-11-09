@@ -45,6 +45,8 @@ static int prepared(VitalsCaBundle *bundle)
     memcpy(bundle->data, BUNDLE, bundle->size);
     return 0;
 }
+/* The app's log: nothing to keep here */
+void app_log_download(const char *line) { (void)line; }
 /* curl's bundle, trusting only the app's Mozilla bundle, Sony's list as the app carries it left out */
 int vitals_ca_download(const char *trust, size_t trust_length, const char *user_agent, void (*log)(const char *line),
                        const char *sony, size_t sony_length, VitalsCaBundle *out, VitalsNote note)
