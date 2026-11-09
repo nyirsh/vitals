@@ -3,12 +3,12 @@
 
     tools/vita_comms.py app [VPK]      uploads the vitals app (make, build/vitals-app/vitals-app.vpk, or
                                        VPK) to ux0:data/vitals/vitals-app.vpk, for VitaShell to install
-    tools/vita_comms.py log            prints vitals.log (Options, Logs: File), and keeps it in build/
-    tools/vita_comms.py app-log        prints the app's vitals-app.log, and keeps it in build/
+    tools/vita_comms.py log            prints vitals.log (Options, Logs: File), and keeps it in fetched/vita/
+    tools/vita_comms.py app-log        prints the app's vitals-app.log, and keeps it in fetched/vita/
     tools/vita_comms.py fetch          copies the app's test reports (ux0:data/vitals/reports, and
                                        ux0:data/vitals from earlier versions), the crash dumps from
                                        ux0:data and any SceWebKit dumps from ux0:data/vitals-dump into
-                                       build/vita-fetch/, leaving them on the Vita; the debug output's log files too
+                                       ../fetched/vita/, leaving them on the Vita; the debug output's log files too
     tools/vita_comms.py status         what's on the Vita now: config.txt, vitals' plugin and modules,
                                        the certificate store, the user's lists and the switches
 
@@ -16,7 +16,7 @@ The Vita is VITA_HOST, port VITA_PORT (1337, VitaShell's), from the environment 
 the top of the repository (copy .env.example). Installing, uninstalling and the debug output are the app's: they
 need vs0: mounted for writing and a reboot, which the app takes care of.
 
-What fetch brings back can hold PSN details (the reports list each request): it stays in build/, which
+What fetch brings back can hold PSN details (the reports list each request): it stays in fetched/, which
 isn't committed."""
 
 import argparse
@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(ROOT, "..", "shared", "tools"))
 import console_ftp  # noqa: E402
 from console_ftp import listing, load_env, make_directory  # noqa: E402
 BUILD = os.path.join(ROOT, "build")
-FETCHED = os.path.join(BUILD, "vita-fetch")
+FETCHED = console_ftp.fetched_folder("vita")
 APP_VPK = os.path.join(BUILD, "vitals-app", "vitals-app.vpk")
 
 # VitaShell's FTP paths: each device is a folder at the top, named with its colon
@@ -99,13 +99,13 @@ def upload_app(ftp, source):
 
 
 def fetch_log(ftp, path):
-    """The log at path saved in build/ and printed, left on the Vita"""
+    """The log at path saved in fetched/vita/ and printed, left on the Vita"""
     data = io.BytesIO()
     try:
         ftp.retrbinary("RETR " + enter(ftp, path), data.write)
     except ftplib.error_perm:
         sys.exit(f"{path}: not there (they're written with debug output on and Logs set to File, in the app's Options)")
-    console_ftp.show_log(data.getvalue(), BUILD, path.rsplit("/", 1)[1], ROOT)
+    console_ftp.show_log(data.getvalue(), FETCHED, path.rsplit("/", 1)[1], console_ftp.REPOSITORY)
 
 
 def status(ftp):
@@ -141,7 +141,7 @@ def main():
         elif arguments.command == "app-log":
             fetch_log(ftp, APP_LOG)
         elif arguments.command == "fetch":
-            console_ftp.fetch(ftp, FETCH, FETCHED, ROOT)
+            console_ftp.fetch(ftp, FETCH, FETCHED, console_ftp.REPOSITORY)
         else:
             status(ftp)
     finally:

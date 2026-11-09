@@ -40,8 +40,8 @@
 #                           (tools/ps3_comms.py); not SIGNED=1 on a console: the PlayStation Store
 #                           app hangs on a black screen loading the real-signed libssl and libhttp
 #   make uninstall, make reboot, make log, make status   tools/ps3_comms.py's
-#   make app-log            fetches the app's own log (vitals-app.log) into build/
-#   make fetch              the logs and the app's test reports, into build/ps3-fetch/
+#   make app-log            fetches the app's own log (vitals-app.log) into ../fetched/ps3/
+#   make fetch              the logs and the app's test reports, into ../fetched/ps3/
 #   make upload-app [SIGNED=1]   builds the app and puts it in the console's /dev_hdd0/packages/
 #   make pull               pulls the newest published image (nyirsh/vitals-ps3-sdk:latest)
 # The console is PS3_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's PS3_HOST

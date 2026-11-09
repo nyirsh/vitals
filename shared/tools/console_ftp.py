@@ -8,6 +8,11 @@ import sys
 REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def fetched_folder(console):
+    """Where what's brought back from a console goes: fetched/<console> at the top of the repository"""
+    return os.path.join(REPOSITORY, "fetched", console)
+
+
 def load_env():
     """.env's KEY=VALUE lines into the environment, where they aren't set already (# comments)"""
     try:
@@ -78,7 +83,7 @@ def listing(ftp, folder):
 def fetch(ftp, wanted, target, root):
     """Each wanted file copied into target and left on the console. wanted: (folder, the name prefixes
     it takes, whether the folder may be missing). What comes back can hold PSN details, so target
-    belongs in build/"""
+    belongs in fetched_folder's, which isn't committed"""
     os.makedirs(target, exist_ok=True)
     count = 0
     for folder, prefixes, optional in wanted:
@@ -100,7 +105,7 @@ def fetch(ftp, wanted, target, root):
 
 def show_log(data, folder, name, root):
     """A log read off the console, saved as folder/name and printed. It can hold PSN details, so folder
-    belongs in build/"""
+    belongs in fetched_folder's, which isn't committed"""
     os.makedirs(folder, exist_ok=True)
     local = os.path.join(folder, name)
     with open(local, "wb") as file:

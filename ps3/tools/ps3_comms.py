@@ -6,9 +6,9 @@
                                           kernel plugin), Mozilla's CA bundle, the example
                                           redirects.txt and dns.txt, the boot_plugins.txt line,
                                           a fresh log
-    tools/ps3_comms.py log                  fetches /dev_hdd0/vitals/logs/vitals.log (into build/)
+    tools/ps3_comms.py log                  fetches /dev_hdd0/vitals/logs/vitals.log (into ../fetched/ps3/)
     tools/ps3_comms.py app-log              fetches the app's own, /dev_hdd0/vitals/logs/vitals-app.log
-    tools/ps3_comms.py fetch                copies the logs and the app's test reports into build/ps3-fetch/,
+    tools/ps3_comms.py fetch                copies the logs and the app's test reports into ../fetched/ps3/,
                                             leaving them on the console (they can hold PSN details)
     tools/ps3_comms.py uninstall            the lines out of the two lists, the modules deleted
     tools/ps3_comms.py status               what's on the console now
@@ -46,10 +46,10 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 BUILD = os.path.join(ROOT, "build")
-FETCHED = os.path.join(BUILD, "ps3-fetch")
 sys.path.insert(0, os.path.join(ROOT, "..", "shared", "tools"))
 import console_ftp  # noqa: E402
 from console_ftp import load_env, make_directory  # noqa: E402
+FETCHED = console_ftp.fetched_folder("ps3")
 
 BOOT_PLUGINS = "/dev_hdd0/boot_plugins.txt"
 PLUGIN = "/dev_hdd0/plugins/vitals_boot.sprx"
@@ -413,7 +413,7 @@ def fetch_log(ftp, path=LOG):
     data = read(ftp, path)
     if data is None:
         sys.exit(f"{path}: not there" + (" (did the console reboot with the plugin?)" if path == LOG else " (has the app run?)"))
-    console_ftp.show_log(data, BUILD, os.path.basename(path), ROOT)
+    console_ftp.show_log(data, FETCHED, os.path.basename(path), console_ftp.REPOSITORY)
 
 
 def upload_app(ftp):
@@ -470,7 +470,7 @@ def main():
         elif arguments.command == "app-log":
             fetch_log(ftp, APP_LOG)
         elif arguments.command == "fetch":
-            console_ftp.fetch(ftp, FETCH, FETCHED, ROOT)
+            console_ftp.fetch(ftp, FETCH, FETCHED, console_ftp.REPOSITORY)
         else:
             status(ftp)
     finally:

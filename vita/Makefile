@@ -18,9 +18,9 @@
 #                           VitaShell to install (tools/vita_comms.py)
 #   make plugin|ssl|http|browser|app [DEBUG=N]   one module (the PS3's names), with what it links first
 #   make preview            the app's screens on this Mac with made-up data (../ps3/build/preview/)
-#   make log                prints vitals.log, and keeps it in build/
-#   make app-log            prints the app's vitals-app.log, and keeps it in build/
-#   make fetch              the logs, the app's test reports and the crash dumps, into build/vita-fetch/
+#   make log                prints vitals.log, and keeps it in ../fetched/vita/
+#   make app-log            prints the app's vitals-app.log, and keeps it in ../fetched/vita/
+#   make fetch              the logs, the app's test reports and the crash dumps, into ../fetched/vita/
 #   make status             what's on the Vita now
 # The Vita is VITA_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's VITA_HOST
 COMPONENTS = common vitals-boot vitals-ssl vitals-browser vitals-http vitals-app
