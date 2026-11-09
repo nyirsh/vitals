@@ -8,6 +8,8 @@
                                           a fresh log
     tools/ps3_comms.py log                  fetches /dev_hdd0/vitals/logs/vitals.log (into build/)
     tools/ps3_comms.py app-log              fetches the app's own, /dev_hdd0/vitals/logs/vitals-app.log
+    tools/ps3_comms.py fetch                copies the logs and the app's test reports into build/ps3-fetch/,
+                                            leaving them on the console (they can hold PSN details)
     tools/ps3_comms.py uninstall            the lines out of the two lists, the modules deleted
     tools/ps3_comms.py status               what's on the console now
     tools/ps3_comms.py reboot               a full reboot through webMAN MOD, waiting until it's back
@@ -20,7 +22,7 @@ asks for the real-signed ones (don't, on a console: the PlayStation Store app ha
 screen loading the real-signed libssl and libhttp), the release builds of libssl, libhttp, the boot plugin and the DNS
 plugin (build/vitals-ssl, build/vitals-http, build/vitals-boot, build/vitals-dns) unless --debug 1 or
 2 asks for debug ones (build/vitals-ssl-debugN and the like, make install DEBUG=N builds them), and Mozilla's CA bundle (VITALS_BUNDLE, else the app's,
-vitals-app/assets/mozilla-certs.pem) when the console has none, so the app's Update certificates
+shared/assets/mozilla-certs.pem) when the console has none, so the app's Update certificates
 isn't undone, without Sony's CAs (read from the console's flash) as the app writes it; the
 example redirects.txt and dns.txt likewise only when the console has none, so the user's lists stay. The boot plugin maps libssl and libhttp at every boot, and loads the DNS
 kernel plugin (make dns-plugin), except on a boot after one that didn't end properly
@@ -44,6 +46,10 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 BUILD = os.path.join(ROOT, "build")
+FETCHED = os.path.join(BUILD, "ps3-fetch")
+sys.path.insert(0, os.path.join(ROOT, "..", "shared", "tools"))
+import console_ftp  # noqa: E402
+from console_ftp import load_env, make_directory  # noqa: E402
 
 BOOT_PLUGINS = "/dev_hdd0/boot_plugins.txt"
 PLUGIN = "/dev_hdd0/plugins/vitals_boot.sprx"
@@ -85,6 +91,9 @@ DNS_OFF = FLAGS + "/dns.off"
 LOG = LOGS + "/vitals.log"
 APP_LOG = LOGS + "/vitals-app.log"
 ASSETS = os.path.join(ROOT, "vitals-app", "assets")
+SHARED_ASSETS = os.path.join(ROOT, "..", "shared", "assets")
+# What fetch takes, as the Vita's: (folder, the names it takes, whether the folder may be missing)
+FETCH = [(REPORTS, ("connection-test-",), True), (LOGS, ("vitals.log", "vitals-app.log"), True)]
 # Earlier versions kept everything in /dev_hdd0/vitals itself and the logs in /dev_hdd0/tmp: install
 # moves what the user chose or got to its folder (MOVED), and deletes the rest (GONE)
 # (and the single XMB switch of earlier builds, xmb.off, is xmb-tls.off now)
@@ -96,39 +105,12 @@ GONE = [VITALS + "/" + name for name in ("libssl.sprx", "libhttp.sprx", "vitals_
 PACKAGES = "/dev_hdd0/packages"
 
 
-def load_env():
-    """.env's KEY=VALUE lines into the environment, where they aren't set already (# comments)"""
-    try:
-        # The repository's, both consoles' settings (.env.example)
-        with open(os.path.join(ROOT, "..", ".env"), encoding="utf-8") as env:
-            lines = env.read().splitlines()
-    except FileNotFoundError:
-        return
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        if key.startswith("export "):
-            key = key[len("export "):]
-        key = key.strip()
-        if not os.environ.get(key):
-            os.environ[key] = value.strip().strip("'\"")
-
-
 def host():
-    value = os.environ.get("PS3_HOST", "")
-    if not value:
-        sys.exit("PS3_HOST isn't set: put the console's address in .env (cp .env.example .env)")
-    return value
+    return console_ftp.host("PS3_HOST", "the console")
 
 
 def connect():
-    # webMAN MOD's replies after a listing carry bytes that aren't UTF-8 (0xb0, a degree sign)
-    ftp = ftplib.FTP(encoding="latin1")
-    ftp.connect(host(), int(os.environ.get("PS3_PORT", "21")), timeout=30)
-    ftp.login()
-    return ftp
+    return console_ftp.connect(host(), int(os.environ.get("PS3_PORT", "21")), "is webMAN MOD's FTP server on?")
 
 
 def reboot():
@@ -170,13 +152,6 @@ def read(ftp, path):
 
 def write(ftp, path, data):
     ftp.storbinary("STOR " + path, io.BytesIO(data))
-
-
-def make_directory(ftp, path):
-    try:
-        ftp.mkd(path)
-    except ftplib.error_perm:
-        pass  # already there
 
 
 def delete(ftp, path):
@@ -227,7 +202,7 @@ def remove_line(ftp, path, entry):
 
 def bundle_source():
     """Mozilla's CA bundle: VITALS_BUNDLE, else the app's (curl's cacert.pem, make update-certs)"""
-    return os.environ.get("VITALS_BUNDLE", os.path.join(ASSETS, "mozilla-certs.pem"))
+    return os.environ.get("VITALS_BUNDLE", os.path.join(SHARED_ASSETS, "mozilla-certs.pem"))
 
 
 PEM_BEGIN, PEM_END = b"-----BEGIN CERTIFICATE-----", b"-----END CERTIFICATE-----"
@@ -479,7 +454,7 @@ def status(ftp):
 def main():
     load_env()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=("install", "log", "app-log", "uninstall", "status", "reboot", "app"))
+    parser.add_argument("command", choices=("install", "log", "app-log", "fetch", "uninstall", "status", "reboot", "app"))
     parser.add_argument("--signed", action="store_true", help="install the real-signed containers (the Store app hangs loading them)")
     parser.add_argument("--debug", type=int, choices=(0, 1, 2), default=0,
                         help="install libssl's and libhttp's debug builds of that level (build/vitals-ssl-debugN, build/vitals-http-debugN)")
@@ -499,6 +474,8 @@ def main():
             fetch_log(ftp)
         elif arguments.command == "app-log":
             fetch_log(ftp, APP_LOG)
+        elif arguments.command == "fetch":
+            console_ftp.fetch(ftp, FETCH, FETCHED, ROOT)
         else:
             status(ftp)
     finally:

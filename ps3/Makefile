@@ -77,7 +77,7 @@ TOOLCHAIN = /opt/ps3dk-src/cmake/ps3-ppu-toolchain.cmake
 DOCKER = docker run --rm -v "$(abspath $(CURDIR)/..)":/src -w /src/ps3 $(IMAGE) bash -c
 ENV = source /opt/ps3dk-src/scripts/env.sh >/dev/null
 # Mozilla's CA bundle: VITALS_BUNDLE, else the app's own copy
-BUNDLE = $(or $(VITALS_BUNDLE),vitals-app/assets/mozilla-certs.pem)
+BUNDLE = $(or $(VITALS_BUNDLE),../shared/assets/mozilla-certs.pem)
 SPRX = $(if $(filter 1,$(SIGNED)),.sprx,.fake.sprx)
 APP_STAGING = build/vitals-app/pkg_files
 VERSION = $(shell cat ../VERSION)
@@ -177,6 +177,7 @@ test: build/ps3dk-include/cell/http.h
 	cmake --build build/vitals-app-tests -j8
 	ctest --test-dir build/vitals-app-tests --output-on-failure
 	python3 -m unittest discover -s vitals-app/tests -p 'test_*.py'
+	python3 -m unittest discover -s ../shared/tests -p 'test_*.py'
 
 
 rpcs3: ssl
@@ -185,9 +186,9 @@ rpcs3: ssl
 install: ssl http plugin dns-plugin
 	python3 tools/ps3_comms.py install $(INSTALL_FLAGS)
 
-# The app's Mozilla bundle, from curl (tools/update_certs.py)
+# Both apps' Mozilla bundle, from curl (shared/tools/update_certs.py)
 update-certs:
-	python3 tools/update_certs.py
+	python3 ../shared/tools/update_certs.py
 
 upload-app: app
 	python3 tools/ps3_comms.py app
@@ -195,7 +196,7 @@ upload-app: app
 app-log:
 	python3 tools/ps3_comms.py app-log
 
-uninstall reboot log status:
+uninstall reboot log status fetch:
 	python3 tools/ps3_comms.py $@
 
 pull:

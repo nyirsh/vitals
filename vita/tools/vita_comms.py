@@ -24,6 +24,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(ROOT, "..", "shared", "tools"))
+import console_ftp  # noqa: E402
+from console_ftp import listing, load_env, make_directory  # noqa: E402
 BUILD = os.path.join(ROOT, "build")
 FETCHED = os.path.join(BUILD, "vita-fetch")
 APP_VPK = os.path.join(BUILD, "vitals-app", "vitals-app.vpk")
@@ -53,8 +56,8 @@ SWITCHES = [VITALS + "/flags/" + name for name in ("tls.off", "http.off", "dns.o
 FETCH = [
     (VITALS + "/reports", ("connection-test-",), True),
     # Where earlier versions saved them, until the installer moves them to reports/
-    # The debug output's file (Options, Logs: File) and the last boot's
-    (VITALS + "/logs", ("vitals.log",), True),
+    # The debug output's file (Options, Logs: File), the last boot's, and the app's own
+    (VITALS + "/logs", ("vitals.log", "vitals-app.log"), True),
     (VITALS, ("vitals-testresults-", "browserleaks-"), False),
     ("/ux0:/data", ("psp2core-",), False),
     # A temporary SceWebKit dump, when the folder is there
@@ -62,41 +65,13 @@ FETCH = [
 ]
 
 
-def load_env():
-    """.env's KEY=VALUE lines into the environment, where they aren't set already (# comments)"""
-    try:
-        # The repository's, both consoles' settings (.env.example)
-        with open(os.path.join(ROOT, "..", ".env"), encoding="utf-8") as env:
-            lines = env.read().splitlines()
-    except FileNotFoundError:
-        return
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        if key.startswith("export "):
-            key = key[len("export "):]
-        key = key.strip()
-        if not os.environ.get(key):
-            os.environ[key] = value.strip().strip("'\"")
-
-
 def host():
-    value = os.environ.get("VITA_HOST", "")
-    if not value:
-        sys.exit("VITA_HOST isn't set: put the Vita's address in .env (cp .env.example .env)")
-    return value
+    return console_ftp.host("VITA_HOST", "the Vita")
 
 
 def connect():
-    ftp = ftplib.FTP(encoding="latin1")
-    try:
-        ftp.connect(host(), int(os.environ.get("VITA_PORT", "1337")), timeout=30)
-    except OSError as error:
-        sys.exit(f"{host()}: {error} (is VitaShell's FTP server on? SELECT in VitaShell starts it)")
-    ftp.login()
-    return ftp
+    return console_ftp.connect(host(), int(os.environ.get("VITA_PORT", "1337")),
+                               "is VitaShell's FTP server on? SELECT in VitaShell starts it")
 
 
 def enter(ftp, path):
@@ -105,34 +80,6 @@ def enter(ftp, path):
     folder, name = path.rsplit("/", 1)
     ftp.cwd(folder)
     return name
-
-
-def listing(ftp, folder):
-    """The files in folder as {name: size}, without its folders; None when it isn't there. VitaShell's
-    LIST is ls -l's: the name is the ninth field, and a folder's line starts with d"""
-    lines = []
-    try:
-        ftp.cwd(folder)
-        ftp.retrlines("LIST", lines.append)
-    except ftplib.error_perm:
-        return None
-    files = {}
-    for line in lines:
-        fields = line.split(None, 8)
-        if len(fields) < 9 or line.startswith("d"):
-            continue
-        try:
-            files[fields[8]] = int(fields[4])
-        except ValueError:
-            files[fields[8]] = None
-    return files
-
-
-def make_directory(ftp, path):
-    try:
-        ftp.mkd(path)
-    except ftplib.error_perm:
-        pass  # already there
 
 
 def upload_app(ftp, source):
@@ -144,28 +91,6 @@ def upload_app(ftp, source):
         ftp.storbinary("STOR " + enter(ftp, APP_TARGET), file)
     print(f"{os.path.relpath(source, ROOT)} -> {APP_TARGET} ({os.path.getsize(source)} bytes)")
     print("Install it with VitaShell: ux0:data/vitals/vitals-app.vpk, Cross, then Install.")
-
-
-def fetch(ftp):
-    """Each wanted file copied into build/vita-fetch/, and left on the Vita"""
-    os.makedirs(FETCHED, exist_ok=True)
-    count = 0
-    for folder, prefixes, optional in FETCH:
-        files = listing(ftp, folder)
-        if files is None:
-            if not optional:
-                print(f"{folder}: not there")
-            continue
-        for name in sorted(files):
-            if not name.startswith(prefixes):
-                continue
-            path = f"{folder}/{name}"
-            target = os.path.join(FETCHED, name)
-            with open(target, "wb") as out:
-                ftp.retrbinary("RETR " + name, out.write)
-            print(f"{path} -> {os.path.relpath(target, ROOT)}")
-            count += 1
-    print(f"{count} fetched" if count else "Nothing to fetch.")
 
 
 def status(ftp):
@@ -197,7 +122,7 @@ def main():
         if arguments.command == "app":
             upload_app(ftp, os.path.abspath(arguments.vpk))
         elif arguments.command == "fetch":
-            fetch(ftp)
+            console_ftp.fetch(ftp, FETCH, FETCHED, ROOT)
         else:
             status(ftp)
     finally:

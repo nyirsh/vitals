@@ -222,7 +222,7 @@ Every build includes all three levels; choose one on the console in the app's **
 [tools/vita_comms.py](tools/vita_comms.py) talks to the Vita over VitaShell's FTP server (**SELECT** in VitaShell starts it). Put the Vita's address in the repository's `.env` first (`cp ../.env.example ../.env` from `vita/`, then set `VITA_HOST`; the PS3's address goes there too), or pass it as `make status VITA_HOST=...`.
 
 - `make upload-app`: builds the app and puts `vitals-app.vpk` in `ux0:data/vitals/`, for VitaShell to install
-- `make fetch`: brings the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, leaving them on the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed
+- `make fetch`: brings the logs (`vitals.log`, its previous boot's and `vitals-app.log`), the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, leaving them on the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed
 - `make status`: `config.txt`, vitals' plugin and modules, the certificate store and your lists, as they are on the Vita
 
 Installing, uninstalling and switching the debug output stay the app's, with the reboot they need: installing and uninstalling also write `vs0:` (removing what earlier versions put there, and putting the system's certificate store back), which the app mounts for writing.
@@ -240,7 +240,7 @@ The installer downloads the latest certificates and checks them against this bun
 make update-certs
 ```
 
-This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` (the store as `vitals` reads it, without your own certificates) with the app's own store filter and updates `certificate-sources.json`, all in `vitals-app/assets/`.
+This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` (the store as `vitals` reads it, without your own certificates) with the app's own store filter and updates `certificate-sources.json`. The Mozilla bundle and its manifest are in `shared/assets/`, used by both consoles' apps, and `certs.cer` in `vitals-app/assets/`.
 
 ### Tests
 

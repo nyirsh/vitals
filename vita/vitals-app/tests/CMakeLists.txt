@@ -55,7 +55,7 @@ add_test(NAME vitals_app_check_run COMMAND vitals_app_check_run_tests)
 add_executable(vitals_app_ca_update_tests ${SHARED_APP}/tests/test_ca_update.c ${SHARED_APP}/ca_update.c
     ${APP_DIR}/../../shared/src/store_certs.c)
 target_include_directories(vitals_app_ca_update_tests PRIVATE ${APP_DIR} ${APP_DIR}/../../shared/include)
-target_compile_definitions(vitals_app_ca_update_tests PRIVATE VITALS_TEST_BUNDLE="${APP_DIR}/assets/mozilla-certs.pem")
+target_compile_definitions(vitals_app_ca_update_tests PRIVATE VITALS_TEST_BUNDLE="${SHARED_APP}/../assets/mozilla-certs.pem")
 target_link_libraries(vitals_app_ca_update_tests PRIVATE mbedx509 tfpsacrypto)
 add_test(NAME vitals_app_ca_update COMMAND vitals_app_ca_update_tests)
 

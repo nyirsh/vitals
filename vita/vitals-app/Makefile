@@ -19,9 +19,10 @@ modules:
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
 	$(foreach level,0 1 2,$(MAKE) -C ../vitals-browser DEBUG=$(level) &&) true
 
-# Refreshes the bundled Mozilla certificates (assets/) from curl; review and commit the result
+# Refreshes both apps' Mozilla certificates from curl (shared/tools/update_certs.py); review and
+# commit the result
 update-certs:
-	python3 tools/update_certs.py
+	python3 ../../shared/tools/update_certs.py
 
 # Host tests, built for this machine (no VitaSDK needed): the C tests of the installer, config.txt
 # editing, the connection test and the certificate update, then the Python tests of the new-release
@@ -33,6 +34,7 @@ test:
 	cmake --build $(TEST_DIR) -j4
 	ctest --test-dir $(TEST_DIR) --output-on-failure
 	python3 -m unittest discover -s tests -p 'test_*.py'
+	python3 -m unittest discover -s ../../shared/tests -p 'test_*.py'
 
 clean:
 	rm -rf $(BUILD_DIR)/vitals-app $(TEST_DIR)

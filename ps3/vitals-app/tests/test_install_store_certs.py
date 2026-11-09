@@ -71,7 +71,7 @@ class InstallStoreCertsTests(unittest.TestCase):
         if not cert_dir.is_dir():
             self.skipTest("Sony's CA files aren't here (dumps/ps3/4.93-cex/cert)")
         sony = ps3_comms.sony_text(lambda name: (cert_dir / name).read_bytes() if (cert_dir / name).exists() else None)
-        mozilla = (ROOT / "vitals-app" / "assets" / "mozilla-certs.pem").read_bytes()
+        mozilla = (ROOT.parent / "shared" / "assets" / "mozilla-certs.pem").read_bytes()
         data, kept, left_out, _cut = ps3_comms.store_mozilla(mozilla, sony)
         sonys = {body for whole, _s, _e, body in ps3_comms.pem_blocks(sony) if whole}
         bodies = [body for whole, _s, _e, body in ps3_comms.pem_blocks(mozilla) if whole]

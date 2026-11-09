@@ -10,19 +10,19 @@
   "mozilla": {
     "source": "https://curl.se/ca/cacert.pem",
     "path": "mozilla-certs.pem",
-    "source_date": "2026-09-25",
-    "fetched_date": "2026-10-12",
-    "bytes": 188900,
-    "sha256": "a41b5d356aea97a529fe27e0f7316d2f9d946d75927476cf9cf1b90637d00505",
-    "certificate_blocks": 121,
-    "unique_certificates": 121
+    "source_date": "2026-11-05",
+    "fetched_date": "2026-11-05",
+    "bytes": 200116,
+    "sha256": "427c064216761a1e72a8b30f0d954d08cb6e4435a82091fb865afd20c8497285",
+    "certificate_blocks": 118,
+    "unique_certificates": 118
   },
   "combined": {
     "path": "certs.cer",
     "policy": "The store as the kernel plugin reads it without the user's own: the original Sony file byte-for-byte, then the selected Mozilla bundle as curl publishes it without the certificates Sony's has (installed as two files), each followed by a line break; no system-store input",
-    "bytes": 269365,
-    "sha256": "d01d1b6bad3a26f343b3d10d8a42018f281f85c6553bdb7b7c5c37fe96868c0b",
-    "certificate_blocks": 176,
-    "unique_certificates": 176
+    "bytes": 280581,
+    "sha256": "72bd1a46433ef11c3388f6189dea6656d24a04d50369594d95bf11a6bb59e0dc",
+    "certificate_blocks": 173,
+    "unique_certificates": 173
   }
 }
