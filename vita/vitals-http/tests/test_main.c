@@ -730,6 +730,10 @@ static void test_https(int template_)
     } else {
         CHECK(strncmp(cipher, "TLS", 3) == 0);
         CHECK_EQ(vitalsHttpGetCipher(request, cipher, 2), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
+        char protocol[16] = "";
+        CHECK_EQ(vitalsHttpGetProtocol(request, protocol, sizeof(protocol)), 0);
+        CHECK(strncmp(protocol, "TLSv1.", 6) == 0);
+        CHECK_EQ(vitalsHttpGetProtocol(request, protocol, 2), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
     }
     CHECK_EQ(vitalsHttpGetCipher(request, NULL, 0), (int)SCE_HTTP_ERROR_INVALID_VALUE);
     CHECK_EQ(vitalsHttpGetCipher(12345, cipher, sizeof(cipher)), (int)SCE_HTTP_ERROR_INVALID_ID);
@@ -1421,6 +1425,10 @@ static void test_host_redirects(int template_)
     char no_cipher[64] = "x";
     CHECK_EQ(vitalsHttpGetCipher(request, no_cipher, sizeof(no_cipher)), 0);
     CHECK(no_cipher[0] == '\0');
+    no_cipher[0] = 'x';
+    CHECK_EQ(vitalsHttpGetProtocol(request, no_cipher, sizeof(no_cipher)), 0);
+    CHECK(no_cipher[0] == '\0');
+    CHECK_EQ(vitalsHttpGetProtocol(12345, no_cipher, sizeof(no_cipher)), (int)SCE_HTTP_ERROR_INVALID_ID);
     /* Too small a buffer, none, no size, another id */
     CHECK_EQ(vitalsHttpGetUrl(request, reached, 5, &required), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
     CHECK_EQ(required, strlen(expected) + 1);

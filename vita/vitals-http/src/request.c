@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "vh.h"
 #include "vitals_http.h"
 
@@ -474,6 +475,14 @@ static int body_finished(const VhRequest *request)
 
 /* Takes the socket off the request: kept on the connection for its next request when keep is set
  * and the response allows it, closed otherwise; with the lock held */
+/* name into out, cut to fit */
+static void keep_name(char *out, size_t size, const char *name)
+{
+    size_t length = strlen(name) < size ? strlen(name) : size - 1;
+    memcpy(out, name, length);
+    out[length] = '\0';
+}
+
 static void release_transport(VhObject *connection, VhRequest *request, int keep)
 {
     VhTransport *transport = request->transport;
@@ -1004,10 +1013,8 @@ static int exchange(VhObject *object, VhObject *connection, const VhObject *temp
             if (result < 0)
                 return failed(request, result);
         }
-        const char *cipher = vh_transport_cipher(request->transport);
-        size_t cipher_length = strlen(cipher) < sizeof(request->cipher) ? strlen(cipher) : sizeof(request->cipher) - 1;
-        memcpy(request->cipher, cipher, cipher_length);
-        request->cipher[cipher_length] = '\0';
+        keep_name(request->cipher, sizeof(request->cipher), vh_transport_cipher(request->transport));
+        keep_name(request->protocol, sizeof(request->protocol), vh_transport_protocol(request->transport));
         VITALS_VERBOSE("send request %d reused=%d header=%u", object->id, reused, request->request_header_size);
         result = vh_transport_send(request->transport, request->request_header, request->request_header_size);
         if (result == 0 && body_size != 0)
@@ -1747,24 +1754,40 @@ int vitalsHttpGetUrl(int reqId, char *url, unsigned int size, unsigned int *requ
     return 0;
 }
 
-/* vitals_http.h: the cipher suite the request last went out on */
-int vitalsHttpGetCipher(int reqId, char *cipher, unsigned int size)
+/* A name of the request's (which, its offset in VhRequest) into text: vitals_http.h */
+static int get_request_name(int reqId, size_t which, char *text, unsigned int size)
 {
-    VH_TRACE();
     VH_REQUIRE_INIT();
-    if (cipher == NULL || size == 0)
+    if (text == NULL || size == 0)
         return (int)SCE_HTTP_ERROR_INVALID_VALUE;
     int result = 0;
     vh_lock();
     VhObject *object = vh_find(reqId, VH_REQUEST);
-    if (object == NULL)
+    if (object == NULL) {
         result = (int)SCE_HTTP_ERROR_INVALID_ID;
-    else if (strlen(object->as.request.cipher) >= size)
-        result = (int)SCE_HTTP_ERROR_OUT_OF_SIZE;
-    else
-        memcpy(cipher, object->as.request.cipher, strlen(object->as.request.cipher) + 1);
+    } else {
+        const char *name = (const char *)&object->as.request + which;
+        if (strlen(name) >= size)
+            result = (int)SCE_HTTP_ERROR_OUT_OF_SIZE;
+        else
+            memcpy(text, name, strlen(name) + 1);
+    }
     vh_unlock();
     return result;
+}
+
+/* vitals_http.h: the cipher suite the request last went out on */
+int vitalsHttpGetCipher(int reqId, char *cipher, unsigned int size)
+{
+    VH_TRACE();
+    return get_request_name(reqId, offsetof(VhRequest, cipher), cipher, size);
+}
+
+/* vitals_http.h: the TLS version the request last went out on */
+int vitalsHttpGetProtocol(int reqId, char *protocol, unsigned int size)
+{
+    VH_TRACE();
+    return get_request_name(reqId, offsetof(VhRequest, protocol), protocol, size);
 }
 
 int sceHttpGetAllResponseHeaders(int reqId, char **header, unsigned int *headerSize)

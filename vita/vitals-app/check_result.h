@@ -16,6 +16,7 @@ typedef struct {
     int ssl_error; \
     unsigned ssl_detail; \
     char cipher[64]; \
+    char protocol[16]; \
     int protocol_confirmed, restore_error, verification_disabled; \
     int vitals_active, vitals_tls; \
     CheckRetry retry;

@@ -10,6 +10,7 @@
 #define VITALS_HTTP_LIBRARY_NID 0x56485450u
 #define VITALS_HTTP_GET_URL_NID 0x5B1F3A6Du
 #define VITALS_HTTP_GET_CIPHER_NID 0x7C2E41A9u
+#define VITALS_HTTP_GET_PROTOCOL_NID 0x3A9D6F12u
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +28,9 @@ int vitalsHttpGetUrl(int reqId, char *url, unsigned int size, unsigned int *requ
  * SCE_HTTP_ERROR_BEFORE_INIT, SCE_HTTP_ERROR_INVALID_ID, SCE_HTTP_ERROR_INVALID_VALUE (no cipher or
  * size), SCE_HTTP_ERROR_OUT_OF_SIZE */
 int vitalsHttpGetCipher(int reqId, char *cipher, unsigned int size);
+
+/* The same for the connection's TLS version, as Mbed TLS names it ("TLSv1.3") */
+int vitalsHttpGetProtocol(int reqId, char *protocol, unsigned int size);
 
 #ifdef __cplusplus
 }

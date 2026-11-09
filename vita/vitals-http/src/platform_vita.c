@@ -537,6 +537,11 @@ const char *vh_transport_cipher(const VhTransport *transport)
     return transport->tls != NULL ? vh_tls_cipher(transport->tls) : "";
 }
 
+const char *vh_transport_protocol(const VhTransport *transport)
+{
+    return transport->tls != NULL ? vh_tls_protocol(transport->tls) : "";
+}
+
 int vh_transport_socket(const VhTransport *transport)
 {
     return transport != NULL ? transport->socket : -1;

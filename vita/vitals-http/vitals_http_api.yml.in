@@ -136,3 +136,4 @@ SceLibHttp:
       functions:
         - vitalsHttpGetUrl: 0x5B1F3A6D
         - vitalsHttpGetCipher: 0x7C2E41A9
+        - vitalsHttpGetProtocol: 0x3A9D6F12

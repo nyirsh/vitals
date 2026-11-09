@@ -160,6 +160,12 @@ const char *vh_tls_cipher(const VhTls *tls)
     return name != NULL ? name : "";
 }
 
+const char *vh_tls_protocol(const VhTls *tls)
+{
+    const char *name = tls->sony == NULL ? vitalsSslGetVersion(tls->ssl) : NULL;
+    return name != NULL ? name : "";
+}
+
 void vh_tls_close(VhTls *tls)
 {
     if (tls == NULL)

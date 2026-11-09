@@ -31,8 +31,14 @@
 /* VitaSDK has the stub, not the prototype: the HTTPS options of one template, connection or request */
 int sceHttpsDisableOption2(int id, unsigned int sslFlags);
 
-/* vitals-http's vitalsHttpGetUrl (vitals_http.h), found once in SceLibHttp's exports: NULL with
- * Sony's libhttp or a vitals-http that predates it, which then can't say where a request went */
+/* vitals-http's own exports (vitals_http.h), each found once in SceLibHttp's: 0 with Sony's libhttp
+ * or a vitals-http that predates it, which then can't say where a request went or what it used */
+static uintptr_t vitals_http_export(uint32_t nid)
+{
+    uintptr_t address = 0;
+    return taiGetModuleExportFunc("SceLibHttp", VITALS_HTTP_LIBRARY_NID, nid, &address) >= 0 ? address : 0;
+}
+
 typedef int (*GetUrl)(int reqId, char *url, unsigned int size, unsigned int *required);
 static GetUrl get_url(void)
 {
@@ -40,27 +46,34 @@ static GetUrl get_url(void)
     static GetUrl found;
     if (!looked)
     {
-        uintptr_t address = 0;
         looked = 1;
-        if (taiGetModuleExportFunc("SceLibHttp", VITALS_HTTP_LIBRARY_NID, VITALS_HTTP_GET_URL_NID, &address) >= 0 &&
-            address != 0)
-            found = (GetUrl)address;
+        found = (GetUrl)vitals_http_export(VITALS_HTTP_GET_URL_NID);
     }
     return found;
 }
-/* vitals-http's vitalsHttpGetCipher, found the same way: NULL when it can't say which cipher was used */
-typedef int (*GetCipher)(int reqId, char *cipher, unsigned int size);
-static GetCipher get_cipher(void)
+
+/* The cipher's and the protocol's, which take the same arguments */
+typedef int (*GetName)(int reqId, char *name, unsigned int size);
+static GetName get_cipher(void)
 {
     static int looked;
-    static GetCipher found;
+    static GetName found;
     if (!looked)
     {
-        uintptr_t address = 0;
         looked = 1;
-        if (taiGetModuleExportFunc("SceLibHttp", VITALS_HTTP_LIBRARY_NID, VITALS_HTTP_GET_CIPHER_NID, &address) >= 0 &&
-            address != 0)
-            found = (GetCipher)address;
+        found = (GetName)vitals_http_export(VITALS_HTTP_GET_CIPHER_NID);
+    }
+    return found;
+}
+
+static GetName get_protocol(void)
+{
+    static int looked;
+    static GetName found;
+    if (!looked)
+    {
+        looked = 1;
+        found = (GetName)vitals_http_export(VITALS_HTTP_GET_PROTOCOL_NID);
     }
     return found;
 }
@@ -263,6 +276,8 @@ done:
             (void)sceHttpsGetSslError(req, &r->ssl_error, &r->ssl_detail);
         if (vitals_http == 1 && get_cipher() != NULL && get_cipher()(req, r->cipher, sizeof(r->cipher)) < 0)
             r->cipher[0] = '\0';
+        if (vitals_http == 1 && get_protocol() != NULL && get_protocol()(req, r->protocol, sizeof(r->protocol)) < 0)
+            r->protocol[0] = '\0';
         lock();
         active_request = -1;
         int del = sceHttpDeleteRequest(req);
@@ -447,8 +462,8 @@ static void report_about(CheckReport *report, const CheckService *s)
 }
 static void report_result(CheckReport *report, const CheckResult *r)
 {
-    check_report_add(report, "ssl_error=0x%08X\nssl_detail=0x%08X\ncipher=%s\n", (unsigned)r->ssl_error, r->ssl_detail,
-                     r->cipher);
+    check_report_add(report, "ssl_error=0x%08X\nssl_detail=0x%08X\nprotocol=%s\ncipher=%s\n", (unsigned)r->ssl_error,
+                     r->ssl_detail, r->protocol, r->cipher);
 }
 static void report_protocol(CheckReport *report, unsigned test, const CheckResult *r)
 {
@@ -610,9 +625,10 @@ static int backend_policy_failed(const CheckResult *r)
 /* A finished check, in the app's log */
 static void log_result(const char *what, const CheckResult *r)
 {
-    VITALS_LOG("test %s: state %d, HTTP %d, error 0x%08X, ssl 0x%08X, detail 0x%04X, %s, %u ms, %s", what, r->state,
+    VITALS_LOG("test %s: state %d, HTTP %d, error 0x%08X, ssl 0x%08X, detail 0x%04X, %s %s, %u ms, %s", what, r->state,
                r->http_code, (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail,
-               r->cipher[0] != '\0' ? r->cipher : "-", r->elapsed_ms, r->message);
+               r->protocol[0] != '\0' ? r->protocol : "-", r->cipher[0] != '\0' ? r->cipher : "-", r->elapsed_ms,
+               r->message);
 }
 
 static const CheckBackend backend = {

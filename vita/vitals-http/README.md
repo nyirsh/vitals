@@ -102,8 +102,9 @@ pool until `sceHttpTerm`. With `DEBUG=1`, the number of rules and each rewrite a
 [include/vitals_http.h](include/vitals_http.h)), gives the URL a request goes to with the redirect
 applied, from the moment it's made; Sony's libhttp has nothing like it, so an app looks it up at
 run time (taiHEN's `taiGetModuleExportFunc`) rather than importing it. The vitals app's connection
-test uses it to check that each redirect reached the new host. `vitalsHttpGetCipher(reqId, cipher, size)`,
-found the same way, gives the cipher suite the request went out on, for the test's log and report.
+test uses it to check that each redirect reached the new host. `vitalsHttpGetCipher(reqId, cipher, size)`
+and `vitalsHttpGetProtocol(reqId, protocol, size)`, found the same way, give the cipher suite and TLS
+version the request went out on, for the test's log and report.
 
 A request to a host the list redirects to waits at least 30 seconds for the server to answer,
 whatever shorter receive timeout the app set: community servers can be slower than the
