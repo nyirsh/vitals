@@ -225,10 +225,12 @@ static uint64_t peek(uint64_t address)
 	return p1;
 }
 
+#if VITALS_DEBUG < 1
 static void sleep_seconds(uint32_t seconds)
 {
 	lv2syscall1(VITALS_LV2_TIMER_SLEEP, seconds);
 }
+#endif
 
 static void __attribute__((noreturn)) thread_exit(void)
 {
@@ -652,10 +654,46 @@ static void add_http(Text *text)
 }
 #endif
 
+#if VITALS_DEBUG >= 1
+/* Each DNS query in the log (dns_query_log.h), from this thread: four passes a second, and only while
+ * the DNS plugin's hooks are in */
+#include "dns_query_log.h"
+#define VITALS_LV2_TIMER_USLEEP 141
+#define DNS_LOG_PASS_MICROSECONDS 250000u
+static uint64_t g_dns_state, g_dns_seen;
+
+static void dns_log_line(const char *line)
+{
+	vitals_log("vitals-dns", line);
+}
+
+static void dns_log_begin(void)
+{
+	if (g_dns != DNS_LOADED)
+		return;
+	uint64_t state = g_dns_at + peek(g_dns_at + DNS_STATE_OFFSET_AT);
+	if (peek(state) == DNS_STATE_MARKER && peek(state + DNS_STATE_STATUS) == DNS_STATUS_HOOKED)
+		g_dns_state = state;
+}
+
+static void dns_log_wait(void)
+{
+	lv2syscall1(VITALS_LV2_TIMER_USLEEP, DNS_LOG_PASS_MICROSECONDS);
+	if (g_dns_state != 0)
+		g_dns_seen = vitals_dns_log_step(g_dns_state, g_dns_seen, peek, dns_log_line, VITALS_DEBUG >= 2);
+}
+#endif
+
 static void notify_thread(void *arg)
 {
 	(void)arg;
+#if VITALS_DEBUG >= 1
+	dns_log_begin();
+	for (unsigned i = 0; i < NOTIFY_DELAY * 4; ++i)
+		dns_log_wait();
+#else
 	sleep_seconds(NOTIFY_DELAY);
+#endif
 	Text text = {{0}, 0};
 	/* The name, then an empty line before the report */
 	add_title(&text);
@@ -671,6 +709,10 @@ static void notify_thread(void *arg)
 		VITALS_VERBOSE("shown:" " %08X", (unsigned)(shown));
 	}
 	VITALS_LOG("%s", text.text);
+#if VITALS_DEBUG >= 1
+	while (g_dns_state != 0)
+		dns_log_wait();
+#endif
 	thread_exit();
 }
 

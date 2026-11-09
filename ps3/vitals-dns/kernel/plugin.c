@@ -12,7 +12,8 @@
  * a file (a first version that logged from inside the syscall froze the console). Answers are matched
  * to queries by socket and DNS id (the engine also checks the question), not yet by process.
  * The hooks also count their calls and keep the last RECENT_MAX queries they saw, read over the
- * network with webMAN's lv2 peek (plugin_main logs where they are).
+ * network with webMAN's lv2 peek (plugin_main logs where they are) and, in the debug builds, by the
+ * boot plugin, which logs each one (vitals-boot/src/dns_query_log.h).
  * Loaded by the boot plugin as the boot starts, with Cobra's syscall 8 as webMAN MOD's
  * /kernelplugin.ps3mapi does (vitals-boot/src/boot.c). Early versions froze the console when loaded
  * at boot: their hooks' frames (a 992-byte one for sendto) overflowed some early thread's kernel
@@ -312,11 +313,19 @@ static uint64_t watch_query(int64_t socket, uint64_t message, uint64_t length, u
 		renamed_length = renamed;
 #endif
 	Recent *slot = &g_state.recent[count(&g_state.queries) % RECENT_MAX];
+#if VITALS_DEBUG >= 1
+	/* Not whole yet, for the boot plugin's reader (vitals-boot/src/dns_query_log.h) */
+	slot->how = 0;
+	__atomic_thread_fence(__ATOMIC_RELEASE);
+#endif
 	unsigned i = 0;
 	for (; i < RECENT_NAME - 1 && buffer->name[i] != '\0'; ++i)
 		slot->name[i] = buffer->name[i];
 	slot->name[i] = '\0';
 	slot->type = type;
+#if VITALS_DEBUG >= 1
+	__atomic_thread_fence(__ATOMIC_RELEASE);
+#endif
 	slot->how = (to != 0 ? 1 : 2) | (action != VITALS_DNS_PASS ? 16 : 0) | (renamed_length != 0 ? 32 : 0);
 	return renamed_length;
 }

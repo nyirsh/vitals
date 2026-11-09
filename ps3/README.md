@@ -132,6 +132,11 @@ turn Cobra back on in Evilnat's CFW Tools in the XMB, and webMAN MOD's FTP is ba
 Installing creates `dns.txt` with these instructions when there's none; it's never overwritten, and
 uninstalling leaves it, as `redirects.txt`.
 
+With debug output on, each DNS query goes in `vitals.log` as a `vitals-dns: [ms] query name=... type=...` line.
+The kernel plugin's hooks can't write a file, so they keep the last 8 queries in memory and the boot plugin
+reads them four times a second: the time is when a query was read, up to a quarter of a second late, the line
+doesn't say which process asked, and a burst of more than 8 between two reads is counted as `N queries not logged`.
+
 ## User-Agent
 
 A request carries `PS3Application libhttp/4.9.3-000 (CellOS)` unless the game sets its own. To send
