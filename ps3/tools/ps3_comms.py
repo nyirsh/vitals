@@ -346,8 +346,7 @@ def install(ftp, signed, debug):
             write(ftp, target, file.read())
         print(f"{os.path.relpath(source, ROOT)} -> {target}")
     add_line(ftp, BOOT_PLUGINS, PLUGIN)
-    with open(os.path.join(ROOT, "..", "VERSION"), encoding="utf-8") as file:
-        version = file.read().strip()
+    version = console_ftp.release()
     write(ftp, INSTALLED, f"version={version}\n".encode())
     print(f"{INSTALLED}: version {version}")
     # The level as the app writes it: flags/debug.<level>, none for off (shared/app/installed.h)
@@ -417,13 +416,11 @@ def fetch_log(ftp, path=LOG):
 
 
 def upload_app(ftp):
-    """build/vitals-app/vitals-app.pkg as /dev_hdd0/packages/vitals-<version>.pkg"""
+    """build/vitals-app/vitals-app.pkg as /dev_hdd0/packages/vitals-app-<VERSION>.pkg"""
     source = os.path.join(BUILD, "vitals-app", "vitals-app.pkg")
     if not os.path.isfile(source):
         sys.exit(f"{source} is missing: build the app first (make app)")
-    with open(os.path.join(ROOT, "..", "VERSION"), encoding="utf-8") as file:
-        version = file.read().strip()
-    target = f"{PACKAGES}/vitals-{version}.pkg"
+    target = f"{PACKAGES}/vitals-app-{console_ftp.release()}.pkg"
     make_directory(ftp, PACKAGES)
     with open(source, "rb") as file:
         ftp.storbinary("STOR " + target, file)

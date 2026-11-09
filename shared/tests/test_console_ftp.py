@@ -55,6 +55,11 @@ class ConsoleFtpTests(unittest.TestCase):
         self.assertTrue(all(command.startswith(("LIST", "RETR")) for command in server.commands))
 
 
+class ReleaseTests(unittest.TestCase):
+    def test_the_release_is_the_version_file(self):
+        self.assertEqual(console_ftp.release(), (Path(console_ftp.REPOSITORY) / "VERSION").read_text().strip())
+
+
 class ShowLogTests(unittest.TestCase):
     def test_saves_and_prints(self):
         with tempfile.TemporaryDirectory() as temporary, redirect_stdout(io.StringIO()) as printed:

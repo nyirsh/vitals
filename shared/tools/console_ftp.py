@@ -8,6 +8,12 @@ import sys
 REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def release():
+    """The release being built, from VERSION at the top of the repository"""
+    with open(os.path.join(REPOSITORY, "VERSION"), encoding="utf-8") as file:
+        return file.read().strip()
+
+
 def fetched_folder(console):
     """Where what's brought back from a console goes: fetched/<console> at the top of the repository"""
     return os.path.join(REPOSITORY, "fetched", console)

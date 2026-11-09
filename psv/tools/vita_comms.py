@@ -2,7 +2,7 @@
 """Talks to a Vita over FTP (VitaShell's server, started with SELECT in VitaShell):
 
     tools/vita_comms.py app [VPK]      uploads the vitals app (make, build/vitals-app/vitals-app.vpk, or
-                                       VPK) to ux0:data/vitals/vitals-app.vpk, for VitaShell to install
+                                       VPK) to ux0:data/vitals/vitals-app-<VERSION>.vpk, for VitaShell to install
     tools/vita_comms.py log            prints vitals.log (Options, Logs: File), and keeps it in fetched/psv/
     tools/vita_comms.py app-log        prints the app's vitals-app.log, and keeps it in fetched/psv/
     tools/vita_comms.py fetch          copies the app's test reports (ux0:data/vitals/reports, and
@@ -36,7 +36,8 @@ APP_VPK = os.path.join(BUILD, "vitals-app", "vitals-app.vpk")
 
 # VitaShell's FTP paths: each device is a folder at the top, named with its colon
 VITALS = "/ux0:/data/vitals"
-APP_TARGET = VITALS + "/vitals-app.vpk"
+APP_NAME = f"vitals-app-{console_ftp.release()}.vpk"
+APP_TARGET = VITALS + "/" + APP_NAME
 LOG = VITALS + "/logs/vitals.log"
 APP_LOG = VITALS + "/logs/vitals-app.log"
 CONFIG = "/ur0:/tai/config.txt"
@@ -88,14 +89,14 @@ def enter(ftp, path):
 
 
 def upload_app(ftp, source):
-    """The app's VPK as ux0:data/vitals/vitals-app.vpk"""
+    """The app's VPK as ux0:data/vitals/vitals-app-<VERSION>.vpk"""
     if not os.path.isfile(source):
         sys.exit(f"{source} is missing: build the app first (make)")
     make_directory(ftp, VITALS)
     with open(source, "rb") as file:
         ftp.storbinary("STOR " + enter(ftp, APP_TARGET), file)
     print(f"{os.path.relpath(source, ROOT)} -> {APP_TARGET} ({os.path.getsize(source)} bytes)")
-    print("Install it with VitaShell: ux0:data/vitals/vitals-app.vpk, Cross, then Install.")
+    print(f"Install it with VitaShell: ux0:data/vitals/{APP_NAME}, Cross, then Install.")
 
 
 def fetch_log(ftp, path):
