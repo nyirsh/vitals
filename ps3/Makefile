@@ -153,7 +153,7 @@ app:
 	mkdir -p $(APP_STAGING)/USRDIR/licenses
 	cp ../THIRD_PARTY_NOTICES.md $(APP_STAGING)/USRDIR/THIRD_PARTY_NOTICES.md
 	cp ../licenses/*.txt $(APP_STAGING)/USRDIR/licenses/
-	cp vitals-app/pkg/PIC1.PNG $(APP_STAGING)/PIC1.PNG
+	cp vitals-app/pkg/PIC0.PNG vitals-app/pkg/PIC1.PNG vitals-app/pkg/PIC2.PNG $(APP_STAGING)/
 	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-app -B build/vitals-app -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 		-DSTAGING=/src/ps3/$(APP_STAGING) && cmake --build build/vitals-app'
 

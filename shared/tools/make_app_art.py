@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Draws both apps' art, so it's one design in one place, with nothing but Python and the fonts in
-shared/assets/fonts: the PS3's PIC1.PNG (1920x1080, the XMB's background), ICON0.PNG and ICON0-wide.PNG (320x176), and the
+shared/assets/fonts: the PS3's PIC1.PNG (1920x1080, the XMB's background), PIC0.PNG (1000x560) and PIC2.PNG (310x250),
+fully transparent, ICON0.PNG and ICON0-wide.PNG (320x176), and the
 Vita's icon0.png (128x128), pic0.png (960x544, shown while it loads), and livearea/contents/bg.png
 (840x500) and startup.png (280x158, the gate). The PS3's ICON0.PNG is the Vita's icon, whole, on a
 transparent 320x176. The Vita's are 8-bit palette PNGs, which is what its LiveArea takes.
@@ -722,6 +723,10 @@ def save_rgba(canvas, path, wide=None, tall=None, left=0, top=0):
     write_png(path, wide, tall, 6, raw)
 
 
+def save_transparent(path, width, height):
+    write_png(path, width, height, 6, bytearray((width * 4 + 1) * height))
+
+
 def quantize(pixels):
     """Median cut to 256 colours, the same result every time: the palette and each colour's entry"""
     counts = Counter(pixels)
@@ -807,6 +812,12 @@ def square_icon(pkg, sce_sys, title, subtitle, layout=ICON_TEXT):
     save_rgba(canvas, pkg / "ICON0.PNG", 320, 176, 96, 24)
 
 
+def ps3_empty_overlays(folder):
+    """The XMB's overlays for 16:9 and 4:3 screens, with nothing on them"""
+    save_transparent(folder / "PIC0.PNG", 1000, 560)
+    save_transparent(folder / "PIC2.PNG", 310, 250)
+
+
 def vita_loading(folder, title, subtitle):
     """Shown full screen while the app loads: the LiveArea's background at the screen's size, with the
     text in the middle, at the gate's size"""
@@ -837,6 +848,7 @@ def main():
     ps3_wide_icon(args.pkg, title, subtitle)
     vita_background(args.sce_sys)
     square_icon(args.pkg, args.sce_sys, title, subtitle)
+    ps3_empty_overlays(args.pkg)
     vita_loading(args.sce_sys, title, subtitle)
     vita_gate(args.sce_sys, title, subtitle)
 

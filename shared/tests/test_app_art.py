@@ -8,6 +8,7 @@ import struct
 import sys
 import tempfile
 import unittest
+import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import make_app_art  # noqa: E402
@@ -32,6 +33,14 @@ class AppArtTests(unittest.TestCase):
             make_app_art.ps3_wide_icon(pkg, self.title, self.subtitle)
             make_app_art.vita_background(sce)
             make_app_art.square_icon(pkg, sce, self.title, self.subtitle)
+            make_app_art.ps3_empty_overlays(pkg)
+            self.assertEqual(header(pkg / "PIC0.PNG"), (1000, 560, 8, 6))
+            self.assertEqual(header(pkg / "PIC2.PNG"), (310, 250, 8, 6))
+            for name, size in (("PIC0.PNG", (1000, 560)), ("PIC2.PNG", (310, 250))):
+                data = (pkg / name).read_bytes()
+                at = data.index(b"IDAT")
+                raw = zlib.decompress(data[at + 4:at + 4 + struct.unpack(">I", data[at - 4:at])[0]])
+                self.assertEqual(raw, bytes((size[0] * 4 + 1) * size[1]), name)
             make_app_art.vita_loading(sce, self.title, self.subtitle)
             make_app_art.vita_gate(sce, self.title, self.subtitle)
             self.assertEqual(header(sce / "pic0.png"), (960, 544, 8, 3))
