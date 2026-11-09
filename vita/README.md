@@ -198,7 +198,7 @@ make
 
 The app's own TLS, for its downloads and its certificate checks, is the Mbed TLS vitals-ssl builds, as on the PS3; its curl is built with it (`../shared/curl`).
 
-Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-boot/`, `vitals-ssl/`, `vitals-http/` and `vitals-browser/` first, because the vpk bundles them. `vitals-dns/` is built as part of `vitals-boot/`, and `common/` as part of each module that uses it.
+Each component folder has its own Makefile that also works on its own (`make -C <folder>`), and `make plugin`, `ssl`, `http`, `browser` or `app` (with `DEBUG=N`) build one with what it links, by the same names as the PS3's; the root Makefile only calls them. `vitals-app/` builds `vitals-boot/`, `vitals-ssl/`, `vitals-http/` and `vitals-browser/` first, because the vpk bundles them. `vitals-dns/` is built as part of `vitals-boot/`, and `common/` as part of each module that uses it.
 
 Available build options:
 
@@ -222,8 +222,9 @@ Every build includes all three levels; choose one on the console in the app's **
 [tools/vita_comms.py](tools/vita_comms.py) talks to the Vita over VitaShell's FTP server (**SELECT** in VitaShell starts it). Put the Vita's address in the repository's `.env` first (`cp ../.env.example ../.env` from `vita/`, then set `VITA_HOST`; the PS3's address goes there too), or pass it as `make status VITA_HOST=...`.
 
 - `make upload-app`: builds the app and puts `vitals-app.vpk` in `ux0:data/vitals/`, for VitaShell to install
+- `make log`, `make app-log`: print `vitals.log` or `vitals-app.log` and keep a copy in `build/`
 - `make fetch`: brings the logs (`vitals.log`, its previous boot's and `vitals-app.log`), the app's test reports and BrowserLeaks dumps, the crash dumps (`psp2core-*`) and any SceWebKit dumps into `build/vita-fetch/`, leaving them on the Vita. The reports can hold PSN details, so they stay in `build/`, which isn't committed
-- `make status`: `config.txt`, vitals' plugin and modules, the certificate store and your lists, as they are on the Vita
+- `make status`: `config.txt`, vitals' plugin and modules, the certificate store, your lists and the logs, as they are on the Vita
 
 Installing, uninstalling and switching the debug output stay the app's, with the reboot they need: installing and uninstalling also write `vs0:` (removing what earlier versions put there, and putting the system's certificate store back), which the app mounts for writing.
 

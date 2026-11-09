@@ -3,6 +3,8 @@
 
     tools/vita_comms.py app [VPK]      uploads the vitals app (make, build/vitals-app/vitals-app.vpk, or
                                        VPK) to ux0:data/vitals/vitals-app.vpk, for VitaShell to install
+    tools/vita_comms.py log            prints vitals.log (Options, Logs: File), and keeps it in build/
+    tools/vita_comms.py app-log        prints the app's vitals-app.log, and keeps it in build/
     tools/vita_comms.py fetch          copies the app's test reports (ux0:data/vitals/reports, and
                                        ux0:data/vitals from earlier versions), the crash dumps from
                                        ux0:data and any SceWebKit dumps from ux0:data/vitals-dump into
@@ -19,6 +21,7 @@ isn't committed."""
 
 import argparse
 import ftplib
+import io
 import os
 import sys
 
@@ -34,6 +37,8 @@ APP_VPK = os.path.join(BUILD, "vitals-app", "vitals-app.vpk")
 # VitaShell's FTP paths: each device is a folder at the top, named with its colon
 VITALS = "/ux0:/data/vitals"
 APP_TARGET = VITALS + "/vitals-app.vpk"
+LOG = VITALS + "/logs/vitals.log"
+APP_LOG = VITALS + "/logs/vitals-app.log"
 CONFIG = "/ur0:/tai/config.txt"
 # What the app installs (vitals-app/install.c): the kernel plugin in ur0:tai, vitals' modules in
 # ux0:data/vitals/system
@@ -93,6 +98,16 @@ def upload_app(ftp, source):
     print("Install it with VitaShell: ux0:data/vitals/vitals-app.vpk, Cross, then Install.")
 
 
+def fetch_log(ftp, path):
+    """The log at path saved in build/ and printed, left on the Vita"""
+    data = io.BytesIO()
+    try:
+        ftp.retrbinary("RETR " + enter(ftp, path), data.write)
+    except ftplib.error_perm:
+        sys.exit(f"{path}: not there (they're written with debug output on and Logs set to File, in the app's Options)")
+    console_ftp.show_log(data.getvalue(), BUILD, path.rsplit("/", 1)[1], ROOT)
+
+
 def status(ftp):
     data = []
     try:
@@ -103,7 +118,7 @@ def status(ftp):
     except ftplib.error_perm:
         print(f"{CONFIG}: missing")
     folders = {}
-    for path in INSTALLED + LISTS + SWITCHES + [APP_TARGET]:
+    for path in INSTALLED + LISTS + SWITCHES + [LOG, APP_LOG, APP_TARGET]:
         folder, name = path.rsplit("/", 1)
         if folder not in folders:
             folders[folder] = listing(ftp, folder) or {}
@@ -114,13 +129,17 @@ def status(ftp):
 def main():
     load_env()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("command", choices=("app", "fetch", "status"))
+    parser.add_argument("command", choices=("app", "log", "app-log", "fetch", "status"))
     parser.add_argument("vpk", nargs="?", default=APP_VPK, help="the VPK app uploads (build/vitals-app/vitals-app.vpk)")
     arguments = parser.parse_args()
     ftp = connect()
     try:
         if arguments.command == "app":
             upload_app(ftp, os.path.abspath(arguments.vpk))
+        elif arguments.command == "log":
+            fetch_log(ftp, LOG)
+        elif arguments.command == "app-log":
+            fetch_log(ftp, APP_LOG)
         elif arguments.command == "fetch":
             console_ftp.fetch(ftp, FETCH, FETCHED, ROOT)
         else:

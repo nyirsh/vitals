@@ -1,6 +1,8 @@
 """shared/tools/console_ftp.py against a stand-in server: a listing's files without its folders, and a
 fetch that copies what's wanted and deletes nothing."""
+from contextlib import redirect_stdout
 import ftplib
+import io
 from pathlib import Path
 import sys
 import tempfile
@@ -51,6 +53,15 @@ class ConsoleFtpTests(unittest.TestCase):
                              ["connection-test-1.txt", "vitals-app.log", "vitals.log", "vitals.log.old"])
             self.assertEqual((target / "vitals-app.log").read_bytes(), b"app")
         self.assertTrue(all(command.startswith(("LIST", "RETR")) for command in server.commands))
+
+
+class ShowLogTests(unittest.TestCase):
+    def test_saves_and_prints(self):
+        with tempfile.TemporaryDirectory() as temporary, redirect_stdout(io.StringIO()) as printed:
+            console_ftp.show_log(b"a line\n", str(Path(temporary) / "build"), "vitals.log", temporary)
+            self.assertEqual((Path(temporary) / "build" / "vitals.log").read_bytes(), b"a line\n")
+        self.assertIn("a line", printed.getvalue())
+        self.assertIn("saved as", printed.getvalue())
 
 
 if __name__ == "__main__":

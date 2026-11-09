@@ -1,12 +1,11 @@
 # vitals-ps3's builds, as the Vita's vitals Makefile has them; everything is built in build/, the
 # console modules in the vitals-ps3-sdk Docker image, nyirsh/vitals-ps3-sdk from Docker Hub (docker
 # pulls it the first time; make pull gets a newer one; github.com/nyirsh/vitals-ps3-sdk builds it)
-#   make                    libssl and the boot plugin, release (build/vitals-ssl, build/vitals-boot)
-#   make DEBUG=1            libssl with a debug log of the calls: the CA store, each handshake's
-#                           result, why a chain was refused, the server's alerts (build/vitals-ssl-debug1)
-#   make DEBUG=2            also the details: which CA the chain comes from, every read and write,
-#                           the pool and the HTTP headers that go by, secrets as their length
-#                           (build/vitals-ssl-debug2)
+#   make                    everything: the vitals app with all it carries (make app), as the Vita's
+#   make ssl [DEBUG=N]      only libssl (build/vitals-ssl, or -debugN: 1 the calls, the CA store, each
+#                           handshake's result, why a chain was refused, the server's alerts; 2 also
+#                           which CA the chain comes from, every read and write, the pool and the HTTP
+#                           headers that go by, secrets as their length)
 #   make http [DEBUG=N] [USER_AGENT=...]   vitals' libhttp (build/vitals-http, or -debugN: 1 calls
 #                           and handshakes, 2 also sockets, cookies, reads and header values, secrets as
 #                           their length); USER_AGENT replaces "libhttp/4.9.3-000 (CellOS)" in the
@@ -27,8 +26,8 @@
 #   make app [SIGNED=1]     the vitals app, build/vitals-app/vitals-app.pkg: the three debug levels'
 #                           builds of libssl, libhttp, the boot plugin and the DNS kernel plugin, Mozilla's CA bundle, the example
 #                           redirects.txt and dns.txt and the changelog inside
-#   make update-certs       refreshes the app's Mozilla CA bundle (vitals-app/assets/) from curl,
-#                           checked against curl's SHA-256; review and commit the result
+#   make update-certs       refreshes both apps' Mozilla CA bundle (shared/assets/) from curl, checked
+#                           against curl's SHA-256; review and commit the result
 #   make preview            the app's screens drawn on this Mac with made-up data (build/preview/), at
 #                           720, 1080 and the Vita's 960x544
 #   make test               the host tests (this machine's compiler, Python 3 and openssl): libssl's,
@@ -42,6 +41,7 @@
 #                           app hangs on a black screen loading the real-signed libssl and libhttp
 #   make uninstall, make reboot, make log, make status   tools/ps3_comms.py's
 #   make app-log            fetches the app's own log (vitals-app.log) into build/
+#   make fetch              the logs and the app's test reports, into build/ps3-fetch/
 #   make upload-app [SIGNED=1]   builds the app and puts it in the console's /dev_hdd0/packages/
 #   make pull               pulls the newest published image (nyirsh/vitals-ps3-sdk:latest)
 # The console is PS3_HOST in the repository's .env (cp ../.env.example ../.env), or make's or the environment's PS3_HOST
@@ -83,7 +83,7 @@ APP_STAGING = build/vitals-app/pkg_files
 VERSION = $(shell cat ../VERSION)
 INSTALL_FLAGS =$(if $(filter 1,$(SIGNED)),--signed) $(if $(filter-out 0,$(DEBUG)),--debug $(DEBUG))
 
-all: ssl plugin
+all: app
 
 ssl:
 	$(DOCKER) '$(ENV) && cmake -Wno-deprecated -G Ninja -S vitals-ssl -B $(SSL_DIR) -DCMAKE_TOOLCHAIN_FILE=$(TOOLCHAIN) \
@@ -215,4 +215,4 @@ build/ps3dk-include/cell/http.h:
 		tar cf - cell/http.h cell/http cell/ssl.h cell/ssl cell/rtc.h cell/error.h' | tar xf - -C build/ps3dk-include
 	docker run --rm $(IMAGE) cat /opt/ps3dk-src/LICENSE > build/ps3dk-include/LICENSE
 
-.PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log app-log status pull clean
+.PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log app-log status fetch pull clean

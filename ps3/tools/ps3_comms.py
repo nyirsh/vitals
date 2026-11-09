@@ -413,12 +413,7 @@ def fetch_log(ftp, path=LOG):
     data = read(ftp, path)
     if data is None:
         sys.exit(f"{path}: not there" + (" (did the console reboot with the plugin?)" if path == LOG else " (has the app run?)"))
-    os.makedirs(BUILD, exist_ok=True)
-    local = os.path.join(BUILD, os.path.basename(path))
-    with open(local, "wb") as file:
-        file.write(data)
-    sys.stdout.write(data.decode("latin1"))
-    print(f"-- saved as {os.path.relpath(local, ROOT)}")
+    console_ftp.show_log(data, BUILD, os.path.basename(path), ROOT)
 
 
 def upload_app(ftp):

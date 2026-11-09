@@ -96,3 +96,14 @@ def fetch(ftp, wanted, target, root):
             print(f"{folder}/{name} -> {os.path.relpath(local, root)}")
             count += 1
     print(f"{count} fetched" if count else "Nothing to fetch.")
+
+
+def show_log(data, folder, name, root):
+    """A log read off the console, saved as folder/name and printed. It can hold PSN details, so folder
+    belongs in build/"""
+    os.makedirs(folder, exist_ok=True)
+    local = os.path.join(folder, name)
+    with open(local, "wb") as file:
+        file.write(data)
+    sys.stdout.write(data.decode("latin1"))
+    print(f"-- saved as {os.path.relpath(local, root)}")
