@@ -10,11 +10,12 @@
 #include <stdio.h>
 #include <string.h>
 
-static int level, writes, folders, wiped;
+static int level, writes, folders, wiped, to_file = 1;
 static char last[300];
 static size_t last_length;
 
 int vitals_debug_read(void) { return level; }
+int app_log_to_file(void) { return to_file; }
 uint64_t platform_now_ms(void) { return 5; }
 int platform_make_folder(const char *path) { (void)path; ++folders; return 0; }
 int platform_write_file(const char *path, const void *data, size_t length)
@@ -62,6 +63,15 @@ int main(void)
 	app_log(2, "detail");
 	app_log_download("curl: a note");
 	assert(writes == 3 && strcmp(last, "[5 ms] curl: a note\n") == 0);
+
+	/* Not to the file (the Vita's Logs on Network): lines still go out, the file is left alone */
+	to_file = 0;
+	wiped = folders = writes = 0;
+	app_log_start();
+	assert(wiped == 0 && folders == 0);
+	app_log(1, "call");
+	assert(writes == 1);
+	to_file = 1;
 
 	/* A long line is cut, and still ends its line */
 	char longer[400];

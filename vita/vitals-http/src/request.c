@@ -1004,6 +1004,10 @@ static int exchange(VhObject *object, VhObject *connection, const VhObject *temp
             if (result < 0)
                 return failed(request, result);
         }
+        const char *cipher = vh_transport_cipher(request->transport);
+        size_t cipher_length = strlen(cipher) < sizeof(request->cipher) ? strlen(cipher) : sizeof(request->cipher) - 1;
+        memcpy(request->cipher, cipher, cipher_length);
+        request->cipher[cipher_length] = '\0';
         VITALS_VERBOSE("send request %d reused=%d header=%u", object->id, reused, request->request_header_size);
         result = vh_transport_send(request->transport, request->request_header, request->request_header_size);
         if (result == 0 && body_size != 0)
@@ -1741,6 +1745,26 @@ int vitalsHttpGetUrl(int reqId, char *url, unsigned int size, unsigned int *requ
         return (int)SCE_HTTP_ERROR_OUT_OF_SIZE;
     memcpy(url, text, length);
     return 0;
+}
+
+/* vitals_http.h: the cipher suite the request last went out on */
+int vitalsHttpGetCipher(int reqId, char *cipher, unsigned int size)
+{
+    VH_TRACE();
+    VH_REQUIRE_INIT();
+    if (cipher == NULL || size == 0)
+        return (int)SCE_HTTP_ERROR_INVALID_VALUE;
+    int result = 0;
+    vh_lock();
+    VhObject *object = vh_find(reqId, VH_REQUEST);
+    if (object == NULL)
+        result = (int)SCE_HTTP_ERROR_INVALID_ID;
+    else if (strlen(object->as.request.cipher) >= size)
+        result = (int)SCE_HTTP_ERROR_OUT_OF_SIZE;
+    else
+        memcpy(cipher, object->as.request.cipher, strlen(object->as.request.cipher) + 1);
+    vh_unlock();
+    return result;
 }
 
 int sceHttpGetAllResponseHeaders(int reqId, char **header, unsigned int *headerSize)

@@ -12,7 +12,7 @@
 
 void app_log_start(void)
 {
-	if (vitals_debug_read() == 0)
+	if (vitals_debug_read() == 0 || !app_log_to_file())
 		return;
 	/* Its folders, before anything is installed */
 	(void)platform_make_folder(VITALS_DIRECTORY);

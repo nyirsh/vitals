@@ -48,6 +48,23 @@ static GetUrl get_url(void)
     }
     return found;
 }
+/* vitals-http's vitalsHttpGetCipher, found the same way: NULL when it can't say which cipher was used */
+typedef int (*GetCipher)(int reqId, char *cipher, unsigned int size);
+static GetCipher get_cipher(void)
+{
+    static int looked;
+    static GetCipher found;
+    if (!looked)
+    {
+        uintptr_t address = 0;
+        looked = 1;
+        if (taiGetModuleExportFunc("SceLibHttp", VITALS_HTTP_LIBRARY_NID, VITALS_HTTP_GET_CIPHER_NID, &address) >= 0 &&
+            address != 0)
+            found = (GetCipher)address;
+    }
+    return found;
+}
+
 /* The URL the last request went to, as vitals-http sent it (after the host redirects); empty when
  * that isn't known */
 static char reached_url[CHECK_HOST_MAX + 64];
@@ -244,6 +261,8 @@ done:
     {
         if (rc < 0)
             (void)sceHttpsGetSslError(req, &r->ssl_error, &r->ssl_detail);
+        if (vitals_http == 1 && get_cipher() != NULL && get_cipher()(req, r->cipher, sizeof(r->cipher)) < 0)
+            r->cipher[0] = '\0';
         lock();
         active_request = -1;
         int del = sceHttpDeleteRequest(req);
@@ -428,7 +447,8 @@ static void report_about(CheckReport *report, const CheckService *s)
 }
 static void report_result(CheckReport *report, const CheckResult *r)
 {
-    check_report_add(report, "ssl_error=0x%08X\nssl_detail=0x%08X\n", (unsigned)r->ssl_error, r->ssl_detail);
+    check_report_add(report, "ssl_error=0x%08X\nssl_detail=0x%08X\ncipher=%s\n", (unsigned)r->ssl_error, r->ssl_detail,
+                     r->cipher);
 }
 static void report_protocol(CheckReport *report, unsigned test, const CheckResult *r)
 {
@@ -590,8 +610,9 @@ static int backend_policy_failed(const CheckResult *r)
 /* A finished check, in the app's log */
 static void log_result(const char *what, const CheckResult *r)
 {
-    VITALS_LOG("test %s: state %d, HTTP %d, error 0x%08X, ssl 0x%08X, detail 0x%04X, %u ms, %s", what, r->state,
-               r->http_code, (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail, r->elapsed_ms, r->message);
+    VITALS_LOG("test %s: state %d, HTTP %d, error 0x%08X, ssl 0x%08X, detail 0x%04X, %s, %u ms, %s", what, r->state,
+               r->http_code, (unsigned)r->error, (unsigned)r->ssl_error, r->ssl_detail,
+               r->cipher[0] != '\0' ? r->cipher : "-", r->elapsed_ms, r->message);
 }
 
 static const CheckBackend backend = {

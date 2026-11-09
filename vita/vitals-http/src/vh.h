@@ -158,6 +158,8 @@ typedef struct VhRequest
     long long content_length;
     VhRequestState state;
     int status_code;
+    /* The cipher suite of the connection it last went out on; empty when that isn't TLS on vitals-ssl */
+    char cipher[64];
     /* The response's status line and headers, as received, NUL-terminated */
     char *response_header;
     unsigned int response_header_size;
@@ -405,6 +407,8 @@ void vh_transport_close(VhTransport *transport);
 int vh_transport_socket(const VhTransport *transport);
 /* The last network error number the transport saw, 0 when none */
 int vh_transport_errno(VhTransport *transport);
+/* The cipher suite the transport's TLS uses; "" without TLS or on Sony's libssl */
+const char *vh_transport_cipher(const VhTransport *transport);
 
 /* The current time, in seconds since 1970 (UTC) */
 long long vh_platform_time(void);
@@ -442,6 +446,7 @@ typedef struct VhTls VhTls;
 /* Handshakes with the server and checks its certificate as open asks; 0 or a libhttp error, with
  * *ssl_error and *ssl_detail saying what failed */
 int vh_tls_start(VhTls **tls, VhTransport *transport, const VhOpen *open, int *ssl_error, unsigned int *ssl_detail);
+const char *vh_tls_cipher(const VhTls *tls);
 int vh_tls_send(VhTls *tls, const void *data, size_t size);
 /* What a server's TLS 1.2 handshake shows before it turns encrypted, read off the records as they
  * arrive: whether it asked for a client certificate. Data is fed in as received, in any pieces */

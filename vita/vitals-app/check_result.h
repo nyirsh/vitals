@@ -15,6 +15,7 @@ typedef struct {
 #define CHECK_RESULT_CONSOLE \
     int ssl_error; \
     unsigned ssl_detail; \
+    char cipher[64]; \
     int protocol_confirmed, restore_error, verification_disabled; \
     int vitals_active, vitals_tls; \
     CheckRetry retry;

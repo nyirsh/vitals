@@ -5,6 +5,12 @@
 #include <cell/cell_fs.h>
 #include <stdio.h>
 
+/* The PS3 has no network log */
+int app_log_to_file(void)
+{
+	return 1;
+}
+
 void app_log_write(const char *line, size_t length)
 {
 	printf("vitals-app: %s", line);

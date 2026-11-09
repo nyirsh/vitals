@@ -9,6 +9,7 @@
 
 #define VITALS_HTTP_LIBRARY_NID 0x56485450u
 #define VITALS_HTTP_GET_URL_NID 0x5B1F3A6Du
+#define VITALS_HTTP_GET_CIPHER_NID 0x7C2E41A9u
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +21,12 @@ extern "C" {
  * only *required, and SCE_HTTP_ERROR_OUT_OF_SIZE. 0, or SCE_HTTP_ERROR_BEFORE_INIT,
  * SCE_HTTP_ERROR_INVALID_ID, SCE_HTTP_ERROR_INVALID_VALUE (no required) */
 int vitalsHttpGetUrl(int reqId, char *url, unsigned int size, unsigned int *required);
+
+/* The cipher suite of the connection the request last went out on, as Mbed TLS names it, into cipher
+ * (size bytes, NUL-terminated): empty before it's sent, over plain HTTP and on Sony's libssl. 0, or
+ * SCE_HTTP_ERROR_BEFORE_INIT, SCE_HTTP_ERROR_INVALID_ID, SCE_HTTP_ERROR_INVALID_VALUE (no cipher or
+ * size), SCE_HTTP_ERROR_OUT_OF_SIZE */
+int vitalsHttpGetCipher(int reqId, char *cipher, unsigned int size);
 
 #ifdef __cplusplus
 }

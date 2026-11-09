@@ -721,6 +721,18 @@ static void test_https(int template_)
     CHECK_EQ(sceHttpSendRequest(request, NULL, 0), 0);
     CHECK(seen & SCE_HTTPS_ERROR_SSL_UNKNOWN_CA);
     CHECK_EQ(read_all(request, body, sizeof(body), 100), 11);
+    /* vitalsHttpGetCipher: the suite it went out on; too small a buffer, none, another id */
+    char cipher[64] = "";
+    CHECK_EQ(vitalsHttpGetCipher(request, cipher, sizeof(cipher)), 0);
+    if (getenv("VH_TEST_SONY_SSL") != NULL) {
+        /* Sony's libssl doesn't say */
+        CHECK(cipher[0] == '\0');
+    } else {
+        CHECK(strncmp(cipher, "TLS", 3) == 0);
+        CHECK_EQ(vitalsHttpGetCipher(request, cipher, 2), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
+    }
+    CHECK_EQ(vitalsHttpGetCipher(request, NULL, 0), (int)SCE_HTTP_ERROR_INVALID_VALUE);
+    CHECK_EQ(vitalsHttpGetCipher(12345, cipher, sizeof(cipher)), (int)SCE_HTTP_ERROR_INVALID_ID);
     sceHttpDeleteRequest(request);
 
     request = sceHttpCreateRequestWithURL(connection, SCE_HTTP_METHOD_GET, url(g_secure_base, "/hello"), 0);
@@ -1405,6 +1417,10 @@ static void test_host_redirects(int template_)
     CHECK_EQ(read_all(request, body, sizeof(body), 64), 11);
     CHECK_EQ(vitalsHttpGetUrl(request, reached, sizeof(reached), &required), 0);
     CHECK(strcmp(reached, expected) == 0);
+    /* Plain HTTP has no cipher */
+    char no_cipher[64] = "x";
+    CHECK_EQ(vitalsHttpGetCipher(request, no_cipher, sizeof(no_cipher)), 0);
+    CHECK(no_cipher[0] == '\0');
     /* Too small a buffer, none, no size, another id */
     CHECK_EQ(vitalsHttpGetUrl(request, reached, 5, &required), (int)SCE_HTTP_ERROR_OUT_OF_SIZE);
     CHECK_EQ(required, strlen(expected) + 1);

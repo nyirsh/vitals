@@ -154,6 +154,12 @@ static int store_outcome(VitalsOutcome outcome, uint32_t detail, int *ssl_error,
     return mapped.hook_result;
 }
 
+const char *vh_tls_cipher(const VhTls *tls)
+{
+    const char *name = tls->sony == NULL ? vitalsSslGetCiphersuite(tls->ssl) : NULL;
+    return name != NULL ? name : "";
+}
+
 void vh_tls_close(VhTls *tls)
 {
     if (tls == NULL)

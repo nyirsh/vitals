@@ -379,6 +379,11 @@ int vh_transport_errno(VhTransport *transport)
     return transport->error_number;
 }
 
+const char *vh_transport_cipher(const VhTransport *transport)
+{
+    return transport->tls != NULL ? vh_tls_cipher(transport->tls) : "";
+}
+
 int vh_transport_socket(const VhTransport *transport)
 {
     return transport != NULL ? transport->socket : -1;
