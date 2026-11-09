@@ -32,8 +32,6 @@ typedef struct {
 	const char *made_for;
 	/* The Install item's description */
 	const char *install_description;
-	/* What each debug output level does, on the Options screen */
-	const char *debug_purposes[VITALS_DEBUG_LEVEL_COUNT];
 } ConsoleWords;
 
 const ConsoleWords *console_words(void);

@@ -25,12 +25,6 @@ static const ConsoleWords words = {
     .name = "PS3",
     .made_for = "4.93 CEX with Cobra",
     .install_description = "Lets games and apps connect to modern secure (TLS 1.2 and 1.3) sites",
-    .debug_purposes =
-        {
-            "Logs nothing, the build for everyday use",
-            "Logs calls and connections to /dev_hdd0/vitals/logs/vitals.log",
-            "Also every read and write, and the HTTP headers, secrets as their length",
-        },
 };
 
 const ConsoleWords *console_words(void)
@@ -64,7 +58,7 @@ static const ConsoleSwitch switches[] = {
 
 /* Only a file here: the PS3 has no way to send its lines over the network */
 static const ConsoleSwitchState log_states[] = {
-    {"File", "Debug output goes to " VITALS_LOG_FILE, CONSOLE_TONE_USUAL, 0},
+    {"File", "Debug output goes to vitals.log and vitals-app.log in " VITALS_LOGS_DIRECTORY, CONSOLE_TONE_USUAL, 0},
 };
 static const ConsoleSwitch log_switch = {"Logs", {NULL, NULL, NULL}, log_states, 1};
 

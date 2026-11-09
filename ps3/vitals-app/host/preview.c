@@ -129,8 +129,8 @@ int main(int argc, char **argv)
 	    {"HTTP", "Sony HTTP enabled", "Off", 1, 0, 1, APP_TONE_RED, NULL, 0},
 	    {"DNS rules", "vitals DNS rules disabled", "Off", 0, 0, 1, APP_TONE_RED, NULL, 0},
 	    {"Redirects", "vitals redirects enabled", "On", 1, 1, 0, APP_TONE_USUAL, NULL, 0},
-	    {"Debug output", "Logs calls and connections to /dev_hdd0/vitals/logs/vitals.log", "Basic debug", 1, 0, 0, APP_TONE_ORANGE, NULL, 0},
-	    {"Logs", "Debug output goes to /dev_hdd0/vitals/logs/vitals.log", "File", 1, 1, 1, APP_TONE_USUAL, NULL, 0},
+	    {"Debug output", "For debugging only: logs the calls and any failures", "Basic debug", 1, 0, 0, APP_TONE_ORANGE, NULL, 0},
+	    {"Logs", "Debug output goes to vitals.log and vitals-app.log in /dev_hdd0/vitals/logs", "File", 1, 1, 1, APP_TONE_USUAL, NULL, 0},
 	};
 	static const AppHint switching[] = {
 	    {APP_GLYPH_DPAD, APP_GLYPH_STICK, "Choose"},

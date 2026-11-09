@@ -57,6 +57,12 @@ static AppMenuItem item(enum Action action)
 }
 
 static const char *const debug_names[VITALS_DEBUG_LEVEL_COUNT] = {"Off", "Basic debug", "Full debug"};
+/* What each is for; where the lines go is the Logs row's */
+static const char *const debug_purposes[VITALS_DEBUG_LEVEL_COUNT] = {
+    "For everyday use: no logs",
+    "For debugging only: logs the calls and any failures",
+    "For deep analysis only: logs every detail and slows things down a lot",
+};
 
 static uint32_t *canvas;
 static unsigned held = ~0u;
@@ -318,7 +324,7 @@ static int run_options(void)
 			                                                               : APP_TONE_USUAL,
 			                         NULL, 0};
 		}
-		items[debug_option] = (AppMenuItem){"Debug output", console_words()->debug_purposes[debug_choice], debug_names[debug_choice],
+		items[debug_option] = (AppMenuItem){"Debug output", debug_purposes[debug_choice], debug_names[debug_choice],
 		                                    debug_choice == debug_level, debug_choice == 0,
 		                                    debug_choice == VITALS_DEBUG_LEVEL_COUNT - 1,
 		                                    debug_choice == 2   ? APP_TONE_RED

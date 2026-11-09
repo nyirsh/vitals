@@ -59,12 +59,6 @@ static const ConsoleWords words = {
     .name = "Vita",
     .made_for = "PS Vita 3.60 or 3.65",
     .install_description = "Lets the browser, apps and games connect to modern secure (TLS 1.2 and 1.3) sites",
-    .debug_purposes =
-        {
-            "For everyday use: no logs",
-            "For debugging only: shows logs on the console",
-            "For deep analysis only: logs everything on the console and slows things down a lot",
-        },
 };
 
 const ConsoleWords *console_words(void)
@@ -204,7 +198,7 @@ static const ConsoleSwitch switches[] = {
 /* The debug console, which a network logger (catlog) reads, or a file */
 static const ConsoleSwitchState log_states[] = {
     {"Network", "Debug output goes to a network logger", CONSOLE_TONE_USUAL, 0},
-    {"File", "Debug output goes to ux0:data/vitals/logs/vitals.log", CONSOLE_TONE_USUAL, 1},
+    {"File", "Debug output goes to vitals.log and vitals-app.log in " VITALS_LOGS_DIRECTORY, CONSOLE_TONE_USUAL, 1},
 };
 static const ConsoleSwitch log_switch = {"Logs", {VITALS_LOG_TO_FILE, NULL, NULL}, log_states, 2};
 
