@@ -161,7 +161,7 @@ A request that times out is tried again, up to 3 times in all, since slow server
 | `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`), installed as the system's libssl, which vitals-http imports; with the Mbed TLS build (`crypto/`)                                                  |
 | `vitals-browser/`    | the browser's TLS provider (`vitals.suprx`), on `vitals-ssl`                                                                                                                                                |
 | `common/`            | what those share: vitals' headers (`include/vitals`), its core library (`src/`) and the user-mode runtime the modules link without a C library (`runtime/`)                                                 |
-| `docs/`              | how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals                            |
+| `docs/`              | [helping support another firmware](docs/testing-other-firmware.md), how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals                            |
 | `dependencies.cmake` | pinned versions and SHA-256 hashes of `Mbed TLS` and `curl`                                                                                                                                                 |
 
 The parts match the PS3's (`../ps3`): its `vitals-boot`, `vitals-dns`, `vitals-http`, `vitals-ssl`, `vitals-app` and `common`, with `vitals-browser` the Vita's own.
