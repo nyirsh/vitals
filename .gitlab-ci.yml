@@ -1,14 +1,21 @@
 # Every push: both consoles' builds, each in its SDK's Docker image, then the host tests. DOCKER= makes
-# the Makefiles run their build commands right here, as CI is already in the image
+# the Makefiles run their build commands right here, as CI is already in the image. On a push to main,
+# once all of that passed, the release VERSION names is published when it isn't yet
+# (shared/tools/release.py)
 stages:
   - build
   - test
+  - release
 
 build-psv:
   stage: build
   image: vitasdk/vitasdk:latest
   script:
     - make -C psv DOCKER='sh -lc'
+  artifacts:
+    paths:
+      - psv/build/vitals-app/vitals-app.vpk
+    expire_in: 1 week
 
 build-ps3:
   stage: build
@@ -21,7 +28,8 @@ build-ps3:
     # The PS3's tests read PS3DK's HTTP and SSL headers, which only its image has
     paths:
       - ps3/build/ps3dk-include
-    expire_in: 1 day
+      - ps3/build/vitals-app/vitals-app.pkg
+    expire_in: 1 week
 
 test:
   stage: test
@@ -33,3 +41,17 @@ test:
     - apt-get update && apt-get install -y zlib1g-dev
     - make -C psv test
     - make -C ps3 test
+
+release:
+  stage: release
+  image: vitasdk/vitasdk:latest
+  needs:
+    - build-psv
+    - build-ps3
+    - test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+  # Two pushes to main in a row never publish at once
+  resource_group: release
+  script:
+    - python3 shared/tools/release.py gitlab psv/build/vitals-app/vitals-app.vpk ps3/build/vitals-app/vitals-app.pkg
