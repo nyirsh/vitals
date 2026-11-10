@@ -42,6 +42,9 @@ jobs:
         with:
           name: ps3dk-include
           path: ps3/build/ps3dk-include
+      # vitals-http's host tests link this machine's zlib, and the image only has the Vita's
+      - name: Install zlib's headers
+        run: apt-get update && apt-get install -y zlib1g-dev
       - name: Vita's host tests
         run: make -C psv test
       - name: PS3's host tests

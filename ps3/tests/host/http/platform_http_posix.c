@@ -21,6 +21,13 @@
 #include <time.h>
 #include <unistd.h>
 
+/* A closed peer is an error from send, not a signal: Linux asks per call, macOS per socket */
+#ifdef MSG_NOSIGNAL
+#define SEND_FLAGS MSG_NOSIGNAL
+#else
+#define SEND_FLAGS 0
+#endif
+
 /* Where /dev_hdd0 is (probe_host.c) */
 const char *vh_test_hdd(void);
 
@@ -247,8 +254,10 @@ int vh_platform_connect(const char *host, unsigned port, int64_t conn_timeout, i
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0)
 		return VH_NET_ERROR(VH_NET_CONNECT, errno);
+#ifdef SO_NOSIGPIPE
 	int on = 1;
 	(void)setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+#endif
 	set_timeout(fd, SO_SNDTIMEO, send_timeout);
 	int flags = fcntl(fd, F_GETFL);
 	(void)fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -292,7 +301,7 @@ int vh_platform_connect(const char *host, unsigned port, int64_t conn_timeout, i
 
 int vh_platform_send(int fd, const void *data, size_t size)
 {
-	ssize_t sent = send(fd, data, size, 0);
+	ssize_t sent = send(fd, data, size, SEND_FLAGS);
 	return sent >= 0 ? (int)sent : VH_NET_ERROR(VH_NET_SEND, errno);
 }
 

@@ -27,7 +27,6 @@ typedef int64_t SceOff;
 
 int ksceIoOpen(const char *, int, int);
 SceUID ksceIoOpenForPid(SceUID, const char *, int, unsigned int);
-long long ksceKernelGetSystemTimeWide(void);
 int ksceIoGetstatByFd(SceUID, SceIoStat *);
 int ksceIoRead(int, void *, unsigned int);
 int ksceIoClose(int);

@@ -14,7 +14,7 @@
 #include <string.h>
 
 int syscall_depth;
-long long ksceKernelGetSystemTimeWide(void) { return 1234000; }
+int64_t ksceKernelGetSystemTimeWide(void) { return 1234000; }
 static int mounted, flag, console_lines, opens;
 static char file[0x40000], old_file[0x40000], console[1024];
 static size_t file_size, old_size;

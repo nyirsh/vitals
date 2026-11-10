@@ -250,6 +250,8 @@ def main():
     secure = Server(("127.0.0.1", port + 1), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(cert, key)
+    # A modern server: no static-RSA suites over TLS 1.2, whatever this machine's OpenSSL allows by default
+    context.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20")
     secure.socket = context.wrap_socket(secure.socket, server_side=True)
     threading.Thread(target=secure.serve_forever, daemon=True).start()
     # The next port wants a client certificate, as PSN sign-in does

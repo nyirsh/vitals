@@ -29,5 +29,7 @@ test:
   needs:
     - build-ps3
   script:
+    # vitals-http's host tests link this machine's zlib, and the image only has the Vita's
+    - apt-get update && apt-get install -y zlib1g-dev
     - make -C psv test
     - make -C ps3 test

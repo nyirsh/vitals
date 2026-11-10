@@ -39,8 +39,13 @@ if [ ! -f "$tls/expired.pem" ]; then
 			case $name in wronghost) cn=wrong.example;; *) cn=127.0.0.1;; esac
 			openssl req -newkey rsa:2048 -nodes -subj "/O=vitals probe/CN=$cn" -keyout $name.key -out $name.csr 2> /dev/null
 			if [ $name = expired ]; then
-				openssl x509 -req -in $name.csr -CA ca.pem -CAkey ca.key -CAcreateserial -sha256 \
-					-not_before 20200101000000Z -not_after 20210101000000Z -extfile $name.ext -out $name.pem 2> /dev/null
+				# openssl ca takes dates in the past on every OpenSSL version; x509 only from 3.4
+				mkdir -p expired-ca
+				: > expired-ca/index.txt
+				echo 01 > expired-ca/serial
+				printf '[ca]\ndefault_ca=d\n[d]\ndatabase=expired-ca/index.txt\nserial=expired-ca/serial\nnew_certs_dir=expired-ca\ndefault_md=sha256\npolicy=p\n[p]\ncommonName=supplied\norganizationName=optional\n' > expired-ca/config
+				openssl ca -batch -notext -preserveDN -config expired-ca/config -cert ca.pem -keyfile ca.key -in $name.csr \
+					-startdate 20200101000000Z -enddate 20210101000000Z -extfile $name.ext -out $name.pem 2> /dev/null
 			else
 				openssl x509 -req -in $name.csr -CA ca.pem -CAkey ca.key -CAcreateserial -sha256 -days 3650 \
 					-extfile $name.ext -out $name.pem 2> /dev/null
@@ -83,7 +88,10 @@ if [ "$label" = host ]; then
 	host_hdd="$out/host-hdd"
 	mkdir -p "$host_hdd/vitals-probe"
 	cp "$tls/ca.pem" "$host_hdd/vitals-probe/ca.pem"
-	VITALS_PROBE_HDD=$host_hdd "$2" > "$out/host.raw" || echo "probe: exited with $?" >> "$out/host.raw"
+	# The probe ends without freeing what it was testing with, which only Linux's sanitizer minds
+	ASAN_OPTIONS=detect_leaks=0 VITALS_PROBE_HDD=$host_hdd "$2" > "$out/host.raw" || echo "probe: exited with $?" >> "$out/host.raw"
+	# The recorded differences have macOS's ECONNREFUSED (61, 0x3d); Linux's is 111 (0x6f)
+	sed 's/0x8071056f/0x8071053d/g' "$out/host.raw" > "$out/host.raw.same" && mv "$out/host.raw.same" "$out/host.raw"
 	cat "$out/host.raw"
 else
 	libssl="$here/build/vitals-ssl/libssl.fake.sprx"

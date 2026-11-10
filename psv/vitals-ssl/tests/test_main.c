@@ -1294,6 +1294,9 @@ static void test_remaining(void)
     cn[2] = 0x06;
     CHECK_EQ(sceSslInternalOidText(oid, 0, sizeof(oid_text), oid_text), 0);
     CHECK(strcmp(oid_text, "2.5.4.3") == 0);
+    /* Mode 0's copy is the caller's to free, and the object has no call for it: its data pointer is
+     * the object's second word on this host */
+    free((void *)(uintptr_t)oid[1]);
     CHECK_EQ(sceSslInternalOidSet(oid, 2, cn, sizeof(cn)), 0);
     CHECK_EQ(sceSslInternalOidText(oid, 0, sizeof(oid_text), oid_text), 0);
     CHECK(strcmp(oid_text, "2.5.4.6") == 0);

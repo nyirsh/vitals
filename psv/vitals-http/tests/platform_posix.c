@@ -299,7 +299,9 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
     set_timeout(socket_, SO_RCVTIMEO, open->recv_timeout_us);
     int on = 1;
     setsockopt(socket_, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+#ifdef SO_NOSIGPIPE
     setsockopt(socket_, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+#endif
     if (open->https && open->proxy_host != NULL) {
         int tunnel = vh_proxy_tunnel(transport, open, ssl_error, ssl_detail);
         if (tunnel < 0)
@@ -310,10 +312,17 @@ int vh_transport_connect(VhTransport *transport, const VhOpen *open, int *ssl_er
     return 0;
 }
 
+/* A closed peer is an error from send, not a signal: Linux asks per call, macOS per socket */
+#ifdef MSG_NOSIGNAL
+#define SEND_FLAGS MSG_NOSIGNAL
+#else
+#define SEND_FLAGS 0
+#endif
+
 int vh_transport_raw_send(VhTransport *transport, const void *data, size_t size)
 {
     for (;;) {
-        ssize_t sent = send(transport->socket, data, size, 0);
+        ssize_t sent = send(transport->socket, data, size, SEND_FLAGS);
         if (sent >= 0)
             return transport->aborted ? (int)SCE_HTTP_ERROR_ABORTED : (int)sent;
         if (errno != EINTR || transport->aborted)
