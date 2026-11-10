@@ -1,0 +1,48 @@
+# Every push and pull request: both consoles' builds, each in its SDK's Docker image, then the host
+# tests. DOCKER= makes the Makefiles run their build commands right here, as CI is already in the image
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-psv:
+    runs-on: ubuntu-latest
+    container: vitasdk/vitasdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Vita app and its modules
+        run: make -C psv DOCKER='sh -lc'
+
+  build-ps3:
+    runs-on: ubuntu-latest
+    container: nyirsh/vitals-ps3-sdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      # The PS3's builds expect the repository at /src, as the Makefile mounts it
+      - name: Build the PS3 app and its modules
+        run: |
+          ln -sfn "$PWD" /src
+          make -C /src/ps3 DOCKER='bash -c' all build/ps3dk-include/cell/http.h
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ps3dk-include
+          path: ps3/build/ps3dk-include
+          retention-days: 1
+
+  test:
+    needs: build-ps3
+    runs-on: ubuntu-latest
+    container: vitasdk/vitasdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      # The PS3's tests read PS3DK's HTTP and SSL headers, which only its image has
+      - uses: actions/download-artifact@v4
+        with:
+          name: ps3dk-include
+          path: ps3/build/ps3dk-include
+      - name: Vita's host tests
+        run: make -C psv test
+      - name: PS3's host tests
+        run: make -C ps3 test

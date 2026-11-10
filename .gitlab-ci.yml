@@ -1,0 +1,33 @@
+# Every push: both consoles' builds, each in its SDK's Docker image, then the host tests. DOCKER= makes
+# the Makefiles run their build commands right here, as CI is already in the image
+stages:
+  - build
+  - test
+
+build-psv:
+  stage: build
+  image: vitasdk/vitasdk:latest
+  script:
+    - make -C psv DOCKER='sh -lc'
+
+build-ps3:
+  stage: build
+  image: nyirsh/vitals-ps3-sdk:latest
+  script:
+    # The PS3's builds expect the repository at /src, as the Makefile mounts it
+    - ln -sfn "$PWD" /src
+    - make -C /src/ps3 DOCKER='bash -c' all build/ps3dk-include/cell/http.h
+  artifacts:
+    # The PS3's tests read PS3DK's HTTP and SSL headers, which only its image has
+    paths:
+      - ps3/build/ps3dk-include
+    expire_in: 1 day
+
+test:
+  stage: test
+  image: vitasdk/vitasdk:latest
+  needs:
+    - build-ps3
+  script:
+    - make -C psv test
+    - make -C ps3 test

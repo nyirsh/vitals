@@ -215,8 +215,8 @@ clean:
 # PS3DK's headers the probe's host run needs (tests/host/CMakeLists.txt)
 build/ps3dk-include/cell/http.h:
 	mkdir -p build/ps3dk-include
-	docker run --rm $(IMAGE) bash -c 'cd /opt/ps3dk-src/stage/ps3dev/ps3dk/ppu/include && \
+	$(DOCKER) 'cd /opt/ps3dk-src/stage/ps3dev/ps3dk/ppu/include && \
 		tar cf - cell/http.h cell/http cell/ssl.h cell/ssl cell/rtc.h cell/error.h' | tar xf - -C build/ps3dk-include
-	docker run --rm $(IMAGE) cat /opt/ps3dk-src/LICENSE > build/ps3dk-include/LICENSE
+	$(DOCKER) 'cat /opt/ps3dk-src/LICENSE' > build/ps3dk-include/LICENSE
 
 .PHONY: dns-plugin update-certs all ssl http http-probe plugin app upload-app preview test rpcs3 install uninstall reboot log app-log status fetch pull editor clean

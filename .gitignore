@@ -10,6 +10,8 @@ __pycache__/
 !.gitignore
 !.gitattributes
 !.vscode
+!.github
+!.gitlab-ci.yml
 !.env.example
 
 # What make fetch, log and app-log bring back from the consoles: logs and reports can hold PSN details
