@@ -27,6 +27,9 @@
  * own code allows for and the assembly doesn't: it crashed in mbedtls_mpi_core_mul on the console
  * and in RPCS3 */
 #undef MBEDTLS_HAVE_ASM
+/* Intel's AES instructions, which never apply on the console, need that assembly (or intrinsics
+ * the default flags don't give) where they do: the host tests on x86_64 */
+#undef MBEDTLS_AESNI_C
 
 #undef MBEDTLS_FS_IO
 #undef MBEDTLS_PSA_ITS_FILE_C

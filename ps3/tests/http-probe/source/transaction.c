@@ -150,7 +150,13 @@ static void run(const char *name, CellHttpTransId transaction, const void *data,
 		shown = blank + 2;
 		shown_length = have - (size_t)(shown - body);
 	}
-	say("%s rc=0x%08x HTTP %d body \"%s\"", name, (unsigned)rc, (int)code, bytes(shown, shown_length));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__(((int)code) + 0) say_2 = (int)code;
+		__typeof__((bytes(shown, shown_length)) + 0) say_3 = bytes(shown, shown_length);
+		say("%s rc=0x%08x HTTP %d body \"%s\"", say_0, say_1, say_2, say_3);
+	}
 }
 
 static CellHttpTransId make(CellHttpClientId client, const char *method, const char *path)
@@ -176,9 +182,17 @@ static void get_uri(const char *name, CellHttpTransId transaction)
 	if (rc != 0)
 		say("%s GetUri rc=0x%08x required=%u", name, (unsigned)rc, required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required);
 	else
-		say("%s GetUri rc=0x%08x required=%u scheme=%s host=%s user=%s password=%s path=%s port=%u", name, (unsigned)rc,
-		    required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required, placed(uri.scheme), placed(uri.hostname),
-		    placed(uri.username), placed(uri.password), placed(uri.path), (unsigned)uri.port);
+		{
+			__typeof__((name) + 0) say_0 = name;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required) + 0) say_2 = required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required;
+			__typeof__((placed(uri.scheme)) + 0) say_3 = placed(uri.scheme);
+			__typeof__((placed(uri.hostname)) + 0) say_4 = placed(uri.hostname);
+			__typeof__((placed(uri.username)) + 0) say_5 = placed(uri.username);
+			__typeof__((placed(uri.password)) + 0) say_6 = placed(uri.password);
+			__typeof__((placed(uri.path)) + 0) say_7 = placed(uri.path);
+			say("%s GetUri rc=0x%08x required=%u scheme=%s host=%s user=%s password=%s path=%s port=%u", say_0, say_1, say_2, say_3, say_4, say_5, say_6, say_7, (unsigned)uri.port);
+		}
 	if (rc == 0 && need != UNTOUCHED && need > 1) {
 		required = UNTOUCHED;
 		rc = cellHttpTransactionGetUri(transaction, &uri, g_pool, need - 1, &required);
@@ -230,9 +244,15 @@ void transaction_probe(void)
 	/* Chunked uploads */
 	t = make(client, "POST", "/echo");
 	bool chunked = true;
-	say("chunked default rc=0x%08x %d", (unsigned)cellHttpRequestGetChunkedTransferStatus(t, &chunked), chunked ? 1 : 0);
+	{
+		__typeof__(((unsigned)cellHttpRequestGetChunkedTransferStatus(t, &chunked)) + 0) say_0 = (unsigned)cellHttpRequestGetChunkedTransferStatus(t, &chunked);
+		say("chunked default rc=0x%08x %d", say_0, chunked ? 1 : 0);
+	}
 	say("chunked set rc=0x%08x", (unsigned)cellHttpRequestSetChunkedTransferStatus(t, true));
-	say("chunked get rc=0x%08x %d", (unsigned)cellHttpRequestGetChunkedTransferStatus(t, &chunked), chunked ? 1 : 0);
+	{
+		__typeof__(((unsigned)cellHttpRequestGetChunkedTransferStatus(t, &chunked)) + 0) say_0 = (unsigned)cellHttpRequestGetChunkedTransferStatus(t, &chunked);
+		say("chunked get rc=0x%08x %d", say_0, chunked ? 1 : 0);
+	}
 	say("chunked NULL rc=0x%08x", (unsigned)cellHttpRequestGetChunkedTransferStatus(t, NULL));
 	say("chunked bad rc=0x%08x", (unsigned)cellHttpRequestSetChunkedTransferStatus((CellHttpTransId)0x10, true));
 	CellHttpHeaderPtr headers = NULL;
@@ -245,8 +265,14 @@ void transaction_probe(void)
 	}
 	say("chunked headers rc=0x%08x %s", (unsigned)rc, names);
 	size_t sent = 0;
-	say("chunked send 1 rc=0x%08x sent=%u", (unsigned)cellHttpSendRequest(t, "hello ", 6, &sent), (unsigned)sent);
-	say("chunked send 2 rc=0x%08x sent=%u", (unsigned)cellHttpSendRequest(t, "chunked", 7, &sent), (unsigned)sent);
+	{
+		__typeof__(((unsigned)cellHttpSendRequest(t, "hello ", 6, &sent)) + 0) say_0 = (unsigned)cellHttpSendRequest(t, "hello ", 6, &sent);
+		say("chunked send 1 rc=0x%08x sent=%u", say_0, (unsigned)sent);
+	}
+	{
+		__typeof__(((unsigned)cellHttpSendRequest(t, "chunked", 7, &sent)) + 0) say_0 = (unsigned)cellHttpSendRequest(t, "chunked", 7, &sent);
+		say("chunked send 2 rc=0x%08x sent=%u", say_0, (unsigned)sent);
+	}
 	say("chunked set after send rc=0x%08x", (unsigned)cellHttpRequestSetChunkedTransferStatus(t, false));
 	run("chunked end", t, NULL, 0);
 	cellHttpDestroyTransaction(t);
@@ -274,7 +300,10 @@ void transaction_probe(void)
 	t = make(kept, "GET", "/keepalive");
 	run("kept 1", t, NULL, 0);
 	int sid = -7;
-	say("release rc=0x%08x sid %s", (unsigned)cellHttpTransactionReleaseConnection(t, &sid), sid >= 0 ? "a socket" : sid == -7 ? "untouched" : "negative");
+	{
+		__typeof__(((unsigned)cellHttpTransactionReleaseConnection(t, &sid)) + 0) say_0 = (unsigned)cellHttpTransactionReleaseConnection(t, &sid);
+		say("release rc=0x%08x sid %s", say_0, sid >= 0 ? "a socket" : sid == -7 ? "untouched" : "negative");
+	}
 	say("release again rc=0x%08x", (unsigned)cellHttpTransactionReleaseConnection(t, &sid));
 	size_t got = 0;
 	char buffer[64];
@@ -306,8 +335,10 @@ void transaction_probe(void)
 	say("close bad rc=0x%08x", (unsigned)cellHttpClientCloseConnections((CellHttpClientId)0x10, NULL));
 
 	CellHttpTransId polled = (CellHttpTransId)0x77;
-	say("poll idle rc=0x%08x %s", (unsigned)cellHttpClientPollConnections(kept, &polled, 100000),
-	    polled == (CellHttpTransId)0x77 ? "untouched" : polled == 0 ? "0" : "an id");
+	{
+		__typeof__(((unsigned)cellHttpClientPollConnections(kept, &polled, 100000)) + 0) say_0 = (unsigned)cellHttpClientPollConnections(kept, &polled, 100000);
+		say("poll idle rc=0x%08x %s", say_0, polled == (CellHttpTransId)0x77 ? "untouched" : polled == 0 ? "0" : "an id");
+	}
 	t = make(kept, "GET", "/plain");
 	cellHttpSendRequest(t, NULL, 0, &sent);
 	polled = (CellHttpTransId)0x77;
@@ -329,8 +360,10 @@ void transaction_probe(void)
 	    info[0] != 0xa5a5a5a5u && info[9] != 0xa5a5a5a5u ? "all" : "not all");
 	say("memory NULLs rc=0x%08x", (unsigned)cellHttpGetMemoryInfo(NULL, NULL, NULL));
 	free_size = 0xa5a5a5a5u;
-	say("memory free only rc=0x%08x %s", (unsigned)cellHttpGetMemoryInfo(&free_size, NULL, NULL),
-	    free_size == 0xa5a5a5a5u ? "untouched" : "written");
+	{
+		__typeof__(((unsigned)cellHttpGetMemoryInfo(&free_size, NULL, NULL)) + 0) say_0 = (unsigned)cellHttpGetMemoryInfo(&free_size, NULL, NULL);
+		say("memory free only rc=0x%08x %s", say_0, free_size == 0xa5a5a5a5u ? "untouched" : "written");
+	}
 
 	/* The transaction-state callback: each state of a request, then its answers */
 	CellHttpClientId watched = 0;

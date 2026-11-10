@@ -92,10 +92,13 @@ static int send_callback(CellHttpTransId transaction, const CellHttpUri *uri, co
 {
 	(void)transaction;
 	++g_send_calls;
-	say("cookie send callback %d: %s %s \"%s\" argument %s -> %d", g_send_calls,
-	    uri != NULL && uri->hostname != NULL ? uri->hostname : "-", uri != NULL && uri->path != NULL ? uri->path : "-",
-	    value != NULL ? bytes(sorted(value), strlen(value)) : "(null)", argument == &g_send_answer ? "ok" : "wrong",
-	    g_send_answer);
+	{
+		__typeof__((g_send_calls) + 0) say_0 = g_send_calls;
+		__typeof__((uri != NULL && uri->hostname != NULL ? uri->hostname : "-") + 0) say_1 = uri != NULL && uri->hostname != NULL ? uri->hostname : "-";
+		__typeof__((uri != NULL && uri->path != NULL ? uri->path : "-") + 0) say_2 = uri != NULL && uri->path != NULL ? uri->path : "-";
+		__typeof__((value != NULL ? bytes(sorted(value), strlen(value)) : "(null)") + 0) say_3 = value != NULL ? bytes(sorted(value), strlen(value)) : "(null)";
+		say("cookie send callback %d: %s %s \"%s\" argument %s -> %d", say_0, say_1, say_2, say_3, argument == &g_send_answer ? "ok" : "wrong", g_send_answer);
+	}
 	return g_send_answer;
 }
 
@@ -103,10 +106,13 @@ static int recv_callback(CellHttpTransId transaction, const CellHttpUri *uri, co
 {
 	(void)transaction;
 	++g_recv_calls;
-	say("cookie recv callback %d: %s %s \"%s\" argument %s -> %d", g_recv_calls,
-	    uri != NULL && uri->hostname != NULL ? uri->hostname : "-", uri != NULL && uri->path != NULL ? uri->path : "-",
-	    value != NULL ? bytes(value, strlen(value)) : "(null)", argument == &g_recv_answer ? "ok" : "wrong",
-	    g_recv_answer);
+	{
+		__typeof__((g_recv_calls) + 0) say_0 = g_recv_calls;
+		__typeof__((uri != NULL && uri->hostname != NULL ? uri->hostname : "-") + 0) say_1 = uri != NULL && uri->hostname != NULL ? uri->hostname : "-";
+		__typeof__((uri != NULL && uri->path != NULL ? uri->path : "-") + 0) say_2 = uri != NULL && uri->path != NULL ? uri->path : "-";
+		__typeof__((value != NULL ? bytes(value, strlen(value)) : "(null)") + 0) say_3 = value != NULL ? bytes(value, strlen(value)) : "(null)";
+		say("cookie recv callback %d: %s %s \"%s\" argument %s -> %d", say_0, say_1, say_2, say_3, argument == &g_recv_answer ? "ok" : "wrong", g_recv_answer);
+	}
 	return g_recv_answer;
 }
 
@@ -150,10 +156,14 @@ static void fetch(const char *name, CellHttpClientId client, const char *path)
 		}
 		line = end != NULL ? end + 1 : NULL;
 	}
-	say("%s %s rc=0x%08x HTTP %d %s", name, path, (unsigned)rc, (int)code,
-	    strncmp(path, "/setcookie/", 11) == 0 && strcmp(path, "/setcookie/echo") != 0 ? ""
-	    : cookies[0] != '\0'                                                      ? cookies
-	                                                                                : "no cookie");
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__((path) + 0) say_1 = path;
+		__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+		__typeof__(((int)code) + 0) say_3 = (int)code;
+		__typeof__((strncmp(path, "/setcookie/", 11) == 0 && strcmp(path, "/setcookie/echo") != 0 ? "" : cookies[0] != '\0' ? cookies : "no cookie") + 0) say_4 = strncmp(path, "/setcookie/", 11) == 0 && strcmp(path, "/setcookie/echo") != 0 ? "" : cookies[0] != '\0' ? cookies : "no cookie";
+		say("%s %s rc=0x%08x HTTP %d %s", say_0, say_1, say_2, say_3, say_4);
+	}
 	cellHttpDestroyTransaction(transaction);
 }
 
@@ -207,9 +217,15 @@ static void get_cookie(const char *name, const char *path)
 	required = UNTOUCHED;
 	rc = cellHttpGetCookie(&uri, buffer, sizeof(buffer), &required);
 	size_t text = rc == 0 ? strlen(buffer) : 0;
-	say("%s GetCookie %s rc=0x%08x required=%u \"%s\" then \"%s\"", name, path, (unsigned)rc,
-	    required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required, rc == 0 ? sorted(buffer) : "-",
-	    rc == 0 && required != UNTOUCHED && required < sizeof(buffer) ? bytes(buffer + text, required + 1 - text) : "-");
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__((path) + 0) say_1 = path;
+		__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+		__typeof__((required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required) + 0) say_3 = required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required;
+		__typeof__((rc == 0 ? sorted(buffer) : "-") + 0) say_4 = rc == 0 ? sorted(buffer) : "-";
+		__typeof__((rc == 0 && required != UNTOUCHED && required < sizeof(buffer) ? bytes(buffer + text, required + 1 - text) : "-") + 0) say_5 = rc == 0 && required != UNTOUCHED && required < sizeof(buffer) ? bytes(buffer + text, required + 1 - text) : "-";
+		say("%s GetCookie %s rc=0x%08x required=%u \"%s\" then \"%s\"", say_0, say_1, say_2, say_3, say_4, say_5);
+	}
 	if (rc == 0 && need != UNTOUCHED && need > 1) {
 		required = UNTOUCHED;
 		rc = cellHttpGetCookie(&uri, buffer, need - 1, &required);
@@ -232,8 +248,13 @@ static size_t export_store(const char *name, CellHttpClientId client, int with_c
 		rc = with_client ? cellHttpCookieExportWithClientId(buffer, need - 1, &exported, client)
 		                 : cellHttpCookieExport(buffer, need - 1, &exported);
 		/* Sony's writes the whole export past the buffer's end; only what's inside it is shown */
-		say("%s short rc=0x%08x exported=%u last bytes \"%s\"", name, (unsigned)rc,
-		    exported == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)exported, bytes(buffer + need - 4, 3));
+		{
+			__typeof__((name) + 0) say_0 = name;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((exported == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)exported) + 0) say_2 = exported == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)exported;
+			__typeof__((bytes(buffer + need - 4, 3)) + 0) say_3 = bytes(buffer + need - 4, 3);
+			say("%s short rc=0x%08x exported=%u last bytes \"%s\"", say_0, say_1, say_2, say_3);
+		}
 	}
 	memset(buffer, FILL, size);
 	exported = UNTOUCHED;
@@ -242,7 +263,12 @@ static size_t export_store(const char *name, CellHttpClientId client, int with_c
 	say("%s rc=0x%08x exported=%u", name, (unsigned)rc, exported == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)exported);
 	if (rc == 0 && exported != UNTOUCHED)
 		for (size_t at = 0; at < exported && at < 1200; at += 100)
-			say("%s %u: \"%s\"", name, (unsigned)at, bytes(buffer + at, exported - at < 100 ? exported - at : 100));
+			{
+				__typeof__((name) + 0) say_0 = name;
+				__typeof__(((unsigned)at) + 0) say_1 = (unsigned)at;
+				__typeof__((bytes(buffer + at, exported - at < 100 ? exported - at : 100)) + 0) say_2 = bytes(buffer + at, exported - at < 100 ? exported - at : 100);
+				say("%s %u: \"%s\"", say_0, say_1, say_2);
+			}
 	return rc == 0 && exported != UNTOUCHED ? exported : 0;
 }
 
@@ -256,7 +282,10 @@ void cookie_probe(void)
 	cellHttpCreateClient(&on);
 	cellHttpCreateClient(&other);
 	bool status = true;
-	say("cookies default status rc=0x%08x %d", (unsigned)cellHttpClientGetCookieStatus(off, &status), status ? 1 : 0);
+	{
+		__typeof__(((unsigned)cellHttpClientGetCookieStatus(off, &status)) + 0) say_0 = (unsigned)cellHttpClientGetCookieStatus(off, &status);
+		say("cookies default status rc=0x%08x %d", say_0, status ? 1 : 0);
+	}
 	say("cookies set status rc=0x%08x", (unsigned)cellHttpClientSetCookieStatus(on, true));
 	cellHttpClientSetCookieStatus(other, true);
 
@@ -298,7 +327,11 @@ void cookie_probe(void)
 	required = UNTOUCHED;
 	memset(buffer, FILL, sizeof(buffer));
 	int secure_rc = cellHttpGetCookie(&secure_uri, buffer, sizeof(buffer), &required);
-	say("on GetCookie https /setcookie/ rc=0x%08x \"%s\"", (unsigned)secure_rc, secure_rc == 0 ? sorted(buffer) : "-");
+	{
+		__typeof__(((unsigned)secure_rc) + 0) say_0 = (unsigned)secure_rc;
+		__typeof__((secure_rc == 0 ? sorted(buffer) : "-") + 0) say_1 = secure_rc == 0 ? sorted(buffer) : "-";
+		say("on GetCookie https /setcookie/ rc=0x%08x \"%s\"", say_0, say_1);
+	}
 	fetch("persist", on, "/setcookie/persist");
 	fetch("persist", on, "/setcookie/prefix");
 	fetch("persist", on, "/setcookie/echo");
@@ -307,8 +340,10 @@ void cookie_probe(void)
 	fetch("persist", on, "/echo");
 	CellHttpUri https_uri = {"https", HOST, "", "", "/", 18443, {0}};
 	required = UNTOUCHED;
-	say("on GetCookie https rc=0x%08x required=%u", (unsigned)cellHttpGetCookie(&https_uri, buffer, sizeof(buffer), &required),
-	    required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required);
+	{
+		__typeof__(((unsigned)cellHttpGetCookie(&https_uri, buffer, sizeof(buffer), &required)) + 0) say_0 = (unsigned)cellHttpGetCookie(&https_uri, buffer, sizeof(buffer), &required);
+		say("on GetCookie https rc=0x%08x required=%u", say_0, required == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)required);
+	}
 	say("GetCookie NULL uri rc=0x%08x", (unsigned)cellHttpGetCookie(NULL, buffer, sizeof(buffer), &required));
 	CellHttpUri path_uri = {"http", HOST, "", "", "/", PORT, {0}};
 	say("GetCookie nothing rc=0x%08x", (unsigned)cellHttpGetCookie(&path_uri, NULL, 0, NULL));
@@ -390,8 +425,11 @@ void cookie_probe(void)
 	g_send_answer = 1;
 	fetch("send 1", on, "/setcookie/echo");
 	g_send_answer = 0;
-	say("cookies clear callbacks rc=0x%08x rc=0x%08x", (unsigned)cellHttpClientSetCookieSendCallback(on, NULL, NULL),
-	    (unsigned)cellHttpClientSetCookieRecvCallback(on, NULL, NULL));
+	{
+		__typeof__(((unsigned)cellHttpClientSetCookieSendCallback(on, NULL, NULL)) + 0) say_0 = (unsigned)cellHttpClientSetCookieSendCallback(on, NULL, NULL);
+		__typeof__(((unsigned)cellHttpClientSetCookieRecvCallback(on, NULL, NULL)) + 0) say_1 = (unsigned)cellHttpClientSetCookieRecvCallback(on, NULL, NULL);
+		say("cookies clear callbacks rc=0x%08x rc=0x%08x", say_0, say_1);
+	}
 
 	/* Max-Age and deleting, after the exports so those stay the same each run */
 	fetch("maxage", on, "/setcookie/maxage");

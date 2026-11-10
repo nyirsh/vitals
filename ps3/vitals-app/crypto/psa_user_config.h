@@ -20,6 +20,8 @@
 
 /* No assembly: Mbed TLS's PowerPC64 multiply crashes with the PS3's 32-bit pointers (see libssl's) */
 #undef MBEDTLS_HAVE_ASM
+/* And so no Intel AES instructions, which only the host tests on x86_64 would have used (see libssl's) */
+#undef MBEDTLS_AESNI_C
 
 /* curl is given its CAs in memory (CURLOPT_CAINFO_BLOB), so no files */
 #undef MBEDTLS_FS_IO

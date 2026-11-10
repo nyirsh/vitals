@@ -106,8 +106,13 @@ static void flag(const char *name, SetFlag set, GetFlag get)
 	int off = set(client, false);
 	rc = get(client, &value);
 	say("%s off rc=0x%08x get rc=0x%08x %d", name, (unsigned)off, (unsigned)rc, value ? 1 : 0);
-	say("%s NULL rc=0x%08x bad set rc=0x%08x bad get rc=0x%08x", name, (unsigned)get(client, NULL),
-	    (unsigned)set(BAD, true), (unsigned)get(BAD, &value));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)get(client, NULL)) + 0) say_1 = (unsigned)get(client, NULL);
+		__typeof__(((unsigned)set(BAD, true)) + 0) say_2 = (unsigned)set(BAD, true);
+		__typeof__(((unsigned)get(BAD, &value)) + 0) say_3 = (unsigned)get(BAD, &value);
+		say("%s NULL rc=0x%08x bad set rc=0x%08x bad get rc=0x%08x", say_0, say_1, say_2, say_3);
+	}
 	cellHttpDestroyClient(client);
 }
 
@@ -126,9 +131,18 @@ static void value(const char *name, SetValue set, GetValue get)
 		say("%s set %u rc=0x%08x get rc=0x%08x %u", name, (unsigned)tries[i], (unsigned)rc_set, (unsigned)rc,
 		    (unsigned)number);
 	}
-	say("%s NULL rc=0x%08x bad get rc=0x%08x", name, (unsigned)get(client, NULL), (unsigned)get(BAD, &number));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)get(client, NULL)) + 0) say_1 = (unsigned)get(client, NULL);
+		__typeof__(((unsigned)get(BAD, &number)) + 0) say_2 = (unsigned)get(BAD, &number);
+		say("%s NULL rc=0x%08x bad get rc=0x%08x", say_0, say_1, say_2);
+	}
 	if (set != NULL)
-		say("%s bad set rc=0x%08x", name, (unsigned)set(BAD, 1));
+		{
+			__typeof__((name) + 0) say_0 = name;
+			__typeof__(((unsigned)set(BAD, 1)) + 0) say_1 = (unsigned)set(BAD, 1);
+			say("%s bad set rc=0x%08x", say_0, say_1);
+		}
 	cellHttpDestroyClient(client);
 }
 
@@ -161,10 +175,17 @@ static int ca_callback(void *certificate, void *argument)
 void unnamed_https_probe(void)
 {
 	uint32_t count = 0xa5a5a5a5u;
-	say("root CA count rc=0x%08x %u", (unsigned)cellHttpsGetRootCaEntryCount(&count), (unsigned)count);
+	{
+		__typeof__(((unsigned)cellHttpsGetRootCaEntryCount(&count)) + 0) say_0 = (unsigned)cellHttpsGetRootCaEntryCount(&count);
+		say("root CA count rc=0x%08x %u", say_0, (unsigned)count);
+	}
 	say("root CA count NULL rc=0x%08x", (unsigned)cellHttpsGetRootCaEntryCount(NULL));
 	say("root CA 0 rc=0x%08x", (unsigned)cellHttp_F799F3EF(0, ca_callback, &g_calls));
-	say("root CA %u rc=0x%08x", (unsigned)count, (unsigned)cellHttp_F799F3EF(count, ca_callback, &g_calls));
+	{
+		__typeof__(((unsigned)count) + 0) say_0 = (unsigned)count;
+		__typeof__(((unsigned)cellHttp_F799F3EF(count, ca_callback, &g_calls)) + 0) say_1 = (unsigned)cellHttp_F799F3EF(count, ca_callback, &g_calls);
+		say("root CA %u rc=0x%08x", say_0, say_1);
+	}
 	say("root CA 99 rc=0x%08x", (unsigned)cellHttp_F799F3EF(99, ca_callback, &g_calls));
 }
 
@@ -231,8 +252,11 @@ void unnamed_probe(void)
 	cellHttpCreateTransaction(&transaction, client, "GET", &with_user);
 	credentials("uri credentials", transaction);
 	char user[8];
-	say("credentials NULL rc=0x%08x rc=0x%08x", (unsigned)cellHttp_15C1FD80(transaction, NULL, user),
-	    (unsigned)cellHttp_15C1FD80(transaction, user, NULL));
+	{
+		__typeof__(((unsigned)cellHttp_15C1FD80(transaction, NULL, user)) + 0) say_0 = (unsigned)cellHttp_15C1FD80(transaction, NULL, user);
+		__typeof__(((unsigned)cellHttp_15C1FD80(transaction, user, NULL)) + 0) say_1 = (unsigned)cellHttp_15C1FD80(transaction, user, NULL);
+		say("credentials NULL rc=0x%08x rc=0x%08x", say_0, say_1);
+	}
 	say("credentials bad rc=0x%08x", (unsigned)cellHttp_15C1FD80((CellHttpTransId)0x10, user, user));
 	cellHttpDestroyTransaction(transaction);
 	CellHttpUri basic = {"http", HOST, "user", "pass", "/basic", PORT, {0}};
@@ -314,8 +338,11 @@ void unnamed_probe(void)
 	{
 		cellHttpCreateClient(&client);
 		cellHttpClientSetPerHostPoolSize(client, 3);
-		say("PerHostKeepAliveMax over PerHostPoolSize 3 rc=0x%08x rc=0x%08x", (unsigned)cellHttpClientSetPerHostKeepAliveMax(client, 3),
-		    (unsigned)cellHttpClientSetPerHostKeepAliveMax(client, 4));
+		{
+			__typeof__(((unsigned)cellHttpClientSetPerHostKeepAliveMax(client, 3)) + 0) say_0 = (unsigned)cellHttpClientSetPerHostKeepAliveMax(client, 3);
+			__typeof__(((unsigned)cellHttpClientSetPerHostKeepAliveMax(client, 4)) + 0) say_1 = (unsigned)cellHttpClientSetPerHostKeepAliveMax(client, 4);
+			say("PerHostKeepAliveMax over PerHostPoolSize 3 rc=0x%08x rc=0x%08x", say_0, say_1);
+		}
 		say("PerHostPoolSize over TotalPoolSize rc=0x%08x", (unsigned)cellHttpClientSetPerHostPoolSize(client, 25));
 		cellHttpDestroyClient(client);
 	}
@@ -328,10 +355,15 @@ void unnamed_probe(void)
 	say("flag 8 with external rc=0x%08x", (unsigned)cellHttpClientSetExternalCacheStatus(client, true));
 	cellHttpDestroyClient(client);
 	external_info[0] = external_info[1] = 0xa5a5a5a5u;
-	say("external info rc=0x%08x %u %u", (unsigned)cellHttpGetExternalCacheInfo(external_info), (unsigned)external_info[0],
-	    (unsigned)external_info[1]);
+	{
+		__typeof__(((unsigned)cellHttpGetExternalCacheInfo(external_info)) + 0) say_0 = (unsigned)cellHttpGetExternalCacheInfo(external_info);
+		say("external info rc=0x%08x %u %u", say_0, (unsigned)external_info[0], (unsigned)external_info[1]);
+	}
 	g_calls = 0;
-	say("external walk rc=0x%08x calls %d", (unsigned)cellHttp_9BF4365D(count_callback, NULL), g_calls);
+	{
+		__typeof__(((unsigned)cellHttp_9BF4365D(count_callback, NULL)) + 0) say_0 = (unsigned)cellHttp_9BF4365D(count_callback, NULL);
+		say("external walk rc=0x%08x calls %d", say_0, g_calls);
+	}
 	say("external flush rc=0x%08x", (unsigned)cellHttpFlushExternalCache());
 	say("external end rc=0x%08x", (unsigned)cellHttpEndExternalCache());
 	say("external end again rc=0x%08x", (unsigned)cellHttpEndExternalCache());
@@ -341,13 +373,24 @@ void unnamed_probe(void)
 	cellHttpCreateTransaction(&transaction, client, "GET", &echo);
 	uint8_t byte = 0xa5;
 	uint32_t word[4] = {0xa5a5a5a5u, 0xa5a5a5a5u, 0xa5a5a5a5u, 0xa5a5a5a5u};
-	say("E0CAF386 before send rc=0x%08x %u", (unsigned)cellHttp_E0CAF386(transaction, &byte), (unsigned)byte);
-	say("8633468C before send rc=0x%08x %s", (unsigned)cellHttp_8633468C(transaction, word),
-	    word[0] == 0xa5a5a5a5u ? "untouched" : "written");
-	say("E0CAF386 NULL rc=0x%08x bad rc=0x%08x", (unsigned)cellHttp_E0CAF386(transaction, NULL),
-	    (unsigned)cellHttp_E0CAF386((CellHttpTransId)0x10, &byte));
-	say("8633468C NULL rc=0x%08x bad rc=0x%08x", (unsigned)cellHttp_8633468C(transaction, NULL),
-	    (unsigned)cellHttp_8633468C((CellHttpTransId)0x10, word));
+	{
+		__typeof__(((unsigned)cellHttp_E0CAF386(transaction, &byte)) + 0) say_0 = (unsigned)cellHttp_E0CAF386(transaction, &byte);
+		say("E0CAF386 before send rc=0x%08x %u", say_0, (unsigned)byte);
+	}
+	{
+		__typeof__(((unsigned)cellHttp_8633468C(transaction, word)) + 0) say_0 = (unsigned)cellHttp_8633468C(transaction, word);
+		say("8633468C before send rc=0x%08x %s", say_0, word[0] == 0xa5a5a5a5u ? "untouched" : "written");
+	}
+	{
+		__typeof__(((unsigned)cellHttp_E0CAF386(transaction, NULL)) + 0) say_0 = (unsigned)cellHttp_E0CAF386(transaction, NULL);
+		__typeof__(((unsigned)cellHttp_E0CAF386((CellHttpTransId)0x10, &byte)) + 0) say_1 = (unsigned)cellHttp_E0CAF386((CellHttpTransId)0x10, &byte);
+		say("E0CAF386 NULL rc=0x%08x bad rc=0x%08x", say_0, say_1);
+	}
+	{
+		__typeof__(((unsigned)cellHttp_8633468C(transaction, NULL)) + 0) say_0 = (unsigned)cellHttp_8633468C(transaction, NULL);
+		__typeof__(((unsigned)cellHttp_8633468C((CellHttpTransId)0x10, word)) + 0) say_1 = (unsigned)cellHttp_8633468C((CellHttpTransId)0x10, word);
+		say("8633468C NULL rc=0x%08x bad rc=0x%08x", say_0, say_1);
+	}
 	CellHttpHeader twice = {"X-Twice", "first"};
 	cellHttpRequestAddHeader(transaction, &twice);
 	CellHttpHeader again = {"X-Twice", "second"};
@@ -366,14 +409,22 @@ void unnamed_probe(void)
 	rc = cellHttpSendRequest(transaction, NULL, 0, &sent);
 	byte = 0xa5;
 	memset(word, 0xa5, sizeof(word));
-	say("E0CAF386 after send rc=0x%08x %u", (unsigned)cellHttp_E0CAF386(transaction, &byte), (unsigned)byte);
-	say("8633468C after send rc=0x%08x %s", (unsigned)cellHttp_8633468C(transaction, word),
-	    word[0] == 0xa5a5a5a5u ? "untouched" : word[0] == 0 ? "0" : "nonzero");
+	{
+		__typeof__(((unsigned)cellHttp_E0CAF386(transaction, &byte)) + 0) say_0 = (unsigned)cellHttp_E0CAF386(transaction, &byte);
+		say("E0CAF386 after send rc=0x%08x %u", say_0, (unsigned)byte);
+	}
+	{
+		__typeof__(((unsigned)cellHttp_8633468C(transaction, word)) + 0) say_0 = (unsigned)cellHttp_8633468C(transaction, word);
+		say("8633468C after send rc=0x%08x %s", say_0, word[0] == 0xa5a5a5a5u ? "untouched" : word[0] == 0 ? "0" : "nonzero");
+	}
 	have = 0;
 	while (have < sizeof(body) - 1 && cellHttpRecvResponse(transaction, body + have, sizeof(body) - 1 - have, &got) == 0 && got != 0)
 		have += got;
 	byte = 0xa5;
-	say("E0CAF386 after body rc=0x%08x %u", (unsigned)cellHttp_E0CAF386(transaction, &byte), (unsigned)byte);
+	{
+		__typeof__(((unsigned)cellHttp_E0CAF386(transaction, &byte)) + 0) say_0 = (unsigned)cellHttp_E0CAF386(transaction, &byte);
+		say("E0CAF386 after body rc=0x%08x %u", say_0, (unsigned)byte);
+	}
 	cellHttpDestroyTransaction(transaction);
 	keepalive("close variant first", client);
 	cellHttpCreateTransaction(&transaction, client, "GET", &echo);
@@ -382,8 +433,11 @@ void unnamed_probe(void)
 	while (have < sizeof(body) - 1 && cellHttpRecvResponse(transaction, body + have, sizeof(body) - 1 - have, &got) == 0 && got != 0)
 		have += got;
 	say("3E30440C rc=0x%08x", (unsigned)cellHttp_3E30440C(transaction));
-	say("3E30440C again rc=0x%08x bad rc=0x%08x", (unsigned)cellHttp_3E30440C(transaction),
-	    (unsigned)cellHttp_3E30440C((CellHttpTransId)0x10));
+	{
+		__typeof__(((unsigned)cellHttp_3E30440C(transaction)) + 0) say_0 = (unsigned)cellHttp_3E30440C(transaction);
+		__typeof__(((unsigned)cellHttp_3E30440C((CellHttpTransId)0x10)) + 0) say_1 = (unsigned)cellHttp_3E30440C((CellHttpTransId)0x10);
+		say("3E30440C again rc=0x%08x bad rc=0x%08x", say_0, say_1);
+	}
 	cellHttpDestroyTransaction(transaction);
 	keepalive("after close variant", client);
 	CellHttpUri post = {"http", HOST, "", "", "/echo", PORT, {0}};
@@ -407,9 +461,15 @@ void unnamed_probe(void)
 
 	/* A libhttp-wide value */
 	uint32_t global = 0xa5a5a5a5u;
-	say("global default rc=0x%08x %u", (unsigned)cellHttp_F1374828(&global), (unsigned)global);
+	{
+		__typeof__(((unsigned)cellHttp_F1374828(&global)) + 0) say_0 = (unsigned)cellHttp_F1374828(&global);
+		say("global default rc=0x%08x %u", say_0, (unsigned)global);
+	}
 	say("global set rc=0x%08x", (unsigned)cellHttp_DE6475BF(1234));
-	say("global get rc=0x%08x %u", (unsigned)cellHttp_F1374828(&global), (unsigned)global);
+	{
+		__typeof__(((unsigned)cellHttp_F1374828(&global)) + 0) say_0 = (unsigned)cellHttp_F1374828(&global);
+		say("global get rc=0x%08x %u", say_0, (unsigned)global);
+	}
 	say("global set 0 rc=0x%08x", (unsigned)cellHttp_DE6475BF(0));
 	say("global NULL rc=0x%08x", (unsigned)cellHttp_F1374828(NULL));
 
@@ -428,7 +488,10 @@ void unnamed_probe(void)
 	cellHttpDestroyTransaction(transaction);
 	cellHttpDestroyClient(client);
 	g_calls = 0;
-	say("cache walk rc=0x%08x calls %d", (unsigned)cellHttp_003F88AE(count_callback, NULL), g_calls);
+	{
+		__typeof__(((unsigned)cellHttp_003F88AE(count_callback, NULL)) + 0) say_0 = (unsigned)cellHttp_003F88AE(count_callback, NULL);
+		say("cache walk rc=0x%08x calls %d", say_0, g_calls);
+	}
 	cellHttpEndCache();
 	say("external walk before init rc=0x%08x", (unsigned)cellHttp_9BF4365D(count_callback, NULL));
 	external_info[0] = external_info[1] = 0xa5a5a5a5u;
@@ -473,7 +536,10 @@ void unnamed_probe(void)
 			snprintf(words + strlen(words), sizeof(words) - strlen(words), " %08x", (unsigned)disk[i]);
 	say("disk cache info rc=0x%08x%s", (unsigned)rc, words);
 	g_calls = 0;
-	say("disk cache walk rc=0x%08x calls %d", (unsigned)cellHttp_EBF753AB(count_callback, NULL), g_calls);
+	{
+		__typeof__(((unsigned)cellHttp_EBF753AB(count_callback, NULL)) + 0) say_0 = (unsigned)cellHttp_EBF753AB(count_callback, NULL);
+		say("disk cache walk rc=0x%08x calls %d", say_0, g_calls);
+	}
 	say("disk cache flush rc=0x%08x", (unsigned)cellHttpFlushDiskCache());
 	cellHttpCreateClient(&client);
 	say("disk cache status on rc=0x%08x", (unsigned)cellHttpClientSetDiskCacheStatus(client, true));

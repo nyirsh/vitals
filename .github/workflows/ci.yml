@@ -46,7 +46,19 @@ jobs:
           path: ps3/build/vitals-app/vitals-app.pkg
           retention-days: 7
 
-  test:
+  # The host tests, each console's on its own; vitals-http's (both consoles') link this machine's
+  # zlib, and the image only has the Vita's
+  test-psv:
+    runs-on: ubuntu-latest
+    container: vitasdk/vitasdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install zlib's headers
+        run: apt-get update && apt-get install -y zlib1g-dev
+      - name: Vita's host tests
+        run: make -C psv test
+
+  test-ps3:
     needs: build-ps3
     runs-on: ubuntu-latest
     container: vitasdk/vitasdk:latest
@@ -57,17 +69,14 @@ jobs:
         with:
           name: ps3dk-include
           path: ps3/build/ps3dk-include
-      # vitals-http's host tests link this machine's zlib, and the image only has the Vita's
       - name: Install zlib's headers
         run: apt-get update && apt-get install -y zlib1g-dev
-      - name: Vita's host tests
-        run: make -C psv test
       - name: PS3's host tests
         run: make -C ps3 test
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build-psv, build-ps3, test]
+    needs: [build-psv, build-ps3, test-psv, test-ps3]
     runs-on: ubuntu-latest
     permissions:
       contents: write

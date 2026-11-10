@@ -64,12 +64,17 @@ static int auth_callback(CellHttpTransId transaction, const char *realm, const C
 	char given_user[40], given_password[40];
 	snprintf(given_user, sizeof(given_user), "%s", username != NULL ? username : "(null)");
 	snprintf(given_password, sizeof(given_password), "%s", password != NULL ? password : "(null)");
-	say("auth callback %d: realm \"%s\" %s://%s:%u%s user \"%s\" password \"%s\" save %s argument %s -> %d", g_calls,
-	    realm != NULL ? realm : "(null)", uri != NULL && uri->scheme != NULL ? uri->scheme : "-",
-	    uri != NULL && uri->hostname != NULL ? uri->hostname : "-", uri != NULL ? (unsigned)uri->port : 0,
-	    uri != NULL && uri->path != NULL ? uri->path : "-", bytes(given_user, strlen(given_user)),
-	    bytes(given_password, strlen(given_password)), save == NULL ? "NULL" : *save ? "1" : "0",
-	    argument == &g_answer ? "ok" : "wrong", g_answer);
+	{
+		__typeof__((g_calls) + 0) say_0 = g_calls;
+		__typeof__((realm != NULL ? realm : "(null)") + 0) say_1 = realm != NULL ? realm : "(null)";
+		__typeof__((uri != NULL && uri->scheme != NULL ? uri->scheme : "-") + 0) say_2 = uri != NULL && uri->scheme != NULL ? uri->scheme : "-";
+		__typeof__((uri != NULL && uri->hostname != NULL ? uri->hostname : "-") + 0) say_3 = uri != NULL && uri->hostname != NULL ? uri->hostname : "-";
+		__typeof__((uri != NULL ? (unsigned)uri->port : 0) + 0) say_4 = uri != NULL ? (unsigned)uri->port : 0;
+		__typeof__((uri != NULL && uri->path != NULL ? uri->path : "-") + 0) say_5 = uri != NULL && uri->path != NULL ? uri->path : "-";
+		__typeof__((bytes(given_user, strlen(given_user))) + 0) say_6 = bytes(given_user, strlen(given_user));
+		__typeof__((bytes(given_password, strlen(given_password))) + 0) say_7 = bytes(given_password, strlen(given_password));
+		say("auth callback %d: realm \"%s\" %s://%s:%u%s user \"%s\" password \"%s\" save %s argument %s -> %d", say_0, say_1, say_2, say_3, say_4, say_5, say_6, say_7, save == NULL ? "NULL" : *save ? "1" : "0", argument == &g_answer ? "ok" : "wrong", g_answer);
+	}
 	if (username != NULL)
 		strcpy(username, g_wrong ? "nobody" : g_user);
 	if (password != NULL)
@@ -112,8 +117,15 @@ static void fetch(const char *name, CellHttpClientId client, const char *path, c
 	}
 	while (have > 0 && body[have - 1] == '\n')
 		--have;
-	say("%s %s send rc=0x%08x rc=0x%08x HTTP %d \"%s\"", name, path, (unsigned)send_rc, (unsigned)rc, (int)code,
-	    bytes(body, have));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__((path) + 0) say_1 = path;
+		__typeof__(((unsigned)send_rc) + 0) say_2 = (unsigned)send_rc;
+		__typeof__(((unsigned)rc) + 0) say_3 = (unsigned)rc;
+		__typeof__(((int)code) + 0) say_4 = (int)code;
+		__typeof__((bytes(body, have)) + 0) say_5 = bytes(body, have);
+		say("%s %s send rc=0x%08x rc=0x%08x HTTP %d \"%s\"", say_0, say_1, say_2, say_3, say_4, say_5);
+	}
 	if (transaction != 0)
 		cellHttpDestroyTransaction(transaction);
 }
@@ -135,14 +147,22 @@ static size_t export_cache(const char *name, unsigned char *buffer, size_t size)
 	say("%s rc=0x%08x exported=%u", name, (unsigned)rc, exported == UNTOUCHED ? 0xa5a5a5a5u : (unsigned)exported);
 	if (rc == 0 && exported != UNTOUCHED)
 		for (size_t at = 0; at < exported && at < 800; at += 100)
-			say("%s %u: \"%s\"", name, (unsigned)at, bytes(buffer + at, exported - at < 100 ? exported - at : 100));
+			{
+				__typeof__((name) + 0) say_0 = name;
+				__typeof__(((unsigned)at) + 0) say_1 = (unsigned)at;
+				__typeof__((bytes(buffer + at, exported - at < 100 ? exported - at : 100)) + 0) say_2 = bytes(buffer + at, exported - at < 100 ? exported - at : 100);
+				say("%s %u: \"%s\"", say_0, say_1, say_2);
+			}
 	return rc == 0 && exported != UNTOUCHED ? exported : 0;
 }
 
 void auth_probe(void)
 {
 	uint32_t max = 0xa5a5a5a5u;
-	say("auth entry max rc=0x%08x %u", (unsigned)cellHttpAuthCacheGetEntryMax(&max), (unsigned)max);
+	{
+		__typeof__(((unsigned)cellHttpAuthCacheGetEntryMax(&max)) + 0) say_0 = (unsigned)cellHttpAuthCacheGetEntryMax(&max);
+		say("auth entry max rc=0x%08x %u", say_0, (unsigned)max);
+	}
 	say("auth entry max NULL rc=0x%08x", (unsigned)cellHttpAuthCacheGetEntryMax(NULL));
 
 	CellHttpClientId plain = 0;
@@ -203,7 +223,10 @@ void auth_probe(void)
 	say("auth import NULL rc=0x%08x", (unsigned)cellHttpAuthCacheImport(NULL, 10));
 	cellHttpAuthCacheFlush();
 	say("auth entry max set 1 rc=0x%08x", (unsigned)cellHttpAuthCacheSetEntryMax(1));
-	say("auth entry max get rc=0x%08x %u", (unsigned)cellHttpAuthCacheGetEntryMax(&max), (unsigned)max);
+	{
+		__typeof__(((unsigned)cellHttpAuthCacheGetEntryMax(&max)) + 0) say_0 = (unsigned)cellHttpAuthCacheGetEntryMax(&max);
+		say("auth entry max get rc=0x%08x %u", say_0, (unsigned)max);
+	}
 	g_save = 1;
 	fetch("max 1 first", client, "/basic", "", "");
 	fetch("max 1 second", client, "/basic2", "", "");
@@ -211,9 +234,15 @@ void auth_probe(void)
 	fetch("max 1 first again", client, "/basic", "", "");
 	fetch("max 1 second again", client, "/basic2", "", "");
 	say("auth entry max set 0 rc=0x%08x", (unsigned)cellHttpAuthCacheSetEntryMax(0));
-	say("auth entry max get rc=0x%08x %u", (unsigned)cellHttpAuthCacheGetEntryMax(&max), (unsigned)max);
+	{
+		__typeof__(((unsigned)cellHttpAuthCacheGetEntryMax(&max)) + 0) say_0 = (unsigned)cellHttpAuthCacheGetEntryMax(&max);
+		say("auth entry max get rc=0x%08x %u", say_0, (unsigned)max);
+	}
 	say("auth entry max set 1000 rc=0x%08x", (unsigned)cellHttpAuthCacheSetEntryMax(1000));
-	say("auth entry max get rc=0x%08x %u", (unsigned)cellHttpAuthCacheGetEntryMax(&max), (unsigned)max);
+	{
+		__typeof__(((unsigned)cellHttpAuthCacheGetEntryMax(&max)) + 0) say_0 = (unsigned)cellHttpAuthCacheGetEntryMax(&max);
+		say("auth entry max get rc=0x%08x %u", say_0, (unsigned)max);
+	}
 	cellHttpAuthCacheSetEntryMax(32);
 	cellHttpAuthCacheFlush();
 

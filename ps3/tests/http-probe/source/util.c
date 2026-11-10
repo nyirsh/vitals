@@ -87,8 +87,14 @@ static void encode(const char *name, Encoder encoder, const char *in, size_t len
 	memset(out, FILL, sizeof(out));
 	int rc = encoder(out, sizeof(out), (const unsigned char *)in, length, &required);
 	size_t shown = required != UNTOUCHED && required < sizeof(out) ? required + 1 : 16;
-	say("%s \"%s\" rc=0x%08x required=%s out=\"%s\"", name, bytes(in, length), (unsigned)rc, size_text(required),
-	    bytes(out, shown));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__((bytes(in, length)) + 0) say_1 = bytes(in, length);
+		__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+		__typeof__((bytes(out, shown)) + 0) say_4 = bytes(out, shown);
+		say("%s \"%s\" rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+	}
 }
 
 static void encode_sizes(const char *name, Encoder encoder)
@@ -97,23 +103,44 @@ static void encode_sizes(const char *name, Encoder encoder)
 	char out[64];
 	size_t required = UNTOUCHED;
 	int rc = encoder(NULL, 0, (const unsigned char *)in, 5, &required);
-	say("%s no out rc=0x%08x required=%s", name, (unsigned)rc, size_text(required));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		say("%s no out rc=0x%08x required=%s", say_0, say_1, say_2);
+	}
 	size_t need = required == UNTOUCHED ? 8 : required;
 	for (size_t size = need > 1 ? need - 1 : 0; size <= need + 1; ++size) {
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		rc = encoder(out, size, (const unsigned char *)in, 5, &required);
-		say("%s size %u rc=0x%08x required=%s out=\"%s\"", name, (unsigned)size, (unsigned)rc, size_text(required),
-		    bytes(out, need + 2));
+		{
+			__typeof__((name) + 0) say_0 = name;
+			__typeof__(((unsigned)size) + 0) say_1 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+			__typeof__((bytes(out, need + 2)) + 0) say_4 = bytes(out, need + 2);
+			say("%s size %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+		}
 	}
 	memset(out, FILL, sizeof(out));
 	rc = encoder(out, sizeof(out), (const unsigned char *)in, 5, NULL);
-	say("%s no required rc=0x%08x out=\"%s\"", name, (unsigned)rc, bytes(out, need + 2));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((bytes(out, need + 2)) + 0) say_2 = bytes(out, need + 2);
+		say("%s no required rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+	}
 	rc = encoder(out, sizeof(out), NULL, 5, &required);
 	say("%s NULL in rc=0x%08x", name, (unsigned)rc);
 	required = UNTOUCHED;
 	rc = encoder(NULL, 0, NULL, 0, &required);
-	say("%s nothing rc=0x%08x required=%s", name, (unsigned)rc, size_text(required));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		say("%s nothing rc=0x%08x required=%s", say_0, say_1, say_2);
+	}
 }
 
 static void decode(const char *name, Decoder decoder, const char *in)
@@ -123,8 +150,14 @@ static void decode(const char *name, Decoder decoder, const char *in)
 	memset(out, FILL, sizeof(out));
 	int rc = decoder(out, sizeof(out), in, &required);
 	size_t shown = required != UNTOUCHED && required < sizeof(out) ? required + 1 : 16;
-	say("%s \"%s\" rc=0x%08x required=%s out=\"%s\"", name, bytes(in, strlen(in)), (unsigned)rc,
-	    size_text(required), bytes(out, shown));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__((bytes(in, strlen(in))) + 0) say_1 = bytes(in, strlen(in));
+		__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+		__typeof__((bytes(out, shown)) + 0) say_4 = bytes(out, shown);
+		say("%s \"%s\" rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+	}
 }
 
 static void decode_sizes(const char *name, Decoder decoder)
@@ -133,18 +166,34 @@ static void decode_sizes(const char *name, Decoder decoder)
 	unsigned char out[64];
 	size_t required = UNTOUCHED;
 	int rc = decoder(NULL, 0, in, &required);
-	say("%s no out rc=0x%08x required=%s", name, (unsigned)rc, size_text(required));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		say("%s no out rc=0x%08x required=%s", say_0, say_1, say_2);
+	}
 	size_t need = required == UNTOUCHED ? 8 : required;
 	for (size_t size = need > 1 ? need - 1 : 0; size <= need + 1; ++size) {
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		rc = decoder(out, size, in, &required);
-		say("%s size %u rc=0x%08x required=%s out=\"%s\"", name, (unsigned)size, (unsigned)rc, size_text(required),
-		    bytes(out, need + 2));
+		{
+			__typeof__((name) + 0) say_0 = name;
+			__typeof__(((unsigned)size) + 0) say_1 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+			__typeof__((bytes(out, need + 2)) + 0) say_4 = bytes(out, need + 2);
+			say("%s size %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+		}
 	}
 	memset(out, FILL, sizeof(out));
 	rc = decoder(out, sizeof(out), in, NULL);
-	say("%s no required rc=0x%08x out=\"%s\"", name, (unsigned)rc, bytes(out, need + 2));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((bytes(out, need + 2)) + 0) say_2 = bytes(out, need + 2);
+		say("%s no required rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+	}
 	rc = decoder(out, sizeof(out), NULL, &required);
 	say("%s NULL in rc=0x%08x", name, (unsigned)rc);
 }
@@ -166,13 +215,25 @@ static void escaping(void)
 		size_t required = UNTOUCHED;
 		memset(out, FILL, sizeof(out));
 		int rc = cellHttpUtilEscapeUri(out, sizeof(out), all + run * 64, 64, &required);
-		say("EscapeUri bytes %d-%d rc=0x%08x required=%s out=\"%s\"", run * 64, run * 64 + 63, (unsigned)rc,
-		    size_text(required), bytes(out, required < sizeof(out) ? required : 32));
+		{
+			__typeof__((run * 64) + 0) say_0 = run * 64;
+			__typeof__((run * 64 + 63) + 0) say_1 = run * 64 + 63;
+			__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+			__typeof__((bytes(out, required < sizeof(out) ? required : 32)) + 0) say_4 = bytes(out, required < sizeof(out) ? required : 32);
+			say("EscapeUri bytes %d-%d rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+		}
 		required = UNTOUCHED;
 		memset(out, FILL, sizeof(out));
 		rc = cellHttpUtilFormUrlEncode(out, sizeof(out), all + run * 64, 64, &required);
-		say("FormUrlEncode bytes %d-%d rc=0x%08x required=%s out=\"%s\"", run * 64, run * 64 + 63, (unsigned)rc,
-		    size_text(required), bytes(out, required < sizeof(out) ? required : 32));
+		{
+			__typeof__((run * 64) + 0) say_0 = run * 64;
+			__typeof__((run * 64 + 63) + 0) say_1 = run * 64 + 63;
+			__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+			__typeof__((bytes(out, required < sizeof(out) ? required : 32)) + 0) say_4 = bytes(out, required < sizeof(out) ? required : 32);
+			say("FormUrlEncode bytes %d-%d rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+		}
 	}
 	encode("EscapeUri empty", cellHttpUtilEscapeUri, "", 0);
 	encode("EscapeUri with NUL", cellHttpUtilEscapeUri, "a\0b", 3);
@@ -181,11 +242,21 @@ static void escaping(void)
 		size_t required = UNTOUCHED;
 		memset(out, FILL, sizeof(out));
 		int rc = cellHttpUtilEscapeUri(out, size, (const unsigned char *)"a b", 3, &required);
-		say("EscapeUri \"a b\" size %u rc=0x%08x required=%s out=\"%s\"", (unsigned)size, (unsigned)rc,
-		    size_text(required), bytes(out, 7));
+		{
+			__typeof__(((unsigned)size) + 0) say_0 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((bytes(out, 7)) + 0) say_3 = bytes(out, 7);
+			say("EscapeUri \"a b\" size %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3);
+		}
 		memset(out, FILL, sizeof(out));
 		rc = cellHttpUtilUnescapeUri((unsigned char *)out, size, "a%20bc", &required);
-		say("UnescapeUri \"a%%20bc\" size %u rc=0x%08x out=\"%s\"", (unsigned)size, (unsigned)rc, bytes(out, 7));
+		{
+			__typeof__(((unsigned)size) + 0) say_0 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((bytes(out, 7)) + 0) say_2 = bytes(out, 7);
+			say("UnescapeUri \"a%%20bc\" size %u rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+		}
 	}
 	encode_sizes("EscapeUri", cellHttpUtilEscapeUri);
 	encode_sizes("FormUrlEncode", cellHttpUtilFormUrlEncode);
@@ -210,14 +281,22 @@ static void base64(void)
 		memset(out, FILL, sizeof(out));
 		size_t length = strlen(inputs[i]);
 		int rc = cellHttpUtilBase64Encoder(out, inputs[i], length);
-		say("Base64Encoder \"%s\" rc=0x%08x out=\"%s\"", inputs[i], (unsigned)rc,
-		    bytes(out, CELL_HTTP_UTIL_BASE64_ENC_BUF_SIZE(length) + 2));
+		{
+			__typeof__((inputs[i]) + 0) say_0 = inputs[i];
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((bytes(out, CELL_HTTP_UTIL_BASE64_ENC_BUF_SIZE(length) + 2)) + 0) say_2 = bytes(out, CELL_HTTP_UTIL_BASE64_ENC_BUF_SIZE(length) + 2);
+			say("Base64Encoder \"%s\" rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+		}
 	}
 	unsigned char binary[] = {0x00, 0xff, 0xfe, 0x80, 0x7f, 0x01};
 	char out[32];
 	memset(out, FILL, sizeof(out));
 	int rc = cellHttpUtilBase64Encoder(out, binary, sizeof(binary));
-	say("Base64Encoder binary rc=0x%08x out=\"%s\"", (unsigned)rc, bytes(out, 10));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((bytes(out, 10)) + 0) say_1 = bytes(out, 10);
+		say("Base64Encoder binary rc=0x%08x out=\"%s\"", say_0, say_1);
+	}
 	say("Base64Encoder NULL out rc=0x%08x", (unsigned)cellHttpUtilBase64Encoder(NULL, "a", 1));
 	say("Base64Encoder NULL in rc=0x%08x", (unsigned)cellHttpUtilBase64Encoder(out, NULL, 1));
 
@@ -229,8 +308,12 @@ static void base64(void)
 		memset(decoded, FILL, sizeof(decoded));
 		size_t length = strlen(encoded[i]);
 		rc = cellHttpUtilBase64Decoder(decoded, encoded[i], length);
-		say("Base64Decoder \"%s\" rc=0x%08x out=\"%s\"", bytes(encoded[i], length), (unsigned)rc,
-		    bytes(decoded, CELL_HTTP_UTIL_BASE64_DEC_BUF_SIZE(length) + 2));
+		{
+			__typeof__((bytes(encoded[i], length)) + 0) say_0 = bytes(encoded[i], length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((bytes(decoded, CELL_HTTP_UTIL_BASE64_DEC_BUF_SIZE(length) + 2)) + 0) say_2 = bytes(decoded, CELL_HTTP_UTIL_BASE64_DEC_BUF_SIZE(length) + 2);
+			say("Base64Decoder \"%s\" rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+		}
 	}
 	unsigned char decoded[8];
 	say("Base64Decoder NULL out rc=0x%08x", (unsigned)cellHttpUtilBase64Decoder(NULL, "Zm9v", 4));
@@ -242,13 +325,25 @@ static void base64(void)
 static void uri_shown(const char *name, int rc, const CellHttpUri *uri, size_t required)
 {
 	if (rc != 0) {
-		say("%s rc=0x%08x required=%s", name, (unsigned)rc, size_text(required));
+		{
+			__typeof__((name) + 0) say_0 = name;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			say("%s rc=0x%08x required=%s", say_0, say_1, say_2);
+		}
 		return;
 	}
-	say("%s rc=0x%08x required=%s scheme=%s host=%s user=%s password=%s path=%s port=%u", name, (unsigned)rc,
-	    size_text(required), placed(uri->scheme, g_pool, sizeof(g_pool)), placed(uri->hostname, g_pool, sizeof(g_pool)),
-	    placed(uri->username, g_pool, sizeof(g_pool)), placed(uri->password, g_pool, sizeof(g_pool)),
-	    placed(uri->path, g_pool, sizeof(g_pool)), (unsigned)uri->port);
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		__typeof__((placed(uri->scheme, g_pool, sizeof(g_pool))) + 0) say_3 = placed(uri->scheme, g_pool, sizeof(g_pool));
+		__typeof__((placed(uri->hostname, g_pool, sizeof(g_pool))) + 0) say_4 = placed(uri->hostname, g_pool, sizeof(g_pool));
+		__typeof__((placed(uri->username, g_pool, sizeof(g_pool))) + 0) say_5 = placed(uri->username, g_pool, sizeof(g_pool));
+		__typeof__((placed(uri->password, g_pool, sizeof(g_pool))) + 0) say_6 = placed(uri->password, g_pool, sizeof(g_pool));
+		__typeof__((placed(uri->path, g_pool, sizeof(g_pool))) + 0) say_7 = placed(uri->path, g_pool, sizeof(g_pool));
+		say("%s rc=0x%08x required=%s scheme=%s host=%s user=%s password=%s path=%s port=%u", say_0, say_1, say_2, say_3, say_4, say_5, say_6, say_7, (unsigned)uri->port);
+	}
 }
 
 static void parse_uri(const char *in)
@@ -259,7 +354,12 @@ static void parse_uri(const char *in)
 	memset(&uri, FILL, sizeof(uri));
 	int rc = cellHttpUtilParseUri(NULL, in, NULL, 0, &required);
 	snprintf(name, sizeof(name), "ParseUri \"%s\" size", in != NULL ? bytes(in, strlen(in)) : "(null)");
-	say("%s rc=0x%08x required=%s", name, (unsigned)rc, size_text(required));
+	{
+		__typeof__((name) + 0) say_0 = name;
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		say("%s rc=0x%08x required=%s", say_0, say_1, say_2);
+	}
 	size_t need = required;
 	memset(g_pool, FILL, sizeof(g_pool));
 	required = UNTOUCHED;
@@ -269,7 +369,12 @@ static void parse_uri(const char *in)
 	if (rc == 0 && need != UNTOUCHED && need > 0) {
 		required = UNTOUCHED;
 		rc = cellHttpUtilParseUri(&uri, in, g_pool, need - 1, &required);
-		say("ParseUri \"%s\" short rc=0x%08x required=%s", bytes(in, strlen(in)), (unsigned)rc, size_text(required));
+		{
+			__typeof__((bytes(in, strlen(in))) + 0) say_0 = bytes(in, strlen(in));
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			say("ParseUri \"%s\" short rc=0x%08x required=%s", say_0, say_1, say_2);
+		}
 	}
 }
 
@@ -341,7 +446,12 @@ static void uris(void)
 		memset(&uri, FILL, sizeof(uri));
 		required = UNTOUCHED;
 		int rc = cellHttpUtilParseProxy(NULL, proxies[i], NULL, 0, &required);
-		say("ParseProxy \"%s\" size rc=0x%08x required=%s", proxies[i], (unsigned)rc, size_text(required));
+		{
+			__typeof__((proxies[i]) + 0) say_0 = proxies[i];
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			say("ParseProxy \"%s\" size rc=0x%08x required=%s", say_0, say_1, say_2);
+		}
 		memset(g_pool, FILL, sizeof(g_pool));
 		required = UNTOUCHED;
 		rc = cellHttpUtilParseProxy(&uri, proxies[i], g_pool, sizeof(g_pool), &required);
@@ -356,21 +466,42 @@ static void uris(void)
 		memset(&path, FILL, sizeof(path));
 		required = UNTOUCHED;
 		int rc = cellHttpUtilParseUriPath(NULL, paths[i], NULL, 0, &required);
-		say("ParseUriPath \"%s\" size rc=0x%08x required=%s", paths[i], (unsigned)rc, size_text(required));
+		{
+			__typeof__((paths[i]) + 0) say_0 = paths[i];
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			say("ParseUriPath \"%s\" size rc=0x%08x required=%s", say_0, say_1, say_2);
+		}
 		size_t need = required;
 		memset(g_pool, FILL, sizeof(g_pool));
 		required = UNTOUCHED;
 		rc = cellHttpUtilParseUriPath(&path, paths[i], g_pool, sizeof(g_pool), &required);
 		if (rc != 0)
-			say("ParseUriPath \"%s\" rc=0x%08x required=%s", paths[i], (unsigned)rc, size_text(required));
+			{
+				__typeof__((paths[i]) + 0) say_0 = paths[i];
+				__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+				say("ParseUriPath \"%s\" rc=0x%08x required=%s", say_0, say_1, say_2);
+			}
 		else
-			say("ParseUriPath \"%s\" rc=0x%08x required=%s path=%s query=%s fragment=%s", paths[i], (unsigned)rc,
-			    size_text(required), placed(path.path, g_pool, sizeof(g_pool)), placed(path.query, g_pool, sizeof(g_pool)),
-			    placed(path.fragment, g_pool, sizeof(g_pool)));
+			{
+				__typeof__((paths[i]) + 0) say_0 = paths[i];
+				__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+				__typeof__((placed(path.path, g_pool, sizeof(g_pool))) + 0) say_3 = placed(path.path, g_pool, sizeof(g_pool));
+				__typeof__((placed(path.query, g_pool, sizeof(g_pool))) + 0) say_4 = placed(path.query, g_pool, sizeof(g_pool));
+				__typeof__((placed(path.fragment, g_pool, sizeof(g_pool))) + 0) say_5 = placed(path.fragment, g_pool, sizeof(g_pool));
+				say("ParseUriPath \"%s\" rc=0x%08x required=%s path=%s query=%s fragment=%s", say_0, say_1, say_2, say_3, say_4, say_5);
+			}
 		if (rc == 0 && need != UNTOUCHED && need > 0) {
 			required = UNTOUCHED;
 			rc = cellHttpUtilParseUriPath(&path, paths[i], g_pool, need - 1, &required);
-			say("ParseUriPath \"%s\" short rc=0x%08x required=%s", paths[i], (unsigned)rc, size_text(required));
+			{
+				__typeof__((paths[i]) + 0) say_0 = paths[i];
+				__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+				say("ParseUriPath \"%s\" short rc=0x%08x required=%s", say_0, say_1, say_2);
+			}
 		}
 	}
 
@@ -392,20 +523,35 @@ static void uris(void)
 			memset(out, FILL, sizeof(out));
 			required = UNTOUCHED;
 			int rc = cellHttpUtilBuildUri(built[i], out, sizeof(out), &required, flags[j]);
-			say("BuildUri %u flags %d rc=0x%08x required=%s out=\"%s\"", i, (int)flags[j], (unsigned)rc,
-			    size_text(required), bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8));
+			{
+				__typeof__((i) + 0) say_0 = i;
+				__typeof__(((int)flags[j]) + 0) say_1 = (int)flags[j];
+				__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+				__typeof__((bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8)) + 0) say_4 = bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8);
+				say("BuildUri %u flags %d rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3, say_4);
+			}
 		}
 	required = UNTOUCHED;
 	char out[64];
 	int rc = cellHttpUtilBuildUri(&full, NULL, 0, &required, 0);
-	say("BuildUri size rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("BuildUri size rc=0x%08x required=%s", say_0, say_1);
+	}
 	size_t need = required == UNTOUCHED ? 8 : required;
 	for (size_t size = need - 1; size <= need + 1; ++size) {
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		rc = cellHttpUtilBuildUri(&full, out, size, &required, 0);
-		say("BuildUri size %u rc=0x%08x required=%s out=\"%s\"", (unsigned)size, (unsigned)rc, size_text(required),
-		    bytes(out, need + 2));
+		{
+			__typeof__(((unsigned)size) + 0) say_0 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((bytes(out, need + 2)) + 0) say_3 = bytes(out, need + 2);
+			say("BuildUri size %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3);
+		}
 	}
 	say("BuildUri NULL uri rc=0x%08x", (unsigned)cellHttpUtilBuildUri(NULL, out, sizeof(out), &required, 0));
 	CellHttpUri nohost = {"http", NULL, NULL, NULL, "/", 80, {0}};
@@ -414,14 +560,23 @@ static void uris(void)
 	required = UNTOUCHED;
 	memset(out, FILL, sizeof(out));
 	rc = cellHttpUtilBuildUri(&noscheme, out, sizeof(out), &required, 0);
-	say("BuildUri no scheme rc=0x%08x required=%s out=\"%s\"", (unsigned)rc, size_text(required), bytes(out, 24));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		__typeof__((bytes(out, 24)) + 0) say_2 = bytes(out, 24);
+		say("BuildUri no scheme rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2);
+	}
 	say("BuildUri nothing rc=0x%08x", (unsigned)cellHttpUtilBuildUri(&full, NULL, 0, NULL, 0));
 
 	/* CopyUri */
 	CellHttpUri copy;
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyUri(NULL, &full, NULL, 0, &required);
-	say("CopyUri size rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyUri size rc=0x%08x required=%s", say_0, say_1);
+	}
 	memset(g_pool, FILL, sizeof(g_pool));
 	memset(&copy, FILL, sizeof(copy));
 	required = UNTOUCHED;
@@ -434,13 +589,25 @@ static void uris(void)
 	say("CopyUri NULL src rc=0x%08x", (unsigned)cellHttpUtilCopyUri(&copy, NULL, g_pool, sizeof(g_pool), &required));
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyUri(&copy, &full, g_pool, 10, &required);
-	say("CopyUri short rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyUri short rc=0x%08x required=%s", say_0, say_1);
+	}
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyUri(&copy, &full, NULL, 0, &required);
-	say("CopyUri no pool rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyUri no pool rc=0x%08x required=%s", say_0, say_1);
+	}
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyUri(NULL, &full, g_pool, sizeof(g_pool), &required);
-	say("CopyUri no dest rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyUri no dest rc=0x%08x required=%s", say_0, say_1);
+	}
 
 	/* MergeUriPath */
 	static const char *const merged[] = {"c", "/c", "../c", "./c", "c/d", "?q", "#f", "", "../../../c", "http://other/x"};
@@ -455,7 +622,13 @@ static void uris(void)
 			char name[96];
 			required = UNTOUCHED;
 			rc = cellHttpUtilMergeUriPath(NULL, bases[b], merged[i], NULL, 0, &required);
-			say("MergeUriPath %u \"%s\" size rc=0x%08x required=%s", b, merged[i], (unsigned)rc, size_text(required));
+			{
+				__typeof__((b) + 0) say_0 = b;
+				__typeof__((merged[i]) + 0) say_1 = merged[i];
+				__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+				say("MergeUriPath %u \"%s\" size rc=0x%08x required=%s", say_0, say_1, say_2, say_3);
+			}
 			memset(g_pool, FILL, sizeof(g_pool));
 			memset(&copy, FILL, sizeof(copy));
 			required = UNTOUCHED;
@@ -467,7 +640,11 @@ static void uris(void)
 	say("MergeUriPath NULL src rc=0x%08x", (unsigned)cellHttpUtilMergeUriPath(&copy, NULL, "c", g_pool, sizeof(g_pool), &required));
 	required = UNTOUCHED;
 	rc = cellHttpUtilMergeUriPath(&copy, &base, "c", g_pool, 8, &required);
-	say("MergeUriPath short rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("MergeUriPath short rc=0x%08x required=%s", say_0, say_1);
+	}
 
 	/* SweepPath */
 	static const char *const swept[] = {"/a/./b/../c", "/../a", "a//b", "/a/b/..", "/a/b/../", "/./", "/a/../../b",
@@ -479,22 +656,38 @@ static void uris(void)
 		memset(result, FILL, sizeof(result));
 		size_t length = strlen(swept[i]);
 		rc = cellHttpUtilSweepPath(result, swept[i], length);
-		say("SweepPath \"%s\" rc=0x%08x out=\"%s\"", swept[i], (unsigned)rc,
-		    bytes(result, memchr(result, 0, length + 1) != NULL ? strlen(result) + 1 : length + 1));
+		{
+			__typeof__((swept[i]) + 0) say_0 = swept[i];
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((bytes(result, memchr(result, 0, length + 1) != NULL ? strlen(result) + 1 : length + 1)) + 0) say_2 = bytes(result, memchr(result, 0, length + 1) != NULL ? strlen(result) + 1 : length + 1);
+			say("SweepPath \"%s\" rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+		}
 		memset(result, FILL, sizeof(result));
 		rc = cellHttpUtilSweepPath(result, swept[i], length + 1);
-		say("SweepPath \"%s\" with NUL rc=0x%08x out=\"%s\"", swept[i], (unsigned)rc,
-		    bytes(result, memchr(result, 0, length + 2) != NULL ? strlen(result) + 1 : length + 2));
+		{
+			__typeof__((swept[i]) + 0) say_0 = swept[i];
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((bytes(result, memchr(result, 0, length + 2) != NULL ? strlen(result) + 1 : length + 2)) + 0) say_2 = bytes(result, memchr(result, 0, length + 2) != NULL ? strlen(result) + 1 : length + 2);
+			say("SweepPath \"%s\" with NUL rc=0x%08x out=\"%s\"", say_0, say_1, say_2);
+		}
 	}
 	char result[16];
 	memset(result, FILL, sizeof(result));
 	rc = cellHttpUtilSweepPath(result, "/a/b/c", 4);
-	say("SweepPath size 4 rc=0x%08x out=\"%s\"", (unsigned)rc, bytes(result, strlen(result) + 1));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((bytes(result, strlen(result) + 1)) + 0) say_1 = bytes(result, strlen(result) + 1);
+		say("SweepPath size 4 rc=0x%08x out=\"%s\"", say_0, say_1);
+	}
 	say("SweepPath NULL dst rc=0x%08x", (unsigned)cellHttpUtilSweepPath(NULL, "/a", 2));
 	say("SweepPath NULL src rc=0x%08x", (unsigned)cellHttpUtilSweepPath(result, NULL, 2));
 	memset(result, FILL, sizeof(result));
 	rc = cellHttpUtilSweepPath(result, "/a", 0);
-	say("SweepPath size 0 rc=0x%08x out=\"%s\"", (unsigned)rc, bytes(result, 4));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((bytes(result, 4)) + 0) say_1 = bytes(result, 4);
+		say("SweepPath size 0 rc=0x%08x out=\"%s\"", say_0, say_1);
+	}
 }
 
 /* ---- status lines and headers ---- */
@@ -505,25 +698,48 @@ static void status_line(const char *in, size_t length)
 	size_t required = UNTOUCHED, parsed = UNTOUCHED;
 	memset(&status, FILL, sizeof(status));
 	int rc = cellHttpUtilParseStatusLine(NULL, in, length, NULL, 0, &required, &parsed);
-	say("ParseStatusLine \"%s\" size rc=0x%08x required=%s parsed=%s", bytes(in, length), (unsigned)rc,
-	    size_text(required), size_text(parsed));
+	{
+		__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+		say("ParseStatusLine \"%s\" size rc=0x%08x required=%s parsed=%s", say_0, say_1, say_2, say_3);
+	}
 	size_t need = required;
 	memset(g_pool, FILL, sizeof(g_pool));
 	required = parsed = UNTOUCHED;
 	rc = cellHttpUtilParseStatusLine(&status, in, length, g_pool, sizeof(g_pool), &required, &parsed);
 	if (rc != 0)
-		say("ParseStatusLine \"%s\" rc=0x%08x required=%s parsed=%s", bytes(in, length), (unsigned)rc,
-		    size_text(required), size_text(parsed));
+		{
+			__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+			say("ParseStatusLine \"%s\" rc=0x%08x required=%s parsed=%s", say_0, say_1, say_2, say_3);
+		}
 	else
-		say("ParseStatusLine \"%s\" rc=0x%08x required=%s parsed=%s protocol=%s %u.%u code=%d reason=%s",
-		    bytes(in, length), (unsigned)rc, size_text(required), size_text(parsed),
-		    placed(status.protocol, g_pool, sizeof(g_pool)), (unsigned)status.majorVersion,
-		    (unsigned)status.minorVersion, (int)status.statusCode, placed(status.reasonPhrase, g_pool, sizeof(g_pool)));
+		{
+			__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+			__typeof__((placed(status.protocol, g_pool, sizeof(g_pool))) + 0) say_4 = placed(status.protocol, g_pool, sizeof(g_pool));
+			__typeof__(((unsigned)status.majorVersion) + 0) say_5 = (unsigned)status.majorVersion;
+			__typeof__(((unsigned)status.minorVersion) + 0) say_6 = (unsigned)status.minorVersion;
+			__typeof__(((int)status.statusCode) + 0) say_7 = (int)status.statusCode;
+			__typeof__((placed(status.reasonPhrase, g_pool, sizeof(g_pool))) + 0) say_8 = placed(status.reasonPhrase, g_pool, sizeof(g_pool));
+			say("ParseStatusLine \"%s\" rc=0x%08x required=%s parsed=%s protocol=%s %u.%u code=%d reason=%s", say_0, say_1, say_2, say_3, say_4, say_5, say_6, say_7, say_8);
+		}
 	if (rc == 0 && need != UNTOUCHED && need > 0) {
 		required = parsed = UNTOUCHED;
 		rc = cellHttpUtilParseStatusLine(&status, in, length, g_pool, need - 1, &required, &parsed);
-		say("ParseStatusLine \"%s\" short rc=0x%08x required=%s parsed=%s", bytes(in, length), (unsigned)rc,
-		    size_text(required), size_text(parsed));
+		{
+			__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+			say("ParseStatusLine \"%s\" short rc=0x%08x required=%s parsed=%s", say_0, say_1, say_2, say_3);
+		}
 	}
 }
 
@@ -533,24 +749,45 @@ static void header(const char *in, size_t length)
 	size_t required = UNTOUCHED, parsed = UNTOUCHED;
 	memset(&parsed_header, FILL, sizeof(parsed_header));
 	int rc = cellHttpUtilParseHeader(NULL, in, length, NULL, 0, &required, &parsed);
-	say("ParseHeader \"%s\" size rc=0x%08x required=%s parsed=%s", bytes(in, length), (unsigned)rc,
-	    size_text(required), size_text(parsed));
+	{
+		__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+		__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+		__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+		say("ParseHeader \"%s\" size rc=0x%08x required=%s parsed=%s", say_0, say_1, say_2, say_3);
+	}
 	size_t need = required;
 	memset(g_pool, FILL, sizeof(g_pool));
 	required = parsed = UNTOUCHED;
 	rc = cellHttpUtilParseHeader(&parsed_header, in, length, g_pool, sizeof(g_pool), &required, &parsed);
 	if (rc != 0)
-		say("ParseHeader \"%s\" rc=0x%08x required=%s parsed=%s", bytes(in, length), (unsigned)rc,
-		    size_text(required), size_text(parsed));
+		{
+			__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+			say("ParseHeader \"%s\" rc=0x%08x required=%s parsed=%s", say_0, say_1, say_2, say_3);
+		}
 	else
-		say("ParseHeader \"%s\" rc=0x%08x required=%s parsed=%s name=%s value=%s", bytes(in, length), (unsigned)rc,
-		    size_text(required), size_text(parsed), placed(parsed_header.name, g_pool, sizeof(g_pool)),
-		    placed(parsed_header.value, g_pool, sizeof(g_pool)));
+		{
+			__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+			__typeof__((placed(parsed_header.name, g_pool, sizeof(g_pool))) + 0) say_4 = placed(parsed_header.name, g_pool, sizeof(g_pool));
+			__typeof__((placed(parsed_header.value, g_pool, sizeof(g_pool))) + 0) say_5 = placed(parsed_header.value, g_pool, sizeof(g_pool));
+			say("ParseHeader \"%s\" rc=0x%08x required=%s parsed=%s name=%s value=%s", say_0, say_1, say_2, say_3, say_4, say_5);
+		}
 	if (rc == 0 && need != UNTOUCHED && need > 0) {
 		required = parsed = UNTOUCHED;
 		rc = cellHttpUtilParseHeader(&parsed_header, in, length, g_pool, need - 1, &required, &parsed);
-		say("ParseHeader \"%s\" short rc=0x%08x required=%s parsed=%s", bytes(in, length), (unsigned)rc,
-		    size_text(required), size_text(parsed));
+		{
+			__typeof__((bytes(in, length)) + 0) say_0 = bytes(in, length);
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((size_text(parsed)) + 0) say_3 = size_text(parsed);
+			say("ParseHeader \"%s\" short rc=0x%08x required=%s parsed=%s", say_0, say_1, say_2, say_3);
+		}
 	}
 }
 
@@ -602,20 +839,34 @@ static void lines(void)
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		int rc = cellHttpUtilBuildRequestLine(&requests[i], out, sizeof(out), &required);
-		say("BuildRequestLine %u rc=0x%08x required=%s out=\"%s\"", i, (unsigned)rc, size_text(required),
-		    bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8));
+		{
+			__typeof__((i) + 0) say_0 = i;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8)) + 0) say_3 = bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8);
+			say("BuildRequestLine %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3);
+		}
 	}
 	char out[64];
 	required = UNTOUCHED;
 	int rc = cellHttpUtilBuildRequestLine(&requests[0], NULL, 0, &required);
-	say("BuildRequestLine size rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("BuildRequestLine size rc=0x%08x required=%s", say_0, say_1);
+	}
 	size_t need = required == UNTOUCHED ? 8 : required;
 	for (size_t size = need - 1; size <= need + 1; ++size) {
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		rc = cellHttpUtilBuildRequestLine(&requests[0], out, size, &required);
-		say("BuildRequestLine size %u rc=0x%08x required=%s out=\"%s\"", (unsigned)size, (unsigned)rc,
-		    size_text(required), bytes(out, need + 2));
+		{
+			__typeof__(((unsigned)size) + 0) say_0 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((bytes(out, need + 2)) + 0) say_3 = bytes(out, need + 2);
+			say("BuildRequestLine size %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3);
+		}
 	}
 	say("BuildRequestLine NULL rc=0x%08x", (unsigned)cellHttpUtilBuildRequestLine(NULL, out, sizeof(out), &required));
 	CellHttpRequestLine nomethod = {NULL, "/", "HTTP", 1, 1};
@@ -629,19 +880,33 @@ static void lines(void)
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		rc = cellHttpUtilBuildHeader(&built[i], out, sizeof(out), &required);
-		say("BuildHeader %u rc=0x%08x required=%s out=\"%s\"", i, (unsigned)rc, size_text(required),
-		    bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8));
+		{
+			__typeof__((i) + 0) say_0 = i;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8)) + 0) say_3 = bytes(out, required != UNTOUCHED && required < sizeof(out) ? required + 1 : 8);
+			say("BuildHeader %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3);
+		}
 	}
 	required = UNTOUCHED;
 	rc = cellHttpUtilBuildHeader(&built[0], NULL, 0, &required);
-	say("BuildHeader size rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("BuildHeader size rc=0x%08x required=%s", say_0, say_1);
+	}
 	need = required == UNTOUCHED ? 8 : required;
 	for (size_t size = need - 1; size <= need + 1; ++size) {
 		memset(out, FILL, sizeof(out));
 		required = UNTOUCHED;
 		rc = cellHttpUtilBuildHeader(&built[0], out, size, &required);
-		say("BuildHeader size %u rc=0x%08x required=%s out=\"%s\"", (unsigned)size, (unsigned)rc, size_text(required),
-		    bytes(out, need + 2));
+		{
+			__typeof__(((unsigned)size) + 0) say_0 = (unsigned)size;
+			__typeof__(((unsigned)rc) + 0) say_1 = (unsigned)rc;
+			__typeof__((size_text(required)) + 0) say_2 = size_text(required);
+			__typeof__((bytes(out, need + 2)) + 0) say_3 = bytes(out, need + 2);
+			say("BuildHeader size %u rc=0x%08x required=%s out=\"%s\"", say_0, say_1, say_2, say_3);
+		}
 	}
 	CellHttpHeader nameless = {NULL, "v"}, valueless = {"N", NULL};
 	say("BuildHeader NULL rc=0x%08x", (unsigned)cellHttpUtilBuildHeader(NULL, out, sizeof(out), &required));
@@ -653,21 +918,39 @@ static void lines(void)
 	CellHttpHeader copy;
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyHeader(NULL, &built[0], NULL, 0, &required);
-	say("CopyHeader size rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyHeader size rc=0x%08x required=%s", say_0, say_1);
+	}
 	memset(g_pool, FILL, sizeof(g_pool));
 	memset(&copy, FILL, sizeof(copy));
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyHeader(&copy, &built[0], g_pool, sizeof(g_pool), &required);
-	say("CopyHeader rc=0x%08x required=%s name=%s value=%s", (unsigned)rc, size_text(required),
-	    placed(copy.name, g_pool, sizeof(g_pool)), placed(copy.value, g_pool, sizeof(g_pool)));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		__typeof__((placed(copy.name, g_pool, sizeof(g_pool))) + 0) say_2 = placed(copy.name, g_pool, sizeof(g_pool));
+		__typeof__((placed(copy.value, g_pool, sizeof(g_pool))) + 0) say_3 = placed(copy.value, g_pool, sizeof(g_pool));
+		say("CopyHeader rc=0x%08x required=%s name=%s value=%s", say_0, say_1, say_2, say_3);
+	}
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyHeader(&copy, &built[0], g_pool, 5, &required);
-	say("CopyHeader short rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyHeader short rc=0x%08x required=%s", say_0, say_1);
+	}
 	memset(&copy, FILL, sizeof(copy));
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyHeader(&copy, &valueless, g_pool, sizeof(g_pool), &required);
-	say("CopyHeader no value rc=0x%08x required=%s name=%s value=%s", (unsigned)rc, size_text(required),
-	    placed(copy.name, g_pool, sizeof(g_pool)), placed(copy.value, g_pool, sizeof(g_pool)));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		__typeof__((placed(copy.name, g_pool, sizeof(g_pool))) + 0) say_2 = placed(copy.name, g_pool, sizeof(g_pool));
+		__typeof__((placed(copy.value, g_pool, sizeof(g_pool))) + 0) say_3 = placed(copy.value, g_pool, sizeof(g_pool));
+		say("CopyHeader no value rc=0x%08x required=%s name=%s value=%s", say_0, say_1, say_2, say_3);
+	}
 	say("CopyHeader NULL src rc=0x%08x", (unsigned)cellHttpUtilCopyHeader(&copy, NULL, g_pool, sizeof(g_pool), &required));
 
 	static const char *const appended[] = {"more", "", NULL};
@@ -675,41 +958,76 @@ static void lines(void)
 		for (unsigned h = 0; h < 2; ++h) {
 			required = UNTOUCHED;
 			rc = cellHttpUtilAppendHeaderValue(NULL, &built[h], appended[i], NULL, 0, &required);
-			say("AppendHeaderValue %u \"%s\" size rc=0x%08x required=%s", h, appended[i] != NULL ? appended[i] : "(null)",
-			    (unsigned)rc, size_text(required));
+			{
+				__typeof__((h) + 0) say_0 = h;
+				__typeof__((appended[i] != NULL ? appended[i] : "(null)") + 0) say_1 = appended[i] != NULL ? appended[i] : "(null)";
+				__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+				say("AppendHeaderValue %u \"%s\" size rc=0x%08x required=%s", say_0, say_1, say_2, say_3);
+			}
 			memset(g_pool, FILL, sizeof(g_pool));
 			memset(&copy, FILL, sizeof(copy));
 			required = UNTOUCHED;
 			rc = cellHttpUtilAppendHeaderValue(&copy, &built[h], appended[i], g_pool, sizeof(g_pool), &required);
-			say("AppendHeaderValue %u \"%s\" rc=0x%08x required=%s name=%s value=%s", h,
-			    appended[i] != NULL ? appended[i] : "(null)", (unsigned)rc, size_text(required),
-			    rc == 0 ? placed(copy.name, g_pool, sizeof(g_pool)) : "-", rc == 0 ? placed(copy.value, g_pool, sizeof(g_pool)) : "-");
+			{
+				__typeof__((h) + 0) say_0 = h;
+				__typeof__((appended[i] != NULL ? appended[i] : "(null)") + 0) say_1 = appended[i] != NULL ? appended[i] : "(null)";
+				__typeof__(((unsigned)rc) + 0) say_2 = (unsigned)rc;
+				__typeof__((size_text(required)) + 0) say_3 = size_text(required);
+				__typeof__((rc == 0 ? placed(copy.name, g_pool, sizeof(g_pool)) : "-") + 0) say_4 = rc == 0 ? placed(copy.name, g_pool, sizeof(g_pool)) : "-";
+				__typeof__((rc == 0 ? placed(copy.value, g_pool, sizeof(g_pool)) : "-") + 0) say_5 = rc == 0 ? placed(copy.value, g_pool, sizeof(g_pool)) : "-";
+				say("AppendHeaderValue %u \"%s\" rc=0x%08x required=%s name=%s value=%s", say_0, say_1, say_2, say_3, say_4, say_5);
+			}
 		}
 	required = UNTOUCHED;
 	rc = cellHttpUtilAppendHeaderValue(&copy, &built[0], "more", g_pool, 8, &required);
-	say("AppendHeaderValue short rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("AppendHeaderValue short rc=0x%08x required=%s", say_0, say_1);
+	}
 
 	CellHttpStatusLine line_in = {"HTTP", 1, 1, "OK", 200, {0}};
 	CellHttpStatusLine line_out;
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyStatusLine(NULL, &line_in, NULL, 0, &required);
-	say("CopyStatusLine size rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyStatusLine size rc=0x%08x required=%s", say_0, say_1);
+	}
 	memset(g_pool, FILL, sizeof(g_pool));
 	memset(&line_out, FILL, sizeof(line_out));
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyStatusLine(&line_out, &line_in, g_pool, sizeof(g_pool), &required);
-	say("CopyStatusLine rc=0x%08x required=%s protocol=%s %u.%u code=%d reason=%s", (unsigned)rc, size_text(required),
-	    placed(line_out.protocol, g_pool, sizeof(g_pool)), (unsigned)line_out.majorVersion,
-	    (unsigned)line_out.minorVersion, (int)line_out.statusCode, placed(line_out.reasonPhrase, g_pool, sizeof(g_pool)));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		__typeof__((placed(line_out.protocol, g_pool, sizeof(g_pool))) + 0) say_2 = placed(line_out.protocol, g_pool, sizeof(g_pool));
+		__typeof__(((unsigned)line_out.majorVersion) + 0) say_3 = (unsigned)line_out.majorVersion;
+		__typeof__(((unsigned)line_out.minorVersion) + 0) say_4 = (unsigned)line_out.minorVersion;
+		__typeof__(((int)line_out.statusCode) + 0) say_5 = (int)line_out.statusCode;
+		__typeof__((placed(line_out.reasonPhrase, g_pool, sizeof(g_pool))) + 0) say_6 = placed(line_out.reasonPhrase, g_pool, sizeof(g_pool));
+		say("CopyStatusLine rc=0x%08x required=%s protocol=%s %u.%u code=%d reason=%s", say_0, say_1, say_2, say_3, say_4, say_5, say_6);
+	}
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyStatusLine(&line_out, &line_in, g_pool, 4, &required);
-	say("CopyStatusLine short rc=0x%08x required=%s", (unsigned)rc, size_text(required));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		say("CopyStatusLine short rc=0x%08x required=%s", say_0, say_1);
+	}
 	CellHttpStatusLine noreason = {"HTTP", 1, 0, NULL, 204, {0}};
 	memset(&line_out, FILL, sizeof(line_out));
 	required = UNTOUCHED;
 	rc = cellHttpUtilCopyStatusLine(&line_out, &noreason, g_pool, sizeof(g_pool), &required);
-	say("CopyStatusLine no reason rc=0x%08x required=%s protocol=%s reason=%s", (unsigned)rc, size_text(required),
-	    placed(line_out.protocol, g_pool, sizeof(g_pool)), placed(line_out.reasonPhrase, g_pool, sizeof(g_pool)));
+	{
+		__typeof__(((unsigned)rc) + 0) say_0 = (unsigned)rc;
+		__typeof__((size_text(required)) + 0) say_1 = size_text(required);
+		__typeof__((placed(line_out.protocol, g_pool, sizeof(g_pool))) + 0) say_2 = placed(line_out.protocol, g_pool, sizeof(g_pool));
+		__typeof__((placed(line_out.reasonPhrase, g_pool, sizeof(g_pool))) + 0) say_3 = placed(line_out.reasonPhrase, g_pool, sizeof(g_pool));
+		say("CopyStatusLine no reason rc=0x%08x required=%s protocol=%s reason=%s", say_0, say_1, say_2, say_3);
+	}
 	say("CopyStatusLine NULL src rc=0x%08x",
 	    (unsigned)cellHttpUtilCopyStatusLine(&line_out, NULL, g_pool, sizeof(g_pool), &required));
 }
