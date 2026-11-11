@@ -60,8 +60,9 @@ jobs:
     container: vitasdk/vitasdk:latest
     steps:
       - uses: actions/checkout@v4
+      # Three tries, as a runner's DNS can drop out for a minute (apt-get update only warns then)
       - name: Install zlib's headers
-        run: apt-get update && apt-get install -y zlib1g-dev
+        run: for try in 1 2 3; do apt-get -o Acquire::Retries=3 update && apt-get install -y zlib1g-dev && break; [ $try = 3 ] && exit 1; sleep 20; done
       - name: Vita's host tests
         run: make -C psv test
 
@@ -76,8 +77,9 @@ jobs:
         with:
           name: ps3dk-include
           path: ps3/build/ps3dk-include
+      # Three tries, as a runner's DNS can drop out for a minute (apt-get update only warns then)
       - name: Install zlib's headers
-        run: apt-get update && apt-get install -y zlib1g-dev
+        run: for try in 1 2 3; do apt-get -o Acquire::Retries=3 update && apt-get install -y zlib1g-dev && break; [ $try = 3 ] && exit 1; sleep 20; done
       - name: PS3's host tests
         run: make -C ps3 test
 

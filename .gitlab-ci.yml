@@ -41,7 +41,8 @@ test-psv:
   image: vitasdk/vitasdk:latest
   needs: []
   script:
-    - apt-get update && apt-get install -y zlib1g-dev
+    # Three tries, as a runner's DNS can drop out for a minute (apt-get update only warns then)
+    - for try in 1 2 3; do apt-get -o Acquire::Retries=3 update && apt-get install -y zlib1g-dev && break; [ $try = 3 ] && exit 1; sleep 20; done
     - make -C psv test
 
 test-ps3:
@@ -51,7 +52,8 @@ test-ps3:
   needs:
     - build-ps3
   script:
-    - apt-get update && apt-get install -y zlib1g-dev
+    # Three tries, as a runner's DNS can drop out for a minute (apt-get update only warns then)
+    - for try in 1 2 3; do apt-get -o Acquire::Retries=3 update && apt-get install -y zlib1g-dev && break; [ $try = 3 ] && exit 1; sleep 20; done
     - make -C ps3 test
 
 release:
