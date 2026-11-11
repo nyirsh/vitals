@@ -13,9 +13,11 @@ typedef struct {
 	/* PS3HEN's payload answers (its revision in hen_revision), else Cobra's (its version) */
 	int hen, cobra;
 	unsigned hen_revision, cobra_version;
+	/* RPCS3 rather than a console (rpcs3_answers in firmware.c) */
+	int rpcs3;
 	/* What vitals is made and tested for: 4.93 CEX with Cobra */
 	int supported;
-	/* "4.93 CEX, Cobra 8.5", with "unknown" for what didn't answer */
+	/* "4.93 CEX, Cobra 8.5", with "unknown" for what didn't answer; in RPCS3, "RPCS3, 4.93" */
 	char text[64];
 } ConsoleInfo;
 

@@ -21,6 +21,15 @@
 
 #define VERSION_TXT "/dev_flash/vsh/etc/version.txt"
 
+/* Where RPCS3 answers unlike a console (the app, 4.93 CEX against RPCS3 0.0.43): the system's
+ * registry, which every console has (a game is refused it, EPERM) and RPCS3 hasn't (ENOENT); and the
+ * console type, which RPCS3 doesn't implement but answers CELL_OK to, writing nothing, where a
+ * console writes it, or refuses a process it doesn't let ask (ENOSYS) */
+#define XREGISTRY "/dev_flash2/etc/xRegistry.sys"
+#define LV2_ENOENT 0x80010006u
+/* What the console type holds until the call writes it */
+#define TYPE_UNWRITTEN 0xa5a5a5a5a5a5a5a5ULL
+
 static ConsoleInfo g_info;
 static int g_read;
 
@@ -54,6 +63,16 @@ static void version_text(char *out, size_t size, unsigned version)
 		snprintf(out, size, "%X.%02X", version >> 8, version & 0xFF);
 }
 
+/* RPCS3 only when both say so, so that one answer changing, on either side, makes a console of it */
+static int rpcs3_answers(int type_unwritten)
+{
+	CellFsStat status;
+	int registry = cellFsStat(XREGISTRY, &status);
+	VITALS_VERBOSE("console: xRegistry.sys 0x%08x, type %s", (unsigned)registry,
+	               type_unwritten ? "unwritten" : "written or refused");
+	return (uint32_t)registry == LV2_ENOENT && type_unwritten;
+}
+
 const ConsoleInfo *console_info(void)
 {
 	if (g_read)
@@ -62,11 +81,16 @@ const ConsoleInfo *console_info(void)
 	ConsoleInfo *info = &g_info;
 	read_firmware(&info->major, &info->minor);
 
-	uint64_t type = 0;
+	static uint64_t type __attribute__((aligned(8)));
+	int type_unwritten = 0;
 	{
-		lv2syscall1(LV2_GET_CONSOLE_TYPE, (uint64_t)(uintptr_t)&type);
+		uint64_t where = (uint64_t)(uintptr_t)&type;
+		type = TYPE_UNWRITTEN;
+		lv2syscall1(LV2_GET_CONSOLE_TYPE, where);
 		if (p1 != 0)
 			type = 0;
+		else if (type == TYPE_UNWRITTEN)
+			type = 0, type_unwritten = 1;
 	}
 	info->type = type == 1 ? CONSOLE_TYPE_CEX : type == 2 ? CONSOLE_TYPE_DEX : type == 3 ? CONSOLE_TYPE_DECR
 	                                                                                   : CONSOLE_TYPE_UNKNOWN;
@@ -86,8 +110,10 @@ const ConsoleInfo *console_info(void)
 		info->cobra = p1 == 0 && version != 0;
 		info->cobra_version = version;
 	}
-	VITALS_LOG("console: version.txt %u.%02u, type %llu, hen %d (0x%X), cobra %d (0x%X)", info->major, info->minor,
-	        (unsigned long long)type, info->hen, info->hen_revision, info->cobra, info->cobra_version);
+	info->rpcs3 = !info->hen && !info->cobra && rpcs3_answers(type_unwritten);
+	VITALS_LOG("console: version.txt %u.%02u, type %llu, hen %d (0x%X), cobra %d (0x%X), rpcs3 %d", info->major,
+	        info->minor, (unsigned long long)type, info->hen, info->hen_revision, info->cobra, info->cobra_version,
+	        info->rpcs3);
 
 	char firmware[24], payload[32], version[16];
 	if (info->major != 0)
@@ -104,7 +130,10 @@ const ConsoleInfo *console_info(void)
 		snprintf(payload, sizeof(payload), "no Cobra");
 	}
 	static const char *const types[] = {"", " CEX", " DEX", " DECR"};
-	snprintf(info->text, sizeof(info->text), "%s%s, %s", firmware, types[info->type], payload);
+	if (info->rpcs3)
+		snprintf(info->text, sizeof(info->text), "RPCS3, %s", firmware);
+	else
+		snprintf(info->text, sizeof(info->text), "%s%s, %s", firmware, types[info->type], payload);
 	info->supported = info->major == 4 && info->minor == 93 && info->type == CONSOLE_TYPE_CEX && !info->hen &&
 	                  info->cobra;
 	return info;
