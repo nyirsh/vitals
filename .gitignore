@@ -1,7 +1,23 @@
-/build/
+# Both consoles' projects (psv/, ps3/), the RPCS3 installers (rpcs3/) and the shared code: what's
+# built, local settings and dumps stay out
+/psv/build/
+/ps3/build/
+/rpcs3/build/
 __pycache__/
 *.o
 
+# Dot files are local (.env, editors' folders), but for these
 .*
 !.gitignore
+!.gitattributes
 !.vscode
+!.github
+!.gitlab-ci.yml
+!.env.example
+
+# What make fetch, log and app-log bring back from the consoles: logs and reports can hold PSN details
+/fetched/
+
+# Dumps from the consoles (firmware modules, CA files, memory segments): Sony's, never committed;
+# a folder per console and firmware (dumps/ps3/4.93-cex, dumps/psv/3.65), where the tools and tests read them
+/dumps/

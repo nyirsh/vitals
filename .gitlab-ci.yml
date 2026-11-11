@@ -1,0 +1,74 @@
+# Every push: both consoles' builds, each in its SDK's Docker image, then the host tests. DOCKER= makes
+# the Makefiles run their build commands right here, as CI is already in the image. On a push to main,
+# once all of that passed, the release VERSION names is published when it isn't yet
+# (shared/tools/release.py)
+stages:
+  - build
+  - test
+  - release
+
+build-psv:
+  stage: build
+  image: vitasdk/vitasdk:latest
+  script:
+    - make -C psv DOCKER='sh -lc'
+  artifacts:
+    paths:
+      - psv/build/vitals-app/vitals-app.vpk
+    expire_in: 1 week
+
+build-ps3:
+  stage: build
+  image: nyirsh/vitals-ps3-sdk:latest
+  script:
+    # The PS3's builds expect the repository at /src, as the Makefile mounts it
+    - ln -sfn "$PWD" /src
+    - make -C /src/ps3 DOCKER='bash -c' all build/ps3dk-include/cell/http.h
+    # The RPCS3 installers (rpcs3/), each carrying the app's modules
+    - make -C /src/rpcs3 DOCKER='bash -c'
+  artifacts:
+    # The PS3's tests read PS3DK's HTTP and SSL headers, which only its image has
+    paths:
+      - ps3/build/ps3dk-include
+      - ps3/build/vitals-app/vitals-app.pkg
+      - rpcs3/build/
+    expire_in: 1 week
+
+# The host tests, each console's on its own; vitals-http's (both consoles') link this machine's zlib,
+# and the image only has the Vita's
+test-psv:
+  stage: test
+  image: vitasdk/vitasdk:latest
+  needs: []
+  script:
+    # Three tries, as a runner's DNS can drop out for a minute (apt-get update only warns then)
+    - for try in 1 2 3; do apt-get -o Acquire::Retries=3 update && apt-get install -y zlib1g-dev && break; [ $try = 3 ] && exit 1; sleep 20; done
+    - make -C psv test
+
+test-ps3:
+  stage: test
+  image: vitasdk/vitasdk:latest
+  # For PS3DK's headers
+  needs:
+    - build-ps3
+  script:
+    # Three tries, as a runner's DNS can drop out for a minute (apt-get update only warns then)
+    - for try in 1 2 3; do apt-get -o Acquire::Retries=3 update && apt-get install -y zlib1g-dev && break; [ $try = 3 ] && exit 1; sleep 20; done
+    - make -C ps3 test
+
+release:
+  stage: release
+  image: vitasdk/vitasdk:latest
+  needs:
+    - build-psv
+    - build-ps3
+    - test-psv
+    - test-ps3
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+  # Two pushes to main in a row never publish at once
+  resource_group: release
+  script:
+    - >-
+      python3 shared/tools/release.py gitlab psv/build/vitals-app/vitals-app.vpk ps3/build/vitals-app/vitals-app.pkg
+      rpcs3/build/linux-rpcs3-install.sh rpcs3/build/macos-rpcs3-install.sh rpcs3/build/windows-rpcs3-install.bat

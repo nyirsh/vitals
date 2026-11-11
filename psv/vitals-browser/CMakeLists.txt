@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.16)
+# The browser's TLS provider (vitals.suprx), which the kernel plugin (../vitals-boot) puts in the
+# browser's process: its TLS is vitals-ssl's, imported as the libssl module (../vitals-ssl builds its
+# stub), and it carries vitals' core library (../common). Its host tests are tests/ (make test)
+project(vitals C)
+
+set(VITALS_DEBUG 0 CACHE STRING
+    "Provider debug output on the console: 0 none, 1 summaries and failures, 2 everything")
+if(NOT VITALS_DEBUG MATCHES "^[012]$")
+    message(FATAL_ERROR "VITALS_DEBUG must be 0, 1 or 2")
+endif()
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+    message(FATAL_ERROR "The browser provider requires the VitaSDK toolchain")
+endif()
+
+# The release version from ../../VERSION, which the provider carries in its module header
+include("${CMAKE_CURRENT_LIST_DIR}/../../version.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../common/core.cmake")
+
+include("${VITASDK}/share/vita.cmake" REQUIRED)
+
+add_executable(vitals
+    module.c
+    backend.c
+    config.c
+    webkit_callback.c
+)
+# Messages printed by the linked code are shown only at debug level 2
+if(VITALS_DEBUG GREATER 0)
+    target_sources(vitals PRIVATE ${VITALS_COMMON_DIR}/runtime/log_user.c)
+endif()
+if(VITALS_DEBUG LESS 2)
+    target_sources(vitals PRIVATE quiet_output.c)
+    target_link_options(vitals PRIVATE -Wl,--wrap=printf -Wl,--wrap=puts)
+endif()
+# The TLS is the libssl module's (../../vitals-ssl), which the kernel plugin loads first, imported
+# through the stub vitals-ssl's build makes
+set(VITALS_SSL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vitals-ssl)
+set(VITALS_SSL_STUB "${CMAKE_BINARY_DIR}/../vitals-ssl/stubs/libSceLibSsl_stub.a")
+if(NOT EXISTS "${VITALS_SSL_STUB}")
+    message(FATAL_ERROR "${VITALS_SSL_STUB} is missing; build ../vitals-ssl first (make does this)")
+endif()
+# vitals' certificate store is looked for through the kernel plugin's system call
+set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-boot/stubs/libvitals_kernel_stub.a")
+if(NOT EXISTS "${VITALS_KERNEL_STUB}")
+    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-boot first (make does this)")
+endif()
+target_include_directories(vitals PRIVATE . ${VITALS_COMMON_DIR}/runtime ${VITALS_SSL_DIR}/include)
+target_compile_features(vitals PRIVATE c_std_11)
+target_compile_definitions(vitals PRIVATE VITALS_DEBUG=${VITALS_DEBUG}
+    VITALS_LOG_NAME="vitals-browser")
+target_compile_options(vitals PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
+    -Wstrict-prototypes -ffunction-sections -fdata-sections -O2)
+target_link_options(vitals PRIVATE -nostdlib -Wl,--gc-sections
+    -Wl,--undefined=module_start -Wl,--undefined=module_stop -Wl,--undefined=vitals_browser_module_data)
+target_link_libraries(vitals PRIVATE vitals_core ${VITALS_SSL_STUB} ${VITALS_KERNEL_STUB} gcc
+    SceLibc_stub SceNet_stub SceRtc_stub SceLibKernel_stub SceIofilemgr_stub
+    SceKernelModulemgr_stub SceKernelThreadMgr_stub SceSysmem_stub taihen_stub)
+# The module header carries the release version from ../../../VERSION
+configure_file(vitals.yml.in vitals.yml @ONLY)
+vita_create_self(vitals.suprx vitals
+    CONFIG ${CMAKE_CURRENT_BINARY_DIR}/vitals.yml UNSAFE)

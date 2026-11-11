@@ -1,46 +1,60 @@
-# Each component builds with its own Makefile; this one only calls them
-#   vitals-plugin/  kernel plugin (vitals.skprx)
-#   vitals-ssl/     libssl written from scratch (libssl.suprx; option: DEBUG), installed as the
-#                   system's libssl
-#   tls13-vita/     the browser's TLS provider, on vitals-ssl (option: DEBUG)
-#   vitals-http/    libhttp written from scratch, importing vitals-ssl as Sony's imports libssl
-#                   (libhttp.suprx; options: TLS_HEAP_KIB, USER_AGENT, DEBUG)
-#   vitals-app/     the vitals app and vitals-app.vpk (builds the plugin, vitals-ssl, tls13-vita and
-#                   vitals-http first)
-# Command-line options such as `make TLS_HEAP_KIB=256` reach the components automatically
-# Every debug level of the providers and redirect is built and packaged; the app switches between
-# them
-# Every CMake build also writes compile_commands.json, which .vscode uses for code navigation
-COMPONENTS = vitals-plugin vitals-ssl tls13-vita vitals-http vitals-app
+# Runs either console's Makefile, or both, and the RPCS3 installers', from the top of the repository:
+#   make                  builds both (the PS3, then the Vita), then the RPCS3 installers (rpcs3/)
+#   make ps3, make psv    builds that one; make rpcs3, the RPCS3 installers (with the PS3 app they carry)
+#   make clean            runs a command on both; make ps3 clean, make psv test: on that one. Of the
+#                         commands, rpcs3/ has only clean, which make clean runs there too
+# What both have: test clean upload-app log app-log fetch status pull editor plugin ssl http app
+# update-certs and preview do the same for both, so they run once. make art redraws both apps' art
+# (shared/tools/make_app_art.py).
+# What only one has (make ps3 install, make psv browser) needs that console named. Options such as
+# DEBUG=1 reach the console's Makefile. It stops at the first failure, so with a console off use
+# make ps3 fetch or make psv fetch.
 
-# The app builds the plugin, providers and redirect it packages, so they are not listed again
-all: vitals-app
+CONSOLES := ps3 psv
+# rpcs3/ builds, and cleans, but has none of the consoles' other commands
+PROJECTS := $(CONSOLES) rpcs3
+RPCS3_ACTIONS := clean
+SHARED := test clean upload-app log app-log fetch status pull editor plugin ssl http app
+ONCE := update-certs preview
 
-$(COMPONENTS):
-	$(MAKE) -C $@
+CHOSEN := $(filter $(PROJECTS),$(MAKECMDGOALS))
+TARGETS := $(or $(CHOSEN),$(PROJECTS))
+ACTIONS := $(filter-out $(PROJECTS),$(MAKECMDGOALS))
 
-# Runs every component's host tests, then the checks on the shared files at the root (tests/);
-# it stops at the first failure and needs no VitaSDK
-test:
-	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) test &&) true
-	python3 -m unittest discover -s tests -p 'test_*.py'
+.DEFAULT_GOAL := all
 
-# Refreshes the app's bundled Mozilla certificates
-update-certs:
-	$(MAKE) -C vitals-app update-certs
-
-# Releases a version: `make version 1.5` checks that the changelog's newest entry is 1.5, sets
-# VERSION, runs the tests, then commits, tags 1.5 and pushes the branch and the tag to origin
-# (tools/release.py)
-# The words after version are its arguments, not things to build; the script takes exactly one
-ifeq (version,$(firstword $(MAKECMDGOALS)))
-RELEASE_ARGUMENTS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-$(foreach argument,$(RELEASE_ARGUMENTS),$(eval $(argument):;@:))
+ifeq ($(CHOSEN),)
+ONE_ONLY := $(filter-out all art $(SHARED) $(ONCE),$(ACTIONS))
+ifneq ($(ONE_ONLY),)
+$(error $(ONE_ONLY): not a command both consoles have, so name the console: make ps3 $(firstword $(ONE_ONLY)) or make psv $(firstword $(ONE_ONLY)), whichever has it)
 endif
-version:
-	python3 tools/release.py $(RELEASE_ARGUMENTS)
+endif
 
-clean:
-	$(foreach component,$(COMPONENTS),$(MAKE) -C $(component) clean;)
+ifeq ($(CHOSEN),rpcs3)
+RPCS3_ONLY := $(filter-out all $(RPCS3_ACTIONS),$(ACTIONS))
+ifneq ($(RPCS3_ONLY),)
+$(error $(RPCS3_ONLY): rpcs3/ only builds and cleans (make rpcs3, make rpcs3 clean))
+endif
+endif
 
-.PHONY: all clean test update-certs version $(COMPONENTS)
+all:
+	$(foreach project,$(TARGETS),$(MAKE) -C $(project) &&) true
+
+# A project named alone is built; with a command, the command is what runs
+$(PROJECTS):
+	$(if $(ACTIONS),@:,$(MAKE) -C $@)
+
+$(ONCE):
+	$(MAKE) -C $(firstword $(filter $(CONSOLES),$(TARGETS)) ps3) $@
+
+EACH := $(filter-out all art $(ONCE),$(ACTIONS))
+ifneq ($(EACH),)
+$(EACH):
+	$(foreach project,$(TARGETS),$(if $(filter rpcs3,$(project)),$(if $(filter $@,$(RPCS3_ACTIONS)),$(MAKE) -C $(project) $@ &&),$(MAKE) -C $(project) $@ &&)) true
+endif
+
+# Both apps' art, from one design: run it, then review and commit the images
+art:
+	python3 shared/tools/make_app_art.py
+
+.PHONY: all art $(PROJECTS) $(ONCE) $(EACH)

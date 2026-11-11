@@ -1,0 +1,119 @@
+cmake_minimum_required(VERSION 3.16)
+project(vitals_http_lib C)
+include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
+
+# Console output: 0 none, 1 start-up, connections and failures, 2 also every TLS step
+# (make DEBUG=<level>)
+set(VITALS_DEBUG 0 CACHE STRING "Debug output on the console: 0, 1 or 2")
+if(NOT VITALS_DEBUG MATCHES "^[012]$")
+    message(FATAL_ERROR "VITALS_DEBUG must be 0, 1 or 2")
+endif()
+# The heap for what TLS keeps here (a connection's state, the app's loaded certificates); the
+# connections themselves are in libssl's pool
+set(VITALS_HTTP_TLS_HEAP_KIB 64 CACHE STRING "TLS heap in KiB (one memory block per process)")
+if(NOT VITALS_HTTP_TLS_HEAP_KIB MATCHES "^[0-9]+$" OR VITALS_HTTP_TLS_HEAP_KIB LESS 64
+   OR VITALS_HTTP_TLS_HEAP_KIB GREATER 4096)
+    message(FATAL_ERROR "VITALS_HTTP_TLS_HEAP_KIB must be 64..4096")
+endif()
+math(EXPR VITALS_HTTP_TLS_HEAP_BYTES "${VITALS_HTTP_TLS_HEAP_KIB} * 1024")
+
+# What follows an app's own User-Agent unless ux0:data/vitals/useragent.txt gives another: printable
+# ASCII without the characters that would break the C string or the build's quoting
+set(VITALS_HTTP_USER_AGENT "libhttp/3.74 (PS Vita)" CACHE STRING "User-Agent suffix after the app's own")
+string(LENGTH "${VITALS_HTTP_USER_AGENT}" VITALS_HTTP_USER_AGENT_LENGTH)
+if(VITALS_HTTP_USER_AGENT_LENGTH EQUAL 0 OR VITALS_HTTP_USER_AGENT_LENGTH GREATER 127
+   OR NOT VITALS_HTTP_USER_AGENT MATCHES "^[ -~]+$" OR VITALS_HTTP_USER_AGENT MATCHES "[\"\\#$;`']")
+    message(FATAL_ERROR "VITALS_HTTP_USER_AGENT must be 1..127 printable ASCII characters, without \" \\ # $ ; ` '")
+endif()
+
+# From ../common: the heap and C library runtime, the error and certificate mapping; the redirect list
+# is shared with the PS3 (../../shared)
+set(VITALS_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../common)
+# TLS is vitals-ssl's: the libssl module, imported as Sony's libhttp imports Sony's (its stub, which
+# ../vitals-ssl's build makes), so a connection's memory is the pool the app gives sceSslInit
+set(VITALS_SSL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../vitals-ssl)
+# The release version from ../../VERSION, which the module header carries
+include(../../version.cmake)
+
+add_executable(vitals_libhttp
+    src/core.c
+    src/request.c
+    src/message.c
+    src/uri.c
+    src/cookie.c
+    src/inflate.c
+    src/async.c
+    src/private.c
+    src/redirect.c
+    src/useragent.c
+    src/tls.c
+    src/tls_sony.c
+    src/md5.c
+    src/platform_vita.c
+    ${VITALS_COMMON_DIR}/runtime/user_runtime.c
+    ${VITALS_COMMON_DIR}/src/error_map.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/host_map.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/src/redirect_list.c
+)
+# The debug builds' log lines (vitals_log_sink.h)
+if(VITALS_DEBUG GREATER 0)
+    target_sources(vitals_libhttp PRIVATE ${VITALS_COMMON_DIR}/runtime/log_user.c)
+endif()
+target_include_directories(vitals_libhttp PRIVATE src include ${VITALS_SSL_DIR}/include ${VITALS_COMMON_DIR}/runtime
+    ${VITALS_COMMON_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/include)
+target_compile_definitions(vitals_libhttp PRIVATE
+    VITALS_DEBUG=${VITALS_DEBUG}
+    VITALS_LOG_NAME="vitals-http"
+    VITALS_HTTP_HEAP_BYTES=${VITALS_HTTP_TLS_HEAP_BYTES}u
+    VH_DEFAULT_SUFFIX="${VITALS_HTTP_USER_AGENT}"
+)
+target_compile_options(vitals_libhttp PRIVATE -std=gnu11 -Wall -Wextra -Werror -Wshadow
+    -Wstrict-prototypes -ffunction-sections -fdata-sections -Os)
+set_source_files_properties(${VITALS_COMMON_DIR}/runtime/user_runtime.c PROPERTIES COMPILE_OPTIONS "-fno-builtin")
+
+# No C library: the runtime's wrappers stand in for the calls this module and its libraries make
+target_link_options(vitals_libhttp PRIVATE -nostdlib -Wl,--gc-sections
+    -Wl,--undefined=module_start -Wl,--undefined=module_stop
+    -Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_gap.ld -Wl,--undefined=module_sdk_version)
+foreach(function malloc calloc realloc free memchr memcmp memcpy memmove memset strchr strcmp strlen
+        strstr printf puts snprintf vsnprintf)
+    target_link_options(vitals_libhttp PRIVATE "-Wl,--wrap=${function}")
+endforeach()
+# Nothing in the module calls its exports, so --gc-sections would drop them: each one the yml lists
+# is kept
+file(STRINGS vitals_http_api.yml.in export_lines REGEX "^ +- (sceHttps?|vitalsHttp)[A-Za-z0-9]+:")
+foreach(line ${export_lines})
+    string(REGEX REPLACE "^ +- ((sceHttps?|vitalsHttp)[A-Za-z0-9]+):.*$" "\\1" function "${line}")
+    target_link_options(vitals_libhttp PRIVATE "-Wl,--undefined=${function}")
+endforeach()
+# The host redirect list is read through the kernel plugin's system call, from the stub its build
+# generates
+set(VITALS_KERNEL_STUB "${CMAKE_BINARY_DIR}/../vitals-boot/stubs/libvitals_kernel_stub.a")
+if(NOT EXISTS "${VITALS_KERNEL_STUB}")
+    message(FATAL_ERROR "${VITALS_KERNEL_STUB} is missing; build ../vitals-boot first (make does this)")
+endif()
+# Weak: a process that loads libhttp without libssl does no https, and still loads this one
+set(VITALS_SSL_STUB "${CMAKE_BINARY_DIR}/../vitals-ssl/stubs/libSceLibSsl_stub_weak.a")
+if(NOT EXISTS "${VITALS_SSL_STUB}")
+    message(FATAL_ERROR "${VITALS_SSL_STUB} is missing; build ../vitals-ssl first (make does this)")
+endif()
+target_link_libraries(vitals_libhttp PRIVATE
+    ${VITALS_KERNEL_STUB}
+    ${VITALS_SSL_STUB}
+    z
+    gcc
+    SceLibKernel_stub
+    SceKernelThreadMgr_stub
+    # Which libssl the process loaded (vh_platform_vitals_ssl)
+    SceKernelModulemgr_stub
+    SceSysmem_stub
+    SceIofilemgr_stub
+    SceNet_stub
+    SceNetCtl_stub
+    SceRtc_stub
+)
+
+configure_file(vitals_http_api.yml.in vitals_http_api.yml @ONLY)
+vita_create_self(libhttp.suprx vitals_libhttp
+    CONFIG ${CMAKE_CURRENT_BINARY_DIR}/vitals_http_api.yml UNSAFE)
+

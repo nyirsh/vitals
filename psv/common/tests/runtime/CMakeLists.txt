@@ -1,0 +1,7 @@
+add_executable(vitals_user_runtime_tests test_runtime.c ../../runtime/user_runtime.c)
+target_include_directories(vitals_user_runtime_tests PRIVATE . ../../runtime)
+target_compile_definitions(vitals_user_runtime_tests PRIVATE VITALS_RUNTIME_HOST_TEST=1)
+target_compile_options(vitals_user_runtime_tests PRIVATE -Wall -Wextra -Werror -fno-builtin -UNDEBUG)
+find_package(Threads REQUIRED)
+target_link_libraries(vitals_user_runtime_tests PRIVATE Threads::Threads)
+add_test(NAME vitals_user_runtime COMMAND vitals_user_runtime_tests)

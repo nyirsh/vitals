@@ -1,0 +1,120 @@
+/* The PS3's part of the shared app (console.h): what the system is (firmware.c), the words that
+ * are the PS3's, the four switches in /dev_hdd0/vitals/flags, the network for the app's downloads, and
+ * where the app's files are. vitals' operations themselves are install.c's */
+
+#include "console.h"
+
+#include "crypto_platform.h"
+#include "firmware.h"
+#include "http.h"
+#include "install.h"
+
+#include <stdio.h>
+
+const char *console_system_text(void)
+{
+	return console_info()->text;
+}
+
+int console_supported(void)
+{
+	return console_info()->supported;
+}
+
+static const ConsoleWords words = {
+    .name = "PS3",
+    .made_for = "4.93 CEX with Cobra",
+    .install_description = "Lets games and apps connect to modern secure (TLS 1.2 and 1.3) sites",
+};
+
+const ConsoleWords *console_words(void)
+{
+	return &words;
+}
+
+/* Each one's .off in /dev_hdd0/vitals/flags, which the boot plugin and vitals' libhttp read at the
+ * next boot (common/vitals_paths.h). The XMB's own TLS and HTTP stay Sony's: no switch here
+ * (vitals-boot/src/boot.c) */
+static const ConsoleSwitchState tls_states[] = {
+    {"On", "vitals TLS enabled", CONSOLE_TONE_USUAL, 0},
+    {"Off", "Sony TLS enabled", CONSOLE_TONE_RED, 1},
+};
+/* The host redirects are vitals' HTTP's, so they're one of its states: On (both), Redirects off
+ * (vitals' HTTP without them, redirects.off) and Off (Sony's, which has none: http.off) */
+static const ConsoleSwitchState http_states[] = {
+    {"On", "vitals HTTP and redirects enabled", CONSOLE_TONE_USUAL, 0},
+    {"Redirects off", "vitals HTTP enabled, redirects disabled", CONSOLE_TONE_ORANGE, 2},
+    {"Off", "Sony HTTP enabled, no redirects", CONSOLE_TONE_RED, 1},
+};
+static const ConsoleSwitchState dns_states[] = {
+    {"On", "vitals DNS rules enabled", CONSOLE_TONE_USUAL, 0},
+    {"Off", "vitals DNS rules disabled", CONSOLE_TONE_RED, 1},
+};
+static const ConsoleSwitch switches[] = {
+    {"TLS", {VITALS_TLS_OFF, NULL, NULL}, tls_states, 2},
+    {"HTTP", {VITALS_HTTP_OFF, VITALS_REDIRECTS_OFF, NULL}, http_states, 3},
+    {"DNS rules", {VITALS_DNS_OFF, NULL, NULL}, dns_states, 2},
+};
+
+/* Only a file here: the PS3 has no way to send its lines over the network */
+static const ConsoleSwitchState log_states[] = {
+    {"File", "Debug output goes to vitals.log and vitals-app.log in " VITALS_LOGS_DIRECTORY, CONSOLE_TONE_USUAL, 0},
+};
+static const ConsoleSwitch log_switch = {"Logs", {NULL, NULL, NULL}, log_states, 1};
+
+const ConsoleSwitch *console_log_switch(void)
+{
+	return &log_switch;
+}
+
+unsigned console_switch_count(void)
+{
+	return sizeof(switches) / sizeof(switches[0]);
+}
+
+const ConsoleSwitch *console_switch(unsigned index)
+{
+	return &switches[index];
+}
+
+int console_flag_exists(const char *path)
+{
+	return vitals_switch_is_off(path);
+}
+
+int console_flag_set(const char *path, int present)
+{
+	return vitals_switch_set(path, present);
+}
+
+/* ---- the network, for the app's own downloads ---- */
+
+/* curl's TLS is Mbed TLS (vitals-app/curl), whose mutexes are liblv2's: set once, before its first use */
+int console_crypto_start(void)
+{
+	static int crypto_ready;
+	if (!crypto_ready) {
+		if (vitals_crypto_platform_init() < 0)
+			return -1;
+		crypto_ready = 1;
+	}
+	return 0;
+}
+
+int console_network_start(int (*stop)(void))
+{
+	if (console_crypto_start() < 0)
+		return -1;
+	return http_network_wait(stop);
+}
+
+/* Next to the EBOOT.BIN, in the app's USRDIR */
+void console_app_file(const char *name, char *path, size_t size)
+{
+	snprintf(path, size, "%s/%s", vitals_install_source(), name);
+}
+
+void console_close(void)
+{
+	http_close();
+}

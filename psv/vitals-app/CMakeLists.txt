@@ -1,0 +1,144 @@
+cmake_minimum_required(VERSION 3.16)
+project(vitals_app C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
+
+# App metadata; the version is set in ../../VERSION
+set(VITALS_TITLE_ID "VITALS001")
+set(VITALS_TITLE "vitals")
+include(../../version.cmake)
+
+# The kernel plugin, vitals-http, vitals-ssl and browser provider this VPK installs, built by
+# ../vitals-boot, ../vitals-http, ../vitals-ssl and ../vitals-browser
+set(VITALS_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build")
+set(VITALS_KERNEL_MODULE "${VITALS_BUILD_DIR}/vitals-boot/vitals.skprx")
+set(VITALS_LIBHTTP "${VITALS_BUILD_DIR}/vitals-http/libhttp.suprx")
+# vitals-ssl, installed as the system's libssl in place of Sony's
+set(VITALS_LIBSSL "${VITALS_BUILD_DIR}/vitals-ssl/libssl.suprx")
+set(VITALS_BROWSER_PROVIDER "${VITALS_BUILD_DIR}/vitals-browser/vitals.suprx")
+foreach(module VITALS_KERNEL_MODULE VITALS_LIBHTTP VITALS_LIBSSL VITALS_BROWSER_PROVIDER)
+    if(NOT EXISTS "${${module}}")
+        message(FATAL_ERROR "${${module}} is missing; build ../vitals-boot, ../vitals-ssl, ../vitals-http and ../vitals-browser first (make does this)")
+    endif()
+endforeach()
+# The debug builds of vitals-http, the browser provider and the kernel plugin (levels
+# 1 and 2), which the app switches to; they go in debug/<level>/ next to the release modules
+set(debug_entries)
+foreach(level 1 2)
+    foreach(module vitals-http-debug${level}/libhttp.suprx vitals-ssl-debug${level}/libssl.suprx
+            vitals-browser-debug${level}/vitals.suprx
+            vitals-boot-debug${level}/vitals.skprx)
+        if(NOT EXISTS "${VITALS_BUILD_DIR}/${module}")
+            message(FATAL_ERROR "${VITALS_BUILD_DIR}/${module} is missing; build every debug level first (make does this)")
+        endif()
+        get_filename_component(name "${module}" NAME)
+        list(APPEND debug_entries "${VITALS_BUILD_DIR}/${module}" "debug/${level}/${name}")
+    endforeach()
+endforeach()
+
+# The app's own TLS: Mbed TLS as vitals-ssl builds it (its crypto options and its platform:
+# ../vitals-ssl/src), for curl's downloads (../../shared/curl, the PS3's too: the Mozilla CA bundle, the
+# new-release check) and to read each certificate of a bundle as vitals' libssl will
+# (../../shared/app/ca_update.c)
+include(../dependencies.cmake)
+vitals_download("${VITALS_MBEDTLS_URL}" "${VITALS_MBEDTLS_SHA256}" VITALS_MBEDTLS_ARCHIVE)
+add_subdirectory(../vitals-ssl/crypto "${CMAKE_CURRENT_BINARY_DIR}/mbedtls")
+add_subdirectory(../../shared/curl "${CMAKE_CURRENT_BINARY_DIR}/curl")
+
+add_executable(vitals-app
+    # The app itself, the same on the PS3 (../../shared/app)
+    ../../shared/app/app.c
+    ../../shared/app/ui.c
+    ../../shared/app/font.c
+    ../../shared/app/model.c
+    ../../shared/app/changelog.c
+    ../../shared/app/switches.c
+    ../../shared/app/check_run.c
+    ../../shared/app/check_service.c
+    ../../shared/app/check_report.c
+    ../../shared/app/input.c
+    ../../shared/app/release_version.c
+    ../../shared/app/release_check.c
+    ../../shared/app/release_fetch.c
+    ../../shared/app/download.c
+    ../../shared/app/ca_update.c
+    ../../shared/app/installed.c
+    # What's the Vita's under it: console.h, platform.h and check.h
+    main.c
+    console_vita.c
+    platform_vita.c
+    files_vita.c
+    font_vita.c
+    app_log_vita.c
+    ../../shared/app/app_log.c
+    network.c
+    check.c
+    check_model.c
+    probe.c
+    install.c
+    options.c
+    config_edit.c
+    ../../shared/src/store_certs.c
+    ../vitals-ssl/src/platform_shims.c
+    module_version.c
+    # The host redirect list is read as vitals' provider reads it
+    ../../shared/src/host_map.c
+    ../../shared/src/redirect_list.c
+)
+target_compile_options(vitals-app PRIVATE -Wall -Wextra -Werror -O2 -std=gnu11)
+# With the app and the redirect list code shared with the PS3's (../../shared); this folder first, for
+# the Vita's own vitals_paths.h and check_result.h, which the shared headers include
+target_include_directories(vitals-app PRIVATE . ../common/include ../vitals-http/include ../../shared/include ../../shared/app
+    ../vitals-ssl/src)
+target_compile_definitions(vitals-app PRIVATE VITALS_VERSION="${VITALS_VERSION}" VITALS_LOG_NAME="vitals-app" VITALS_LOG_APP)
+# Keeps room for the tables vita-elf-create adds at the end of the code (sce_space.ld)
+target_link_options(vitals-app PRIVATE "-Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld")
+set_property(TARGET vitals-app APPEND PROPERTY LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_space.ld)
+target_link_libraries(vitals-app PRIVATE libcurl_static mbedtls mbedx509 tfpsacrypto
+    pthread z m
+    ScePvf_stub SceHttp_stub SceSsl_stub SceNet_stub SceNetCtl_stub
+    SceSysmodule_stub SceDisplay_stub SceCtrl_stub ScePower_stub SceVshBridge_stub SceRtc_stub
+    SceLibKernel_stub SceIofilemgr_stub SceKernelThreadMgr_stub SceKernelModulemgr_stub
+    SceSysmem_stub SceProcessmgr_stub SceAppUtil_stub
+    # vitals-http's own exports, looked for at run time (check.c)
+    taihen_stub)
+
+# UNSAFE: installing needs system access (firmware version, vs0 and ur0 writes, reboot)
+vita_create_self(eboot.bin vitals-app UNSAFE)
+
+# The third-party notices ship with the licenses they refer to, next to the README (both the
+# repository's, shared with the PS3's app)
+file(GLOB license_files "${CMAKE_CURRENT_SOURCE_DIR}/../../licenses/*.txt")
+set(license_entries)
+foreach(license ${license_files})
+    get_filename_component(name "${license}" NAME)
+    list(APPEND license_entries "${license}" "licenses/${name}")
+endforeach()
+
+vita_create_vpk(vitals-app.vpk ${VITALS_TITLE_ID} eboot.bin
+    VERSION ${VITALS_APP_VERSION}
+    NAME ${VITALS_TITLE}
+    FILE sce_sys/icon0.png sce_sys/icon0.png
+         sce_sys/pic0.png sce_sys/pic0.png
+         sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+         sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+         sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
+         ${VITALS_KERNEL_MODULE} vitals.skprx
+         assets/compat.suprx compat.suprx
+         ${VITALS_LIBHTTP} libhttp.suprx
+         ${VITALS_LIBSSL} libssl.suprx
+         ${VITALS_BROWSER_PROVIDER} vitals.suprx
+         ${debug_entries}
+         ../README.md README.md
+         ../../CHANGELOG.md CHANGELOG.md
+         ../../CREDITS.md CREDITS.md
+         ../../THIRD_PARTY_NOTICES.md THIRD_PARTY_NOTICES.md
+         ${license_entries}
+         assets/sony-certs.pem sony-certs.pem
+         ../../shared/assets/mozilla-certs.pem mozilla-certs.pem
+         ../../shared/assets/certificate-sources.json certificate-sources.json
+         assets/redirects.txt redirects.txt
+         assets/dns.txt dns.txt
+)

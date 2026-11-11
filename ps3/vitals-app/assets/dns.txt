@@ -1,0 +1,17 @@
+# vitals DNS rules, for every game, app and the system
+# One "host target" pair per line ('#' starts a comment), 32 at most; the target is one of:
+#   another host name   the host is looked up under that name instead: the answer is that host's
+#                       addresses, given back for the original name
+#   an IPv4 address     the host resolves to that address
+#   block               the host doesn't exist
+# Only the address changes: the game still connects by the original name, so an HTTPS server must
+# have a certificate for that name, and a server that tells sites apart by name (Cloudflare, for
+# one) has to know it. For games using Sony's HTTP library, redirects.txt is the better place: it
+# connects with the new name too.
+# The list is read when the console starts: changes apply at the next boot. While a file named
+# dns.off is in the flags folder next to this one, no rules apply.
+# After a power cut (or a freeze), the next start leaves the rules out.
+#
+# old.server.example        new.server.example
+# game.server.example       203.0.113.5
+# telemetry.example         block

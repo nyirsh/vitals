@@ -1,0 +1,42 @@
+# Builds vitals-app.vpk: the vitals app (installer and connection test), packaged with the kernel
+# plugin, vitals-http, vitals-ssl and the browser provider it installs
+# Those come from ../vitals-boot, ../vitals-http, ../vitals-ssl and ../vitals-browser, which are built
+# first
+# Everything is built in build/ at the repository root
+BUILD_DIR := $(abspath ../build)
+OUT_DIR = $(BUILD_DIR)/vitals-app
+VITA_TOOLCHAIN = $(VITASDK)/share/vita.toolchain.cmake
+
+all: modules
+	cmake -S . -B $(OUT_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TOOLCHAIN_FILE=$(VITA_TOOLCHAIN) -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(OUT_DIR)
+
+# The plugin, vitals-http, vitals-ssl and the providers have their own Makefiles; CMake decides what
+# to rebuild. All of them are built at every debug level, which the app lets users switch between
+modules:
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-boot DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-ssl DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-http DEBUG=$(level) &&) true
+	$(foreach level,0 1 2,$(MAKE) -C ../vitals-browser DEBUG=$(level) &&) true
+
+# Refreshes both apps' Mozilla certificates from curl (shared/tools/update_certs.py); review and
+# commit the result
+update-certs:
+	python3 ../../shared/tools/update_certs.py
+
+# Host tests, built for this machine (no VitaSDK needed): the C tests of the installer, config.txt
+# editing, the connection test and the certificate update, then the Python tests of the new-release
+# check's download (on the app's curl and Mbed TLS, against local HTTPS servers) and make update-certs
+TEST_DIR = $(BUILD_DIR)/vitals-app-tests
+
+test:
+	cmake -S tests -B $(TEST_DIR) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
+	cmake --build $(TEST_DIR) -j4
+	ctest --test-dir $(TEST_DIR) --output-on-failure
+	python3 -m unittest discover -s tests -p 'test_*.py'
+	python3 -m unittest discover -s ../../shared/tests -p 'test_*.py'
+
+clean:
+	rm -rf $(BUILD_DIR)/vitals-app $(TEST_DIR)
+
+.PHONY: all clean modules update-certs test

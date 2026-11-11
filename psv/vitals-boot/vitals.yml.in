@@ -1,0 +1,25 @@
+vitals_kernel:
+  attributes: 0
+  version:
+    major: @VITALS_MODULE_VERSION_MAJOR@
+    minor: @VITALS_MODULE_VERSION_MINOR@
+  main:
+    start: module_start
+    stop: module_stop
+  libraries:
+    vitals_redirects:
+      syscall: true
+      functions:
+        - vitals_redirects_read
+    vitals_useragent:
+      syscall: true
+      functions:
+        - vitals_useragent_read
+    vitals_certificates:
+      syscall: true
+      functions:
+        - vitals_ca_read
+    vitals_log:
+      syscall: true
+      functions:
+        - vitals_log_write

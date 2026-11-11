@@ -1,268 +1,66 @@
-![vitals](/vitals-app/sce_sys/icon0.png)
+![vitals](psv/vitals-app/sce_sys/icon0.png)
 
 # vitals - TLS Toolkit
 
-Modern TLS (1.2 and 1.3) for the PS Vita browser, apps and games that use Sony's `sceHttp` APIs.  
-It started as a derivation of `tls_fixer` by [devnoname120](https://github.com/devnoname120), it grew enough to become its own full project. ([more info](#why-a-separate-project))
-
-The Vita's own TLS stack (RSA BSAFE, 2014) can no longer connect to many current servers. vitals gives apps and games rewrites of Sony's HTTP and SSL libraries, the SSL one on [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), gives the browser that same SSL library in place of its own TLS, and installs an up-to-date certificate store. Apps keep calling the same HTTP functions, so they work unchanged.
-
-> [!TIP]
-> **If it's not broken, don't fix it**
-> Please please please don't install this only because it's the shiny new thing and it has "security" in it. If you're happy with how your system is working and have no uses for the new functionalities that this project offer, DO NOT move away from iTLS, there's no reason to do so. Seriously.
-
-> [!CAUTION]
-> **Use `vitals` at your own risk.** It is provided as is, without any warranty, and I am not responsible for any damage, data loss or bricked console that may result from using it. While I personally tested this on two different systems of mine, I simply can't promise it will work on every single possible configuration out there.  
-> You alone are responsible for your system, its maintenance and what's installed on it.
->
-> `vitals` is a kernel plugin: it modifies files on your Vita's system partition (`vs0:`), your taiHEN configuration (`ur0:tai/config.txt`) and the system certificate store, and it changes how the system and your games connect to the internet. A bug, an interrupted installation or a conflict with another plugin could keep apps, the browser or the whole system from working properly.
->
-> Before installing:
->
-> - back up your Vita, including `ur0:tai/config.txt`
-> - make sure you know how to start your Vita without plugins and how to recover it if something goes wrong
-> - only install it on firmware 3.60 or 3.65, the only firmwares it is built and tested for
-
-## Installation
-
-You need a hacked PS Vita on **firmware 3.60 or 3.65** with taiHEN. Supporting only these two versions keeps things a lot simpler; 3.65 is what [Vita Hacks Guide](https://vita.hacks.guide/) recommends, so if you're on another version and want to use this software, please follow their guides and update. On any other firmware the installation simply won't start.
-
-- Download `vitals-app.vpk` from the releases page on [GitHub](https://github.com/nyirsh/vitals/releases) or [GitLab](https://gitlab.com/nyirsh/vitals/-/releases)
-- Transfer it to your vita and install it (`VitaShell` can do both)
-- Launch `vitals`, select **Install** and press **Cross**  
-  _This installs everything: the browser plugin, the system plugin and the certificates. The certificates are also downloaded from the internet, so there's no need to update them -- yet_
-- The Vita reboots after a successful operation
-
-Once `vitals` is installed, from the same application you'll be able to:
-
-- **Reinstall** (or **Update**, when the installed version differs): installs this version over the existing one, to update `vitals` or repair an installation
-- **Uninstall**: this removes all of `vitals` files and configurations
-- **Update certificates**: it just downloads the latest Mozilla certificates and rebuilds the certificate store, without touching the plugins, use it from time to time to keep the store current
-- **Test connections**: is `vitals` installed correctly and running just fine?
-
-Before installing, the app removes the plugins known to conflict with vitals. Uninstalling vitals does not reinstall them:
-
-- **iTLS-Enso:** its plugin hooks the same module loader as `vitals`, so the two cannot run together. The app removes its plugin, its taiHEN entry and its modules. iTLS's backup of Sony's original certificates is kept, and `vitals` restores it when you uninstall
-- **reAuth:** its PSN redirect is built into `vitals`, and both take over the same `libhttp` loads. The app removes every `reAuth.skprx` line from `ur0:tai/config.txt`, wherever the file was placed, and deletes the plugin and `ur0:data/reAuth/`
-- **tls_fixer** the plugin and its config entry are removed
-
-## What it covers
-
-- **Browser:** a dedicated provider takes over TLS inside the browser's networking library (`ScePsp2Compat`/libcurl), on `vitals-ssl`, which the kernel plugin loads into the browser's process
-- **Apps, games and the shell:** `vitals-http`, Sony's HTTP library written from scratch, with its TLS from `vitals-ssl` (Sony's SSL library rewritten on `Mbed TLS` 4.2), replaces `SceLibHttp` in every process that loads it. Apps keep calling the normal `sceHttp`/`sceHttps` APIs: if an app loads its own CA certificates (`sceHttpsLoadCert`), they are trusted in addition to the system store. This way, games that pinpoint a certificate that are redirected to community servers, such as Sound Shapes, can sign in via https!
-- **PSN sign-in and the Store:** PSN sign-in moved from `native.np.ac.playstation.net` to `native-vita.np.ac.playstation.net`. The starter [host redirects](#host-redirects) list sends the old host to the new one, and `vitals-http` applies it in the shell and in every app, as [reAuth](https://github.com/psv-plugins-archive/reAuth) did
-
-TLS 1.0 and 1.1 are deliberately disabled.
-
-## What's new compared to tls_fixer
-
-- **Sony's HTTP library, rewritten.** `tls_fixer` kept Sony's libhttp, giving each app a private copy of it and of libssl, and injected a provider into it to swap the TLS underneath. `vitals` replaces the whole library with `vitals-http`, written from scratch, and libssl with `vitals-ssl`, written from scratch on `Mbed TLS` 4.2, under the same functions and NIDs, so apps and games work unchanged. It's loaded shared, as Sony's is, in every process, the system shell and the PlayStation Store included, with nothing injected or hooked. How it works is in [docs/vitals-http.md](docs/vitals-http.md)
-- **Much less heap memory taken.** `tls_fixer` reserved a fixed 2 MiB heap inside every app that uses sceHttp, which is a lot on a console where games have little memory to spare. vitals-http reserves 64 KiB, and only once a process makes its first HTTPS connection; the TLS itself is in the pool the app gives libssl, as with Sony's: apps and system processes that never use HTTPS reserve nothing. That alone fixes most of the out-of-memory crashes.
-- **Certificates are looked up on demand.** `tls_fixer` parsed the whole certificate store into memory when each app started. `vitals` only builds a small index at start-up and reads a root certificate from the file when a handshake actually needs it. Apps and the browser start faster, and the parsed store no longer takes memory.
-- **Games with their own certificates work.** When an app loaded its own CA certificates, `tls_fixer` sent all of that app's new connections back to Sony's old TLS stack, which fails against current servers. `vitals` keeps its modern TLS and trusts the app's certificates in addition to the system store. This is what lets games redirected to community servers, such as Sound Shapes, sign in via https instead of http.
-- **A simpler kernel plugin**, modeled on `iTLS-Enso` module redirection, with the experimental, diagnostic and multi-firmware code removed. It targets firmware 3.60 and 3.65 only.
-- **Host redirects for servers:** a simple list lets you redirect connections for a given host to a new one (see [Host redirects](#host-redirects))
-- **Custom DNS resolutions:** you can set up how some host names are resolved, or even block them, especially useful for games that use UDP (see [DNS rules](#dns-rules))
-- **Custom User-Agent:** one line in a file replaces the `libhttp/3.74 (PS Vita)` part every app and game sends after its own User-Agent (see [User-Agent](#user-agent)). The browser keeps its own
-- **PSN sign-in redirect built in:** the shell and the Store are sent to the new PSN sign-in host, without a separate reAuth installation, saving even more memory.
-- **Easier to build and maintain:** refactored code, pinned and hash-verified `Mbed TLS` and curl downloads, a Makefile per component, `make update-certs` to refresh the bundled certificates, and `make test` to allow easy automated sanity checks.
-
-## Host redirects
-
-Games whose official servers are gone can be sent to a community server by listing the old and new host names in `ux0:data/vitals/redirects.txt`, one pair per line:
-
-```
-# old host                          new host
-soundshapes.psvita.online.scea.com  sound.ture.fish
-```
-
-Installing `vitals` also creates the file with instructions and examples: it is never overwritten, and uninstalling leaves it in place. Changes apply the next time a game starts.
-
-Every app and game that uses Sony's HTTP library, as well as the system shell, then connects to the new host. It applies to connections made by host name or by URL; the scheme, port, path and query are kept, and the certificate is checked against the new name.
-
-For now, only up to a maximum of 32 hosts can be redirected (trying to be cautious with memory usage and performance), maybe one day after more careful testing the restriction will be lifted. Malformed host names are also ignored.
-
-## DNS rules
-
-`redirects.txt` is for the HTTP library only. For every other lookup (a game's own UDP or TCP connections, and the other system libraries), put rules in `ux0:data/vitals/dns.txt`, one `host target` pair per line, where the target is another host name, an IPv4 address, or `block`:
-
-```
-# host                      target
-old.server.example          new.server.example
-game.server.example         203.0.113.5
-telemetry.example           block
-block.this                  0.0.0.0
-```
-
-The kernel plugin watches the DNS queries every process sends. For a host name target it asks for that name instead and answers with its addresses under the original name; for an address it answers with that address; for `block` it answers that the name doesn't exist. Installing `vitals` creates the file with these instructions, commented out; it is never overwritten, and uninstalling leaves it in place. Changes apply to new lookups within a few seconds, and an answer already given may stay cached for up to 5 minutes.
-
-The app still connects by the original name, so an HTTPS server must have a certificate for that name (apps using the HTTP library are better served by `redirects.txt`, which also checks the certificate against the new name). Only names are covered, not addresses a game has written in, and only IPv4 (A) lookups.
-
-## User-Agent
-
-Every request carries the app's own User-Agent followed by `libhttp/3.74 (PS Vita)`, as the latest firmware's library sends. To send something else in place of that last part, put it on a line of `ux0:data/vitals/useragent.txt`:
-
-```
-# replaces "libhttp/3.74 (PS Vita)"
-libhttp/3.74 (PS Vita) MyFork/1.0
-```
-
-The first line that isn't empty or a `#` comment is used, trimmed, up to 127 printable ASCII characters; a line with anything else is ignored. Apps that set their own whole User-Agent keep it. Changes apply the next time an app starts.
-
-## Custom certificates
-
-To trust your own servers, for example a community server with a self-signed certificate, put their certificates in `ux0:data/vitals/custom-certs.pem`, one or more PEM blocks (`-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`). Comments and anything that isn't a certificate are ignored.
-
-The file is optional. Its certificates are added to Sony's and Mozilla's whenever the app installs, updates, reinstalls or updates certificates, so after editing it run **Update certificates**. Duplicates are added only once, a mistake in the file never stops an update, and uninstalling leaves the file in place.
-
-A server's self-signed certificate is trusted as itself, exactly as it appears in the file, whether or not it's marked as a certificate authority. For a server whose certificate was issued by a certificate authority of your own, add that authority's certificate instead. To make a self-signed certificate:
-
-```
-openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout server.key -out server.crt \
-    -subj "/CN=my.server.example" -addext "subjectAltName=DNS:my.server.example"
-```
-
-The certificate must also name the host apps connect to: combined with [host redirects](#host-redirects), that's the redirect's new host.
-
-> [!caution]
-> Every certificate in this file is trusted by every app, game and the browser. A server's own self-signed certificate is harmless, but adding someone else's certificate authority lets them impersonate any website on your console. Only add certificates you created yourself or fully trust.
-
-## Connection test
-
-**Test connections** in the app checks what an ordinary app experiences, using only Sony's HTTP APIs, and you can run it even without `vitals` being installed:
-
-- TLS 1.0–1.3 checks against BrowserLeaks (with `vitals`, TLS 1.0 and 1.1 show as blocked, which is intended)
-- the negotiated cipher and handshake details, from the BrowserLeaks TLS report
-- certificate checks against [badssl.com](https://badssl.com): 5 hosts that must load (valid certificate, SHA-256, ECDSA P-256, RSA 2048, TLS 1.2 only) and 7 that must be refused (expired, wrong host name, self-signed, untrusted root, RC4, 3DES, DH 512). A refusal only counts when the host was reachable, so being offline shows as inconclusive, never as a pass
-- every host in your [host redirects](#host-redirects), requested by its old name
-- whether vitals-http is loaded in the app
-
-A request that times out is tried again, up to 3 times in all, since slow servers say nothing about TLS. Square goes through the detail pages: cipher suites, request details, handshake details, certificate checks and host redirects. Press START after a run to save its log to `ux0:data/vitals/`. The test works on any firmware and changes nothing on the console.
-
-## Repository layout
-
-| Folder               | Contents                                                                                                                                                                         |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vitals-plugin/`     | the kernel plugin (`vitals.skprx`) that redirects Sony's modules and injects the browser provider                                                                                |
-| `vitals-http/`       | Sony's HTTP library written from scratch (`libhttp.suprx`), with its TLS from `vitals-ssl`                                                                                       |
-| `vitals-ssl/`        | Sony's SSL library written from scratch (`libssl.suprx`): installed as the system's libssl, which vitals-http imports                                                             |
-| `tls13-vita/`        | the browser's TLS provider, the Mbed TLS build, and the code it shares with `vitals-ssl`, `vitals-http` and the kernel plugin                                                    |
-| `vitals-app/`        | the `vitals` app (`VITALS001`)                                                                                                                                                   |
-| `docs/`              | how apps' HTTP ([vitals-http.md](docs/vitals-http.md)), the browser's TLS ([browser.md](docs/browser.md)) and Sony's SSL library ([libssl.md](docs/libssl.md)) go through vitals |
-| `licenses/`          | full license texts of the third-party software in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)                                                                               |
-| `dependencies.cmake` | pinned versions and SHA-256 hashes of `Mbed TLS` and `curl`                                                                                                                      |
-
-## Why a separate project
-
-`vitals` started as a mashup of my URL redirector project and devnoname120's `tls_fixer`, and owes `tls_fixer` the idea and the first hard parts: running Mbed TLS where Sony's TLS was, the browser provider and the injection. Since then the HTTP side has been rewritten from scratch (`vitals-http`), and it's a separate project instead of a fork because the two have grown apart in ways that can't be merged back in either direction:
-
-- **Different memory design.** `tls_fixer` gives every app its own private copy of Sony's HTTP and SSL libraries, which costs a game about 440 KiB on top of the provider. `vitals` keeps the SSL library shared and handles the certificates games load at the HTTP level instead, so games that were running out of memory (like Sound Shapes) now fit. The comments left in the code and in the specs made me feel like it was a deliberate choice from devnoname120 I was going against.
-- **Different scope.** `tls_fixer` supports several firmware versions, and keeps experimental, diagnostic and self-disarming code for testing on hardware. `vitals` targets firmware 3.60 and 3.65 only, with that code removed and a simpler kernel plugin modeled on `iTLS-Enso`.
-- **Features that don't exist upstream:** `vitals-http` in place of Sony's HTTP library, the configurable host redirects, the DNS rules, the custom User-Agent, the built-in PSN sign-in redirect, the redirect list read through the kernel for sandboxed games, and a single app for installing, updating certificates and testing.
-- **They replace each other.** Both take over the same system modules and use different install paths, so only one can be installed at a time. The `vitals` installer removes `tls_fixer` for that reason.
-
-Merging would mean asking `tls_fixer` to give up its multi-firmware and goals, or `vitals` to bring back what it removed. Keeping them apart lets each follow its own direction.
-
-Seriously tho, devnoname120 is a legend and you'll find out that, out of respect and admiration for what was accomplished, I kept my name out of any visible part of the code or UIs.
-
-## Building
-
-The first build downloads the pinned `Mbed TLS` and `curl` releases, so it needs internet access. The easiest way is VitaSDK's Docker image:
-
-```sh
-docker run --rm -v "$PWD":"$PWD" -w "$PWD" vitasdk/vitasdk:latest sh -lc 'make'
-```
-
-This produces `build/vitals-app/vitals-app.vpk`. Everything is built under `build/`.
-
-To build without Docker, install [VitaSDK](https://vitasdk.org) (make sure to add the sdk to your `PATH`) and the Vita libraries the app links, then run `make`:
-
-```sh
-vdpm install openssl-1.1.1 zlib zstd
-make
-```
-
-Use `openssl-1.1.1`: vdpm's plain `openssl` package is the older 1.0.2.
-
-Each component folder has its own Makefile that also works on its own (`make -C <folder>`); the root Makefile only calls them. `vitals-app/` builds `vitals-plugin/`, `vitals-http/` and `tls13-vita/` first, because the vpk bundles them.
-
-Available build options:
-
-| Option         | Default                  | Effect                                                                                                                                                                                       |
-| -------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TLS_HEAP_KIB` | `64`                     | memory (KiB) `vitals-http` keeps for TLS state, in a process's first https use                                                                                                                |
-| `USER_AGENT`   | `libhttp/3.74 (PS Vita)` | what `vitals-http` puts after each app's own User-Agent, unless `useragent.txt` gives another; up to 127 printable ASCII characters, without quotes, backslashes, backticks, `#`, `$` or `;` |
-
-Debug output levels, for `vitals-http` and the browser provider (lines start with `vitals-http:` for apps and games, `vitals_browser:` for the browser):
-
-- **Off (0):** nothing, the default
-- **Basic (1):** start-up, heap use, the app's `sceHttp` calls, the certificates a game loads, and a few lines per connection (connect, certificate result, handshake result), plus any failure. The kernel plugin also logs every DNS query a process sends (`vitals: dns query …`), after the reboot that switching debug output asks for
-- **Full (2):** everything in Basic, plus every step of every connection (retries, locks, each socket read and write). This produces a lot of output and slows connections down, use it only to investigate a problem
-
-Every build includes all three levels; choose one on the console from the app's **Debug output** option, which reboots the Vita. To build a single component at a level, run `make -C tls13-vita DEBUG=2` (each level has its own `build/` folder).
-
-### Updating `Mbed TLS` or `curl`
-
-Both are pinned in [dependencies.cmake](dependencies.cmake). Change the version and the SHA-256 together, where the SHA-256 is that of the new release archive (`sha256sum` of the downloaded file).  
-The next build downloads and verifies it. `vitals-ssl`, which does the TLS of apps, games and the browser, builds it ([tls13-vita/crypto](tls13-vita/crypto/)) with four patches, which must still apply to the new release; one of them puts back the client side of TLS 1.2's RSA key exchange, which Mbed TLS 4 removed and PSN sign-in needs, so check a new release against it with care.
-
-### Updating the bundled certificates
-
-The installer downloads the latest certificates and checks them against this bundled copy; if the download fails, it uses the bundled copy instead. Refreshing it keeps that fallback current:
-
-```sh
-make update-certs
-```
-
-This downloads `https://curl.se/ca/cacert.pem`, checks it against the SHA-256 curl publishes next to it, rebuilds `certs.cer` with the app's own merge code and updates `certificate-sources.json`, all in `vitals-app/assets/`. It needs `pkg-config` with `libcurl` and `OpenSSL development files` on the host.
-
-### Tests
-
-```sh
-make test
-```
-
-This runs every component's host tests (`make -C <folder> test` runs one component's). Each component keeps its tests in its own `tests/` folder, and any helper scripts its build uses in `tools/`:
-
-- `vitals-plugin/tests/`: the kernel plugin's routing, injection and module checks, against mocks of the Vita kernel, and the build check that keeps floating-point instructions out of it
-- `tls13-vita/tests/`: the browser provider's real TLS handshakes over loopback, certificate checks, memory use, the host redirect list's parser, the Makefile's settings, and a build with debug output on, so every log line compiles
-- `vitals-http/tests/`: the HTTP library against a local HTTP and HTTPS server: requests, keep-alive, bodies, redirects, cookies, Basic and Digest auth, HTTPS (including client certificates and the console's TLS profile), non-blocking calls, host redirects and the User-Agent
-- `vitals-ssl/tests/`: the SSL library's connection and certificate functions, called as Sony's libhttp calls them, against a local TLS server: reading and writing, close_notify and dropped sockets, timeouts, certificate and host name checks, the error codes, and a verify callback that checks a CA's chain through the certificate functions and the CA store
-- `vitals-app/tests/`: install, reinstall and uninstall on a console mapped onto a temporary folder (including removing `iTLS-Enso`, `tls_fixer` and `reAuth`, and `config.txt` surviving a failed write), the install options, `config.txt` editing, OpenSSL locking, certificate merging, the certificate updater and how the connection test judges its certificate checks
-
-The loopback TLS and most browser tests place memory at fixed low addresses, as the Vita's 32-bit pointers need, which only Linux allows; elsewhere they are left out (on macOS, run `make test` inside Docker to include them). A few certificate tests are skipped unless `pkg-config` and the libcurl and OpenSSL development files are installed: `pkg-config libcurl4-openssl-dev libssl-dev` on Debian/Ubuntu, `brew install pkgconf curl openssl` on macOS (the tests find Homebrew's copies themselves). The OpenSSL must be the one libcurl itself uses, as the code under test shares OpenSSL objects with curl.
-
-Each normal build also checks that the kernel plugin contains no floating-point instructions.
-
-> [!WARNING]
-> **The kernel plugin must never use floating-point or vector (VFP/NEON) instructions.** `vitals.skprx` runs inside the Vita's kernel, which does not save or restore the floating-point registers around kernel code. If the plugin used them, it could silently corrupt the math of whatever app it interrupted, or even crash the whole system, including at boot.
->
-> The compiler can add these instructions on its own, as a speed-up for copying or clearing memory, even when the code never uses decimal numbers. Two safeguards keep them out:
->
-> - the plugin is compiled with `-mgeneral-regs-only`, so the compiler never uses those registers;
-> - every build disassembles the finished plugin and fails if any such instruction appears (`kernel register check: no decoded FP/SIMD instructions`).
->
-> Don't remove either one. If the check fails, find out which code produced the instruction rather than disabling the check. DO NOT install a new build on your system without running this test first. Out of all of the tests available, this is probably the most important one and I can't stress this concept enough.
->
-> `vitals-http` and the browser provider are not affected: they run inside an app's own process, where these registers are saved normally.
-
-## Credits
-
-**`vitals` started from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) by devnoname120, and the idea is his:** giving the Vita modern TLS by running `Mbed TLS` where Sony's old TLS stack used to be. vitals has since become a project of its own: Sony's HTTP library is now rewritten from scratch as `vitals-http` instead of having its TLS swapped, and the DNS rules, host redirects and User-Agent are new. What `vitals` still carries from `tls_fixer` is the browser's TLS provider, the kernel plugin's injection, the certificate merging/updating, the original connection test applet and the patch that puts TLS 1.2's RSA key exchange back into Mbed TLS 4 (`tls13-vita/crypto/rsa-client.patch`).
-
-**Thanks to SKGleba for the [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso) plugin!** His work updating the Vita's certificates is the foundation of `vitals`, along with his original installer and module-redirection code. Existing author notices are preserved in the source.
-
-**Thanks to Reiko Asakura for [reAuth](https://github.com/psv-plugins-archive/reAuth)!** Its PSN sign-in redirect is what the starter redirect list does.
-
-Also special thanks to Team Molecule, for all of the and love they poured into the PS Vita, and to everyone who works on [VitaSDK](https://vitasdk.org) and its packages, which every part of `vitals` is built with.
+Modern TLS (1.2 and 1.3), HTTP and DNS for consoles whose own TLS can no longer reach today's
+servers: vitals replaces Sony's SSL and HTTP libraries with its own rewrites, the SSL one on
+[Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/), adds an up-to-date certificate
+store, and lets you redirect hosts and DNS lookups to community servers. Games and apps keep calling
+the same functions, so they work unchanged.
+
+| Console | Folder | Runs on | What it covers |
+|---|---|---|---|
+| PS Vita | [psv/](psv/) | firmware 3.60 or 3.65, taiHEN | the browser, apps and games |
+| PlayStation 3 | [ps3/](ps3/) | firmware 4.93 CEX, Evilnat's Cobra CFW | games and apps (the XMB, with PSN and the browser, keeps Sony's) |
+
+Each folder's README covers installing, using and building that console's vitals.
+
+## Downloads
+
+The releases pages on [GitHub](https://github.com/nyirsh/vitals/releases) and
+[GitLab](https://gitlab.com/nyirsh/vitals/-/releases) have the Vita's `vitals-app.vpk` and the PS3's
+`vitals-app.pkg`.
+
+For the RPCS3 emulator, download the installer for your system. Each is a single file with vitals
+inside it, and shows a menu like the app's: install, update or uninstall, update the certificates,
+the options, the changelog and the credits. Close RPCS3 first; the PS3 firmware must already be
+installed in it.
+
+| System | File | Run it |
+| --- | --- | --- |
+| Windows | `windows-rpcs3-install.bat` | double-click it |
+| macOS | `macos-rpcs3-install.sh` | `bash ~/Downloads/macos-rpcs3-install.sh` in Terminal |
+| Linux | `linux-rpcs3-install.sh` | `bash ~/Downloads/linux-rpcs3-install.sh` |
+
+It finds RPCS3's folder on its own (on Windows, the one `rpcs3.exe` is in, which it asks for when it
+isn't next to it), puts vitals' libssl and libhttp in place of Sony's in RPCS3's `dev_flash`, and
+keeps Sony's to put back when you uninstall. RPCS3's network must be on (Configuration, Network,
+Network Status: Connected). The DNS rules don't apply in RPCS3: its own IP/Hosts switches do that.
+
+## Layout
+
+- `psv/`: the Vita's kernel plugin, libssl, libhttp, browser TLS provider and app, built in
+  VitaSDK's Docker image (`make` in `psv/`).
+- `ps3/`: the PS3's libssl, libhttp, boot plugin, DNS kernel plugin and app, built in the
+  [vitals-ps3-sdk](https://github.com/nyirsh/vitals-ps3-sdk) Docker image (`make` in `ps3/`).
+- `rpcs3/`: the RPCS3 installers for Windows, macOS and Linux, one file each with the PS3 app's
+  modules inside it (`make` in `rpcs3/`, which builds the PS3 app first).
+
+`make` at the top builds both consoles, then the RPCS3 installers. Name one to work on just that console (`make ps3`, `make psv`, `make rpcs3`), and add a command to run it: `make clean` for all of them, `make ps3 clean` or `make psv test` for one. `make art` redraws both apps' art.
+
+Both consoles share one version and one changelog, at the root: [VERSION](VERSION), which
+[version.cmake](version.cmake) turns into each build's version numbers, and
+[CHANGELOG.md](CHANGELOG.md), which both apps carry and show as it is. A change for one console
+only starts with its name, `- (Vita) ...` or `- (PS3) ...`.
+
+Code both consoles use is in `shared/`, once: Mbed TLS's version pin, patches and TLS options
+(`mbedtls/`), the redirect list's parser, the CA store's scanner both libssls index with and the
+Mozilla part of the store without Sony's certificates both apps write (`include/`, `src/`), DNS
+messages (`dns/`), the apps' changelog and input code (`app/`), and the test TLS server and the
+shared code's tests (`tests/`).
 
 ## License
 
-All contributions to vitals are released under the [Zero-Clause BSD license](LICENSE) (0BSD): you can use, copy, modify and distribute them for any purpose, with or without credit.
-
-Some parts keep their own terms:
-
-- **Code from tls_fixer** by devnoname120: the parts of vitals that come from [tls_fixer](https://github.com/devnoname120/vita_tls_fixer) (listed in [Credits](#credits)) are published there without a license. That code remains devnoname120's; the 0BSD license covers it only if he agrees to it. `vitals-http` is not among them.
-- **Code from iTLS-Enso** by SKGleba: `vitals-plugin/main.c` (module redirection) and `vitals-app/install.c` (the install and uninstall operations) are derived from [iTLS-Enso](https://github.com/SKGleba/iTLS-Enso), which is published without a license. Its code remains SKGleba's ("All Rights Reserved"); the 0BSD license does not cover the original iTLS-Enso code.
-- **Third-party libraries and data:** under their own licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-- **Sony material:** the Sony modules and certificate bundle in `vitals-app/assets/` are not covered by any license.
+vitals is under the Zero-Clause BSD license, [LICENSE](LICENSE). What's under other licenses, for both
+consoles, is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), with their texts in [licenses/](licenses/);
+both apps' packages carry them.

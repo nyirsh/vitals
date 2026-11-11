@@ -1,0 +1,64 @@
+#ifndef VITALS_APP_INSTALL_H
+#define VITALS_APP_INSTALL_H
+
+#include <stddef.h>
+
+#include "console.h"
+#include "options.h"
+
+/* Installs, reinstalls or removes vitals and its certificates on the Vita, for console_vita.c, which
+ * puts them behind the shared app's console.h
+ * The code comes from the vitals installer; progress messages are reported one line at a
+ * time through a callback (console.h's VitalsNote) */
+
+/* vitals' certificate store (vitals/ca_store.h), in ux0:data/vitals/system: Sony's list, then
+ * Mozilla's certificates it lacks, which a certificate update rewrites, then the user's own */
+#include "vitals/ca_store.h"
+
+/* 1 on firmware 3.60 or 3.65; otherwise 0, with the detected firmware described in description */
+int vitals_install_firmware_supported(char *description, size_t size);
+/* 1 when an earlier version's modules are where it kept them (vs0, ur0:tai/vitals-native) rather than
+ * in ux0:data/vitals/system, or its bundle is still the system's certificate store (CA_LIST.cer_old
+ * beside it): an update moves them and puts the system's own store back */
+int vitals_install_old_layout(void);
+/* 1 when the plugin, every module and the certificates are installed */
+int vitals_install_complete(void);
+/* 1 when the installed kernel plugin is the one this app carries, 0 when it differs (another
+ * version), negative when either cannot be read (not installed) */
+int vitals_install_plugin_current(void);
+/* The release number the installed kernel plugin carries ("1.2"), or a negative error */
+int vitals_install_plugin_version(char *version, size_t size);
+/* Debug output on the console: 0 off, 1 summaries and failures, 2 everything (console.h's
+ * VITALS_DEBUG_LEVEL_COUNT levels); each level has its own build of vitals-http, the browser provider
+ * and the kernel plugin, all carried by the app */
+/* The level of the installed modules: flags/debug.<level>'s, as on the PS3 (shared/app/installed.h), 0
+ * without one */
+int vitals_install_debug_level(void);
+/* Replaces vitals-http, the browser provider and the kernel plugin with the given level's builds
+ * The caller reboots the Vita after a success */
+int vitals_install_debug_modules(int level, VitalsNote note);
+/* Where an install, reinstall or update lists the kernel plugin in config.txt */
+typedef enum
+{
+    /* vitals' own *KERNEL block, at the top of the file */
+    VITALS_PLACEMENT_BLOCK,
+    /* The first line of the first *KERNEL section, so it loads before the other kernel plugins */
+    VITALS_PLACEMENT_FIRST,
+    /* The last line of the last *KERNEL section, so it loads after them */
+    VITALS_PLACEMENT_LAST,
+    /* Wherever it is listed already; a config that doesn't list it gets vitals' own block */
+    VITALS_PLACEMENT_KEEP,
+} VitalsPlacement;
+/* Where config.txt lists the plugin now: VITALS_PLACEMENT_KEEP when it is somewhere other than
+ * the three places, negative when it isn't listed (or config.txt can't be read) */
+int vitals_install_placement(void);
+/* Where the next install, reinstall or update lists the plugin; VITALS_PLACEMENT_KEEP until set
+ * Another place than the current one moves the plugin's line there, so it is listed only once */
+void vitals_install_set_placement(VitalsPlacement placement);
+/* Runs option (FULL or CERTIFICATES)
+ * The caller reboots the Vita after a success */
+int vitals_install_apply(enum VitalsOption option, int removing, VitalsNote note);
+/* Implemented by the app (console_vita.c): 1 when the network is up for the certificate download */
+int vitals_install_network_ready(void);
+
+#endif

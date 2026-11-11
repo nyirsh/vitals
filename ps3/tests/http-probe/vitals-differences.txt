@@ -1,0 +1,175 @@
+< default UserAgent size rc=0x00000000 required=42
+< default UserAgent small rc=0x80710006 required=42
+< default UserAgent rc=0x00000000 "PS3Application libhttp/4.9.3-000 (CellOS)" required=42
+> default UserAgent size rc=0x00000000 required=59
+> default UserAgent small rc=0x80710006 required=59
+> default UserAgent rc=0x00000000 "PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0" required=59
+< additions redirected https uri rc=0x00000000 host old.vitals-probe.invalid
+< additions redirected https send rc=0x80710101
+> additions redirected https uri rc=0x00000000 host 127.0.0.1
+> additions redirected https send rc=0x00000000
+> additions redirected https status 200, 14 bytes
+< after uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< uri wrong /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< uri digest /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digest qop=auth nc=0000"
+< uri digest no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digestnoqop cnonce none"
+> after uri credentials /basic send rc=0x80710021 rc=0x80710021 HTTP 0 ""
+> uri wrong /basic send rc=0x80710021 rc=0x80710021 HTTP 0 ""
+> uri digest /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first without: username=user realm=probe digest uri=/digest qop=auth nc=0"
+> uri digest no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first without: username=user realm=probe digest uri=/digestnoqop cnonce n"
+< callback again /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< callback uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< callback saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< after saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< after saved sub /basic/sub send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< after saved other realm /basic2 send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< auth callback 2: realm "probe digest" http://127.0.0.1:18080/digest user "user" password "pass" save 0 argument ok -> 0
+< after saved digest /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digest qop=auth nc=0000"
+< after saved digest again /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 0 refusals, first with: username=user realm=probe digest uri=/digest qop=auth nc=0000"
+> auth callback 2: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> callback again /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+< auth callback 3: realm "probe digest" http://127.0.0.1:18080/digestnoqop user "user" password "pass" save 1 argument ok -> 0
+< after saved digest no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digestnoqop cnonce none"
+> auth state 8
+> auth callback 3: realm "probe realm" http://127.0.0.1:18080/basic user "given" password "secret" save 0 argument ok -> 0
+> callback uri credentials /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 2 refusals, first without"
+> auth state 8
+> auth callback 4: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> callback saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+> auth state 8
+> auth callback 5: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> after saved /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+> auth state 8
+> auth callback 6: realm "probe realm" http://127.0.0.1:18080/basic/sub user "" password "" save 0 argument ok -> 0
+> after saved sub /basic/sub send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+> auth state 8
+> auth callback 7: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+> after saved other realm /basic2 send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+> auth state 8
+> auth callback 8: realm "probe digest" http://127.0.0.1:18080/digest user "" password "" save 0 argument ok -> 0
+> after saved digest /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first without: username=user realm=probe digest uri=/digest qop=auth nc=0"
+> auth state 8
+> auth callback 9: realm "probe digest" http://127.0.0.1:18080/digest user "" password "" save 0 argument ok -> 0
+> after saved digest again /digest send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first without: username=user realm=probe digest uri=/digest qop=auth nc=0"
+> auth state 8
+> auth callback 10: realm "probe digest" http://127.0.0.1:18080/digestnoqop user "" password "" save 0 argument ok -> 0
+> after saved digest no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first without: username=user realm=probe digest uri=/digestnoqop cnonce n"
+< auth export size rc=0x00000000 exported=1931
+< auth export short rc=0x80710006 exported=2779096485
+< auth export rc=0x00000000 exported=1931
+< auth export 0: "\x01\x00\x00\x00\x04\x00\x00\x00\x04\x02\x0d\x07\xdf\xb1\x9d\x0aX}<`\xa4\xc8\xdbU:\xfd\x03user\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+< auth export 100: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+< auth export 200: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x04pass\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+< auth export 300: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+< auth export 400: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+< auth export 500: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x00\x00\x04\x00\x00\x00"\x00\x00\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00probe digestauthdcd98b7102dd2f"
+< auth export 600: "0e8b11d0f600bfb0c093MD5\x06http://127.0.0.1:18080/\x00\xff\x02\x0d\x07\xdf\xb1\x9d\x0aX}<`\xa4\xc8\xdbU:\xfd\x03user\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+< auth export 700: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+> auth export size rc=0x00000000 exported=0
+> auth export rc=0x00000000 exported=0
+< auth export tiny rc=0x80710006
+> auth export tiny rc=0x00000000
+< auth callback 4: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> auth callback 11: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+< auth import rc=0x80710006
+< after import /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< auth import garbage rc=0x80710059
+< after garbage import /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+> auth import rc=0x00000000
+> auth state 8
+> auth callback 12: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> after import /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+> auth import garbage rc=0x00000000
+> auth state 8
+> auth callback 13: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> after garbage import /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 1 refusals, first without"
+< auth callback 5: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> auth callback 14: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+< auth callback 6: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+> auth callback 15: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+< auth callback 7: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> auth callback 16: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+< auth callback 8: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+> auth callback 17: realm "other realm" http://127.0.0.1:18080/basic2 user "" password "" save 0 argument ok -> 0
+< auth callback 9: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> -1
+> auth callback 18: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> -1
+< auth callback 10: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 1
+> auth callback 19: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 1
+< callback wrong /basic send rc=0x00000000 rc=0x00000000 HTTP 200 "basic ok with Authorization after 0 refusals, first with"
+< auth callback 11: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth callback 20: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+< auth callback 12: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth callback 21: realm "probe realm" http://127.0.0.1:18080/basic user "nobody" password "wrong" save 0 argument ok -> 0
+< auth callback 13: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth callback 22: realm "probe realm" http://127.0.0.1:18080/basic user "nobody" password "wrong" save 0 argument ok -> 0
+< auth callback 14: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth callback 23: realm "probe realm" http://127.0.0.1:18080/basic user "nobody" password "wrong" save 0 argument ok -> 0
+< auth callback 15: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth callback 24: realm "probe realm" http://127.0.0.1:18080/basic user "nobody" password "wrong" save 0 argument ok -> 0
+< auth callback 16: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth callback 25: realm "probe realm" http://127.0.0.1:18080/basic user "nobody" password "wrong" save 0 argument ok -> 0
+> callback wrong /basic send rc=0x80710019 rc=0x80710019 HTTP 0 ""
+> auth state 8
+> auth callback 26: realm "probe realm" http://127.0.0.1:18080/basicfail user "" password "" save 0 argument ok -> 0
+> auth state 8
+> auth callback 27: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth state 8
+> auth callback 28: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth state 8
+> auth callback 29: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth state 8
+> auth callback 30: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+> auth state 8
+> auth callback 31: realm "probe realm" http://127.0.0.1:18080/basicfail user "user" password "pass" save 0 argument ok -> 0
+< auth callback 17: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> auth callback 32: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+< auth callback 18: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+> auth callback 33: realm "probe realm" http://127.0.0.1:18080/basic user "" password "" save 0 argument ok -> 0
+< auth callback 19: realm "probe digest" http://127.0.0.1:18080/digest user "user" password "pass" save 1 argument ok -> 0
+> auth callback 34: realm "probe digest" http://127.0.0.1:18080/digest user "" password "" save 0 argument ok -> 0
+< auth callback 20: realm "probe digest" http://127.0.0.1:18080/digestnoqop user "user" password "pass" save 0 argument ok -> 0
+< digest callback no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first with: username=user realm=probe digest uri=/digestnoqop cnonce none"
+> auth callback 35: realm "probe digest" http://127.0.0.1:18080/digestnoqop user "" password "" save 0 argument ok -> 0
+> digest callback no qop /digestnoqop send rc=0x00000000 rc=0x00000000 HTTP 200 "digest ok with Authorization after 1 refusals, first without: username=user realm=probe digest uri=/digestnoqop cnonce n"
+< auth calls 20
+> auth calls 35
+< proxied | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+> proxied | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+< proxied port | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+> proxied port | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+< proxied post | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+> proxied post | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+< proxied no keep-alive | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+> proxied no keep-alive | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+< proxy with user | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS)
+> proxy with user | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+< cache ended GET http://127.0.0.1:18080/cache/s304 send rc=0x80010002 rc=0x80010002 HTTP 0
+> cache ended GET http://127.0.0.1:18080/cache/s304 send rc=0x00000000 rc=0x00000000 HTTP 200
+> cache ended | s304 46
+< cache small 1 | s304 46
+> cache small 1 | s304 47
+< cache small 2 | s304 47
+> cache small 2 | s304 48
+< additions default agent rc=0x00000000 "PS3Application libhttp/4.9.3-000 (CellOS)"
+< additions redirected uri rc=0x00000000 host old.vitals-probe.invalid
+< additions redirected send rc=0x80710101
+< additions redirected again uri rc=0x00000000 host old.vitals-probe.invalid
+< additions redirected again send rc=0x80710101
+> additions default agent rc=0x00000000 "PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0"
+> additions redirected uri rc=0x00000000 host 127.0.0.1
+> additions redirected send rc=0x00000000
+> additions redirected status 200, 153 bytes
+> additions redirected | Host: 127.0.0.1:18080
+> additions redirected | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+> additions redirected again uri rc=0x00000000 host 127.0.0.1
+> additions redirected again send rc=0x00000000
+> additions redirected again status 200, 153 bytes
+> additions redirected again | Host: 127.0.0.1:18080
+> additions redirected again | User-Agent: PS3Application libhttp/4.9.3-000 (CellOS) vitals-probe/1.0
+< additions own agent uri rc=0x00000000 host old.vitals-probe.invalid
+< additions own agent send rc=0x80710101
+> additions own agent uri rc=0x00000000 host 127.0.0.1
+> additions own agent send rc=0x00000000
+> additions own agent status 200, 109 bytes
+> additions own agent | Host: 127.0.0.1:18080
+> additions own agent | User-Agent: ProbeAgent/1.0
