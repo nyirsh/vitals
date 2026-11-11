@@ -1,7 +1,8 @@
-# Both consoles' projects (psv/, ps3/) and the shared code: what's built, local settings and dumps
-# stay out
+# Both consoles' projects (psv/, ps3/), the RPCS3 installers (rpcs3/) and the shared code: what's
+# built, local settings and dumps stay out
 /psv/build/
 /ps3/build/
+/rpcs3/build/
 __pycache__/
 *.o
 

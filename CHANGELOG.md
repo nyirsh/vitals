@@ -3,10 +3,10 @@
 ## 2.1
 
 - (PS3) Brought vitals to PS3 too with the same functionalities, except that the XMB is not yet supported
+- (RPCS3) Installers for Windows, macOS and Linux
 - (vitals-app) Improved app UI, added DNS redirection tests too
-- (vitals-app) Options: the redirects are part of HTTP now, which is On, Redirects off or Off
-- (Vita) vitals' modules and certificate store moved to ux0:data/vitals/system: the system's own certificate store is put back as it was before vitals and never written again
-- (Vita, PS3) Sony's and Mozilla's certificates are kept apart, Mozilla's file holding only what Sony's lack, and custom-certs.pem is read directly: edits to it apply to the next app or game you open, without updating the certificates
+- (vitals-app) Added options, you can now disable specific functions on the fly
+- (Vita) All vitals files are moved to ux0:data/vitals/system: not writing to vs0 anymore makes it safer
 
 ## 2.0
 

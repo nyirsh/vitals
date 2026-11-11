@@ -21,14 +21,32 @@ The releases pages on [GitHub](https://github.com/nyirsh/vitals/releases) and
 [GitLab](https://gitlab.com/nyirsh/vitals/-/releases) have the Vita's `vitals-app.vpk` and the PS3's
 `vitals-app.pkg`.
 
+For the RPCS3 emulator, download the installer for your system. Each is a single file with vitals
+inside it, and shows a menu like the app's: install, update or uninstall, update the certificates,
+the options, the changelog and the credits. Close RPCS3 first; the PS3 firmware must already be
+installed in it.
+
+| System | File | Run it |
+| --- | --- | --- |
+| Windows | `windows-rpcs3-install.bat` | double-click it |
+| macOS | `macos-rpcs3-install.sh` | `bash ~/Downloads/macos-rpcs3-install.sh` in Terminal |
+| Linux | `linux-rpcs3-install.sh` | `bash ~/Downloads/linux-rpcs3-install.sh` |
+
+It finds RPCS3's folder on its own (on Windows, the one `rpcs3.exe` is in, which it asks for when it
+isn't next to it), puts vitals' libssl and libhttp in place of Sony's in RPCS3's `dev_flash`, and
+keeps Sony's to put back when you uninstall. RPCS3's network must be on (Configuration, Network,
+Network Status: Connected). The DNS rules don't apply in RPCS3: its own IP/Hosts switches do that.
+
 ## Layout
 
 - `psv/`: the Vita's kernel plugin, libssl, libhttp, browser TLS provider and app, built in
   VitaSDK's Docker image (`make` in `psv/`).
 - `ps3/`: the PS3's libssl, libhttp, boot plugin, DNS kernel plugin and app, built in the
   [vitals-ps3-sdk](https://github.com/nyirsh/vitals-ps3-sdk) Docker image (`make` in `ps3/`).
+- `rpcs3/`: the RPCS3 installers for Windows, macOS and Linux, one file each with the PS3 app's
+  modules inside it (`make` in `rpcs3/`, which builds the PS3 app first).
 
-`make` at the top builds both consoles. Name one to work on just that console (`make ps3`, `make psv`), and add a command to run it: `make clean` for both, `make ps3 clean` or `make psv test` for one. `make art` redraws both apps' art.
+`make` at the top builds both consoles, then the RPCS3 installers. Name one to work on just that console (`make ps3`, `make psv`, `make rpcs3`), and add a command to run it: `make clean` for all of them, `make ps3 clean` or `make psv test` for one. `make art` redraws both apps' art.
 
 Both consoles share one version and one changelog, at the root: [VERSION](VERSION), which
 [version.cmake](version.cmake) turns into each build's version numbers, and

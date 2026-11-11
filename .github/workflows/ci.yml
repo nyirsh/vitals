@@ -31,10 +31,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # The PS3's builds expect the repository at /src, as the Makefile mounts it
-      - name: Build the PS3 app and its modules
+      - name: Build the PS3 app and its modules, and the RPCS3 installers that carry them
         run: |
           ln -sfn "$PWD" /src
           make -C /src/ps3 DOCKER='bash -c' all build/ps3dk-include/cell/http.h
+          make -C /src/rpcs3 DOCKER='bash -c'
       - uses: actions/upload-artifact@v4
         with:
           name: ps3dk-include
@@ -44,6 +45,12 @@ jobs:
         with:
           name: vitals-app-pkg
           path: ps3/build/vitals-app/vitals-app.pkg
+          retention-days: 7
+      # The RPCS3 installers (rpcs3/), each carrying the app's modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpcs3-installers
+          path: rpcs3/build/
           retention-days: 7
 
   # The host tests, each console's on its own; vitals-http's (both consoles') link this machine's
@@ -92,7 +99,13 @@ jobs:
         with:
           name: vitals-app-pkg
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpcs3-installers
+          path: dist
       - name: Tag and release VERSION, when it isn't yet
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 shared/tools/release.py github dist/vitals-app.vpk dist/vitals-app.pkg
+        run: >-
+          python3 shared/tools/release.py github dist/vitals-app.vpk dist/vitals-app.pkg
+          dist/linux-rpcs3-install.sh dist/macos-rpcs3-install.sh dist/windows-rpcs3-install.bat

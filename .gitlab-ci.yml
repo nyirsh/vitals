@@ -24,11 +24,14 @@ build-ps3:
     # The PS3's builds expect the repository at /src, as the Makefile mounts it
     - ln -sfn "$PWD" /src
     - make -C /src/ps3 DOCKER='bash -c' all build/ps3dk-include/cell/http.h
+    # The RPCS3 installers (rpcs3/), each carrying the app's modules
+    - make -C /src/rpcs3 DOCKER='bash -c'
   artifacts:
     # The PS3's tests read PS3DK's HTTP and SSL headers, which only its image has
     paths:
       - ps3/build/ps3dk-include
       - ps3/build/vitals-app/vitals-app.pkg
+      - rpcs3/build/
     expire_in: 1 week
 
 # The host tests, each console's on its own; vitals-http's (both consoles') link this machine's zlib,
@@ -64,4 +67,6 @@ release:
   # Two pushes to main in a row never publish at once
   resource_group: release
   script:
-    - python3 shared/tools/release.py gitlab psv/build/vitals-app/vitals-app.vpk ps3/build/vitals-app/vitals-app.pkg
+    - >-
+      python3 shared/tools/release.py gitlab psv/build/vitals-app/vitals-app.vpk ps3/build/vitals-app/vitals-app.pkg
+      rpcs3/build/linux-rpcs3-install.sh rpcs3/build/macos-rpcs3-install.sh rpcs3/build/windows-rpcs3-install.bat

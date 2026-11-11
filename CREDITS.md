@@ -8,17 +8,17 @@
 
 ## Where vitals original idea comes from
 
-- devnoname120: vitals originally started from his tls_fixer for the PS Vita, and the idea is his, modern TLS by running Mbed TLS where Sony's old TLS stack was. It then grew to become its very own distinct project. What the Vita's still carries from tls_fixer is the browser's TLS provider, the kernel plugin's injection, the certificate merging and updating and the original connection test applet; both consoles carry, other than the spirit, the patch that puts TLS 1.2's RSA key exchange back into Mbed TLS
+- devnoname120: vitals originally started from his tls_fixer for the PS Vita, and the idea of running Mbed TLS where Sony's old TLS stack was is his. What the Vita version of vitals still carries from tls_fixer is the browser's TLS provider, and the structure of connection test applet; both consoles carry, other than the spirit, the patch that puts TLS 1.2's RSA key exchange back into Mbed TLS
 
 ## Vita homebrew
 
 - SKGleba, for the iTLS-Enso plugin: his work updating the Vita's certificates is the foundation of vitals, along with his original installer and module-redirection code
 - Reiko Asakura, for reAuth: its PSN sign-in redirect is what the starter redirect list does
-- Team Molecule, for all of the love they poured into the PS Vita
+- Team Molecule and every VITA SDK contributor, for all of the love they poured into the PS Vita
 
 ## PS3 homebrew
 
-- aldostools, webMAN MOD's creator: the boot popup finds the XMB's notification functions the way webMAN MOD does, and shows its icon the way webMAN MOD's show_msg_with_icon does. webMAN MOD's lv2 peek, kernel plugin loader and FTP server are what made the DNS plugin's work on the console possible, and his Mamba showed how Cobra's kernel plugins are loaded
+- aldostools, webMAN MOD's creator: the boot popup finds the XMB's notification functions the way webMAN MOD does, and shows its icon the way webMAN MOD's show_msg_with_icon does. webMAN MOD's lv2 peek, kernel plugin loader and FTP server are what made the DNS plugin's work on the console possible
 - PHTNC, for the code behind webMAN MOD's notifications with icons
 - Mysis, for the research into the XMB's explore_plugin on psdevwiki
 - Evilnat, for the CFW vitals runs on, and everyone behind Cobra, whose path redirection and payload loading put vitals' modules in place
